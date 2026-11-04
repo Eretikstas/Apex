@@ -21,6 +21,7 @@ enum class PumpCapability {
     EopatchCapabilities(arrayOf(Capability.Bolus, Capability.ExtendedBolus, Capability.TempBasal, Capability.BasalProfileSet, Capability.BasalRate30min)),
     MedtrumCapabilities(arrayOf(Capability.Bolus, Capability.TempBasal, Capability.BasalProfileSet, Capability.BasalRate30min, Capability.TDD)), // Technically the pump supports ExtendedBolus, but not implemented (yet)
     ApexCapabilities(arrayOf(Capability.Bolus, Capability.TempBasal, Capability.BasalProfileSet, Capability.Refill, Capability.ReplaceBattery, Capability.TDD)),
+    Atc3Capabilities(arrayOf(Capability.Bolus, Capability.TempBasal, Capability.BasalProfileSet, Capability.BasalRate30min, Capability.Refill, Capability.ReplaceBattery, Capability.TDD, Capability.ManualTDDLoad)), // 48 half hour basal slots. Refill is what shows the prime/fill button, the only place a site or a cartridge change is recorded by hand; ReplaceBattery shows the battery change button and the battery's age. The protocol does have an extended bolus, but the driver does not offer one: its history record carries no duration, so one read back could not be reconstructed
     ;
 
     var children: ArrayList<Capability> = ArrayList()

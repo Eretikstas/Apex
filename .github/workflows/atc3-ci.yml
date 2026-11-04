@@ -1,0 +1,76 @@
+name: ATC3 driver CI
+
+# Builds and tests the ATC3 (Apex TruCare III) pump driver in this AIMI tree.
+# Runs on the driver branch and by hand. The APK is a debug build, for testing only.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - atc3-driver
+
+concurrency:
+  group: atc3-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
+        -Dkotlin.daemon.jvm.options="-Xmx2g"
+        -Dkotlin.compiler.execution.strategy=in-process
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile the driver
+        run: ./gradlew :pump:atc3:compileFullDebugKotlin --stacktrace
+
+      - name: Compile the driver tests
+        run: ./gradlew :pump:atc3:compileFullDebugUnitTestKotlin --stacktrace
+
+      - name: Driver unit tests
+        run: ./gradlew :pump:atc3:testFullDebugUnitTest --stacktrace
+
+      - name: Core changes unit tests
+        run: >-
+          ./gradlew
+          :database:impl:testFullDebugUnitTest --tests '*SyncPumpTemporaryBasalTransactionTest*'
+          --stacktrace
+
+      - name: Build the app
+        run: ./gradlew :app:assembleFullDebug --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atc3-test-reports
+          path: |
+            pump/atc3/build/reports/tests/
+            database/impl/build/reports/tests/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aaps-aimi-atc3-fullDebug
+          path: app/build/outputs/apk/full/debug/*.apk
+          retention-days: 14
+          if-no-files-found: error
