@@ -10,7 +10,7 @@ on:
       - atc3-driver
 
 concurrency:
-  group: atc3-ci-${{ github.ref }}
+  group: atc3-ci-v2-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
