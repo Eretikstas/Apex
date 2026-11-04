@@ -354,7 +354,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         afterFirstPass()
         val record = ownRecord(now - 30_000L, 80)
         rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, ids = IDs(pumpId = 1L, pumpSerial = "other"), iCfg = someICfg))
-        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, ids = IDs(pumpId = minuteOf(record.timestamp), iCfg = someICfg)))
+        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, ids = IDs(pumpId = minuteOf(record.timestamp)), iCfg = someICfg))
 
         sync.reconcileBoluses(listOf(record), 1)
 

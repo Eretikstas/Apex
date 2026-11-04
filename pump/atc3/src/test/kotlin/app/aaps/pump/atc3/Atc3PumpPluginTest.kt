@@ -120,6 +120,9 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
     private val clockWatch = Atc3ClockWatch()
 
+    /** The profile as AAPS 4.0 hands it to a pump: the effective profile in the pump's units. */
+    private val pumpProfile get() = effectiveProfile.toPump()
+
     /** Two history reads in a row that found our boluses a minute off: the history wants the clock written. */
     private fun historyTwiceAMinuteOff() {
         clockWatch.matched(-1, now)
@@ -319,7 +322,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         val results = listOf(
             plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal),
             plugin.cancelTempBasal(false),
-            plugin.setNewBasalProfile(validProfile),
+            plugin.setNewBasalProfile(pumpProfile),
             plugin.deliverTreatment(manualBolus(1.0, lastKnownBolusTime = 0L)),
             plugin.loadTDDs()
         )
@@ -344,7 +347,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         val results = listOf(
             plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal),
             plugin.cancelTempBasal(false),
-            plugin.setNewBasalProfile(validProfile),
+            plugin.setNewBasalProfile(pumpProfile),
             plugin.deliverTreatment(manualBolus(1.0, lastKnownBolusTime = 0L)),
             plugin.executeCustomCommand(Atc3SetSuspended(true))!!
         )
@@ -397,7 +400,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         // Saying otherwise would have AAPS queue a profile write it cannot yet carry out.
         pumpState.profiles = null
 
-        assertThat(plugin.isThisProfileSet(validProfile)).isTrue()
+        assertThat(plugin.isThisProfileSet(pumpProfile)).isTrue()
     }
 
     @Test
@@ -405,7 +408,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         pumpState.profiles = Atc3PumpState.Profiles(Array(Atc3Protocol.PROFILE_COUNT) { DoubleArray(Atc3Protocol.BASAL_SLOTS) { 1.0 } }, null)
         pumpState.editStatus { it.copy(activeProfileIndex = Atc3Const.DRIVER_PROFILE_INDEX + 1) }
 
-        assertThat(plugin.isThisProfileSet(validProfile)).isFalse()
+        assertThat(plugin.isThisProfileSet(pumpProfile)).isFalse()
     }
 
     @Test
@@ -666,7 +669,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     private fun clockSetAtStart() {
         whenever(atc3Manager.readStatus()).thenAnswer { pumpState.currentCard() }
         whenever(atc3Manager.writeClock(any())).thenReturn(null)
-        plugin.getPumpStatus("start")
+        runBlocking { plugin.getPumpStatus("start") }
         verify(atc3Manager, times(1)).writeClock(any())
     }
 
@@ -969,7 +972,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     fun `writing the basal profile reads them too`() = runTest {
         whenever(atc3Manager.writeBasalProfile(any(), any())).thenReturn("not the point of this test")
 
-        plugin.setNewBasalProfile(validProfile)
+        plugin.setNewBasalProfile(pumpProfile)
 
         verify(atc3Manager, times(1)).readBolusHistory()
     }
@@ -1271,7 +1274,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
             whenever(aapsJournal.insulinBetween(any(), any(), any())).thenReturn(Atc3JournalArithmetic.Breakdown(0.0, 0.0, 0.0))
         }
         // The first read begins the window the comparison counts from.
-        plugin.getPumpStatus("test")
+        runBlocking { plugin.getPumpStatus("test") }
         pumpAnswersWithCount(10.0 + excess)
     }
 

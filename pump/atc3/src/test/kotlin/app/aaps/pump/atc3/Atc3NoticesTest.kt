@@ -1,6 +1,7 @@
 package app.aaps.pump.atc3
 
 import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.core.interfaces.notifications.NotificationAction
 import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.notifications.NotificationLevel
 import app.aaps.core.interfaces.notifications.NotificationManager
@@ -64,14 +65,14 @@ class Atc3NoticesTest : TestBase() {
     fun `a notice is posted to the notification manager`() {
         notices.addNotification(Notification.PUMP_ERROR, "pump alarm", Notification.URGENT)
 
-        verify(notificationManager).post(eq(NotificationId.PUMP_ERROR), eq("pump alarm"), eq(NotificationLevel.URGENT), any(), anyOrNull(), any(), anyOrNull())
+        verify(notificationManager).post(eq(NotificationId.PUMP_ERROR), eq("pump alarm"), eq(NotificationLevel.URGENT), any<Int>(), anyOrNull<Int>(), any<List<NotificationAction>>(), anyOrNull<() -> Boolean>())
     }
 
     @Test
     fun `a notice asked a sound for is an alarm with that sound`() {
         notices.addNotificationWithSound(Notification.PUMP_UNREACHABLE, "no answer", Notification.URGENT, 42)
 
-        verify(notificationManager).post(eq(NotificationId.PUMP_UNREACHABLE), eq("no answer"), eq(NotificationLevel.URGENT), any(), eq(42), any(), anyOrNull())
+        verify(notificationManager).post(eq(NotificationId.PUMP_UNREACHABLE), eq("no answer"), eq(NotificationLevel.URGENT), any<Int>(), eq(42), any<List<NotificationAction>>(), anyOrNull<() -> Boolean>())
     }
 
     @Test
