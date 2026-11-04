@@ -48,8 +48,13 @@ jobs:
         run: ./gradlew :pump:atc3:compileFullDebugUnitTestKotlin --stacktrace
 
       - name: Driver unit tests
-        timeout-minutes: 30
+        timeout-minutes: 20
         run: ./gradlew :pump:atc3:testFullDebugUnitTest --continue --stacktrace
+
+      - name: End to end scenarios on the virtual pump
+        if: ${{ !cancelled() }}
+        timeout-minutes: 30
+        run: ./gradlew :pump:atc3:testFullDebugUnitTest -Patc3VirtualPump=only --continue --stacktrace
 
       - name: Core changes unit tests
         if: ${{ !cancelled() }}

@@ -39,8 +39,17 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
-    // A test that waits for an answer that never comes must fail, not hold the build for hours.
+    // A test that waits for an answer that never comes must fail, not hold the build for hours. The
+    // test runs on a thread of its own, so even a thread stuck where it cannot be interrupted is left
+    // behind and the test fails; the threads are dumped first, to show where it was stuck.
     systemProperty("junit.jupiter.execution.timeout.default", "60 s")
+    systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
+    systemProperty("junit.jupiter.extensions.preinterrupt.thread.dump.enabled", "true")
+    // The end to end scenarios on the virtual pump run as their own step: -Patc3VirtualPump=only.
+    filter {
+        if (project.findProperty("atc3VirtualPump") == "only") includeTestsMatching("app.aaps.pump.atc3.virtual.*")
+        else excludeTestsMatching("app.aaps.pump.atc3.virtual.*")
+    }
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = TestExceptionFormat.FULL
