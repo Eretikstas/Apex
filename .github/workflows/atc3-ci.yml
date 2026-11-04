@@ -35,6 +35,14 @@ jobs:
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          # Swap, so a memory peak of the app build slows it down instead of stopping the runner.
+          sudo swapoff -a || true
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -m
           df -h /
 
       - name: Set up JDK 21
@@ -74,7 +82,14 @@ jobs:
       - name: Build the app
         id: app
         if: ${{ !cancelled() }}
-        run: ./gradlew :app:assembleFullDebug --stacktrace
+        run: |
+          # The test steps' daemon and its memory are not needed any more: start the build fresh.
+          ./gradlew --stop
+          # Memory and disk every 30 s in this log, to see what ran out if the runner stops again.
+          ( while true; do echo "RESOURCES $(date -u +%T) $(free -m | sed -n 2p) | $(free -m | sed -n 3p) | $(df -h / | tail -1)"; sleep 30; done ) &
+          MONITOR=$!
+          trap 'kill $MONITOR 2>/dev/null || true' EXIT
+          ./gradlew :app:assembleFullDebug --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -119,6 +134,14 @@ jobs:
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          # Swap, so a memory peak of the app build slows it down instead of stopping the runner.
+          sudo swapoff -a || true
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -m
           df -h /
 
       - name: Set up JDK 21
@@ -146,11 +169,15 @@ jobs:
           "$SDKMANAGER" --install "emulator" "system-images;android-31;google_apis_playstore;x86_64"
 
       - name: ATC3 UI smoke test on an emulator
-        run: >-
-          ./gradlew :app:emuFullDebugAndroidTest
-          -Pandroid.testInstrumentationRunnerArguments.class=app.aaps.e2e.Atc3UiSmokeTest
-          -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
-          --stacktrace
+        run: |
+          # Memory and disk every 30 s in this log, to see what ran out if the runner stops again.
+          ( while true; do echo "RESOURCES $(date -u +%T) $(free -m | sed -n 2p) | $(free -m | sed -n 3p) | $(df -h / | tail -1)"; sleep 30; done ) &
+          MONITOR=$!
+          trap 'kill $MONITOR 2>/dev/null || true' EXIT
+          ./gradlew :app:emuFullDebugAndroidTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=app.aaps.e2e.Atc3UiSmokeTest \
+            -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
+            --stacktrace
 
       - name: Upload UI test reports
         if: always()
