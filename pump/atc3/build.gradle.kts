@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
@@ -34,4 +36,14 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.com.google.dagger.hilt.compiler)
     ksp(libs.com.google.dagger.android.processor)
+}
+
+tasks.withType<Test>().configureEach {
+    // A test that waits for an answer that never comes must fail, not hold the build for hours.
+    systemProperty("junit.jupiter.execution.timeout.default", "60 s")
+    testLogging {
+        events("passed", "skipped", "failed")
+        exceptionFormat = TestExceptionFormat.FULL
+        showStandardStreams = false
+    }
 }
