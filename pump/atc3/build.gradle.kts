@@ -46,8 +46,15 @@ tasks.withType<Test>().configureEach {
     systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
     systemProperty("junit.jupiter.extensions.preinterrupt.thread.dump.enabled", "true")
     // The end to end scenarios on the virtual pump run as their own step: -Patc3VirtualPump=only.
+    // They talk to the pump like on a phone, with real waits: a clock that moves (see the test copy of
+    // android.os.SystemClock) and more time per test.
+    val virtualPump = project.findProperty("atc3VirtualPump") == "only"
+    if (virtualPump) {
+        systemProperty("atc3.realClock", "true")
+        systemProperty("junit.jupiter.execution.timeout.default", "180 s")
+    }
     filter {
-        if (project.findProperty("atc3VirtualPump") == "only") includeTestsMatching("app.aaps.pump.atc3.virtual.*")
+        if (virtualPump) includeTestsMatching("app.aaps.pump.atc3.virtual.*")
         else excludeTestsMatching("app.aaps.pump.atc3.virtual.*")
     }
     testLogging {

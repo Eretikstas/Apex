@@ -122,6 +122,13 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # Gradle downloads the emulator image itself, but only with every SDK licence accepted first.
+      - name: Accept the SDK licences and get the emulator image
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "emulator" "system-images;android-31;google_apis_playstore;x86_64"
+
       - name: ATC3 UI smoke test on an emulator
         run: >-
           ./gradlew :app:emuFullDebugAndroidTest
