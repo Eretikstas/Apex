@@ -12,6 +12,7 @@ import app.aaps.core.interfaces.constraints.Constraint
 import app.aaps.core.interfaces.constraints.PluginConstraints
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.db.observeChanges
+import app.aaps.core.interfaces.insulin.ConcentrationHelper
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
@@ -36,8 +37,6 @@ import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.AapsSchedulers
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
-import app.aaps.core.interfaces.rx.events.EventDismissNotification
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.interfaces.Preferences
@@ -106,7 +105,7 @@ class Atc3PumpPlugin @Inject constructor(
     private val atc3Manager: Atc3Manager,
     private val bolusDelivery: Atc3BolusDelivery,
     private val rxBus: RxBus,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val atc3HistorySync: Atc3HistorySync,
     private val historyEvents: Atc3HistoryEvents,
     private val reconciliation: Atc3Reconciliation,
@@ -123,7 +122,8 @@ class Atc3PumpPlugin @Inject constructor(
     private val atc3Queue: Atc3Queue,
     private val bolusProgressData: BolusProgressData,
     private val persistenceLayer: PersistenceLayer,
-    private val blePreCheck: BlePreCheck
+    private val blePreCheck: BlePreCheck,
+    private val ch: ConcentrationHelper
 ) : PumpPluginBase(
     pluginDescription = PluginDescription()
         .mainType(PluginType.PUMP)
@@ -265,6 +265,9 @@ class Atc3PumpPlugin @Inject constructor(
     }
 
     // Connection state
+
+    /** A pump is picked: a serial to address it by. Until then AAPS 4.0 does not ask for the first status read. */
+    override fun isConfigured(): Boolean = atc3Connection.isConfigured
 
     override fun isInitialized(): Boolean = pumpState.isInitialized
 
@@ -419,7 +422,7 @@ class Atc3PumpPlugin @Inject constructor(
             Atc3LinkProtection.UNPROTECTED,
             Atc3LinkProtection.UNSUPPORTED ->
                 // NORMAL rather than the id's default: the pump works, and is to be improved.
-                uiInteraction.addNotification(
+                notices.addNotification(
                     Notification.WRONG_PUMP_PASSWORD,
                     if (noPasswordFirmware || atc3Connection.linkProtection == Atc3LinkProtection.UNSUPPORTED)
                         rh.gs(
@@ -431,7 +434,7 @@ class Atc3PumpPlugin @Inject constructor(
                 )
 
             Atc3LinkProtection.PROTECTED,
-            Atc3LinkProtection.UNKNOWN     -> rxBus.send(EventDismissNotification(Notification.WRONG_PUMP_PASSWORD))
+            Atc3LinkProtection.UNKNOWN     -> notices.dismiss(Notification.WRONG_PUMP_PASSWORD)
         }
     }
 
@@ -545,14 +548,14 @@ class Atc3PumpPlugin @Inject constructor(
         val rates = Atc3PumpState.buildBasalSlots(profile) { PumpType.ATC3.determineCorrectBasalSize(it) }
         val failure = atc3Manager.writeBasalProfile(rates, pumpDescription.basalStep)
         return if (failure == null) {
-            rxBus.send(EventDismissNotification(Notification.FAILED_UPDATE_PROFILE))
-            uiInteraction.addNotificationValidFor(
+            notices.dismiss(Notification.FAILED_UPDATE_PROFILE)
+            notices.addNotificationValidFor(
                 Notification.PROFILE_SET_OK, rh.gs(app.aaps.core.ui.R.string.profile_set_ok), Notification.INFO, 60
             )
             pumpEnactResultProvider.get().success(true).enacted(true)
         } else {
             aapsLogger.error(LTag.PUMP, "ATC3: setNewBasalProfile failed, $failure")
-            uiInteraction.addNotification(
+            notices.addNotification(
                 Notification.FAILED_UPDATE_PROFILE, rh.gs(app.aaps.core.ui.R.string.failed_update_basal_profile), Notification.URGENT
             )
             failed(failure)
@@ -743,6 +746,16 @@ class Atc3PumpPlugin @Inject constructor(
         // No Bluetooth password entered in AAPS: the driver does not work with the pump, and
         // there is nothing for the loop to decide. See [Atc3Connection.isPasswordEntered].
         if (!atc3Connection.isPasswordEntered) value.set(false, rh.gs(R.string.atc3_password_loop_blocked), Apex)
+        // The driver compares the AAPS journal with the pump's own count unit for unit. That holds
+        // for U100 insulin only: with any other concentration the two would not match and the
+        // checks above would judge on wrong numbers.
+        if (!ch.isU100()) value.set(false, rh.gs(R.string.atc3_concentration_loop_blocked), Apex)
+        return value
+    }
+
+    /** Not offered with this pump: see the U100 check in [isLoopInvocationAllowed]. */
+    override fun isConcentrationEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
+        value.set(false, rh.gs(R.string.atc3_concentration_loop_blocked), Apex)
         return value
     }
 
@@ -763,10 +776,10 @@ class Atc3PumpPlugin @Inject constructor(
             val text =
                 if (alarm != null) rh.gs(R.string.atc3_pump_stopped_by_aaps, rh.gs(Atc3AlarmText.labelRes(alarm)))
                 else rh.gs(R.string.atc3_pump_suspended)
-            uiInteraction.addNotification(Notification.PUMP_SUSPENDED, text, Notification.NORMAL)
+            notices.addNotification(Notification.PUMP_SUSPENDED, text, Notification.NORMAL)
         } else {
             stoppedByDriverFor = null
-            rxBus.send(EventDismissNotification(Notification.PUMP_SUSPENDED))
+            notices.dismiss(Notification.PUMP_SUSPENDED)
         }
     }
 
@@ -778,13 +791,13 @@ class Atc3PumpPlugin @Inject constructor(
         val codes = pumpState.activeAlarmCodes
         if (codes.isEmpty()) {
             if (alarmNotificationShown) {
-                rxBus.send(EventDismissNotification(Notification.PUMP_ERROR))
+                notices.dismiss(Notification.PUMP_ERROR)
                 alarmNotificationShown = false
             }
             return
         }
         val names = codes.joinToString(", ") { code -> Atc3AlarmText.label(rh, code) }
-        uiInteraction.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_alarm_active, names), Notification.URGENT)
+        notices.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_alarm_active, names), Notification.URGENT)
         alarmNotificationShown = true
     }
 
@@ -802,7 +815,7 @@ class Atc3PumpPlugin @Inject constructor(
         if (card.locked) {
             trace.event(Atc3TraceCat.DRV, "alarm_stop", "alarm" to alarm.name, "ok" to false, "why" to "locked")
             aapsLogger.error(LTag.PUMP, "ATC3: the pump raises ${alarm.name} and is locked, cannot stop it")
-            uiInteraction.addNotification(
+            notices.addNotification(
                 Notification.PUMP_ERROR,
                 rh.gs(R.string.atc3_alarm_stop_locked),
                 Notification.URGENT

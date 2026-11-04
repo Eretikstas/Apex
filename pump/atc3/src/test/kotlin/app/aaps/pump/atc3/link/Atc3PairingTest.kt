@@ -2,6 +2,7 @@ package app.aaps.pump.atc3.link
 
 import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.queue.CommandQueue
+import app.aaps.pump.atc3.command.Atc3Queue
 import app.aaps.pump.atc3.history.Atc3HistorySync
 import app.aaps.pump.atc3.keys.Atc3StringKey
 import app.aaps.pump.atc3.state.Atc3PumpState
@@ -19,6 +20,7 @@ class Atc3PairingTest : TestBaseWithProfile() {
     @Mock lateinit var atc3HistorySync: Atc3HistorySync
     @Mock lateinit var atc3Connection: Atc3Connection
     @Mock lateinit var commandQueue: CommandQueue
+    @Mock lateinit var atc3Queue: Atc3Queue
 
     private lateinit var pairing: Atc3Pairing
 
@@ -26,7 +28,7 @@ class Atc3PairingTest : TestBaseWithProfile() {
     fun setup() {
         pairing = Atc3Pairing(
             aapsLogger, preferences, commandQueue, pumpSync, atc3HistorySync, Atc3PumpState(),
-            { atc3Connection }, pumpEnactResultProvider
+            { atc3Connection }, atc3Queue
         )
     }
 

@@ -5,11 +5,10 @@ import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
-import app.aaps.core.interfaces.rx.events.EventDismissNotification
 import app.aaps.core.interfaces.rx.events.EventPumpStatusChanged
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.pump.atc3.Atc3Const
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.keys.Atc3BooleanKey
 import app.aaps.pump.atc3.keys.Atc3StringKey
@@ -33,7 +32,7 @@ class Atc3Connection @Inject constructor(
     private val preferences: Preferences,
     private val atc3BLE: Atc3BLE,
     private val trace: Atc3Trace,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val rh: ResourceHelper,
     private val pairing: Atc3Pairing
 ) : Atc3BleCallback {
@@ -126,7 +125,7 @@ class Atc3Connection @Inject constructor(
         passwordMissingSaid = true
         aapsLogger.error(LTag.PUMP, "ATC3: ${Refusal.NO_PASSWORD.message}")
         trace.event(Atc3TraceCat.SESS, "no_password")
-        uiInteraction.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_password_missing), Notification.URGENT)
+        notices.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_password_missing), Notification.URGENT)
         rxBus.send(EventPumpStatusChanged(EventPumpStatusChanged.Status.DISCONNECTED))
     }
 
@@ -160,7 +159,7 @@ class Atc3Connection @Inject constructor(
         if (refusal == before) return
         refusedFor = refusal
         when (before) {
-            Refusal.BLUETOOTH_OFF -> rxBus.send(EventDismissNotification(Notification.BLUETOOTH_NOT_ENABLED))
+            Refusal.BLUETOOTH_OFF -> notices.dismiss(Notification.BLUETOOTH_NOT_ENABLED)
             // The next time it is missing is told again.
             Refusal.NO_PASSWORD   -> passwordMissingSaid = false
             else                  -> {}
@@ -172,7 +171,7 @@ class Atc3Connection @Inject constructor(
             Refusal.NO_PASSWORD   -> refuseWithoutPassword()
             Refusal.BLUETOOTH_OFF -> {
                 aapsLogger.error(LTag.PUMP, "ATC3: ${refusal.message}")
-                uiInteraction.addNotification(Notification.BLUETOOTH_NOT_ENABLED, rh.gs(R.string.atc3_bluetooth_off), Notification.NORMAL)
+                notices.addNotification(Notification.BLUETOOTH_NOT_ENABLED, rh.gs(R.string.atc3_bluetooth_off), Notification.NORMAL)
             }
             else                  ->
                 if (refusal.isError) aapsLogger.error(LTag.PUMP, "ATC3: ${refusal.message}")
@@ -344,7 +343,7 @@ class Atc3Connection @Inject constructor(
                 if (givenUp) ", not trying again until it is changed" else ""
         )
         trace.event(Atc3TraceCat.SESS, "auth_rejected", "attempt" to authFailures, "givenUp" to givenUp)
-        uiInteraction.addNotification(
+        notices.addNotification(
             Notification.PUMP_ERROR,
             rh.gs(if (givenUp) R.string.atc3_password_given_up else R.string.atc3_password_rejected),
             Notification.URGENT

@@ -1,6 +1,6 @@
 package app.aaps.pump.atc3.manager
 
-import app.aaps.core.interfaces.ui.UiInteraction
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.clock.Atc3ClockWatch
 import app.aaps.pump.atc3.command.Atc3BolusDelivery
 import app.aaps.pump.atc3.exchange.Atc3Exchange
@@ -37,7 +37,7 @@ import org.mockito.kotlin.whenever
 class Atc3ManagerDeadLinkTest : TestBaseWithProfile() {
 
     @Mock lateinit var atc3BLE: Atc3BLE
-    @Mock lateinit var uiInteraction: UiInteraction
+    @Mock lateinit var uiInteraction: Atc3Notices
     @Mock lateinit var trace: Atc3Trace
 
     private lateinit var manager: Atc3Manager

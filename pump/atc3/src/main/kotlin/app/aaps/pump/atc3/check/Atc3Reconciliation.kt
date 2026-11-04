@@ -5,7 +5,7 @@ import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
-import app.aaps.core.interfaces.ui.UiInteraction
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.basal.Atc3TbrTracker
 import app.aaps.pump.atc3.clock.Atc3DayClock
@@ -38,7 +38,7 @@ class Atc3Reconciliation @Inject constructor(
     private val aapsLogger: AAPSLogger,
     private val rh: ResourceHelper,
     private val rxBus: RxBus,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val pumpState: Atc3PumpState,
     private val atc3Manager: Atc3Manager,
     private val atc3HistorySync: Atc3HistorySync,
@@ -292,7 +292,7 @@ class Atc3Reconciliation @Inject constructor(
         if (!motion.tellDue) return
         aapsLogger.error(LTag.PUMP, "ATC3: the pump owes insulin and the reservoir has not moved for ${motion.motionlessTicks} ticks")
         trace.event(Atc3TraceCat.DRV, "no_delivery", "times" to motion.motionlessTicks)
-        uiInteraction.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_no_delivery), Notification.URGENT)
+        notices.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_no_delivery), Notification.URGENT)
     }
 
     /** When the newest bolus nobody had told AAPS of was given, over every read so far: what refuses an SMB decided without it. */

@@ -37,6 +37,9 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # This branch is not the default one: let it write the cache, so the next run is faster.
+          cache-read-only: false
 
       - name: Compile the driver
         run: ./gradlew :pump:atc3:compileFullDebugKotlin --stacktrace

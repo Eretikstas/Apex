@@ -2,8 +2,8 @@ package app.aaps.pump.atc3.manager
 
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.pump.atc3.Atc3Const
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.clock.Atc3ClockWatch
 import app.aaps.pump.atc3.command.Atc3BolusDelivery
@@ -39,7 +39,7 @@ import org.mockito.kotlin.whenever
 class Atc3ManagerConnectTest : TestBaseWithProfile() {
 
     @Mock lateinit var atc3BLE: Atc3BLE
-    @Mock lateinit var uiInteraction: UiInteraction
+    @Mock lateinit var uiInteraction: Atc3Notices
 
     private lateinit var manager: Atc3Manager
     private lateinit var exchange: Atc3Exchange

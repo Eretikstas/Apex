@@ -6,9 +6,11 @@ import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.core.interfaces.pump.PumpInsulin
+import app.aaps.core.interfaces.pump.PumpRate
 import app.aaps.core.interfaces.pump.PumpSync
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.keys.LongNonKey
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.clock.Atc3ClockWatch
 import app.aaps.pump.atc3.manager.Atc3Manager
 import app.aaps.pump.atc3.protocol.Atc3BolusHistory
@@ -20,7 +22,7 @@ import app.aaps.pump.atc3.store.Atc3Store
 import app.aaps.pump.atc3.trace.Atc3Trace
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
-import io.reactivex.rxjava3.core.Single
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -43,7 +45,7 @@ import org.mockito.kotlin.whenever
 class Atc3JournalFaultTest : TestBaseWithProfile() {
 
     @Mock lateinit var pumpSync: PumpSync
-    @Mock lateinit var uiInteraction: UiInteraction
+    @Mock lateinit var uiInteraction: Atc3Notices
     @Mock lateinit var persistenceLayer: PersistenceLayer
     @Mock lateinit var atc3Manager: Atc3Manager
 
@@ -65,12 +67,18 @@ class Atc3JournalFaultTest : TestBaseWithProfile() {
         whenever(rh.gs(anyInt(), anyString(), anyDouble())).thenReturn("mocked resource")
         whenever(preferences.get(LongNonKey.ActivePumpChangeTimestamp)).thenReturn(0L)
         whenever(pumpSync.verifyPumpIdentification(PumpType.ATC3, serial)).thenReturn(true)
-        whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenAnswer {
-            rows.add(BS(timestamp = it.getArgument(0), amount = it.getArgument(1), type = it.getArgument(2), ids = IDs(pumpId = it.getArgument(3), pumpSerial = it.getArgument(5))))
-            true
+        runBlocking {
+            whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenAnswer {
+                rows.add(BS(timestamp = it.getArgument(0), amount = it.getArgument<PumpInsulin>(1).cU, type = it.getArgument(2), ids = IDs(pumpId = it.getArgument(3), pumpSerial = it.getArgument(5)), iCfg = someICfg))
+                true
+            }
         }
-        whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true)
-        whenever(persistenceLayer.getBolusesFromTimeIncludingInvalid(any(), any())).thenAnswer { Single.just(rows.toList()) }
+        runBlocking {
+            whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true)
+        }
+        runBlocking {
+            whenever(persistenceLayer.getBolusesFromTimeIncludingInvalid(any(), any())).thenAnswer { rows.toList() }
+        }
         val trace = Atc3Trace(aapsLogger, preferences)
         val registration = Atc3PumpRegistration(aapsLogger, rh, pumpSync, pumpState)
         val store = Atc3Store(aapsLogger, preferences, uiInteraction, rh)
@@ -274,7 +282,9 @@ class Atc3JournalFaultTest : TestBaseWithProfile() {
 
     @Test
     fun `a refused row leaves the bolus and the fault for the next read`() = runTest {
-        whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenReturn(false)
+        runBlocking {
+            whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenReturn(false)
+        }
         val acceptedAt = now - 20_000L
         sync.expect(acceptedAt, 2.0, BS.Type.NORMAL)
         sync.seen(acceptedAt, 0.45)

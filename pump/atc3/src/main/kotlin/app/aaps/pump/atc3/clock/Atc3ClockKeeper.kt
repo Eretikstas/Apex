@@ -5,10 +5,9 @@ import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
-import app.aaps.core.interfaces.rx.events.EventDismissNotification
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.pump.atc3.Atc3Const
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.history.Atc3HistorySync
 import app.aaps.pump.atc3.manager.Atc3Manager
@@ -32,7 +31,7 @@ class Atc3ClockKeeper @Inject constructor(
     private val aapsLogger: AAPSLogger,
     private val rh: ResourceHelper,
     private val rxBus: RxBus,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val dateUtil: DateUtil,
     private val pumpState: Atc3PumpState,
     private val atc3Manager: Atc3Manager,
@@ -83,14 +82,14 @@ class Atc3ClockKeeper @Inject constructor(
             )
             trace.event(Atc3TraceCat.DRV, "clock_too_far", "apartMs" to apart)
             // URGENT rather than the id's default: this one stops the loop.
-            uiInteraction.addNotification(
+            notices.addNotification(
                 Notification.OVER_24H_TIME_CHANGE_REQUESTED,
                 rh.gs(R.string.atc3_clock_skew_too_large),
                 Notification.URGENT
             )
             return
         }
-        rxBus.send(EventDismissNotification(Notification.OVER_24H_TIME_CHANGE_REQUESTED))
+        notices.dismiss(Notification.OVER_24H_TIME_CHANGE_REQUESTED)
 
         // The middle band: set at once and said so; no bolus record pairs this far off.
         if (phoneMoved || apart > Atc3Const.CLOCK_QUIET_CORRECTION_MS) {
@@ -99,7 +98,7 @@ class Atc3ClockKeeper @Inject constructor(
                 val text = if (phoneMoved) rh.gs(R.string.atc3_clock_follows_phone)
                 else rh.gs(R.string.atc3_clock_set_after_drift, apart / 60_000L)
                 phoneMoved = false
-                uiInteraction.addNotificationValidFor(Notification.INSIGHT_DATE_TIME_UPDATED, text, Notification.INFO, 60)
+                notices.addNotificationValidFor(Notification.INSIGHT_DATE_TIME_UPDATED, text, Notification.INFO, 60)
             }
             return
         }
@@ -118,7 +117,7 @@ class Atc3ClockKeeper @Inject constructor(
         }
 
         if (!clockWatch.needsSetting(now)) {
-            rxBus.send(EventDismissNotification(Notification.PUMP_WARNING))
+            notices.dismiss(Notification.PUMP_WARNING)
             return
         }
 
@@ -137,13 +136,13 @@ class Atc3ClockKeeper @Inject constructor(
         // A locked pump refuses the write: nothing is sent, the warning stays.
         if (pumpState.locked) {
             aapsLogger.debug(LTag.PUMP, "ATC3: $why, but the pump is locked, not setting its clock")
-            uiInteraction.addNotification(Notification.PUMP_WARNING, rh.gs(R.string.atc3_clock_not_set), Notification.NORMAL)
+            notices.addNotification(Notification.PUMP_WARNING, rh.gs(R.string.atc3_clock_not_set), Notification.NORMAL)
             return false
         }
         val history = readHistory()
         if (history == null) {
             aapsLogger.debug(LTag.PUMP, "ATC3: could not read the bolus history, not setting the pump clock yet")
-            uiInteraction.addNotification(Notification.PUMP_WARNING, rh.gs(R.string.atc3_clock_not_set), Notification.NORMAL)
+            notices.addNotification(Notification.PUMP_WARNING, rh.gs(R.string.atc3_clock_not_set), Notification.NORMAL)
             return false
         }
         atc3HistorySync.reconcileBoluses(history.records, history.recordCount)
@@ -160,13 +159,13 @@ class Atc3ClockKeeper @Inject constructor(
         val failure = atc3Manager.writeClock(dateUtil.now())
         if (failure != null) {
             aapsLogger.error(LTag.PUMP, "ATC3: could not set the pump clock, $failure")
-            uiInteraction.addNotification(Notification.PUMP_WARNING, rh.gs(R.string.atc3_clock_not_set), Notification.NORMAL)
+            notices.addNotification(Notification.PUMP_WARNING, rh.gs(R.string.atc3_clock_not_set), Notification.NORMAL)
             return false
         }
         atc3HistorySync.onPumpClockWritten(dateUtil.now())
         clockSyncedAtMs = dateUtil.now()
         // The window's start stays: a clock write changes neither the count nor the phone's time.
-        rxBus.send(EventDismissNotification(Notification.PUMP_WARNING))
+        notices.dismiss(Notification.PUMP_WARNING)
         return true
     }
 }

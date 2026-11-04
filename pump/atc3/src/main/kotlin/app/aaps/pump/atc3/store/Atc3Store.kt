@@ -4,8 +4,8 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.resources.ResourceHelper
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.keys.Atc3StringNonKey
 import app.aaps.pump.atc3.basal.Atc3BasalPeriod
@@ -34,7 +34,7 @@ import javax.inject.Singleton
 class Atc3Store @Inject constructor(
     private val aapsLogger: AAPSLogger,
     private val preferences: Preferences,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val rh: ResourceHelper
 ) {
 
@@ -96,7 +96,7 @@ class Atc3Store @Inject constructor(
             else                                     -> "not ${read.lost.joinToString()}"
         }
         aapsLogger.error(LTag.PUMP, "ATC3: the stored state did not read in full ($what), it is kept aside: $stored")
-        uiInteraction.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_state_set_aside), Notification.URGENT)
+        notices.addNotification(Notification.PUMP_ERROR, rh.gs(R.string.atc3_state_set_aside), Notification.URGENT)
     }
 
     /** A document read part by part: the state from what read, and the parts that did not. */

@@ -2,8 +2,8 @@ package app.aaps.pump.atc3.store
 
 import app.aaps.core.data.model.BS
 import app.aaps.core.interfaces.resources.ResourceHelper
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.basal.Atc3BasalPeriod
 import app.aaps.pump.atc3.history.ActiveTbr
 import app.aaps.pump.atc3.history.Atc3HistoryLedger
@@ -31,7 +31,7 @@ import java.util.TimeZone
 class Atc3StoreTest : TestBase() {
 
     @Mock lateinit var preferences: Preferences
-    @Mock lateinit var uiInteraction: UiInteraction
+    @Mock lateinit var uiInteraction: Atc3Notices
     @Mock lateinit var rh: ResourceHelper
 
     private fun store() = Atc3Store(aapsLogger, preferences, uiInteraction, rh)

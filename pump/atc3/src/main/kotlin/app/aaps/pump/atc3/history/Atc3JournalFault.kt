@@ -8,8 +8,8 @@ import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.resources.ResourceHelper
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.manager.Atc3Manager
 import app.aaps.pump.atc3.protocol.Atc3BolusHistory
@@ -73,7 +73,7 @@ class Atc3JournalFault @Inject constructor(
     private val aapsLogger: AAPSLogger,
     private val rh: ResourceHelper,
     private val dateUtil: DateUtil,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val pumpSync: PumpSync,
     private val atc3Manager: Atc3Manager,
     private val atc3HistorySync: Atc3HistorySync,
@@ -201,7 +201,7 @@ class Atc3JournalFault @Inject constructor(
 
     /** Tell the user on the screen and in the treatment history. The pump runs on. */
     private suspend fun tell(text: String, atMs: Long) {
-        uiInteraction.addNotification(Notification.PUMP_SYNC_ERROR, text, Notification.URGENT)
+        notices.addNotification(Notification.PUMP_SYNC_ERROR, text, Notification.URGENT)
         pumpSync.insertTherapyEventIfNewWithTimestamp(atMs, TE.Type.NOTE, text, atMs, PumpType.ATC3, pumpState.serialNumber)
     }
 

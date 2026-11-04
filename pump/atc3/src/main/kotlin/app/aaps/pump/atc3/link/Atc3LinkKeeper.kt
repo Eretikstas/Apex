@@ -5,10 +5,9 @@ import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.rx.bus.RxBus
-import app.aaps.core.interfaces.rx.events.EventDismissNotification
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.clock.Atc3DayClock
 import app.aaps.pump.atc3.command.Atc3Queue
@@ -44,7 +43,7 @@ class Atc3LinkKeeper @Inject constructor(
     private val dateUtil: DateUtil,
     private val atc3Queue: Atc3Queue,
     private val rxBus: RxBus,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val pumpState: Atc3PumpState,
     private val atc3Connection: Atc3Connection,
     private val atc3HistorySync: Atc3HistorySync,
@@ -110,7 +109,7 @@ class Atc3LinkKeeper @Inject constructor(
                 // The pump answers. A stop still open is lifted by the read that found it, not here.
                 if (linkAlarmsSaid > 0) {
                     linkAlarmsSaid = 0
-                    rxBus.send(EventDismissNotification(Notification.PUMP_UNREACHABLE))
+                    notices.dismiss(Notification.PUMP_UNREACHABLE)
                 }
                 return@withLock
             }
@@ -122,7 +121,7 @@ class Atc3LinkKeeper @Inject constructor(
             val minutes = (silence / 60_000L).toInt()
             aapsLogger.error(LTag.PUMP, "ATC3: no answer from the pump for $minutes min" + if (stop != null) ", it is held to be stopped" else "")
             trace.event(Atc3TraceCat.DRV, "link_silent", "min" to minutes, "times" to due, "stopped" to (stop != null))
-            uiInteraction.addNotificationWithSound(
+            notices.addNotificationWithSound(
                 Notification.PUMP_UNREACHABLE,
                 // A silence of the driver's own making is called what it is.
                 if (!atc3Connection.isPasswordEntered) rh.gs(R.string.atc3_password_missing)
@@ -158,7 +157,7 @@ class Atc3LinkKeeper @Inject constructor(
         atc3HistorySync.recordLinkStop(stop.fromReadMs, card.readAtMs - stop.fromReadMs)
         store.update { it.copy(linkStop = null) }
         linkAlarmsSaid = 0
-        rxBus.send(EventDismissNotification(Notification.PUMP_UNREACHABLE))
+        notices.dismiss(Notification.PUMP_UNREACHABLE)
         aapsLogger.warn(LTag.PUMP, "ATC3: the pump is back after $minutes min; the window closed at this read counts what it delivered")
         trace.event(Atc3TraceCat.HIST, "link_back", "from" to stop.fromReadMs, "to" to card.readAtMs, "min" to minutes)
     }

@@ -1,10 +1,11 @@
 package app.aaps.pump.atc3.check
 
 import app.aaps.core.interfaces.db.PersistenceLayer
-import app.aaps.core.interfaces.profile.Profile
+import app.aaps.core.interfaces.profile.EffectiveProfile
 import app.aaps.pump.atc3.state.Atc3PumpState
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -26,7 +27,7 @@ class Atc3AapsJournalTest : TestBaseWithProfile() {
     @Mock lateinit var persistenceLayer: PersistenceLayer
 
     private lateinit var journal: Atc3AapsJournal
-    private lateinit var profile: Profile
+    private lateinit var profile: EffectiveProfile
 
     private val serial = "12345678"
 
@@ -45,27 +46,37 @@ class Atc3AapsJournalTest : TestBaseWithProfile() {
         journal = Atc3AapsJournal(persistenceLayer, profileFunction, pumpState)
         profile = mock()
         whenever(profile.getBasal(any())).thenReturn(RATE)
-        whenever(persistenceLayer.getBolusesFromTimeToTime(any(), any(), any())).thenReturn(emptyList())
-        whenever(persistenceLayer.getTemporaryBasalsActiveBetweenTimeAndTime(any(), any())).thenReturn(emptyList())
-        whenever(persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(any(), any(), any()))
+        runBlocking {
+            whenever(persistenceLayer.getBolusesFromTimeToTime(any(), any(), any())).thenReturn(emptyList())
+        }
+        runBlocking {
+            whenever(persistenceLayer.getTemporaryBasalsActiveBetweenTimeAndTime(any(), any())).thenReturn(emptyList())
+        }
+        runBlocking {
+            whenever(persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(any(), any(), any()))
+        }
             .thenReturn(emptyList())
     }
 
     /** The profile runs from [from] on and there is none before it, as after a first setup. */
     private fun profileRunningFrom(from: Long) {
-        whenever(profileFunction.getProfile(any())).thenAnswer { invocation ->
-            if (invocation.getArgument<Long>(0) >= from) profile else null
+        runBlocking {
+            whenever(profileFunction.getProfile(any())).thenAnswer { invocation ->
+                if (invocation.getArgument<Long>(0) >= from) profile else null
+            }
         }
     }
 
     /** One profile until [at], another from it on, as a percentage switch makes. */
     private fun profileChangingAt(at: Long, before: Double, after: Double) {
-        val earlier: Profile = mock()
+        val earlier: EffectiveProfile = mock()
         whenever(earlier.getBasal(any())).thenReturn(before)
-        val later: Profile = mock()
+        val later: EffectiveProfile = mock()
         whenever(later.getBasal(any())).thenReturn(after)
-        whenever(profileFunction.getProfile(any())).thenAnswer { invocation ->
-            if (invocation.getArgument<Long>(0) >= at) later else earlier
+        runBlocking {
+            whenever(profileFunction.getProfile(any())).thenAnswer { invocation ->
+                if (invocation.getArgument<Long>(0) >= at) later else earlier
+            }
         }
     }
 
@@ -76,7 +87,9 @@ class Atc3AapsJournalTest : TestBaseWithProfile() {
         // it there and not at the next half hour.
         val switch = at(7, 4, 32)
         profileChangingAt(switch, before = 1.35, after = 0.9)
-        whenever(persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(any(), any(), any()))
+        runBlocking {
+            whenever(persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(any(), any(), any()))
+        }
             .thenReturn(listOf(effectiveProfileSwitch.copy(timestamp = switch)))
         val from = at(7, 3, 0)
         val to = at(7, 8, 0)
@@ -90,7 +103,9 @@ class Atc3AapsJournalTest : TestBaseWithProfile() {
 
     /** The effective switches the database is to hand back for any window. */
     private fun switchesAt(vararg moments: Long) {
-        whenever(persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(any(), any(), any()))
+        runBlocking {
+            whenever(persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(any(), any(), any()))
+        }
             .thenReturn(moments.map { effectiveProfileSwitch.copy(timestamp = it) })
     }
 
@@ -132,14 +147,16 @@ class Atc3AapsJournalTest : TestBaseWithProfile() {
         // arithmetic walks forward and would step over a moment it was handed late.
         val first = at(7, 2, 0)
         val second = at(7, 6, 0)
-        whenever(profileFunction.getProfile(any())).thenAnswer { invocation ->
-            val instant = invocation.getArgument<Long>(0)
-            val rate = when {
-                instant >= second -> 0.45
-                instant >= first  -> 1.35
-                else              -> 0.9
+        runBlocking {
+            whenever(profileFunction.getProfile(any())).thenAnswer { invocation ->
+                val instant = invocation.getArgument<Long>(0)
+                val rate = when {
+                    instant >= second -> 0.45
+                    instant >= first  -> 1.35
+                    else              -> 0.9
+                }
+                mock<EffectiveProfile>().also { whenever(it.getBasal(any())).thenReturn(rate) }
             }
-            mock<Profile>().also { whenever(it.getBasal(any())).thenReturn(rate) }
         }
         switchesAt(second, first)
         val from = at(7, 0, 0)

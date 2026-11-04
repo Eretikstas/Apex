@@ -6,9 +6,11 @@ import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.core.interfaces.pump.PumpInsulin
+import app.aaps.core.interfaces.pump.PumpRate
 import app.aaps.core.interfaces.pump.PumpSync
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.keys.LongNonKey
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.basal.Atc3BasalPeriod
 import app.aaps.pump.atc3.clock.Atc3ClockWatch
 import app.aaps.pump.atc3.keys.Atc3LongNonKey
@@ -26,7 +28,7 @@ import app.aaps.pump.atc3.store.Atc3StoredState
 import app.aaps.pump.atc3.trace.Atc3Trace
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
-import io.reactivex.rxjava3.core.Single
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -54,7 +56,7 @@ import org.mockito.kotlin.whenever
 class Atc3HistorySyncTest : TestBaseWithProfile() {
 
     @Mock lateinit var pumpSync: PumpSync
-    @Mock lateinit var uiInteraction: UiInteraction
+    @Mock lateinit var uiInteraction: Atc3Notices
     @Mock lateinit var persistenceLayer: PersistenceLayer
 
     /** The bolus rows AAPS holds: every row written here lands in it, as the reconciler reads them back. */
@@ -76,14 +78,24 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         whenever(preferences.get(LongNonKey.ActivePumpChangeTimestamp)).thenReturn(0L)
         // These say the uninteresting thing — the write went in — so each case can stub over it
         // when the answer is what it is about.
-        whenever(pumpSync.syncTemporaryBasalWithPumpId(any(), any(), any(), any(), anyOrNull(), any(), any(), any())).thenReturn(true)
-        whenever(pumpSync.syncStopTemporaryBasalWithPumpId(any(), any(), any(), any(), any())).thenReturn(true)
-        whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenAnswer {
-            rows.add(BS(timestamp = it.getArgument(0), amount = it.getArgument(1), type = it.getArgument(2), ids = IDs(pumpId = it.getArgument(3), pumpSerial = it.getArgument(5))))
-            true
+        runBlocking {
+            whenever(pumpSync.syncTemporaryBasalWithPumpId(any(), any(), any(), any(), anyOrNull(), any(), any(), any())).thenReturn(true)
         }
-        whenever(persistenceLayer.getBolusesFromTimeIncludingInvalid(any(), any())).thenAnswer { Single.just(rows.toList()) }
-        whenever(pumpSync.createOrUpdateTotalDailyDose(any(), any(), any(), any(), anyOrNull(), any(), any())).thenReturn(true)
+        runBlocking {
+            whenever(pumpSync.syncStopTemporaryBasalWithPumpId(any(), any(), any(), any(), any())).thenReturn(true)
+        }
+        runBlocking {
+            whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenAnswer {
+                rows.add(BS(timestamp = it.getArgument(0), amount = it.getArgument<PumpInsulin>(1).cU, type = it.getArgument(2), ids = IDs(pumpId = it.getArgument(3), pumpSerial = it.getArgument(5)), iCfg = someICfg))
+                true
+            }
+        }
+        runBlocking {
+            whenever(persistenceLayer.getBolusesFromTimeIncludingInvalid(any(), any())).thenAnswer { rows.toList() }
+        }
+        runBlocking {
+            whenever(pumpSync.createOrUpdateTotalDailyDose(any(), any(), any(), any(), anyOrNull(), any(), any())).thenReturn(true)
+        }
         clockWatch = Atc3ClockWatch()
         val trace = Atc3Trace(aapsLogger, preferences)
         val registration = Atc3PumpRegistration(aapsLogger, rh, pumpSync, pumpState)
@@ -137,7 +149,9 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
     /** Take the first pass: AAPS adopted the pump ten minutes ago, and what the pump held before that is its past. */
     private suspend fun afterFirstPass() {
-        whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(true)
+        runBlocking {
+            whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(true)
+        }
         whenever(preferences.get(LongNonKey.ActivePumpChangeTimestamp)).thenReturn(now - 600_000L)
         sync.reconcileBoluses(listOf(record(3600, 40)), 1)
     }
@@ -166,7 +180,9 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
     fun `an unadopted pump has nothing written and nothing filed away`() = runTest {
         // AAPS is holding somebody else's pump, so every write would be refused. Filing the records
         // as counted here would lose them for good: nothing offers a record twice.
-        whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(false)
+        runBlocking {
+            whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(false)
+        }
 
         val result = sync.reconcileBoluses(listOf(record(60, 40)), 1)
 
@@ -184,7 +200,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
         // Dated by the minute: the record's seconds are its place in the minute, not a time.
         verify(pumpSync, times(1)).syncBolusWithPumpId(
-            eq(minuteOf(now - 60_000L)), eq(2.0), eq(BS.Type.NORMAL), any(), eq(PumpType.ATC3), eq(serial)
+            eq(minuteOf(now - 60_000L)), eq(PumpInsulin(2.0)), eq(BS.Type.NORMAL), any(), eq(PumpType.ATC3), eq(serial)
         )
         assertThat(result.newestImportedAtMs).isEqualTo(minuteOf(now - 60_000L))
     }
@@ -193,20 +209,24 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
     fun `a bolus of the minute the pump was adopted in is dated at the adoption moment, so AAPS takes it`() = runTest {
         // Adopted one second into the minute, the bolus 21 seconds later: a row at the minute start is older than the adoption.
         val adopted = minuteOf(now - 60_000L) + 1_000L
-        whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(true)
+        runBlocking {
+            whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(true)
+        }
         whenever(preferences.get(LongNonKey.ActivePumpChangeTimestamp)).thenReturn(adopted)
 
         sync.reconcileBoluses(listOf(record(60, 80)), 1)
         sync.reconcileBoluses(listOf(record(60, 80)), 1)
 
-        verify(pumpSync, times(1)).syncBolusWithPumpId(eq(adopted), eq(2.0), eq(BS.Type.NORMAL), eq(minuteOf(now - 60_000L)), eq(PumpType.ATC3), eq(serial))
+        verify(pumpSync, times(1)).syncBolusWithPumpId(eq(adopted), eq(PumpInsulin(2.0)), eq(BS.Type.NORMAL), eq(minuteOf(now - 60_000L)), eq(PumpType.ATC3), eq(serial))
         verify(uiInteraction, never()).addNotification(anyInt(), anyOrNull(), anyInt())
     }
 
     @Test
     fun `a bolus row AAPS refuses is said on the screen`() = runTest {
         afterFirstPass()
-        whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenReturn(false)
+        runBlocking {
+            whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenReturn(false)
+        }
 
         sync.reconcileBoluses(listOf(record(60, 80)), 1)
 
@@ -221,7 +241,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         sync.reconcileBoluses(listOf(record(60, 80)), 1)
 
         verify(pumpSync, times(1)).syncBolusWithPumpId(
-            any(), eq(2.0), anyOrNull(), any(), any(), any()
+            any(), eq(PumpInsulin(2.0)), anyOrNull(), any(), any(), any()
         )
     }
 
@@ -234,7 +254,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
         // Twenty minutes old, and AAPS only took the pump ten minutes ago.
         verify(pumpSync, never()).syncBolusWithPumpId(
-            any(), eq(2.0), anyOrNull(), any(), any(), any()
+            any(), eq(PumpInsulin(2.0)), anyOrNull(), any(), any(), any()
         )
     }
 
@@ -252,7 +272,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
         assertThat(result.confirmed).containsExactly(startedAt, 2.0)
         verify(pumpSync, times(1)).syncBolusWithPumpId(
-            eq(minuteOf(record.timestamp)), eq(2.0), eq(BS.Type.SMB), any(), eq(PumpType.ATC3), eq(serial)
+            eq(minuteOf(record.timestamp)), eq(PumpInsulin(2.0)), eq(BS.Type.SMB), any(), eq(PumpType.ATC3), eq(serial)
         )
         assertThat(sync.hasExpectedBolus()).isFalse()
         assertThat(pumpState.lastBolus?.atMs).isEqualTo(minuteOf(record.timestamp))
@@ -280,7 +300,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         val result = sync.reconcileBoluses(listOf(ownRecord(startedAt, 40)), 1)
 
         assertThat(result.confirmed).isEmpty()
-        verify(pumpSync, times(1)).syncBolusWithPumpId(any(), eq(1.0), eq(BS.Type.NORMAL), any(), any(), any())
+        verify(pumpSync, times(1)).syncBolusWithPumpId(any(), eq(PumpInsulin(1.0)), eq(BS.Type.NORMAL), any(), any(), any())
         assertThat(sync.hasExpectedBolus()).isTrue()
     }
 
@@ -295,7 +315,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
         // Written as the arithmetic rather than as 0.6: raw 24 times the dose scale is not exactly that in binary floating point.
         assertThat(result.confirmed[startedAt]!!).isWithin(1e-9).of(0.6)
-        verify(pumpSync, times(1)).syncBolusWithPumpId(any(), eq(24 * Atc3Protocol.DOSE_SCALE), eq(BS.Type.NORMAL), any(), any(), any())
+        verify(pumpSync, times(1)).syncBolusWithPumpId(any(), eq(PumpInsulin(24 * Atc3Protocol.DOSE_SCALE)), eq(BS.Type.NORMAL), any(), any(), any())
     }
 
     @Test
@@ -322,7 +342,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
     fun `a row the user deleted is not written again`() = runTest {
         afterFirstPass()
         val record = ownRecord(now - 30_000L, 80)
-        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, isValid = false, ids = IDs(pumpId = 1L, pumpSerial = serial)))
+        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, isValid = false, ids = IDs(pumpId = 1L, pumpSerial = serial), iCfg = someICfg))
 
         sync.reconcileBoluses(listOf(record), 1)
 
@@ -333,18 +353,20 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
     fun `a row of another pump, or one entered by hand, does not stand for the record`() = runTest {
         afterFirstPass()
         val record = ownRecord(now - 30_000L, 80)
-        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, ids = IDs(pumpId = 1L, pumpSerial = "other")))
-        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, ids = IDs(pumpId = minuteOf(record.timestamp))))
+        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, ids = IDs(pumpId = 1L, pumpSerial = "other"), iCfg = someICfg))
+        rows.add(BS(timestamp = minuteOf(record.timestamp), amount = 2.0, type = BS.Type.NORMAL, ids = IDs(pumpId = minuteOf(record.timestamp), iCfg = someICfg)))
 
         sync.reconcileBoluses(listOf(record), 1)
 
-        verify(pumpSync, times(1)).syncBolusWithPumpId(any(), eq(2.0), anyOrNull(), any(), any(), any())
+        verify(pumpSync, times(1)).syncBolusWithPumpId(any(), eq(PumpInsulin(2.0)), anyOrNull(), any(), any(), any())
     }
 
     @Test
     fun `an extended bolus becomes a note and a warning, not a row, and only once`() = runTest {
         afterFirstPass()
-        whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true, false)
+        runBlocking {
+            whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true, false)
+        }
         val record = Atc3BolusRecord(0, now - 60_000L, (now - 60_000L) / 1000L, 40, 40, 80, 80)
 
         sync.reconcileBoluses(listOf(record), 1)
@@ -429,7 +451,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         sync.reconcileBoluses(listOf(ownRecord(second, 40, shiftMinutes = -1)), 1)
         assertThat(clockWatch.needsSetting(now)).isTrue()
         // Recognised both times, as ours.
-        verify(pumpSync, times(2)).syncBolusWithPumpId(any(), eq(1.0), eq(BS.Type.SMB), any(), any(), any())
+        verify(pumpSync, times(2)).syncBolusWithPumpId(any(), eq(PumpInsulin(1.0)), eq(BS.Type.SMB), any(), any(), any())
     }
 
     @Test
@@ -459,7 +481,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         sync.onStatus(suspended = false, tbrRunning = true, rate = 1.5, durationMs = null, pumpTbrStart = null)
 
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            any(), eq(1.5), any(), eq(true), eq(PumpSync.TemporaryBasalType.NORMAL), any(), any(), any()
+            any(), eq(PumpRate(1.5)), any(), eq(true), eq(PumpSync.TemporaryBasalType.NORMAL), any(), any(), any()
         )
     }
 
@@ -468,7 +490,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         sync.onStatus(suspended = true, tbrRunning = false, rate = 0.0, durationMs = null, pumpTbrStart = null)
 
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            any(), eq(0.0), any(), eq(true), eq(PumpSync.TemporaryBasalType.PUMP_SUSPEND), any(), any(), any()
+            any(), eq(PumpRate(0.0)), any(), eq(true), eq(PumpSync.TemporaryBasalType.PUMP_SUSPEND), any(), any(), any()
         )
     }
 
@@ -504,7 +526,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
         val duration = argumentCaptor<Long>()
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            any(), eq(0.45), duration.capture(), eq(true), any(), any(), any(), any()
+            any(), eq(PumpRate(0.45)), duration.capture(), eq(true), any(), any(), any(), any()
         )
         assertThat(duration.firstValue).isEqualTo(45 * 60_000L)
     }
@@ -577,7 +599,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         val firstEnd = Atc3PumpId.tbrEndOf(Atc3PumpId.of(minute + 10_000L, Atc3PumpId.KIND_TBR_START))
         verify(pumpSync, times(1)).syncStopTemporaryBasalWithPumpId(eq(minute + 20_000L), eq(firstEnd), any(), any(), any())
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            eq(minute + 20_000L), eq(2.0), any(), eq(true), any(), any(), any(), any()
+            eq(minute + 20_000L), eq(PumpRate(2.0)), any(), eq(true), any(), any(), any(), any()
         )
     }
 
@@ -586,7 +608,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         val stoppedAt = now - 5 * 60_000L
         sync.onStatus(suspended = true, tbrRunning = false, rate = 0.0, durationMs = null, pumpTbrStart = null, pausedAtMs = stoppedAt)
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            eq(stoppedAt), eq(0.0), any(), eq(true), eq(PumpSync.TemporaryBasalType.PUMP_SUSPEND), any(), any(), any()
+            eq(stoppedAt), eq(PumpRate(0.0)), any(), eq(true), eq(PumpSync.TemporaryBasalType.PUMP_SUSPEND), any(), any(), any()
         )
 
         val resumedAt = now - 2 * 60_000L
@@ -613,7 +635,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         sync.tbrStartedByAaps(ackAtMs = nextStart + 2_000L, rate = 1.0, durationMinutes = 30, pumpStart = next)
 
         verify(pumpSync, times(1)).syncStopTemporaryBasalWithPumpId(eq(nextStart + 2_000L), any(), any(), any(), any())
-        verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(eq(pumpStart + 2_000L), eq(3.0), eq(30 * 60_000L), eq(true), eq(PumpSync.TemporaryBasalType.NORMAL), any(), any(), any())
+        verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(eq(pumpStart + 2_000L), eq(PumpRate(3.0)), eq(30 * 60_000L), eq(true), eq(PumpSync.TemporaryBasalType.NORMAL), any(), any(), any())
     }
 
     @Test
@@ -623,7 +645,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         afterFirstPass()
         sync.tbrStartedByAaps(ackAtMs = now, rate = 0.0, durationMinutes = 15, type = PumpSync.TemporaryBasalType.EMULATED_PUMP_SUSPEND)
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            eq(now), eq(0.0), eq(15 * 60_000L), eq(true), eq(PumpSync.TemporaryBasalType.EMULATED_PUMP_SUSPEND), any(), any(), any()
+            eq(now), eq(PumpRate(0.0)), eq(15 * 60_000L), eq(true), eq(PumpSync.TemporaryBasalType.EMULATED_PUMP_SUSPEND), any(), any(), any()
         )
     }
 
@@ -639,7 +661,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         sync.tbrStopped(pumpStart + 170_000L)
 
         verify(pumpSync, times(1)).syncStopTemporaryBasalWithPumpId(eq(pumpStart + 170_000L), any(), any(), any(), any())
-        verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(eq(pumpStart + 2_000L), eq(3.0), eq(30 * 60_000L), eq(true), eq(PumpSync.TemporaryBasalType.NORMAL), any(), any(), any())
+        verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(eq(pumpStart + 2_000L), eq(PumpRate(3.0)), eq(30 * 60_000L), eq(true), eq(PumpSync.TemporaryBasalType.NORMAL), any(), any(), any())
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(any(), any(), any(), any(), anyOrNull(), any(), any(), any())
     }
 
@@ -651,7 +673,9 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
     fun `the first read of the refills imports nothing, the next one records a new refill as an insulin change`() = runTest {
         afterFirstPass()
         whenever(preferences.get(Atc3LongNonKey.LastRefillSeconds)).thenReturn(0L)
-        whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true)
+        runBlocking {
+            whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true)
+        }
         val old = refill(now - 3 * 24 * 3_600_000L, 9.2)
 
         events.recordRefills(listOf(old))

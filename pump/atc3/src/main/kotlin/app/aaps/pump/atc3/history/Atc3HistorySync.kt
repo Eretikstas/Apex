@@ -11,11 +11,11 @@ import app.aaps.core.interfaces.pump.PumpInsulin
 import app.aaps.core.interfaces.pump.PumpRate
 import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.resources.ResourceHelper
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.pump.atc3.Atc3Const
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.basal.Atc3TbrAction
 import app.aaps.pump.atc3.basal.Atc3TbrTracker
@@ -55,7 +55,7 @@ data class LearnedBolus(val learnedAtMs: Long, val units: Double, val startMs: L
 class Atc3HistorySync @Inject constructor(
     private val aapsLogger: AAPSLogger,
     private val rh: ResourceHelper,
-    private val uiInteraction: UiInteraction,
+    private val notices: Atc3Notices,
     private val preferences: Preferences,
     private val store: Atc3Store,
     private val pumpSync: PumpSync,
@@ -249,7 +249,7 @@ class Atc3HistorySync @Inject constructor(
             if (!syncPumpBolus(write.timestamp, write.units, write.pumpId, type)) {
                 // Seen on the screen, not in the log only: the loop runs without this insulin until it is resolved.
                 aapsLogger.error(LTag.PUMP, "ATC3: AAPS refused the bolus of ${write.units} U at ${write.timestamp}, id ${write.pumpId}")
-                uiInteraction.addNotification(
+                notices.addNotification(
                     Notification.PUMP_SYNC_ERROR,
                     rh.gs(R.string.atc3_bolus_row_refused, write.units, dateUtil.timeString(write.timestamp)),
                     Notification.URGENT
@@ -281,9 +281,8 @@ class Atc3HistorySync @Inject constructor(
     }
 
     /** The rows AAPS holds of this pump over the last day, deleted ones included: a deleted row is still its record's row. */
-    private fun rowsOfLastDay(now: Long): List<Atc3BolusRow> =
+    private suspend fun rowsOfLastDay(now: Long): List<Atc3BolusRow> =
         persistenceLayer.getBolusesFromTimeIncludingInvalid(Atc3BolusReconciler.minuteStartOf(now - Atc3Const.RECONCILE_MAX_AGE_MS), true)
-            .blockingGet()
             .filter { it.ids.pumpSerial == serial }
             .map { Atc3BolusRow(it.timestamp, Atc3HistoryLedger.raw(it.amount)) }
 
@@ -618,6 +617,6 @@ class Atc3HistorySync @Inject constructor(
         if (!pumpSync.insertTherapyEventIfNewWithTimestamp(timestamp, TE.Type.NOTE, text, timestamp, PumpType.ATC3, serial)) return
         aapsLogger.warn(LTag.PUMP, "ATC3: extended or dual bolus of $units U at $timestamp, which the loop does not count")
         trace.event(Atc3TraceCat.HIST, "extended_bolus", "units" to units, "at" to timestamp)
-        uiInteraction.addNotification(Notification.PUMP_ERROR, text, Notification.URGENT)
+        notices.addNotification(Notification.PUMP_ERROR, text, Notification.URGENT)
     }
 }

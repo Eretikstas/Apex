@@ -1,18 +1,19 @@
 package app.aaps.pump.atc3
 
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.GV
+import app.aaps.core.data.model.RM
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.pump.defs.TimeChangeType
+import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.core.interfaces.pump.BlePreCheck
 import app.aaps.core.interfaces.pump.BolusProgressData
 import app.aaps.core.interfaces.pump.DetailedBolusInfo
 import app.aaps.core.interfaces.pump.PumpEnactResult
 import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
-import app.aaps.core.interfaces.rx.events.EventDismissNotification
-import app.aaps.core.interfaces.rx.events.EventNewBG
-import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.pump.atc3.basal.Atc3BasalPeriodKeeper
 import app.aaps.pump.atc3.basal.Atc3BasalSpread
@@ -27,6 +28,7 @@ import app.aaps.pump.atc3.Atc3Const
 import app.aaps.pump.atc3.command.Atc3BolusOutcome
 import app.aaps.pump.atc3.command.Atc3Failure
 import app.aaps.pump.atc3.command.Atc3ProbeLink
+import app.aaps.pump.atc3.command.Atc3Queue
 import app.aaps.pump.atc3.command.Atc3SetSuspended
 import app.aaps.pump.atc3.command.Atc3TbrResult
 import app.aaps.pump.atc3.history.Atc3HistoryEvents
@@ -52,6 +54,7 @@ import app.aaps.pump.atc3.store.Atc3Store
 import app.aaps.pump.atc3.trace.Atc3Trace
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -91,7 +94,15 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     @Mock lateinit var historyEvents: Atc3HistoryEvents
     @Mock lateinit var aapsJournal: Atc3AapsJournal
     @Mock lateinit var commandQueue: CommandQueue
-    @Mock lateinit var uiInteraction: UiInteraction
+    @Mock lateinit var uiInteraction: Atc3Notices
+    @Mock lateinit var atc3Queue: Atc3Queue
+    @Mock lateinit var bolusProgressData: BolusProgressData
+    @Mock lateinit var persistenceLayer: PersistenceLayer
+    @Mock lateinit var blePreCheck: BlePreCheck
+
+    /** New glucose rows and running mode rows, as the database tells the plugin of them in AAPS 4.0. A replay of one: the plugin subscribes in a coroutine of its own, maybe after the test has emitted. */
+    private val glucoseChanges = MutableSharedFlow<List<GV>>(replay = 1)
+    private val runningModeChanges = MutableSharedFlow<List<RM>>(replay = 1)
 
     /*
      * The trace is a real one on a mocked preference store, which answers false, so it is switched
@@ -123,7 +134,6 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
     @BeforeEach
     fun setup() {
-        BolusProgressData.stopPressed = false
         pumpState = Atc3PumpState()
         whenever(rh.gs(anyInt())).thenReturn("mocked resource")
         whenever(rh.gs(anyInt(), anyOrNull())).thenReturn("mocked resource")
@@ -146,16 +156,20 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
             whenever(historyEvents.recordDailyTotals(any())).thenReturn(0)
             whenever(historyEvents.recordRefills(any())).thenReturn(0)
         }
-        whenever(commandQueue.readStatus(any(), anyOrNull())).thenReturn(true)
+        whenever(atc3Queue.readStatus(any())).thenReturn(true)
+        // U100 insulin, the only one the driver runs the loop with.
+        whenever(ch.isU100()).thenReturn(true)
+        whenever(persistenceLayer.observeChanges(GV::class.java)).thenReturn(glucoseChanges)
+        whenever(persistenceLayer.observeChanges(RM::class.java)).thenReturn(runningModeChanges)
         val trace = Atc3Trace(aapsLogger, preferences)
         clockKeeper = Atc3ClockKeeper(aapsLogger, rh, rxBus, uiInteraction, dateUtil, pumpState, atc3Manager, atc3HistorySync, clockWatch, trace)
         store = Atc3Store(aapsLogger, preferences, uiInteraction, rh)
         val journalFault = Atc3JournalFault(aapsLogger, rh, dateUtil, uiInteraction, pumpSync, atc3Manager, atc3HistorySync, pumpState, trace)
         val reconciliation = Atc3Reconciliation(aapsLogger, rh, rxBus, uiInteraction, pumpState, atc3Manager, atc3HistorySync, journalFault, aapsJournal, store, trace)
         val basalPeriods = Atc3BasalPeriodKeeper(
-            aapsLogger, rh, store, dateUtil, commandQueue, pumpState, atc3Manager, atc3HistorySync, aapsJournal, reconciliation, trace, Atc3BasalSpread()
+            aapsLogger, rh, store, dateUtil, atc3Queue, pumpState, atc3Manager, atc3HistorySync, aapsJournal, reconciliation, trace, Atc3BasalSpread()
         )
-        linkKeeper = Atc3LinkKeeper(aapsLogger, rh, preferences, store, dateUtil, commandQueue, rxBus, uiInteraction, pumpState, atc3Connection, atc3HistorySync, trace)
+        linkKeeper = Atc3LinkKeeper(aapsLogger, rh, preferences, store, dateUtil, atc3Queue, rxBus, uiInteraction, pumpState, atc3Connection, atc3HistorySync, trace)
         plugin = Atc3PumpPlugin(
             aapsLogger, rh, preferences, commandQueue, pumpState, atc3Manager, bolusDelivery, rxBus,
             uiInteraction,
@@ -164,7 +178,12 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
             clockKeeper,
             basalPeriods,
             linkKeeper,
-            atc3Connection
+            atc3Connection,
+            atc3Queue,
+            bolusProgressData,
+            persistenceLayer,
+            blePreCheck,
+            ch
         )
     }
 
@@ -270,7 +289,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         pumpState.editStatus { it.copy(suspended = true) }
         pumpState.editStatus { it.copy(scheduledBasalRate = 0.0) }
 
-        assertThat(plugin.baseBasalRate).isEqualTo(0.8)
+        assertThat(plugin.baseBasalRate.cU).isEqualTo(0.8)
     }
 
     @Test
@@ -279,7 +298,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         pumpState.editStatus { it.copy(suspended = false) }
         pumpState.editStatus { it.copy(scheduledBasalRate = 1.2) }
 
-        assertThat(plugin.baseBasalRate).isEqualTo(1.2)
+        assertThat(plugin.baseBasalRate.cU).isEqualTo(1.2)
     }
 
     @Test
@@ -288,7 +307,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         pumpState.profiles = null
         pumpState.editStatus { it.copy(suspended = true) }
 
-        assertThat(plugin.baseBasalRate).isEqualTo(0.0)
+        assertThat(plugin.baseBasalRate.cU).isEqualTo(0.0)
     }
 
     // The shape of the answers AAPS gets back
@@ -298,7 +317,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         whenever(atc3Connection.isConnected).thenReturn(false)
 
         val results = listOf(
-            plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal),
+            plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal),
             plugin.cancelTempBasal(false),
             plugin.setNewBasalProfile(validProfile),
             plugin.deliverTreatment(manualBolus(1.0, lastKnownBolusTime = 0L)),
@@ -323,7 +342,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         pumpState.editStatus { it.copy(tbrActive = true) }
 
         val results = listOf(
-            plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal),
+            plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal),
             plugin.cancelTempBasal(false),
             plugin.setNewBasalProfile(validProfile),
             plugin.deliverTreatment(manualBolus(1.0, lastKnownBolusTime = 0L)),
@@ -462,7 +481,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `what the pump does not offer is refused rather than pretended`() = runTest {
-        assertThat(plugin.setTempBasalPercent(80, 30, validProfile, false, tbrTypeNormal).success).isFalse()
+        assertThat(plugin.setTempBasalPercent(80, 30, false, tbrTypeNormal).success).isFalse()
         assertThat(plugin.setExtendedBolus(1.0, 30).success).isFalse()
         assertThat(plugin.cancelExtendedBolus().success).isFalse()
     }
@@ -879,7 +898,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         // Nothing is sent from the callback itself: wrong thread, and the pump may be out of range.
         plugin.timezoneOrDSTChanged(TimeChangeType.TimezoneChanged)
 
-        verify(commandQueue, times(1)).readStatus(any(), anyOrNull())
+        verify(atc3Queue, times(1)).readStatus(any())
     }
 
     // Telling the user the pump itself is stopped
@@ -900,17 +919,12 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     fun `a running pump raises nothing and clears what was there`() = runTest {
         whenever(atc3Manager.readStatus()).thenAnswer { pumpState.currentCard() }
         pumpState.editStatus { it.copy(suspended = false) }
-        val dismissed = mutableListOf<Int>()
-        val subscription = rxBus.toObservable(EventDismissNotification::class.java)
-            .subscribe { dismissed.add(it.id) }
-
         plugin.getPumpStatus("test")
 
         verify(uiInteraction, never()).addNotification(
             eq(Notification.PUMP_SUSPENDED), any(), any()
         )
-        assertThat(dismissed).contains(Notification.PUMP_SUSPENDED)
-        subscription.dispose()
+        verify(uiInteraction, atLeastOnce()).dismiss(Notification.PUMP_SUSPENDED)
     }
 
     // The barrier: a command that changes delivery reads the pump's boluses first
@@ -921,7 +935,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
             app.aaps.pump.atc3.command.Atc3TbrResult(now, 1.0, 30, "not the point of this test")
         )
 
-        plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal)
+        plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
 
         verify(atc3Manager, times(1)).readBolusHistory()
         verify(atc3HistorySync, times(1)).reconcileBoluses(any(), any())
@@ -934,8 +948,8 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
             app.aaps.pump.atc3.command.Atc3TbrResult(now, 1.0, 30, "not the point of this test")
         )
 
-        plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal)
-        plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal)
+        plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
+        plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
 
         verify(atc3Manager, times(2)).readBolusHistory()
     }
@@ -967,7 +981,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
     /** The watchers a started plugin launches must not outlive the test that started them. */
     @AfterEach
-    fun stopPlugin() = plugin.onStop()
+    fun stopPlugin() = runBlocking { plugin.onStop() }
 
     /** Pretend the pump's state was last reconciled [minutes] ago. */
     private fun stateAge(minutes: Long) =
@@ -982,7 +996,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
         rxBus.send(EventAPSCalculationFinished())
 
-        verify(commandQueue, timeout(2_000).times(1)).readStatus(any(), anyOrNull())
+        verify(atc3Queue, timeout(2_000).times(1)).readStatus(any())
         plugin.onStop()
     }
 
@@ -993,7 +1007,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
         rxBus.send(EventAPSCalculationFinished())
 
-        verify(commandQueue, after(300).never()).readStatus(any(), anyOrNull())
+        verify(atc3Queue, after(300).never()).readStatus(any())
         plugin.onStop()
     }
 
@@ -1006,9 +1020,9 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         stateAge(4)
         startPlugin()
 
-        rxBus.send(EventNewBG(now))
+        glucoseChanges.emit(emptyList())
 
-        verify(commandQueue, after(300).never()).readStatus(any(), anyOrNull())
+        verify(atc3Queue, after(300).never()).readStatus(any())
         plugin.onStop()
     }
 
@@ -1019,9 +1033,9 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         stateAge(11)
         startPlugin()
 
-        rxBus.send(EventNewBG(now))
+        glucoseChanges.emit(emptyList())
 
-        verify(commandQueue, timeout(2_000).times(1)).readStatus(any(), anyOrNull())
+        verify(atc3Queue, timeout(2_000).times(1)).readStatus(any())
         plugin.onStop()
     }
 
@@ -1036,7 +1050,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
         rxBus.send(EventAPSCalculationFinished())
 
-        verify(commandQueue, timeout(2_000).times(1)).readStatus(any(), anyOrNull())
+        verify(atc3Queue, timeout(2_000).times(1)).readStatus(any())
         plugin.onStop()
     }
 
@@ -1276,7 +1290,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         pumpCountedMoreThanTheJournal(1.2)
         whenever(atc3Manager.setTempBasal(any(), any())).thenReturn(Atc3TbrResult(now, 1.0, 30, null))
 
-        val result = plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal)
+        val result = plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
 
         assertThat(result.success).isTrue()
         verify(atc3Manager, times(1)).setTempBasal(any(), any())
@@ -1288,7 +1302,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         whenever(atc3Manager.setTempBasal(any(), any())).thenReturn(Atc3TbrResult(now, 1.0, 30, null))
         clearInvocations(atc3Manager)
 
-        plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal)
+        plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
 
         verify(atc3Manager, times(1)).readBolusHistory()
     }
@@ -1300,7 +1314,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
             Atc3HistorySync.ReconcileResult(newestImportedAtMs = now - 60_000L, importedUnits = 1.0)
         )
 
-        val result = plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal)
+        val result = plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
 
         assertThat(result.success).isFalse()
         verify(atc3Manager, never()).setTempBasal(any(), any())
@@ -1454,7 +1468,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         whenever(atc3Manager.setTempBasal(any(), any())).thenReturn(Atc3TbrResult(now, 1.0, 30, null))
         clearInvocations(aapsJournal, atc3HistorySync)
 
-        plugin.setTempBasalAbsolute(1.0, 30, validProfile, false, tbrTypeNormal)
+        plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
 
         val order = inOrder(aapsJournal, atc3HistorySync)
         order.verify(aapsJournal).insulinBetween(any(), any(), any())
@@ -1583,7 +1597,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
         linkKeeper.checkLink()
 
-        verify(commandQueue, times(1)).readStatus(any(), anyOrNull())
+        verify(atc3Queue, times(1)).readStatus(any())
     }
 
     @Test
@@ -1669,5 +1683,26 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         plugin.getPumpStatus("test")
 
         assertThat(plugin.isLoopInvocationAllowed(ConstraintObject(true, aapsLogger)).value()).isTrue()
+    }
+
+    // Insulin concentration, see Atc3PumpPlugin.isLoopInvocationAllowed
+
+    @Test
+    fun `the loop does not run with insulin other than U100`() = runTest {
+        // The driver compares the AAPS journal with the pump's count unit for unit; with U200 the
+        // two would differ by half and every check of it would judge on wrong numbers.
+        whenever(ch.isU100()).thenReturn(false)
+
+        assertThat(plugin.isLoopInvocationAllowed(ConstraintObject(true, aapsLogger)).value()).isFalse()
+    }
+
+    @Test
+    fun `the loop runs with U100 insulin`() = runTest {
+        assertThat(plugin.isLoopInvocationAllowed(ConstraintObject(true, aapsLogger)).value()).isTrue()
+    }
+
+    @Test
+    fun `the insulin concentration setting is not offered with this pump`() = runTest {
+        assertThat(plugin.isConcentrationEnabled(ConstraintObject(true, aapsLogger)).value()).isFalse()
     }
 }

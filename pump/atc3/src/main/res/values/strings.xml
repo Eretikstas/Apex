@@ -195,4 +195,5 @@
     <string name="atc3_change_password">Change Bluetooth password</string>
     <string name="atc3_reservoir_value" comment="%1$s=units left, %2$d=size of the cartridge. Example: 120 U of 300 U">%1$s U of %2$d U</string>
     <string name="atc3_battery_value" comment="%1$d=charge in percent, %2$.2f=voltage. Example: 80 % (1.45 V)">%1$d %% (%2$.2f V)</string>
+    <string name="atc3_concentration_loop_blocked">Apex: the loop runs only with U100 insulin. This driver compares AAPS and the pump unit for unit.</string>
 </resources>

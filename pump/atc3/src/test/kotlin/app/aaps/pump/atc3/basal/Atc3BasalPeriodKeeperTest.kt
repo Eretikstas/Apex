@@ -1,10 +1,10 @@
 package app.aaps.pump.atc3.basal
 
-import app.aaps.core.interfaces.queue.CommandQueue
-import app.aaps.core.interfaces.ui.UiInteraction
+import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.check.Atc3AapsJournal
 import app.aaps.pump.atc3.check.Atc3JournalArithmetic
 import app.aaps.pump.atc3.check.Atc3Reconciliation
+import app.aaps.pump.atc3.command.Atc3Queue
 import app.aaps.pump.atc3.history.Atc3HistorySync
 import app.aaps.pump.atc3.manager.Atc3Manager
 import app.aaps.pump.atc3.state.Atc3PumpState
@@ -33,8 +33,8 @@ import java.util.Calendar
  */
 class Atc3BasalPeriodKeeperTest : TestBaseWithProfile() {
 
-    @Mock lateinit var commandQueue: CommandQueue
-    @Mock lateinit var uiInteraction: UiInteraction
+    @Mock lateinit var atc3Queue: Atc3Queue
+    @Mock lateinit var uiInteraction: Atc3Notices
     @Mock lateinit var atc3Manager: Atc3Manager
     @Mock lateinit var atc3HistorySync: Atc3HistorySync
     @Mock lateinit var aapsJournal: Atc3AapsJournal
@@ -63,7 +63,7 @@ class Atc3BasalPeriodKeeperTest : TestBaseWithProfile() {
         store = Atc3Store(aapsLogger, preferences, uiInteraction, rh)
         val trace = Atc3Trace(aapsLogger, preferences)
         keeper = Atc3BasalPeriodKeeper(
-            aapsLogger, rh, store, dateUtil, commandQueue, pumpState, atc3Manager, atc3HistorySync, aapsJournal, reconciliation, trace, spread
+            aapsLogger, rh, store, dateUtil, atc3Queue, pumpState, atc3Manager, atc3HistorySync, aapsJournal, reconciliation, trace, spread
         )
         whenever(atc3HistorySync.bolusesLearnedAfter(any())).thenReturn(0.0)
         whenever(atc3HistorySync.hasExpectedBolus()).thenReturn(false)
