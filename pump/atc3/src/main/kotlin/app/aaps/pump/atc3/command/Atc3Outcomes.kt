@@ -6,8 +6,14 @@ sealed interface Atc3BolusOutcome {
     /** The pump refused the command: nothing was delivered. */
     data object Refused : Atc3BolusOutcome
 
-    /** The command never reached the pump, or it never answered: nothing is known to be delivered. */
+    /** The command never reached the pump: nothing was delivered. */
     data object NotSent : Atc3BolusOutcome
+
+    /**
+     * The command was written to the pump, but no answer came and no delivery was seen. The pump may
+     * still have taken it: only its history can say. [sentAtMs] is the phone's clock when it was sent.
+     */
+    data class Unanswered(val sentAtMs: Long) : Atc3BolusOutcome
 
     /**
      * The pump accepted the bolus and it was followed to its end.

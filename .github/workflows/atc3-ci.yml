@@ -25,9 +25,17 @@ jobs:
         -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
         -Dkotlin.daemon.jvm.options="-Xmx2g"
         -Dkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.workers.max=2
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # The runner was shut down in the middle of the app build: out of disk or memory. Free what this
+      # build does not use (the Android SDK stays).
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -101,9 +109,17 @@ jobs:
         -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
         -Dkotlin.daemon.jvm.options="-Xmx2g"
         -Dkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.workers.max=2
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      # The runner was shut down in the middle of the app build: out of disk or memory. Free what this
+      # build does not use (the Android SDK stays).
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h /
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5

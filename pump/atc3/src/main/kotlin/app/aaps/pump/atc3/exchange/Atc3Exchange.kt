@@ -218,7 +218,15 @@ class Atc3Exchange @Inject constructor(
         opcode: Byte,
         payload: ByteArray,
         group: Byte = Atc3Protocol.GROUP_CONTROL
-    ): Atc3Answer {
+    ): Atc3Answer = sendControl(opcode, payload, group).answer
+
+    /** As [sendControlAndWait], and also whether the request was written to the pump at all. */
+    fun sendControl(
+        opcode: Byte,
+        payload: ByteArray,
+        group: Byte = Atc3Protocol.GROUP_CONTROL
+    ): Atc3ControlResult {
+        var written = false
         val answer = exchangeForAnswer(
             "control 0x%02X".format(opcode),
             {
@@ -226,15 +234,15 @@ class Atc3Exchange @Inject constructor(
                     (it.objectType == Atc3Protocol.ObjectType.ACK || it.objectType == Atc3Protocol.ObjectType.REJECTED)
             }
         ) {
-            send(group, Atc3Protocol.MODE_CONTROL, opcode, Atc3Frame.NO_PARAMETER, payload)
+            send(group, Atc3Protocol.MODE_CONTROL, opcode, Atc3Frame.NO_PARAMETER, payload).also { written = it }
         }
-        if (answer == null) return Atc3Answer.NONE
+        if (answer == null) return Atc3ControlResult(Atc3Answer.NONE, written)
         if (answer.objectType == Atc3Protocol.ObjectType.REJECTED) {
             aapsLogger.error(LTag.PUMP, "ATC3: pump refused command 0x%02X".format(opcode))
             trace.event(Atc3TraceCat.EXCH, "refused", "opcode" to "0x%02X".format(opcode))
-            return Atc3Answer.REFUSED
+            return Atc3ControlResult(Atc3Answer.REFUSED, written)
         }
-        return Atc3Answer.ACCEPTED
+        return Atc3ControlResult(Atc3Answer.ACCEPTED, written)
     }
 
     fun send(group: Byte, mode: Byte, opcode: Byte, parameter: Byte, payload: ByteArray = ByteArray(0)): Boolean {

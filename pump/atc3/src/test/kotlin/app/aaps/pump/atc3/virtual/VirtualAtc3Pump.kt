@@ -89,6 +89,9 @@ class VirtualAtc3Pump(
     /** A running bolus stops being delivered after this many raw steps, and nothing more is sent. */
     var bolusStallsAt: Int? = null
 
+    /** The pump starts a bolus but its answer to the command is lost on the way. */
+    var bolusAckLost: Boolean = false
+
     /** The link drops after this many raw steps of a bolus. */
     var dropLinkAtBolusRaw: Int? = null
 
@@ -330,7 +333,7 @@ class VirtualAtc3Pump(
             0x12 -> {
                 val dose = u16(payload, 0)
                 // §4.12: the bolus start is acknowledged with an echo of its payload.
-                send(response(0xA1, 0x55, 0x00, 0x00, payload))
+                if (!bolusAckLost) send(response(0xA1, 0x55, 0x00, 0x00, payload))
                 startBolus(dose)
             }
 

@@ -25,6 +25,9 @@
     <string name="atc3_firmware_no_password">Pump firmware %1$s has no Bluetooth password: anything within radio range can control this pump. Have the firmware updated to %2$s or newer.</string>
     <string name="atc3_pump_locked">The pump is locked and refuses every command. It can only be unlocked on the pump itself.</string>
     <string name="atc3_bolus_failed">Bolus could not be delivered</string>
+    <string name="atc3_bolus_unanswered_found">The pump did not answer the bolus command, but its history shows a new bolus. It was added to AAPS. Check the pump before you give another bolus.</string>
+    <string name="atc3_bolus_unanswered_not_found">The pump did not answer the bolus command. Its history shows no new bolus yet, but the bolus may still be running. Check the pump before you give another bolus.</string>
+    <string name="atc3_bolus_unanswered_unknown">The pump did not answer the bolus command. It is not known if the bolus was given. Check the pump before you give another bolus.</string>
     <string name="atc3_bolus_cancelled">Bolus cancelled, no insulin was delivered</string>
     <string name="atc3_bolus_zero">Nothing to deliver</string>
     <string name="atc3_bolus_unconfirmed">Bolus delivered, but the pump has not written it in its history yet. AAPS adds it as soon as the record appears.</string>

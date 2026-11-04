@@ -6,6 +6,7 @@ import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.RM
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.pump.BlePreCheck
 import app.aaps.core.interfaces.pump.BolusProgressData
 import app.aaps.core.interfaces.pump.DetailedBolusInfo
@@ -280,6 +281,34 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
         val result = runBlocking { plugin.deliverTreatment(bolus(1.0)) }
 
         assertThat(result.success).isFalse()
+    }
+
+    @Test
+    fun `a bolus whose answer was lost but which the pump delivers is followed and counted once`() {
+        status()
+        pump.bolusAckLost = true
+
+        val result = runBlocking { plugin.deliverTreatment(bolus(1.0)) }
+
+        // The progress showed the bolus running: followed to its end like any other.
+        assertThat(result.success).isTrue()
+        assertThat(result.bolusDelivered).isWithin(1e-9).of(1.0)
+        assertThat(pump.bolusLog.size).isEqualTo(1)
+        assertThat(bolusRows().filter { it.amount > 0 }.map { it.amount }).containsExactly(1.0)
+    }
+
+    @Test
+    fun `a bolus the pump never answered is not reported as simply failed, and the user is told to check`() {
+        status()
+        pump.silentFor.add(0x12)
+
+        val result = runBlocking { plugin.deliverTreatment(bolus(1.0)) }
+
+        assertThat(result.success).isFalse()
+        assertThat(pump.bolusLog).isEmpty()
+        assertThat(bolusRows().filter { it.amount > 0 }).isEmpty()
+        // The warning stays on screen, not only in the dialog that may be closed already.
+        verify(notices, atLeastOnce()).addNotification(eq(Notification.PUMP_WARNING), any(), eq(Notification.URGENT))
     }
 
     @Test

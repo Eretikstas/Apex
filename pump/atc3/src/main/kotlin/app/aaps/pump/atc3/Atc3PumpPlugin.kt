@@ -633,6 +633,7 @@ class Atc3PumpPlugin @Inject constructor(
             onAccepted = { acceptedAt -> atc3HistorySync.expect(acceptedAt, requested, detailedBolusInfo.bolusType) },
             onProgress = { delivered -> bolusProgressData.updateProgress(PumpInsulin(delivered)) }
         )
+        if (outcome is Atc3BolusOutcome.Unanswered) return bolusUnanswered(requested, outcome.sentAtMs)
         if (outcome !is Atc3BolusOutcome.Delivered) {
             val comment =
                 if (outcome is Atc3BolusOutcome.Refused) rh.gs(R.string.atc3_refused_by_pump)
@@ -654,6 +655,29 @@ class Atc3PumpPlugin @Inject constructor(
         trace.event(Atc3TraceCat.DRV, "bolus_unconfirmed", "asked" to requested, "seen" to outcome.reportedUnits)
         val judged = judgeBolus(requested, outcome.reportedUnits, outcome.cancelled, fromRecord = false)
         return if (judged.success) judged.comment(rh.gs(R.string.atc3_bolus_unconfirmed)) else judged
+    }
+
+    /**
+     * The bolus was written to the pump, but its answer was lost and no delivery was seen. It is never
+     * reported as simply failed: the user could give it again and get it twice. The pump's journal is
+     * read at once, so a bolus the pump did take reaches AAPS now, and the user is told to look.
+     */
+    private suspend fun bolusUnanswered(requested: Double, sentAtMs: Long): PumpEnactResult {
+        trace.event(Atc3TraceCat.DRV, "bolus_unanswered", "units" to requested, "sentAt" to sentAtMs)
+        val read = reconciliation.readBoluses()
+        // A record from the minute the bolus was sent, or after: the pump took it.
+        val newest = read?.newestImportedAtMs
+        val found = newest != null && newest >= sentAtMs - UNANSWERED_BOLUS_MARGIN_MS
+        val comment = when {
+            found        -> rh.gs(R.string.atc3_bolus_unanswered_found)
+            read == null -> rh.gs(R.string.atc3_bolus_unanswered_unknown)
+            else         -> rh.gs(R.string.atc3_bolus_unanswered_not_found)
+        }
+        aapsLogger.error(LTag.PUMP, "ATC3: no answer to the bolus of $requested U, found in the journal: $found, journal read: ${read != null}")
+        notices.addNotification(Notification.PUMP_WARNING, comment, Notification.URGENT)
+        // The next status read looks again: a running bolus is written in the journal when it ends.
+        atc3Queue.readStatus(rh.gs(R.string.atc3_bolus_unanswered_unknown))
+        return failed(comment)
     }
 
     /**
@@ -1198,6 +1222,9 @@ class Atc3PumpPlugin @Inject constructor(
 
         /** How far the pump's stamp of our temporary basal may sit from our acknowledgement: a minute, and the clock. */
         const val OWN_TBR_START_MS = 90_000L
+
+        /** How far before the send a journal record of an unanswered bolus may stand: records carry whole minutes, and the clock. */
+        const val UNANSWERED_BOLUS_MARGIN_MS = 120_000L
 
     }
 }

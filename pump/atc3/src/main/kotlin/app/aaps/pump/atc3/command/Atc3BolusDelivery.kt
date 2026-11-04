@@ -63,15 +63,26 @@ class Atc3BolusDelivery @Inject constructor(
         bolusInProgress = true
         var acceptedAt = 0L
         try {
-            when (exchange.sendControlAndWait(Atc3Protocol.ControlOpcode.BOLUS, payload)) {
+            val sentAt = dateUtil.now()
+            val sent = exchange.sendControl(Atc3Protocol.ControlOpcode.BOLUS, payload)
+            when (sent.answer) {
                 Atc3Answer.REFUSED  -> return Atc3BolusOutcome.Refused
-                Atc3Answer.NONE     -> return Atc3BolusOutcome.NotSent
-                Atc3Answer.ACCEPTED -> Unit
+                Atc3Answer.ACCEPTED -> acceptedAt = dateUtil.now()
+                Atc3Answer.NONE     -> {
+                    if (!sent.written) return Atc3BolusOutcome.NotSent
+                    // Written, but the answer was lost: the pump may be delivering all the same. Its
+                    // progress says so; then the bolus is ours from the moment it was sent.
+                    if (!deliverySeenWithin(BOLUS_STALL_MS)) {
+                        aapsLogger.error(LTag.PUMP, "ATC3: the pump did not answer the bolus and shows no delivery")
+                        return Atc3BolusOutcome.Unanswered(sentAt)
+                    }
+                    aapsLogger.warn(LTag.PUMP, "ATC3: the pump did not answer the bolus, but it is delivering it")
+                    acceptedAt = sentAt
+                }
             }
-            acceptedAt = dateUtil.now()
             onAccepted(acceptedAt)
             // The time to a first progress frame is counted from the pump's acceptance.
-            lastProgressAt = System.currentTimeMillis()
+            if (!bolusSawProgress) lastProgressAt = System.currentTimeMillis()
 
             var lastReported = -1.0
             while (!bolusFinished && !bolusCancelAccepted) {
@@ -98,6 +109,16 @@ class Atc3BolusDelivery @Inject constructor(
             sawProgress = bolusSawProgress,
             acceptedAtMs = acceptedAt
         )
+    }
+
+    /** Whether a progress or completion frame of the bolus just sent comes within [ms]. */
+    private fun deliverySeenWithin(ms: Long): Boolean {
+        val end = System.currentTimeMillis() + ms
+        while (System.currentTimeMillis() < end) {
+            if (bolusSawProgress || bolusFinished) return true
+            SystemClock.sleep(BOLUS_POLL_MS)
+        }
+        return bolusSawProgress || bolusFinished
     }
 
     /**
