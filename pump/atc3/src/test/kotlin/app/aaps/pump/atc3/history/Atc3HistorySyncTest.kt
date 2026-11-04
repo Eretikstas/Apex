@@ -513,7 +513,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
         val timestamp = argumentCaptor<Long>()
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            timestamp.capture(), eq(0.45), any(), eq(true), any(), any(), any(), any()
+            timestamp.capture(), eq(PumpRate(0.45)), any(), eq(true), any(), any(), any(), any()
         )
         assertThat(timestamp.firstValue).isEqualTo(now)
     }
@@ -547,7 +547,7 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
 
         val timestamp = argumentCaptor<Long>()
         verify(pumpSync, times(1)).syncTemporaryBasalWithPumpId(
-            timestamp.capture(), eq(0.45), any(), eq(true), any(), any(), any(), any()
+            timestamp.capture(), eq(PumpRate(0.45)), any(), eq(true), any(), any(), any(), any()
         )
         assertThat(timestamp.firstValue).isEqualTo(startedAt)
     }
