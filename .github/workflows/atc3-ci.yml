@@ -90,6 +90,19 @@ jobs:
           MONITOR=$!
           trap 'kill $MONITOR 2>/dev/null || true' EXIT
           ./gradlew :app:assembleFullDebug --stacktrace
+          # Kept apart: the side by side build below writes to the same folder.
+          mkdir -p out/regular
+          cp app/build/outputs/apk/full/debug/*.apk out/regular/
+
+      # The same app with its own package name (info.nightscout.androidaps.atc3test): it installs next to
+      # the AAPS on a phone, not over it, to try the screens. Only the app module is built again.
+      - name: Build the side by side test app
+        id: sidebyside
+        if: ${{ !cancelled() && steps.app.outcome == 'success' }}
+        run: |
+          ./gradlew :app:assembleFullDebug -Patc3SideBySide=true --stacktrace
+          mkdir -p out/sidebyside
+          cp app/build/outputs/apk/full/debug/*.apk out/sidebyside/
 
       - name: Upload test reports
         if: always()
@@ -107,7 +120,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aaps-aimi-atc3-fullDebug
-          path: app/build/outputs/apk/full/debug/*.apk
+          path: out/regular/*.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload side by side test APK
+        if: ${{ !cancelled() && steps.sidebyside.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: aimi-atc3-test-side-by-side
+          path: out/sidebyside/*.apk
           retention-days: 14
           if-no-files-found: error
 

@@ -195,6 +195,13 @@ android {
         }
         getByName("debug") {
             // config debug
+            // -Patc3SideBySide=true: a test build that installs next to the AAPS already on the phone,
+            // not over it. Its own package name, so its own data, and its own name in the launcher.
+            if (project.findProperty("atc3SideBySide") == "true") {
+                applicationIdSuffix = ".atc3test"
+                versionNameSuffix = "-atc3test"
+                resValue("string", "app_name", "AIMI ATC3 test")
+            }
         }
     }
 
