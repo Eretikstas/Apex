@@ -1,9 +1,11 @@
 package app.aaps.di
 
+import app.aaps.core.interfaces.ble.BleRadioPriority
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.ExternalOptions
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.history.HistoryBrowserData
+import app.aaps.implementations.BleRadioPriorityImpl
 import app.aaps.implementations.ConfigImpl
 import app.aaps.implementations.UiInteractionImpl
 import app.aaps.ui.compose.history.HistoryScope
@@ -64,6 +66,9 @@ abstract class TestAppBindingsInstallModule {
     @Binds abstract fun bindActivityNames(activityNames: UiInteractionImpl): UiInteraction
 
     @Binds @Singleton abstract fun bindHistoryScope(impl: HistoryBrowserData): HistoryScope
+
+    // As in AppModule.AppBindings, which this module replaces: without it the test graph does not build.
+    @Binds @Singleton abstract fun bindBleRadioPriority(impl: BleRadioPriorityImpl): BleRadioPriority
 
     companion object {
 
