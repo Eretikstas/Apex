@@ -114,6 +114,13 @@ jobs:
               data["client"].append(entry)
               json.dump(data, open(path, "w"), indent=2)
           PY
+          # The sync module declares app.aaps.weardata.permission (signature level). The AAPS already on
+          # the phone declares it too, with another key, and Android then refuses the install. The test
+          # app gets the permission under its own name, in this throwaway checkout only.
+          sed -i 's/app\.aaps\.weardata\.permission/info.nightscout.androidaps.atc3test.weardata.permission/g' \
+            plugins/sync/src/main/AndroidManifest.xml \
+            plugins/sync/src/main/kotlin/app/aaps/plugins/sync/wear/receivers/WearDataReceiver.kt
+          grep -c "info.nightscout.androidaps.atc3test.weardata.permission" plugins/sync/src/main/AndroidManifest.xml
           ./gradlew :app:assembleFullDebug -Patc3SideBySide=true --stacktrace
           mkdir -p out/sidebyside
           cp app/build/outputs/apk/full/debug/*.apk out/sidebyside/
