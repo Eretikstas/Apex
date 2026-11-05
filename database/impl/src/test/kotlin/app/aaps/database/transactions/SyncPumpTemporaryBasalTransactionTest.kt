@@ -97,6 +97,58 @@ class SyncPumpTemporaryBasalTransactionTest {
     }
 
     @Test
+    fun `a record already cut by an end event is not reopened when its rate changes too`() = runTest {
+        // Rate and duration both sent again: the rate is taken, the cut end stays.
+        val tb = createTemporaryBasal(pumpId = 100L, timestamp = 1000L, rate = 0.0, duration = 60_000L)
+        val existing = createTemporaryBasal(pumpId = 100L, timestamp = 1000L, rate = 1.5, duration = 20_000L)
+        existing.interfaceIDs.endId = 200L
+
+        whenever(temporaryBasalDao.findByPumpIds(100L, InterfaceIDs.PumpType.DANA_I, "ABC123")).thenReturn(existing)
+
+        val transaction = SyncPumpTemporaryBasalTransaction(tb, null)
+        transaction.database = database
+        val result = transaction.run()
+
+        assertThat(result.updated).hasSize(1)
+        assertThat(existing.rate).isEqualTo(0.0)
+        assertThat(existing.duration).isEqualTo(20_000L)
+        assertThat(existing.end).isEqualTo(21_000L)
+    }
+
+    @Test
+    fun `a record already cut by an end event does not end later when its start moves`() = runTest {
+        // A later start with the same duration would push the end out: the end is kept where it was cut.
+        val tb = createTemporaryBasal(pumpId = 100L, timestamp = 5000L, rate = 1.5, duration = 20_000L)
+        val existing = createTemporaryBasal(pumpId = 100L, timestamp = 1000L, rate = 1.5, duration = 20_000L)
+        existing.interfaceIDs.endId = 200L
+
+        whenever(temporaryBasalDao.findByPumpIds(100L, InterfaceIDs.PumpType.DANA_I, "ABC123")).thenReturn(existing)
+
+        val transaction = SyncPumpTemporaryBasalTransaction(tb, null)
+        transaction.database = database
+        val result = transaction.run()
+
+        assertThat(result.updated).hasSize(1)
+        assertThat(existing.timestamp).isEqualTo(5000L)
+        assertThat(existing.end).isEqualTo(21_000L)
+    }
+
+    @Test
+    fun `an open record still takes the duration the pump sends`() = runTest {
+        // Not cut by an end event: the pump may extend it, as before.
+        val tb = createTemporaryBasal(pumpId = 100L, timestamp = 2000L, rate = 2.0, duration = 90_000L)
+        val existing = createTemporaryBasal(pumpId = 100L, timestamp = 1000L, rate = 1.5, duration = 60_000L)
+
+        whenever(temporaryBasalDao.findByPumpIds(100L, InterfaceIDs.PumpType.DANA_I, "ABC123")).thenReturn(existing)
+
+        val transaction = SyncPumpTemporaryBasalTransaction(tb, null)
+        transaction.database = database
+        transaction.run()
+
+        assertThat(existing.duration).isEqualTo(90_000L)
+    }
+
+    @Test
     fun `does not update when values are same`() = runTest {
         val tb = createTemporaryBasal(pumpId = 100L, timestamp = 1000L, rate = 1.5, duration = 60_000L)
         val existing = createTemporaryBasal(pumpId = 100L, timestamp = 1000L, rate = 1.5, duration = 60_000L)
