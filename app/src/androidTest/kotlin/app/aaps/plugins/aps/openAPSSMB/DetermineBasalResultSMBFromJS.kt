@@ -9,6 +9,9 @@ import org.json.JSONException
 import org.json.JSONObject
 import javax.inject.Inject
 
+/** The old name, still used by the JS adapters and the replay test. */
+typealias DetermineBasalResultSMBFromJS = DetermineBasalResultSMB
+
 open class DetermineBasalResultSMB internal constructor(injector: HasAndroidInjector) : APSResultObject(injector), VariableSensitivityResult {
 
     @Inject lateinit var dateUtil: DateUtil
