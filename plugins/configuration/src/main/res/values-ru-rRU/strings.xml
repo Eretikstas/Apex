@@ -62,4 +62,34 @@
     <!-- Google Drive error messages (used by GoogleDriveManager) -->
     <!-- Provider-agnostic cloud storage strings -->
     <!-- Authorization status strings -->
+    <!-- Russian, from upstream AAPS (Crowdin) -->
+    <string name="import_setting">Импортировать настройки</string>
+    <string name="aaps_directory">Папка AAPS</string>
+    <string name="google_drive_authorized">Google Drive авторизован</string>
+    <string name="google_drive_reauth_required">Очистите настройки и повторно авторизуйте Google Drive</string>
+    <!-- Russian, from AAPS 3.x translations (Crowdin) -->
+    <string name="permission">Права доступа</string>
+    <string name="need_system_window_permission">Приложению требуется разрешение системного окна для уведомлений</string>
+    <string name="need_location_permission">Приложению требуется разрешение на доступ к местоположению для сканирования BT и идентификации WiFi</string>
+    <string name="need_background_location_permission">Приложению необходим доступ к геолокации в любое время для автоматизаций</string>
+    <string name="error_asking_for_permissions">Ошибка при запросе разрешения</string>
+    <string name="askforpermission">Запросить права доступа</string>
+    <string name="status_label">состояние:</string>
+    <string name="authorization_status">Статус авторизации</string>
+    <!-- Russian, from translated for AIMI ATC3 (Claude), check wording -->
+    <string name="need_storage_permission">Приложению нужно разрешение на память, чтобы сохранять журналы и экспортировать настройки (только для старых версий Android)</string>
+    <string name="need_whitelisting">%1$s нужно исключить из оптимизации батареи для правильной работы</string>
+    <string name="select_aaps_directory">Выберите папку AAPS для экспорта, настроек и связанных данных.</string>
+    <string name="setupwizard_client_control_title">Управление с клиента</string>
+    <string name="setupwizard_client_control_info">Сопрягите клиентские устройства, чтобы они могли отправлять этому главному телефону подписанные команды через Nightscout. Это новый рекомендуемый способ удалённо управлять AAPS.</string>
+    <string name="setupwizard_ns_receive_info">Приём терапии и данных напрямую из Nightscout (менее безопасный способ) теперь по умолчанию выключен. Открывайте настройки ниже, только если это вам ещё нужно. Это нужно, если вы вводите данные через NS или сторонние приложения.</string>
+    <string name="setupwizard_open_ns_receive_settings">Приём данных из Nightscout</string>
+    <string name="setupwizard_pair_with_master_info">Сопрягите этот клиент с главным AAPS, чтобы он мог отправлять команды по защищённому каналу.</string>
+    <string name="setupwizard_pairing_ws_warning">Для сопряжения нужно соединение WebSocket с Nightscout. Вернитесь на прошлый шаг и сначала включите его.</string>
+    <string name="setupwizard_pairing_status_master">Сопряжённых клиентов: %1$d</string>
+    <string name="setupwizard_pairing_status_master_none">Клиентов пока нет</string>
+    <string name="setupwizard_pairing_status_client_paired">Сопряжено с главным телефоном</string>
+    <string name="setupwizard_pairing_status_client_not_paired">Ещё не сопряжено</string>
+    <string name="aimi_backup_to_cloud">Резервная копия AIMI в облако</string>
+    <string name="aimi_data_export_option">Данные AIMI (модели, наборы данных)</string>
 </resources>

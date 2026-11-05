@@ -163,4 +163,8 @@
         <item quantity="many">Оповещений Pod: %1$s</item>
         <item quantity="other">Оповещений Pod: %1$s</item>
     </plurals>
+    <!-- Russian, from upstream AAPS (Crowdin) -->
+    <string name="omnipod_common_cmd_cancel_tbr">ВБС отменена (пользователем)</string>
+    <!-- Russian, from AAPS 3.x translations (Crowdin) -->
+    <string name="omnipod_common_preferences_notification_delivery_suspended_sound_enabled">Звук на приостановку подачи включен</string>
 </resources>

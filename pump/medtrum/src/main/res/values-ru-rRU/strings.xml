@@ -125,4 +125,10 @@
     <string name="bolus_error_reason_unable_to_send_command">Невозможно отправить команду на болюс</string>
     <string name="bolus_error_reason_communication_lost">Истекло время ожидания статуса болюса</string>
     <string name="bolus_error_reason_pump_error">Ошибка помпы</string>
+    <!-- Russian, from upstream AAPS (Crowdin) -->
+    <string name="status_priming">Заправка</string>
+    <string name="status_active">Активна</string>
+    <string name="status_stopped">остановлено</string>
+    <string name="ble_scan_connect_pump_base_first">Подсоедините базу к новому патчу, чтобы включить его, после этого выберите его из списка ниже.</string>
+    <string name="connect_pump_base">Убедитесь, что база соединена с патчем, удалите оставшийся воздух и заправьте инсулин, после этого нажмите <b>Далее</b>.</string>
 </resources>

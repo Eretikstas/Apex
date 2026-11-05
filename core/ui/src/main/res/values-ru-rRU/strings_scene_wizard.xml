@@ -19,4 +19,10 @@
     <!-- Scene wizard: chain step -->
     <!-- Scene list: chain indicator -->
     <!-- Scene expiry: chain result notifications -->
+    <!-- Russian, from upstream AAPS (Crowdin) -->
+    <string name="scene_template_exercise">Нагрузка</string>
+    <string name="scene_template_sleep">Сон</string>
+    <string name="scene_chain_none">Отсутствует</string>
+    <!-- Russian, from AAPS 3.x translations (Crowdin) -->
+    <string name="scene_wizard_finish">Завершить</string>
 </resources>

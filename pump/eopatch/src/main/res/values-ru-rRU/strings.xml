@@ -81,4 +81,6 @@
     <string name="string_temp_basal_remained_hhmm">оставшееся время: %1$s:%2$s</string>
     <string name="string_resume_failed">Возобновление не состоялось.</string>
     <!-- Permission rationales -->
+    <!-- Russian, from AAPS 3.x translations (Crowdin) -->
+    <string name="no_profile_selected_try_again">Профиль не выбран. Выберите профиль и повторите попытку.</string>
 </resources>

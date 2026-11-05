@@ -1196,4 +1196,22 @@
     <string name="oaps_aimi_adaptive_basal_summary">Automatically scale standard basal rates based on neural insights (for all users).</string>
     <string name="oaps_aimi_adaptive_basal_max_scaling_title">Max Adaptive Scaling</string>
     <string name="oaps_aimi_adaptive_basal_max_scaling_summary">Maximum multiplier allowed for adaptive basal scaling (e.g. 1.5x).</string>
+    <!-- Russian, from upstream AAPS (Crowdin) -->
+    <string name="aimi_pkpd_wizard_next">Далее</string>
+    <string name="aimi_t3c_family_activity">Нагрузка</string>
+    <string name="aimi_t3c_level_high">Высокий</string>
+    <string name="aimi_t3c_level_low">Низкий заряд</string>
+    <string name="sos_sms_pos_not_available">Недоступно</string>
+    <string name="aimi_settings_audit_secret_set">Задать</string>
+    <string name="aimi_control_center_not_configured">Не настроено</string>
+    <string name="aimi_control_center_current_profile">Текущий профиль</string>
+    <string name="aimi_control_center_meal_level_active">Активна</string>
+    <string name="aimi_control_center_harmonia_action">Действие</string>
+    <string name="aimi_control_center_physio_level_low">Низкий заряд</string>
+    <!-- Russian, from AAPS 3.x translations (Crowdin) -->
+    <string name="autotune_peak">Пик</string>
+    <string name="aimi_pkpd_pace_normal">Норма</string>
+    <string name="aimi_pkpd_wizard_skip">Пропустить</string>
+    <string name="aimi_tuning_context_auto">Авто</string>
+    <string name="aimi_settings_audit_secret_not_set">Не выбрано</string>
 </resources>

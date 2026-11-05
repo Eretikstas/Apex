@@ -177,4 +177,16 @@
     <string name="atc3_scanner_no_bluetooth">Bluetooth выключен или нет разрешения, искать помпу нельзя</string>
     <string name="atc3_pump_stopped_by_aaps">Apex: AAPS остановил помпу из-за её тревоги (%1$s). Устраните причину, сбросьте тревогу на помпе и запустите помпу: на ней самой или во вкладке Apex. Сама она не запустится.</string>
     <string name="atc3_alarm_note">Apex: %1$s</string>
+    <!-- Russian, from upstream AAPS (Crowdin) -->
+    <string name="atc3_pump_state_label">Помпа</string>
+    <string name="atc3_stop_pump">Остановить помпу</string>
+    <!-- Russian, from translated for AIMI ATC3 (Claude), check wording -->
+    <string name="atc3_bolus_unanswered_found">Помпа не ответила на команду болюса, но в её истории есть новый болюс. Он добавлен в AAPS. Проверьте помпу, прежде чем давать ещё один болюс.</string>
+    <string name="atc3_bolus_unanswered_not_found">Помпа не ответила на команду болюса. В её истории пока нет нового болюса, но болюс может ещё идти. Проверьте помпу, прежде чем давать ещё один болюс.</string>
+    <string name="atc3_bolus_unanswered_unknown">Помпа не ответила на команду болюса. Неизвестно, был ли болюс введён. Проверьте помпу, прежде чем давать ещё один болюс.</string>
+    <string name="atc3_last_answer_label">Последний ответ</string>
+    <string name="atc3_resume_pump">Запустить помпу</string>
+    <string name="atc3_change_password">Сменить пароль Bluetooth</string>
+    <string name="atc3_reservoir_value">%1$s ЕД из %2$d ЕД</string>
+    <string name="atc3_concentration_loop_blocked">Apex: цикл работает только с инсулином U100. Драйвер сравнивает AAPS и помпу единица в единицу.</string>
 </resources>
