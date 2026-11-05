@@ -238,6 +238,10 @@ jobs:
           ( while true; do echo "RESOURCES $(date -u +%T) $(free -m | sed -n 2p) | $(free -m | sed -n 3p) | $(df -h / | tail -1)"; sleep 30; done ) &
           MONITOR=$!
           trap 'kill $MONITOR 2>/dev/null || true' EXIT
+          # Build both APKs first, then stop Gradle. The build fills the Gradle heap, and with the
+          # emulator next to it the swap ran full and the emulator showed "isn't responding".
+          ./gradlew :app:assembleFullDebug :app:assembleFullDebugAndroidTest --stacktrace
+          ./gradlew --stop
           ./gradlew :app:emuFullDebugAndroidTest \
             -Pandroid.testInstrumentationRunnerArguments.class=app.aaps.e2e.Atc3UiSmokeTest \
             -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \

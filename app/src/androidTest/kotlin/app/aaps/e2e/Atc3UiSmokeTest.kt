@@ -201,6 +201,7 @@ class Atc3UiSmokeTest {
     private fun find(label: String, timeout: Long = STEP_TIMEOUT): UiObject2 {
         val end = SystemClock.uptimeMillis() + timeout
         while (SystemClock.uptimeMillis() < end) {
+            dismissSystemNotResponding()
             device.findObject(byText(label))?.let { return it }
             device.findObject(byDesc(label))?.let { return it }
             device.waitForIdle(IDLE_MS)
@@ -221,6 +222,7 @@ class Atc3UiSmokeTest {
     private fun waitForVisible(label: String, timeout: Long = STEP_TIMEOUT): Boolean {
         val end = SystemClock.uptimeMillis() + timeout
         while (SystemClock.uptimeMillis() < end) {
+            dismissSystemNotResponding()
             if (device.findObject(byText(label)) != null || device.findObject(byDesc(label)) != null) return true
             device.waitForIdle(IDLE_MS)
         }
@@ -234,6 +236,7 @@ class Atc3UiSmokeTest {
     private fun assertVisibleContains(substring: String, timeout: Long = STEP_TIMEOUT) {
         val end = SystemClock.uptimeMillis() + timeout
         while (SystemClock.uptimeMillis() < end) {
+            dismissSystemNotResponding()
             if (device.findObject(byTextContains(substring)) != null) return
             device.waitForIdle(IDLE_MS)
         }
@@ -243,11 +246,22 @@ class Atc3UiSmokeTest {
     private fun waitForOverview() {
         val end = SystemClock.uptimeMillis() + INIT_TIMEOUT
         while (SystemClock.uptimeMillis() < end) {
+            dismissSystemNotResponding()
             runCatching { device.findObject(byDesc("Close sheet"))?.click() }
             if (device.findObject(byDesc("Open navigation")) != null) return
             device.waitForIdle(IDLE_MS)
         }
         error("Overview never appeared within ${INIT_TIMEOUT}ms")
+    }
+
+    /**
+     * A slow CI emulator can show the system dialog "... isn't responding".
+     * It covers the app, so press "Wait" and let the test go on.
+     */
+    private fun dismissSystemNotResponding() {
+        if (device.findObject(byTextContains("isn't responding")) == null) return
+        runCatching { device.findObject(byText("Wait"))?.click() }
+        device.waitForIdle(IDLE_MS)
     }
 
     private inline fun withStaleRetry(times: Int = STALE_RETRIES, block: () -> Unit) {
