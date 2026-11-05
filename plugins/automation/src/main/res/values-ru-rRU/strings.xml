@@ -117,12 +117,4 @@
     <string name="off">ВЫКЛ</string>
     <!--    Map Picker (OpenStreetMap)-->
     <!-- Permission rationales -->
-    <!-- Russian, from upstream AAPS (Crowdin) -->
-    <string name="automation_discard_confirm">Завершить пользование</string>
-    <string name="automation_category_other">Другое</string>
-    <string name="automation_category_targets">Цели</string>
-    <string name="automation_category_profile">Профиль</string>
-    <string name="automation_category_alerts">Оповещения</string>
-    <string name="automation_unit_meters">м</string>
-    <string name="permission_location_title">Местоположение</string>
 </resources>

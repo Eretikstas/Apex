@@ -84,6 +84,4 @@
     <string name="invalid_history_data">Обнаружены недопустимые данные истории помпы. Создайте запись о новой проблеме и предоставьте журналы.</string>
     <string name="riley_statistics">Статистика RL</string>
     <string name="clicked_refresh" comment="26 characters max for translation">Нажато обновление</string>
-    <!-- Russian, from upstream AAPS (Crowdin) -->
-    <string name="medtronic_custom_action_reset_rileylink">Перезагрузить RileyLink</string>
 </resources>

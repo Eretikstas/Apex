@@ -45,6 +45,11 @@ jobs:
           free -m
           df -h /
 
+      # Russian strings the AIMI files do not have live in strings_ru_overlay.xml. After an AIMI update
+      # some may be translated by AIMI too; a string defined twice would stop the build.
+      - name: Prune the Russian overlay
+        run: python3 tools/ru_overlay_prune.py
+
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
@@ -186,6 +191,11 @@ jobs:
           sudo swapon /swapfile
           free -m
           df -h /
+
+      # Russian strings the AIMI files do not have live in strings_ru_overlay.xml. After an AIMI update
+      # some may be translated by AIMI too; a string defined twice would stop the build.
+      - name: Prune the Russian overlay
+        run: python3 tools/ru_overlay_prune.py
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5

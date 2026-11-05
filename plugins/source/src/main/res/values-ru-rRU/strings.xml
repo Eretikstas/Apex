@@ -39,38 +39,4 @@
     <!-- Notification Reader -->
     <!-- Permission rationales -->
     <string name="permission_notification_listener_title">Доступ к уведомлениям</string>
-    <!-- Russian, from upstream AAPS (Crowdin) -->
-    <string name="dexcom_oneplus_scan_stop">Прервать</string>
-    <string name="dexcom_oneplus_session_up">Вверх</string>
-    <string name="dexcom_oneplus_session_down">Вниз</string>
-    <string name="dexcom_oneplus_phase_pairing">Сопряжение</string>
-    <string name="dexcom_oneplus_phase_ready">Активна</string>
-    <string name="dexcom_oneplus_phase_failed">Сбой</string>
-    <string name="dexcom_oneplus_staging_state_absent">Отсутствует</string>
-    <string name="dexcom_oneplus_staging_promote_dismiss">Отмена</string>
-    <string name="cgm_nav_close">Закрыть</string>
-    <string name="cgm_sensor_heading">Сенсор</string>
-    <string name="dexcom_oneplus_open_status">Статус</string>
-    <string name="cgm_actions_heading">Действия</string>
-    <string name="libre3_phase_pairing">Сопряжение</string>
-    <string name="libre3_phase_ready">Активна</string>
-    <string name="libre3_phase_failed">Сбой</string>
-    <string name="libre3_status_heading">Сенсор</string>
-    <string name="libre3_status_session_up">Вверх</string>
-    <string name="libre3_status_session_down">Вниз</string>
-    <string name="cgm_driver_log_refresh">Обновить</string>
-    <string name="cgm_driver_log_filter_all">Все</string>
-    <string name="libre3_presoak_state_absent">Отсутствует</string>
-    <string name="eversense_information_connected">Соединение установлено</string>
-    <string name="eversense_calibration_title">Калибровка</string>
-    <string name="eversense_not_connected">Нет подключения</string>
-    <string name="eversense_scan_cancel">Отмена</string>
-    <!-- Russian, from AAPS 3.x translations (Crowdin) -->
-    <string name="dexcom_oneplus_nav_back">Сзади</string>
-    <string name="dexcom_oneplus_scan_start">Сканирование</string>
-    <string name="dexcom_oneplus_phase_connecting">Соединение устанавливается</string>
-    <string name="libre3_nav_back">Сзади</string>
-    <string name="libre3_phase_connecting">Соединение устанавливается</string>
-    <string name="libre3_step_scan">Сканирование</string>
-    <string name="eversense_credentials_not_set">Не выбрано</string>
 </resources>

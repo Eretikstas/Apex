@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Russian, from upstream AAPS (Crowdin) -->
-    <string name="no_calibration_name">Нет калибровки</string>
-    <string name="sensor_change_detected_action">Сделайте отметку о замене датчика</string>
-</resources>

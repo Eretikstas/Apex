@@ -141,11 +141,4 @@
     <string name="equil_pump_updated">Помпа обновлена</string>
     <string name="equil_replace_reservoir">Резервуар пуст. Замените резервуар</string>
     <string name="equil_removed_anyway">Ошибка при выполнении команды Разъединить. Помпа будет удалена в любом случае. Пароль, установленный при сопряжении, не удаляется из помпы.</string>
-    <!-- Russian, from upstream AAPS (Crowdin) -->
-    <string name="equil_title_fill">Заполнение</string>
-    <string name="equil_title_attach">Прикрепить помпу</string>
-    <string name="equil_title_air">Заполнить канюлю</string>
-    <string name="equil_title_unpair_detach">Отсоединить помпу</string>
-    <string name="equil_unbind_content">Эта операция прекратит подачу инсулина и опустит поршень помпы! Она также удалит статус сопряжения!</string>
-    <string name="equil_install">Установите помпу на тело</string>
 </resources>

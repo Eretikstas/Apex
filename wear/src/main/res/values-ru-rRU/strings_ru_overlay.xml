@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Russian strings that the AIMI translation files do not have yet.
+  Kept in this separate file so that updates of AIMI never conflict with it: AIMI does not
+  know this file. Strings in the app module override the library modules.
+  Sources, in this order: the translation of the AAPS build in use (same English text only),
+  AAPS dev and 3.x (Crowdin), then strings translated for the ATC3 work.
+  After an update of AIMI run tools/ru_overlay_prune.py: it removes the strings AIMI has
+  translated by itself, which would otherwise be defined twice.
+-->
+<resources>
+    <string name="action_duration_hours_format">%1$d ч</string>
+    <string name="action_duration_hours_minutes_format">%1$dч %2$dмин</string>
+    <string name="action_high_unit">Высокие [%s]</string>
+    <string name="action_low_unit">Низкие [%s]</string>
+    <string name="action_minutes_format">%1$d мин</string>
+    <string name="action_target_unit">Цель [%s]</string>
+    <string name="complication_bg_graph">График ГК</string>
+    <string name="complication_cwf_ambient_cob_iob">%1$s %2$s</string>
+    <string name="complication_target">Цель</string>
+    <string name="complication_type_priority_icon">Иконка</string>
+    <string name="confirm">Подтверждаю</string>
+    <string name="constraint_applied">Применено ограничение!</string>
+    <string name="duration_1_hour">1 час</string>
+    <string name="duration_3_hours">3 часа</string>
+    <string name="duration_6_hours">6 часов</string>
+    <string name="ecarbs_start_format">%1$d мин</string>
+    <string name="error">Ошибка</string>
+    <string name="label_actions_tile">Действия</string>
+    <string name="label_bg_graph_tile">График ГК</string>
+    <string name="label_quick_wizard_tile">Мастер быстрых настроек</string>
+    <string name="label_running_mode_title">Рабочий режим</string>
+    <string name="label_scene_tile">Сцена</string>
+    <string name="label_temp_target_tile">Временная цель</string>
+    <string name="loop_status_pump_suspended">Помпа приостановлена</string>
+    <string name="loop_status_refresh">Обновить</string>
+    <string name="menu_bg_graph">График ГК</string>
+    <string name="menu_install_watchface">Установить циферблат</string>
+    <string name="menu_installing_watchface">Установка циферблата…</string>
+    <string name="menu_tempt_long">Временная цель</string>
+    <string name="minute_short">м</string>
+    <string name="pref_tile_settings">Карточки</string>
+    <string name="quick_wizard_tile_carbs">%1$d гр</string>
+    <string name="quick_wizard_tile_insulin">%1$.2f ед</string>
+    <string name="request">Запрос</string>
+    <string name="tile_graph_time_range">Диапазон времени</string>
+    <string name="tile_tap_bg_graph">График ГК</string>
+    <string name="title_activity_disconnect_pump">Отключить помпу</string>
+    <string name="wizard_calculation">Расчет</string>
+    <string name="wizard_carbs_short">%1$d гр</string>
+    <string name="wizard_insulin_format">%1$s ед</string>
+    <string name="wizard_result_bg">ГК</string>
+    <string name="wizard_result_bg_tt">ГК (ВЦ: %1$s)</string>
+    <string name="wizard_result_carbs">Углеводы (%1$d g)</string>
+    <string name="wizard_result_cob">акт угл COB (%1$.1f g)</string>
+    <string name="wizard_result_correction">Коррекция</string>
+    <string name="wizard_result_iob">IOB (актИнс)</string>
+    <string name="wizard_result_new_iob">Новый активный инсулин IOB %1$s ед</string>
+    <string name="wizard_result_subtotal">Подытог</string>
+    <string name="wizard_result_total">Всего</string>
+    <string name="wizard_result_trend">тренд 15\'</string>
+    <string name="wizard_total_insulin">Суммарное количество инсулина</string>
+</resources>

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Russian, from upstream AAPS (Crowdin) -->
-    <string name="activate_license">Активировать</string>
-    <!-- Russian, from AAPS 3.x translations (Crowdin) -->
-    <string name="minutes">мин</string>
-    <string name="mode_description_placeholder">Описание</string>
-</resources>
