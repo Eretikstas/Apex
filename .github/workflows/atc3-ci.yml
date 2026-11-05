@@ -100,6 +100,20 @@ jobs:
         id: sidebyside
         if: ${{ !cancelled() && steps.app.outcome == 'success' }}
         run: |
+          # google-services.json knows only info.nightscout.androidaps. The test app gets a copy of that
+          # entry under its own name, in this throwaway checkout only (Firebase is not used by it).
+          python3 - <<'PY'
+          import copy, json
+          path = "app/google-services.json"
+          data = json.load(open(path))
+          names = [c["client_info"]["android_client_info"]["package_name"] for c in data["client"]]
+          if "info.nightscout.androidaps.atc3test" not in names:
+              entry = copy.deepcopy(next(c for c in data["client"] if c["client_info"]["android_client_info"]["package_name"] == "info.nightscout.androidaps"))
+              entry["client_info"]["android_client_info"]["package_name"] = "info.nightscout.androidaps.atc3test"
+              entry.pop("oauth_client", None)
+              data["client"].append(entry)
+              json.dump(data, open(path, "w"), indent=2)
+          PY
           ./gradlew :app:assembleFullDebug -Patc3SideBySide=true --stacktrace
           mkdir -p out/sidebyside
           cp app/build/outputs/apk/full/debug/*.apk out/sidebyside/
