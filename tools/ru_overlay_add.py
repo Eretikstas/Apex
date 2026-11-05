@@ -47,7 +47,10 @@ def check(en, ru, force_percent=False):
 def main():
     new = json.load(open(sys.argv[1], encoding="utf-8"))
     # literal "%" before a letter in English ("50% or") looks like a format; list such keys here
+    literal_file = "tools/ru_overlay_literal_percent.txt"
     literal_percent = set(sys.argv[2].split(",")) if len(sys.argv) > 2 else set()
+    if os.path.exists(literal_file):
+        literal_percent |= {l.strip() for l in open(literal_file, encoding="utf-8") if l.strip() and not l.startswith("#")}
     source = json.load(open(SOURCE, encoding="utf-8")) if os.path.exists(SOURCE) else {}
     english, module_of, translated = {}, {}, set()
     for f in glob.glob("**/src/main/res/values*/strings*.xml", recursive=True):

@@ -1,0 +1,4 @@
+# Keys whose English has a literal % before a letter ("50% or"), which looks like a format.
+# For these the number of % signs is compared instead of the placeholders.
+scene_wizard_exercise_desc
+scene_wizard_info_sick_day

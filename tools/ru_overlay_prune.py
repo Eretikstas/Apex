@@ -23,6 +23,13 @@ import re
 import sys
 
 SOURCE = "tools/ru_overlay_source.json"
+LITERAL_PERCENT = "tools/ru_overlay_literal_percent.txt"
+
+
+def literal_percent_keys():
+    if not os.path.exists(LITERAL_PERCENT):
+        return set()
+    return {l.strip() for l in open(LITERAL_PERCENT, encoding="utf-8") if l.strip() and not l.startswith("#")}
 
 R = re.compile(r'<string\s+name="([^"]+)"[^>]*>(.*?)</string>', re.S)
 PH = re.compile(r'%(?:\d+\$)?[-#+ 0,(]*\d*(?:\.\d+)?[sdfxXcbeEgGoh%]')
@@ -37,6 +44,7 @@ def main():
     found = 0
     source = json.load(open(SOURCE, encoding="utf-8")) if os.path.exists(SOURCE) else {}
     changed = []
+    literal = literal_percent_keys()
     for overlay in glob.glob("*/src/main/res/values-ru-rRU/strings_ru_overlay.xml"):
         wear = overlay.startswith("wear/")
         others, english = set(), {}
@@ -57,7 +65,9 @@ def main():
                 drop.append((k, "AIMI translates it now"))
             elif k not in english:
                 drop.append((k, "no longer in the English strings"))
-            elif placeholders(english[k]) != placeholders(v) or english[k].count("%%") != v.count("%%"):
+            elif k in literal and english[k].count("%") != v.count("%"):
+                drop.append((k, "percent signs changed in English"))
+            elif k not in literal and (placeholders(english[k]) != placeholders(v) or english[k].count("%%") != v.count("%%")):
                 drop.append((k, "placeholders changed in English"))
             elif k in source and source[k] != english[k]:
                 changed.append(k)
