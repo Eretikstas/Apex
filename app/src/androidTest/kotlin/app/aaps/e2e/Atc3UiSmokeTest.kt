@@ -3,6 +3,7 @@ package app.aaps.e2e
 import android.Manifest
 import android.content.Context
 import android.os.SystemClock
+import android.util.Log
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -14,11 +15,17 @@ import androidx.test.uiautomator.UiObject2
 import androidx.work.WorkManager
 import app.aaps.ComposeMainActivity
 import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.data.ue.Action
+import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.ConfigBuilder
+import app.aaps.core.interfaces.insulin.InsulinManager
 import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.plugin.PluginBase
+import app.aaps.core.interfaces.profile.ProfileFunction
+import app.aaps.core.interfaces.profile.ProfileRepository
 import app.aaps.core.interfaces.queue.CommandQueue
+import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.BooleanComposedKey
 import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.StringKey
@@ -30,6 +37,8 @@ import app.aaps.pump.atc3.Atc3PumpPlugin
 import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -62,6 +71,10 @@ class Atc3UiSmokeTest {
     @Inject lateinit var configBuilder: ConfigBuilder
     @Inject lateinit var activePlugin: ActivePlugin
     @Inject lateinit var config: Config
+    @Inject lateinit var profileFunction: ProfileFunction
+    @Inject lateinit var profileRepository: ProfileRepository
+    @Inject lateinit var insulinManager: InsulinManager
+    @Inject lateinit var dateUtil: DateUtil
     @Suppress("unused") @Inject lateinit var staticInjector: StaticInjector
 
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -83,6 +96,9 @@ class Atc3UiSmokeTest {
         pluginStore.plugins = pluginList
         configBuilder.initialize()
         config.initCompleted()
+        // A running profile, as in DanaRPairWizardUiTest: without one the app does not show the overview.
+        seedLocalProfile()
+        activateSeededProfile()
         device.executeShellCommand("settings put global heads_up_notifications_enabled 0")
     }
 
@@ -129,10 +145,50 @@ class Atc3UiSmokeTest {
             }
         } catch (t: Throwable) {
             logScreen("E2E_ATC3")
-            throw t
+            // In the message too: the Gradle log shows it, logcat is only in the report.
+            throw AssertionError("${t.message}\nOn screen: ${screenText()}", t)
         } finally {
             scenario.close()
         }
+    }
+
+    private fun seedLocalProfile() {
+        val profile = profileRepository.newDraft().apply {
+            mgdl = true
+            ic = JSONArray(singleValue(10.0))
+            isf = JSONArray(singleValue(50.0))
+            basal = JSONArray(singleValue(0.5))
+            targetLow = JSONArray(singleValue(100.0))
+            targetHigh = JSONArray(singleValue(110.0))
+        }
+        runBlocking { profileRepository.add(profile) }.getOrThrow()
+    }
+
+    private fun activateSeededProfile() {
+        val store = checkNotNull(
+            awaitNotNull(PROFILE_STORE_TIMEOUT) {
+                profileRepository.profile.value?.takeIf { it.getSpecificProfile(PROFILE_NAME) != null }
+            }
+        ) { "The profile store never published '$PROFILE_NAME'" }
+        val switch = runBlocking {
+            profileFunction.createProfileSwitch(
+                profileStore = store, profileName = PROFILE_NAME, durationInMinutes = 0, percentage = 100,
+                timeShiftInHours = 0, timestamp = dateUtil.now(), action = Action.PROFILE_SWITCH,
+                source = Sources.Aaps, listValues = emptyList(), iCfg = insulinManager.insulins.first()
+            )
+        }
+        checkNotNull(switch) { "Could not activate the seeded local profile" }
+    }
+
+    private fun singleValue(value: Double) = """[{"time":"00:00","timeAsSeconds":0,"value":$value}]"""
+
+    private fun <T> awaitNotNull(timeoutMs: Long, supplier: () -> T?): T? {
+        val end = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < end) {
+            runCatching(supplier).getOrNull()?.let { return it }
+            SystemClock.sleep(IDLE_MS)
+        }
+        return null
     }
 
     // ---- ui helpers (same contract as DanaRPairWizardUiTest) ------------------------------------
@@ -206,15 +262,17 @@ class Atc3UiSmokeTest {
         throw last ?: IllegalStateException("withStaleRetry exhausted")
     }
 
+    private fun screenText(): String = runCatching {
+        // Any package: a system dialog in front of the app is what this is often about.
+        device.findObjects(By.pkg(Pattern.compile(".*"))).mapNotNull { o ->
+            val txt = runCatching { o.text }.getOrNull()?.takeIf { it.isNotBlank() }
+            val desc = runCatching { o.contentDescription }.getOrNull()?.takeIf { it.isNotBlank() }
+            if (txt != null || desc != null) "[t=$txt|d=$desc]" else null
+        }.joinToString(" ").take(3000)
+    }.getOrDefault("(could not read the screen)")
+
     private fun logScreen(tag: String) {
-        runCatching {
-            val items = device.findObjects(By.pkg(PKG)).mapNotNull { o ->
-                val txt = runCatching { o.text }.getOrNull()?.takeIf { it.isNotBlank() }
-                val desc = runCatching { o.contentDescription }.getOrNull()?.takeIf { it.isNotBlank() }
-                if (txt != null || desc != null) "[t=$txt|d=$desc]" else null
-            }
-            items.joinToString(" ").chunked(3500).forEachIndexed { i, c -> android.util.Log.e(tag, "$i $c") }
-        }
+        runCatching { screenText().chunked(3500).forEachIndexed { i, c -> Log.e(tag, "$i $c") } }
     }
 
     private fun clearAllSharedPrefs() {
@@ -234,5 +292,7 @@ class Atc3UiSmokeTest {
         private const val IDLE_MS = 300L
         private const val STALE_RETRIES = 10
         private const val STALE_SETTLE_MS = 700L
+        private const val PROFILE_NAME = "LocalProfile1"
+        private const val PROFILE_STORE_TIMEOUT = 20_000L
     }
 }
