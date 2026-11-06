@@ -2,7 +2,7 @@ name: ATC3 Russian screenshots
 
 # Walks through the app on an emulator with a Russian system language and saves a screenshot of
 # every screen it reaches (Atc3RuScreensTest), to read the translation on real screens.
-# Runs when the Russian strings, this walk or this workflow change, and by hand.
+# Runs by hand, or on a push of these files with [screens] in the commit message.
 
 on:
   workflow_dispatch:
@@ -24,6 +24,8 @@ permissions:
 
 jobs:
   screens:
+    # About 50 minutes of the limited Actions minutes: on a push only with [screens] in the commit message.
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[screens]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
     env:

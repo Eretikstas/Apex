@@ -18,6 +18,9 @@ permissions:
 
 jobs:
   build:
+    # GitHub Actions minutes are limited (2000 a month, a full run takes about 80). A push runs this
+    # only when its commit message has [ci]; it can also be started by hand.
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ci]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -163,8 +166,9 @@ jobs:
   # Bluetooth here; delivery is checked against the virtual pump in the unit tests above.
   ui-smoke:
     needs: build
-    # Runs even when a unit test failed: the screens are checked on their own.
-    if: ${{ !cancelled() }}
+    # Runs even when a unit test failed: the screens are checked on their own. About 55 minutes, so on
+    # a push only with [ui] in the commit message (and [ci], for the build it needs).
+    if: ${{ !cancelled() && needs.build.result != 'skipped' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ui]')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
