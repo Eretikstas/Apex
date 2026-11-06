@@ -1525,30 +1525,28 @@ private const val TIGHT_SPIRAL_SMB_CAP_IOB_LEGACY_U = 8.0
 /** Poids de référence (kg) : second terme IOB = [TIGHT_SPIRAL_SMB_CAP_IOB_LEGACY_U] U à 75 kg. */
 private const val TIGHT_SPIRAL_WEIGHT_REFERENCE_KG = 75.0
 
-private const val TIGHT_SPIRAL_CAP_ENERGY_MIN_U = 3.0
+// Lowest spiral thresholds. They were 3 U: for a child of 25 kg with a TDD of 17 U the scaled
+// values are about 2.2 U (energy) and 2.7 U (IOB), so the SMB cap came late. The cap needs both
+// thresholds passed; lower thresholds only cap sooner.
+private const val TIGHT_SPIRAL_CAP_ENERGY_MIN_U = 1.0
 private const val TIGHT_SPIRAL_CAP_ENERGY_MAX_U = 18.0
-private const val TIGHT_SPIRAL_CAP_IOB_MIN_U = 3.0
+private const val TIGHT_SPIRAL_CAP_IOB_MIN_U = 1.0
 private const val TIGHT_SPIRAL_CAP_IOB_MAX_U = 20.0
 
-private fun tightSpiralSmbCapEnergyThresholdU(tdd24hU: Double): Double {
+internal fun tightSpiralSmbCapEnergyThresholdU(tdd24hU: Double): Double {
     if (!tdd24hU.isFinite() || tdd24hU <= 0.0) return TIGHT_SPIRAL_SMB_CAP_ENERGY_LEGACY_U
     val scaled = tdd24hU * (TIGHT_SPIRAL_SMB_CAP_ENERGY_LEGACY_U / TIGHT_SPIRAL_CAP_TDD_REFERENCE_U)
     return scaled.coerceIn(TIGHT_SPIRAL_CAP_ENERGY_MIN_U, TIGHT_SPIRAL_CAP_ENERGY_MAX_U)
 }
 
-private fun tightSpiralSmbCapIobThresholdU(tdd24hU: Double, patientWeightKg: Double): Double {
-    val fromTdd = if (tdd24hU.isFinite() && tdd24hU > 0.0) {
-        tdd24hU * (TIGHT_SPIRAL_SMB_CAP_IOB_LEGACY_U / TIGHT_SPIRAL_CAP_TDD_REFERENCE_U)
-    } else {
-        TIGHT_SPIRAL_SMB_CAP_IOB_LEGACY_U
-    }
-    val fromWeight = if (patientWeightKg.isFinite() && patientWeightKg > 0.0) {
-        patientWeightKg * (TIGHT_SPIRAL_SMB_CAP_IOB_LEGACY_U / TIGHT_SPIRAL_WEIGHT_REFERENCE_KG)
-    } else {
-        0.0
-    }
-    return max(fromTdd, fromWeight).coerceIn(TIGHT_SPIRAL_CAP_IOB_MIN_U, TIGHT_SPIRAL_CAP_IOB_MAX_U)
-}
+internal fun tightSpiralSmbCapIobThresholdU(tdd24hU: Double, patientWeightKg: Double): Double =
+    InsulinLoadGovernor.weightAndTddScaledIobU(
+        tdd24hU = tdd24hU,
+        patientWeightKg = patientWeightKg,
+        iobAtReferenceU = TIGHT_SPIRAL_SMB_CAP_IOB_LEGACY_U,
+        tddReferenceU = TIGHT_SPIRAL_CAP_TDD_REFERENCE_U,
+        weightReferenceKg = TIGHT_SPIRAL_WEIGHT_REFERENCE_KG,
+    ).coerceIn(TIGHT_SPIRAL_CAP_IOB_MIN_U, TIGHT_SPIRAL_CAP_IOB_MAX_U)
 
 /** Bundles locals produced by [DetermineBasalaimiSMB2.runEarlyDetermineBasalStages]. */
 private data class AimiDetermineBasalEarlyTickState(

@@ -80,11 +80,20 @@ data class AutoDriveState(
         require(cob >= 0.0) { "COB cannot be negative: $cob" }
         require(estimatedSI > 0.0) { "Estimated SI must be positive: $estimatedSI" }
         require(estimatedRa >= 0.0) { "Estimated Ra cannot be negative: $estimatedRa" }
-        require(patientWeightKg in 40.0..250.0) { "Patient weight out of physiological bounds: $patientWeightKg" }
+        require(patientWeightKg in MIN_PATIENT_WEIGHT_KG..MAX_PATIENT_WEIGHT_KG) { "Patient weight out of physiological bounds: $patientWeightKg" }
         require(hour in 0..23) { "Invalid hour: $hour" }
     }
 
     companion object {
+
+        /**
+         * Lowest weight Autodrive takes. It was 40 kg: a child of 25 kg was taken as 40 kg, so the
+         * dose cap per 5 min (weight × U/kg) and the carb appearance ceiling were too high for the
+         * child. A lighter weight only lowers these limits.
+         */
+        const val MIN_PATIENT_WEIGHT_KG = 20.0
+        const val MAX_PATIENT_WEIGHT_KG = 250.0
+
         /**
          * Creates a safe [AutoDriveState] by coercing all inputs into physiological bounds.
          * Useful when parsing external data from sensors or persistence layers.
@@ -132,7 +141,7 @@ data class AutoDriveState(
                         InsulinActionModel.MAX_ISF_MGDL_PER_U / 10000.0,
                     ),
                     estimatedRa = estimatedRa.coerceAtLeast(0.0),
-                    patientWeightKg = patientWeightKg.coerceIn(40.0, 250.0),
+                    patientWeightKg = patientWeightKg.coerceIn(MIN_PATIENT_WEIGHT_KG, MAX_PATIENT_WEIGHT_KG),
                     physiologicalStressMask = physiologicalStressMask,
                     isNight = isNight,
                     hour = hour.coerceIn(0, 23),

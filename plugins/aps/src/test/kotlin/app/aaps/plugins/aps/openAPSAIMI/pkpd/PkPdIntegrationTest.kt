@@ -209,6 +209,34 @@ class PkPdIntegrationTest {
     }
 
     @Test
+    fun `a 25 kg child gets the light weight factor, so a higher pkpd scale and ISF`() {
+        every { preferences.get(BooleanKey.OApsAIMIPkpdEnabled) } returns true
+        mockPkpdDefaults()
+        fun runtimeFor(weightKg: Double) = PkPdIntegration(preferences, PkPdLearnedState()).computeRuntime(
+            epochMillis = 1000,
+            bg = 140.0,
+            deltaMgDlPer5 = 2.0,
+            iobU = 0.8,
+            carbsActiveG = 10.0,
+            windowMin = 60,
+            exerciseFlag = false,
+            profileIsf = 160.0,
+            tdd24h = 17.0,
+            patientWeightKg = weightKg,
+        )
+        val child = runtimeFor(25.0)
+        val adult = runtimeFor(75.0)
+
+        assertNotNull(child)
+        assertNotNull(adult)
+        // It was 1.0 below 40 kg: the weight of a child was not used.
+        assertTrue(child!!.weightKineticFactor > 1.0)
+        assertTrue(child.pkpdScale > adult!!.pkpdScale)
+        // A higher scale only raises the ISF candidate: the child never gets a lower ISF (more insulin).
+        assertTrue(child.fusedIsf >= adult.fusedIsf)
+    }
+
+    @Test
     fun `strong physio family applies more of latent pkpd modulation than low physio family`() {
         val lowPhysioPrefs: Preferences = mockk(relaxed = true)
         val strongPhysioPrefs: Preferences = mockk(relaxed = true)

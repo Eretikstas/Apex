@@ -25,6 +25,12 @@ object InsulinLoadGovernor {
     /** Reference weight (kg) — second term of physiological budget. */
     private const val PHYS_BUDGET_WEIGHT_REFERENCE_KG = 75.0
 
+    /**
+     * Lowest IOB budget. It was 4 U (half of the 8 U reference): for a child of 25 kg with a TDD of
+     * 17 U the formula gives about 2.7 U, so the brake came late. A lower budget only brakes sooner.
+     */
+    const val PHYS_BUDGET_MIN_U = 1.0
+
     private const val G_MIN = 0.35
     private const val G_MAX = 1.0
     private const val SMOOTH_PRIOR_WEIGHT = 0.4
@@ -88,18 +94,36 @@ object InsulinLoadGovernor {
     /**
      * Physiological IOB budget (U) — same scaling family as tight-spiral cap, without hard Max-IOB.
      */
-    fun physiologicalBudgetU(tdd24hU: Double, patientWeightKg: Double): Double {
-        val fromTdd = if (tdd24hU.isFinite() && tdd24hU > 0.0) {
-            tdd24hU * (PHYS_BUDGET_IOB_AT_REFERENCE_U / PHYS_BUDGET_TDD_REFERENCE_U)
-        } else {
-            PHYS_BUDGET_IOB_AT_REFERENCE_U
+    fun physiologicalBudgetU(tdd24hU: Double, patientWeightKg: Double): Double =
+        weightAndTddScaledIobU(
+            tdd24hU = tdd24hU,
+            patientWeightKg = patientWeightKg,
+            iobAtReferenceU = PHYS_BUDGET_IOB_AT_REFERENCE_U,
+            tddReferenceU = PHYS_BUDGET_TDD_REFERENCE_U,
+            weightReferenceKg = PHYS_BUDGET_WEIGHT_REFERENCE_KG,
+        ).coerceAtLeast(PHYS_BUDGET_MIN_U)
+
+    /**
+     * An IOB level that scales with TDD and weight: `iobAtReferenceU` at the reference TDD or the
+     * reference weight, the larger of the two. Without a TDD the weight alone is used (it was the
+     * adult reference, too high for a child); without both, the adult reference.
+     */
+    fun weightAndTddScaledIobU(
+        tdd24hU: Double,
+        patientWeightKg: Double,
+        iobAtReferenceU: Double,
+        tddReferenceU: Double,
+        weightReferenceKg: Double,
+    ): Double {
+        val fromTdd = if (tdd24hU.isFinite() && tdd24hU > 0.0) tdd24hU * (iobAtReferenceU / tddReferenceU) else null
+        val fromWeight =
+            if (patientWeightKg.isFinite() && patientWeightKg > 0.0) patientWeightKg * (iobAtReferenceU / weightReferenceKg) else null
+        return when {
+            fromTdd != null && fromWeight != null -> max(fromTdd, fromWeight)
+            fromTdd != null -> fromTdd
+            fromWeight != null -> fromWeight
+            else -> iobAtReferenceU
         }
-        val fromWeight = if (patientWeightKg.isFinite() && patientWeightKg > 0.0) {
-            patientWeightKg * (PHYS_BUDGET_IOB_AT_REFERENCE_U / PHYS_BUDGET_WEIGHT_REFERENCE_KG)
-        } else {
-            0.0
-        }
-        return max(fromTdd, fromWeight).coerceAtLeast(PHYS_BUDGET_IOB_AT_REFERENCE_U * 0.5)
     }
 
     /**

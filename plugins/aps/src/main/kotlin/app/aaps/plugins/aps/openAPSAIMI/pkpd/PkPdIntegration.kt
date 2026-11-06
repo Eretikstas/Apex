@@ -30,6 +30,9 @@ class PkPdIntegration(
 ) {
 
     companion object {
+        /** Lowest weight used by the weight kinetic factor (was 40 kg). Below it the factor is 1.0. */
+        const val MIN_KINETIC_WEIGHT_KG = 20.0
+
         /** Minimum learned DIA change (hours) before writing prefs again. */
         const val DIA_PERSIST_MIN_DELTA_H = 0.005
 
@@ -661,8 +664,12 @@ class PkPdIntegration(
         return 1.0 + ((value - 1.0) * safeBlend)
     }
 
+    /**
+     * Light patients get a factor above 1.0: a higher pkpd scale, so a higher fused ISF and less
+     * insulin. The weight of a child (from 20 kg) is used too; it was ignored below 40 kg.
+     */
     private fun buildWeightKineticFactor(patientWeightKg: Double?): Double {
-        val safeWeight = patientWeightKg?.takeIf { it.isFinite() && it >= 40.0 } ?: return 1.0
+        val safeWeight = patientWeightKg?.takeIf { it.isFinite() && it >= MIN_KINETIC_WEIGHT_KG } ?: return 1.0
         return (75.0 / safeWeight).coerceIn(0.84, 1.08)
     }
 
