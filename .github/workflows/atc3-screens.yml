@@ -1,0 +1,105 @@
+name: ATC3 Russian screenshots
+
+# Walks through the app on an emulator with a Russian system language and saves a screenshot of
+# every screen it reaches (Atc3RuScreensTest), to read the translation on real screens.
+# Runs when the Russian strings, this walk or this workflow change, and by hand.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - atc3-driver
+    paths:
+      - '.github/workflows/atc3-screens.yml'
+      - 'tools/atc3_screens.sh'
+      - 'app/src/androidTest/kotlin/app/aaps/e2e/Atc3RuScreensTest.kt'
+      - '**/values-ru-rRU/**'
+
+concurrency:
+  group: atc3-screens-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  screens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
+        -Dkotlin.daemon.jvm.options="-Xmx2g"
+        -Dkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.workers.max=2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo swapoff -a || true
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -m
+          df -h /
+
+      - name: Prune the Russian overlay
+        run: python3 tools/ru_overlay_prune.py
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      # Same as in atc3-ci.yml: old AIMI replay tests that do not compile, removed from this checkout only.
+      - name: Leave out the old AIMI tests that do not compile
+        run: |
+          T=app/src/androidTest/kotlin/app/aaps
+          rm -v "$T/ReplayApsResultsTest.kt" "$T/di/AlgModule.kt"
+          rm -rv "$T/plugins/aps/openAPS" "$T/plugins/aps/openAPSAMA" "$T/plugins/aps/openAPSSMB" \
+            "$T/plugins/aps/openAPSSMBAutoISF" "$T/plugins/aps/openAPSSMBDynamicISF" "$T/plugins/aps/logger"
+
+      # Build first, then stop Gradle, so its memory is free for the emulator.
+      - name: Build the app and the test APK
+        run: |
+          ./gradlew :app:assembleFullDebug :app:assembleFullDebugAndroidTest --stacktrace
+          ./gradlew --stop
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Walk the app in Russian and take screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 3072M
+          disk-size: 6000M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -change-locale ru-RU
+          disable-animations: true
+          script: bash tools/atc3_screens.sh
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atc3-ru-screens
+          path: out/
+          retention-days: 14
+          if-no-files-found: ignore
