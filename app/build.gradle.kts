@@ -119,15 +119,6 @@ android {
 
         // For Hilt injected instrumentation tests in app module
         testInstrumentationRunner = "app.aaps.runners.HiltTestRunner"
-
-        // -Patc3Abi=x86_64: native libraries for this one CPU type only. A small APK for an online
-        // emulator (Appetize takes at most 50 MB). Not for a phone, which needs arm64-v8a.
-        (project.findProperty("atc3Abi") as String?)?.let { abi ->
-            ndk {
-                abiFilters.clear()
-                abiFilters += abi
-            }
-        }
     }
 
     flavorDimensions.add("standard")

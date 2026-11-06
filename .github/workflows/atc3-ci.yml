@@ -130,26 +130,6 @@ jobs:
           mkdir -p out/sidebyside
           cp app/build/outputs/apk/full/debug/*.apk out/sidebyside/
 
-      # The side by side app with native libraries for x86_64 only, to try it in Appetize (50 MB at most).
-      - name: Build the small APK for Appetize
-        id: appetize
-        if: ${{ !cancelled() && steps.sidebyside.outcome == 'success' }}
-        run: |
-          ./gradlew :app:assembleFullDebug -Patc3SideBySide=true -Patc3Abi=x86_64 --stacktrace
-          mkdir -p out/appetize
-          cp app/build/outputs/apk/full/debug/*.apk out/appetize/
-          ls -l out/regular out/appetize
-          # What takes the space, to see what to cut if it is still too big.
-          unzip -lv out/appetize/*.apk | sed -n '4,$p' | sort -k1 -n -r | head -25
-
-      - name: Upload Appetize APK
-        if: ${{ !cancelled() && steps.appetize.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: aimi-atc3-appetize-x86_64
-          path: out/appetize/*.apk
-          retention-days: 14
-
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
