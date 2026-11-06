@@ -36,7 +36,8 @@ Not changed: `UndeclaredCobEstimator` (carb cap = real weight × g/kg) and
 ## Tests
 
 - `plugins/aps/src/test/.../openAPSAIMI/ChildWeightLimitsTest.kt`: each limit above for 25 kg /
-  17 U and lighter values, the 20–250 kg bounds, and the adult values unchanged.
+  17 U, and for the whole range of weight 20–75 kg and TDD 10–55 U: never above the old formula,
+  growing with weight and TDD, the 20–250 kg bounds, and the adult values unchanged.
 - `PkPdIntegrationTest`: a 25 kg child gets a factor above 1.0 and an ISF not lower than an adult.
 - CI job `aimi-tests` in `.github/workflows/atc3-ci.yml` (commit message with `[aimi]`).
 
