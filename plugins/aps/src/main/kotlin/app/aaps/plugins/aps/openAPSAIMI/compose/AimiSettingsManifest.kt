@@ -301,6 +301,7 @@ internal object AimiSettingsManifest {
         AimiSettingEntry(BooleanKey.OApsAIMIAnticipBasalFloor, AimiSettingsLevel.ADVANCED, AimiBehaviorFamilyId.MealCapture, AimiSettingsWriter.USER),
         AimiSettingEntry(BooleanKey.OApsAIMIAnticipMealEvidence, AimiSettingsLevel.ADVANCED, AimiBehaviorFamilyId.MealCapture, AimiSettingsWriter.USER),
         AimiSettingEntry(BooleanKey.OApsAIMIRiseCeilingGuard, AimiSettingsLevel.ADVANCED, AimiBehaviorFamilyId.Protection, AimiSettingsWriter.USER),
+        AimiSettingEntry(IntKey.OApsAIMIHypoExposureGuardMode, AimiSettingsLevel.ADVANCED, AimiBehaviorFamilyId.Protection, AimiSettingsWriter.USER),
         AimiSettingEntry(BooleanKey.OApsAIMIEffortActivityProtection, AimiSettingsLevel.ADVANCED, AimiBehaviorFamilyId.Physio, AimiSettingsWriter.USER),
         AimiSettingEntry(BooleanKey.OApsAIMIautoDriveAuthoritative, AimiSettingsLevel.ADVANCED, AimiBehaviorFamilyId.Autonomy, AimiSettingsWriter.SLIDER),
         AimiSettingEntry(BooleanKey.OApsAIMIwcycle, AimiSettingsLevel.ADVANCED, AimiBehaviorFamilyId.Physio, AimiSettingsWriter.USER),

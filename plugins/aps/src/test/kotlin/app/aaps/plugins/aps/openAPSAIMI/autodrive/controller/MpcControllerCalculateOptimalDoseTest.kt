@@ -58,4 +58,28 @@ class MpcControllerCalculateOptimalDoseTest {
         assertTrue(command.reason.contains("|180:"))
         assertTrue(!command.reason.contains("|120:n/a|"))
     }
+
+    @Test
+    fun `the hypo history guard lowers the dose cap and never raises the dose`() {
+        fun rising(scale: Double) = AutoDriveState.createSafe(
+            bg = 230.0,
+            bgVelocity = 3.0,
+            iob = 0.2,
+            estimatedRa = 3.0,
+            combinedDelta = 12.0,
+            isNight = false,
+            hour = 13,
+            patientWeightKg = 25.0,
+            maxIOB = 10.0,
+            maxSMB = 3.0,
+            highBgMaxSMB = 3.0,
+            hypoExposureScale = scale,
+        )
+        val full = controller().calculateOptimalDose(rising(1.0), profileBasal = 0.5, lgsThreshold = 70.0)
+        val guarded = controller().calculateOptimalDose(rising(0.85), profileBasal = 0.5, lgsThreshold = 70.0)
+        // Cap without the guard: min(maxSMB 3.0, 25 kg x 0.065 U/kg) = 1.625 U; with it 0.85 of that.
+        assertTrue(full.scheduledMicroBolus <= 1.625 + 1e-6)
+        assertTrue(guarded.scheduledMicroBolus <= 1.625 * 0.85 + 1e-6)
+        assertTrue(guarded.scheduledMicroBolus <= full.scheduledMicroBolus + 1e-9)
+    }
 }

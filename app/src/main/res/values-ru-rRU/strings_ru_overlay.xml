@@ -504,6 +504,9 @@
     <string name="aimi_hormonitor_viewer_no_events">За этот день подробных событий нет.</string>
     <string name="aimi_hormonitor_viewer_summary">Просмотр экспортированных данных исследования по дням: время в диапазоне, решения и как работали дерево/Harmonia, физиология и гормональный контекст.</string>
     <string name="aimi_hormonitor_viewer_title">Hormonitor — данные исследования</string>
+    <string name="aimi_hypo_exposure_guard_off">Выключена</string>
+    <string name="aimi_hypo_exposure_guard_on">Включена</string>
+    <string name="aimi_hypo_exposure_guard_watch">Только наблюдение</string>
     <string name="aimi_hypo_risk_alarm_summary">AIMI выдаёт общую СРОЧНУЮ тревогу (NotificationId.HYPO_RISK_ALARM) со звуком тревоги AAPS. Отложить или закрыть можно в списке уведомлений или в окне на панели.</string>
     <string name="aimi_lab_title">Лаборатория AIMI</string>
     <string name="aimi_oura_pat_summary">Личный токен доступа с cloud.ouraring.com — позволяет использовать измеренное отклонение температуры кожи, если Oura не передаёт его в Health Connect. Пользователи Garmin опираются на ритм восстановления, рассчитанный по сну/пульсу покоя из HC.</string>
@@ -2314,6 +2317,7 @@
     <string name="pref_summary_aimi_hyper_established_dev">0 = значение по TDD (~80). Отклонение выше цели для уровня ESTABLISHED.</string>
     <string name="pref_summary_aimi_hyper_trajectory_release">Когда включён Autodrive V3, увеличивать микроболюс V3 по прогнозу сценария и траектории при достоверном росте к гипер. Срабатывание не привязано к фиксированному порогу 200 мг/дл.</string>
     <string name="pref_summary_aimi_hyper_trajectory_release_aggressive">Поднимает нижние пределы SMB HTR примерно на 15%%, когда сценарий подтверждает рост к гипер. Используйте, только если обычное освобождение кажется слишком слабым.</string>
+    <string name="pref_summary_aimi_hypo_exposure_guard">Смотрит последние 14 дней. Если ниже 70 мг/дл больше 4 из 100 показаний (или ниже 54 мг/дл больше 1 из 100), дополнительный инсулин (SMB, Autodrive, усиление базала) уменьшается, а выученные настройки могут становиться только мягче. «Только наблюдение»: пишет в лог, что бы сделала, и не меняет дозы.</string>
     <string name="pref_summary_aimi_max_multiplier">Наибольшая базальная скорость, которую может использовать адаптивный базал, как кратное базала профиля. Например, 1.6 значит не больше 1,6 базала профиля.</string>
     <string name="pref_summary_aimi_meal_confirmed_early_release">Для незаявленной еды: как только еда подтверждена и глюкоза растёт, разрешить циклу раньше выходить на ваш максимальный SMB и базал, а не ждать, пока высокий сахар уже установится. Это только поднимает внутренний защитный предел к пути еды, пока глюкоза растёт, остаётся в пределах вашего max SMB, max базала и max IOB и само возвращается к осторожному пределу после пика, накопления инсулина или остановки роста. Настоящие гипо и защита после гипо никогда не обходятся. Это увеличивает ранние дозы, поэтому по умолчанию выключено.</string>
     <string name="pref_summary_aimi_peak_governor_enabled">Когда включена адаптивная PK/PD, смешивать пик профиля инсулина с выученным пиком PKPD для peakTime цикла (см. документ TAP_G_PEAK_GOVERNOR_RFC).</string>
@@ -2444,6 +2448,7 @@
     <string name="pref_title_aimi_hyper_established_dev">HTR: отклонение устойчивой гипер (мг/дл выше цели)</string>
     <string name="pref_title_aimi_hyper_trajectory_release">Освобождение SMB по траектории гипер (HTR)</string>
     <string name="pref_title_aimi_hyper_trajectory_release_aggressive">Агрессивные пределы HTR</string>
+    <string name="pref_title_aimi_hypo_exposure_guard">Защита по истории гипо</string>
     <string name="pref_title_aimi_max_multiplier">Адаптивный базал: верхний предел</string>
     <string name="pref_title_aimi_meal_confirmed_early_release">Раннее снятие ограничений при подтверждённой еде</string>
     <string name="pref_title_aimi_peak_governor_enabled">Контроль пика TAP-G</string>

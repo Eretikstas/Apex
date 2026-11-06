@@ -212,6 +212,8 @@ import app.aaps.plugins.aps.openAPSAIMI.control.StraightLineTubeAdvisor
 import app.aaps.plugins.aps.openAPSAIMI.compose.readAimiBehaviorRuntimeProfile
 import app.aaps.plugins.aps.openAPSAIMI.safety.signalTrajectoryStack
 import app.aaps.plugins.aps.openAPSAIMI.safety.HypoThresholdMath
+import app.aaps.plugins.aps.openAPSAIMI.safety.HypoExposureGuard
+import app.aaps.plugins.aps.openAPSAIMI.safety.HypoExposureMonitor
 import app.aaps.plugins.aps.openAPSAIMI.safety.InsulinLoadGovernor
 import app.aaps.plugins.aps.openAPSAIMI.safety.MealSafetyContext
 import app.aaps.plugins.aps.openAPSAIMI.safety.HyperInstalledDroppingExemption
@@ -1739,6 +1741,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
     private val context: Context
 ) {
     @Inject lateinit var persistenceLayer: PersistenceLayer
+    @Inject lateinit var hypoExposureMonitor: HypoExposureMonitor
     @Inject lateinit var tddCalculator: TddCalculator
     @Inject lateinit var tirCalculator: TirCalculator
     @Inject lateinit var dateUtil: DateUtil
@@ -2312,6 +2315,16 @@ class DetermineBasalaimiSMB2 @Inject constructor(
         bolusQueryCache.clear()
         consoleError = mutableListOf()
         consoleLog = mutableListOf()
+        // Hypo history guard: read once per tick, see [HypoExposureGuard]. Neutral unless it is on.
+        if (::hypoExposureMonitor.isInitialized) {
+            hypoGuardThisTick = hypoExposureMonitor.applied
+            val guardMode = hypoExposureMonitor.mode
+            if (guardMode != HypoExposureGuard.Mode.OFF) {
+                consoleLog.add(HypoExposureGuard.describe(hypoExposureMonitor.verdict, guardMode))
+            }
+        } else {
+            hypoGuardThisTick = HypoExposureGuard.Verdict.NEUTRAL
+        }
         if (::aapsLogger.isInitialized) {
             try {
                 hormonitorStudyExporter?.recordLoopPulse(ctx.currentTime, AimiLoopTelemetry.activeTickId)
@@ -2411,7 +2424,12 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             )
         } else null
         val nMult = nDecision?.multiplier ?: 1.0
-        adaptiveMult = BasalAdaptiveMultiplier.combine(hMult, nMult)
+        val learnedAdaptiveMult = BasalAdaptiveMultiplier.combine(hMult, nMult)
+        // Hypo history guard: the part above 1.0 is scaled, and removed for a hypo-prone history.
+        adaptiveMult = HypoExposureGuard.scaleBoostMultiplier(learnedAdaptiveMult, hypoGuardThisTick)
+        if (adaptiveMult < learnedAdaptiveMult - 1e-9) {
+            consoleLog.add("🩸 HYPO_EXPOSURE_BASAL: adaptive ${"%.2f".format(Locale.US, learnedAdaptiveMult)}x -> ${"%.2f".format(Locale.US, adaptiveMult)}x")
+        }
         if (Math.abs(adaptiveMult - 1.0) > 0.01) {
             consoleLog.add("🛡️ BASAL_UNIFIED_SCALING: H=${"%.2f".format(hMult)}x / N=${"%.2f".format(nMult)}x -> Applied=${"%.2f".format(adaptiveMult)}x")
         }
@@ -5701,7 +5719,13 @@ class DetermineBasalaimiSMB2 @Inject constructor(
      * which is a different boundary.
      */
     private fun applySmbUnits(rT: RT, requestedU: Double, owner: String) {
-        val requested = if (requestedU.isFinite()) requestedU.coerceAtLeast(0.0) else 0.0
+        val asked = if (requestedU.isFinite()) requestedU.coerceAtLeast(0.0) else 0.0
+        // Hypo history guard: the AI auditor's dose is the algorithm's; meal advisor and meal modes
+        // are the user's and are left alone.
+        val requested = if (owner == "AiAuditor") HypoExposureGuard.scaleDose(asked, hypoGuardThisTick) else asked
+        if (requested < asked - 1e-9) {
+            consoleLog.add("🩸 HYPO_EXPOSURE_SMB[$owner] ${"%.2f".format(Locale.US, asked)}→${"%.2f".format(Locale.US, requested)}U")
+        }
         if (requested > 0.0 && !SmbSwitchGate.allows(smbSwitchOnThisTick, owner)) {
             consoleLog.add("⛔ SMB_DISABLED[$owner]: ${"%.2f".format(requested)} U refused (Enable SMB is off)")
             rT.units = 0.0
@@ -6018,6 +6042,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 htrProjectedDevMgdl = mpcHints.projectedDevMgdl,
                 htrProjectionLeadMgdl = mpcHints.projectionLeadMgdl,
                 physioExtendedDawnGuard = physioPolicy?.extendedDawnGuard == true,
+                hypoExposureScale = hypoGuardThisTick.scale,
             )
 
             if (physioLatentState.isActive()) {
@@ -6785,7 +6810,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 timenowCaptured < sixAMHourCaptured                               -> {
                     val multiplier = if (honeymoon) 1.2 else 1.4
                     val reactivity = if (useUnified) {
-                        unifiedReactivityLearner.globalFactor
+                        HypoExposureGuard.learnedFactor(unifiedReactivityLearner.globalFactor, hypoGuardThisTick)
                     } else {
                         1.0  // Fallback to neutral if disabled
                     }
@@ -6796,7 +6821,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 timenowCaptured > sixAMHourCaptured                               -> {
                     val multiplier = if (honeymoon) 1.4 else 1.6
                     val reactivity = if (useUnified) {
-                        unifiedReactivityLearner.globalFactor
+                        HypoExposureGuard.learnedFactor(unifiedReactivityLearner.globalFactor, hypoGuardThisTick)
                     } else {
                         1.0  // Fallback to neutral if disabled
                     }
@@ -11704,6 +11729,14 @@ class DetermineBasalaimiSMB2 @Inject constructor(
     private var mealModeSmbReason: String? = null
     private var consoleError = mutableListOf<String>()
     private var consoleLog = mutableListOf<String>()
+
+    /** Read the glucose history for the hypo history guard when due; the plugin calls it before each decision. */
+    suspend fun refreshHypoExposure() {
+        if (::hypoExposureMonitor.isInitialized) hypoExposureMonitor.refreshIfDue()
+    }
+
+    /** What the hypo history guard applies on this tick; neutral unless the guard is on. */
+    private var hypoGuardThisTick: HypoExposureGuard.Verdict = HypoExposureGuard.Verdict.NEUTRAL
     private val externalDir by lazy { storageHelper.getAimiDirectory() }
     //private val modelFile = File(externalDir, "ml/model.tflite")
     //private val modelFileUAM = File(externalDir, "ml/modelUAM.tflite")
@@ -15814,6 +15847,18 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             finalUnits = 0.0
         }
 
+        // Hypo history guard: an algorithm SMB is made smaller after too much time below range.
+        // What the user asked for is left alone, as for the effort protection above.
+        if (hypoGuardThisTick.scale < 1.0 && !isExplicitUserAction && finalUnits > 0.0) {
+            val beforeGuard = finalUnits
+            finalUnits = HypoExposureGuard.scaleDose(finalUnits, hypoGuardThisTick)
+            consoleLog.add(
+                "🩸 HYPO_EXPOSURE_SMB ×${"%.2f".format(Locale.US, hypoGuardThisTick.scale)} " +
+                    "${"%.2f".format(Locale.US, beforeGuard)}→${"%.2f".format(Locale.US, finalUnits)}U",
+            )
+            rT.reason.append("🩸hypo history×${"%.2f".format(Locale.US, hypoGuardThisTick.scale)} ")
+        }
+
         // Charge the SlowCarbMeal early-window budget with the ACTUAL delivered amount (post-effort).
         if (chargeSlowCarbBudget && finalUnits > 0.0) slowCarbBudgetDeliveredU += finalUnits
         chainFinal = finalUnits
@@ -18112,9 +18157,13 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 highBgOverrideUsed = highBgOverrideUsed,
                 profileCurrentBasal = profileCurrentBasalLocal,
                 cob = cob,
-                globalReactivityFactor = if (preferences.get(BooleanKey.OApsAIMIUnifiedReactivityEnabled)) {
-                    if (isConfirmedHighRise) max(safeReactivityFactor, 1.0) else safeReactivityFactor
-                } else 1.0,
+                globalReactivityFactor = HypoExposureGuard.learnedFactor(
+                    if (preferences.get(BooleanKey.OApsAIMIUnifiedReactivityEnabled)) {
+                        if (isConfirmedHighRise) max(safeReactivityFactor, 1.0) else safeReactivityFactor
+                    } else 1.0,
+                    hypoGuardThisTick,
+                ),
+                stopExtraBoosts = hypoGuardThisTick.stopExtraBoosts,
                 isConfirmedHighRise = isConfirmedHighRise,
                 minBgLookbackMgdl = minBgLookbackMgdl,
             ),
@@ -20797,6 +20846,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
                 maxIOB = this.maxIob,
                 maxSMB = this.maxSMB,
                 highBgMaxSMB = this.maxSMBHB,
+                hypoExposureScale = hypoGuardThisTick.scale,
                 applyHypoRecoveryRaDampening = applyHypoRecoveryRaT3c,
             )
         } catch (e: Exception) {

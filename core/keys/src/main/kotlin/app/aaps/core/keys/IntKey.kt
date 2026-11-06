@@ -461,6 +461,24 @@ enum class IntKey(
         sync = SyncSpec(SyncChannel.Cold, SyncDirection.Bidirectional)
     ),
     GarminLocalHttpPort("communication_http_port", 28891, 1001, 65535, defaultedBySM = true, hideParentScreenIfHidden = true),
+    /**
+     * AIMI hypo exposure guard: 0 off, 1 watch only (logs what it would do), 2 on. See
+     * `HypoExposureGuard` in plugins/aps. Watch only by default: it changes no dose until it is on.
+     */
+    OApsAIMIHypoExposureGuardMode(
+        key = "key_aimi_hypo_exposure_guard_mode",
+        defaultValue = 1,
+        min = 0,
+        max = 2,
+        titleResId = R.string.pref_title_aimi_hypo_exposure_guard,
+        summaryResId = R.string.pref_summary_aimi_hypo_exposure_guard,
+        preferenceType = PreferenceType.LIST,
+        entries = mapOf(
+            0 to R.string.aimi_hypo_exposure_guard_off,
+            1 to R.string.aimi_hypo_exposure_guard_watch,
+            2 to R.string.aimi_hypo_exposure_guard_on
+        )
+    ),
     OApsAIMIHighBGinterval("key_oaps_aimi_highBG_interval", 3, 1, 20, defaultedBySM = true),
     OApsAIMImealinterval("key_oaps_aimi_meal_interval", 3, 1, 20, defaultedBySM = true),
     OApsAIMILunchinterval("key_oaps_aimi_lunch_interval", 3, 1, 20, defaultedBySM = true),

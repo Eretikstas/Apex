@@ -163,7 +163,8 @@ class MpcController @Inject constructor(
         val uPerKg = preferences.get(DoubleKey.OApsAIMIMpcInsulinUPerKgPerStep)
         val boundedMaxSmb = if (activeMaxSmb.isFinite() && activeMaxSmb > 0.0) activeMaxSmb else state.maxSMB.coerceAtLeast(0.0)
         val weightCap = state.patientWeightKg.takeIf { it.isFinite() && it > 0.0 }?.let { it * uPerKg } ?: boundedMaxSmb
-        val maxSafeDoseU = min(boundedMaxSmb, weightCap).coerceAtLeast(0.0)
+        // Hypo history guard: a lower cap after too much time below range (1.0 = no change).
+        val maxSafeDoseU = min(boundedMaxSmb, weightCap).coerceAtLeast(0.0) * state.hypoExposureScale
 
         val isHyperPlateauQuiet = !state.isNight &&
             state.bg > 145.0 &&

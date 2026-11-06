@@ -72,6 +72,12 @@ data class AutoDriveState(
     val htrProjectedDevMgdl: Double = 0.0,
     val htrProjectionLeadMgdl: Double = 0.0,
     val physioExtendedDawnGuard: Boolean = false,
+    /**
+     * Multiplier on the dose cap from the hypo history guard, see
+     * `app.aaps.plugins.aps.openAPSAIMI.safety.HypoExposureGuard`: 1.0 = no change, below 1.0 when
+     * the last 14 days had too much time below range. It only ever lowers the cap.
+     */
+    val hypoExposureScale: Double = 1.0,
 ) {
     init {
         require(bg in 30.0..600.0) { "BG out of safe bounds: $bg" }
@@ -82,6 +88,7 @@ data class AutoDriveState(
         require(estimatedRa >= 0.0) { "Estimated Ra cannot be negative: $estimatedRa" }
         require(patientWeightKg in MIN_PATIENT_WEIGHT_KG..MAX_PATIENT_WEIGHT_KG) { "Patient weight out of physiological bounds: $patientWeightKg" }
         require(hour in 0..23) { "Invalid hour: $hour" }
+        require(hypoExposureScale in 0.0..1.0) { "Hypo exposure scale out of bounds: $hypoExposureScale" }
     }
 
     companion object {
@@ -124,6 +131,7 @@ data class AutoDriveState(
             htrProjectedDevMgdl: Double = 0.0,
             htrProjectionLeadMgdl: Double = 0.0,
             physioExtendedDawnGuard: Boolean = false,
+            hypoExposureScale: Double = 1.0,
         ): AutoDriveState {
             return try {
                 AutoDriveState(
@@ -159,6 +167,7 @@ data class AutoDriveState(
                     htrProjectedDevMgdl = htrProjectedDevMgdl.coerceAtLeast(0.0),
                     htrProjectionLeadMgdl = htrProjectionLeadMgdl.coerceAtLeast(0.0),
                     physioExtendedDawnGuard = physioExtendedDawnGuard,
+                    hypoExposureScale = hypoExposureScale.takeIf { it.isFinite() }?.coerceIn(0.0, 1.0) ?: 1.0,
                 )
             } catch (e: Exception) {
                 AutoDriveState(

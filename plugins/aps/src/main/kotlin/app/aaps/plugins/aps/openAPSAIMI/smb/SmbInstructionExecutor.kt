@@ -89,6 +89,8 @@ object SmbInstructionExecutor {
         val isConfirmedHighRise: Boolean = false, // 🚀 NEW: For meal confirmation
         /** Min BG (mg/dL) in lookback window; used for post-hypo MPC/PI blend dampening. */
         val minBgLookbackMgdl: Double = Double.MAX_VALUE,
+        /** Hypo history guard: the extra high BG SMB boost (×1.2) is off. See `HypoExposureGuard`. */
+        val stopExtraBoosts: Boolean = false,
     )
 
     data class Hooks(
@@ -485,6 +487,7 @@ object SmbInstructionExecutor {
         
         input.pkpdRuntime?.let { runtime ->
                         if (!isT3cBrittleMode &&
+                                !input.stopExtraBoosts &&
                                 input.bg >= 120.0 &&
                                 input.delta >= 0.0 &&
                                 runtime.tailFraction < 0.30 &&
@@ -504,6 +507,8 @@ object SmbInstructionExecutor {
                                 smbAfterDamping = boosted
                             } else if (isT3cBrittleMode && runtime.fusedIsf <= runtime.profileIsf) {
                                 input.rT.reason.append("\n[T3c Mode] HighBG PKPD boost (20%) is DISABLED.")
+                            } else if (input.stopExtraBoosts && input.bg >= 120.0 && input.delta >= 0.0 && runtime.fusedIsf <= runtime.profileIsf) {
+                                input.rT.reason.append("\n[Hypo history] HighBG PKPD boost (20%) is OFF.")
                             }
                     }
         var highBgOverrideFlag = false

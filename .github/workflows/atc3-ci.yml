@@ -199,6 +199,11 @@ jobs:
           --tests '*AutoDrivePipelineTest*'
           --tests '*ControlBarrierShield*'
           --tests '*DetermineBasalAimiLogDecisionFinalScenarioTest*'
+          --tests '*HypoExposureGuard*'
+          --tests '*MpcController*'
+          --tests '*AimiSettingsManifest*'
+          --tests '*SmbInstructionExecutor*'
+          --tests '*DetermineBasalAimi*Scenario*'
           --continue --stacktrace
 
       - name: Upload AIMI test reports

@@ -1101,6 +1101,7 @@ internal object AimiSettingsScreens {
                 BooleanKey.OApsAIMIStressIsfFloor,
                 BooleanKey.OApsAIMIEffortActivityProtection,
                 BooleanKey.OApsAIMIRiseCeilingGuard,
+                IntKey.OApsAIMIHypoExposureGuardMode,
                 BooleanKey.OApsAIMIAnticipBasalFloor,
                 DoubleKey.OApsAIMIAnticipBudgetU,
                 BooleanKey.OApsAIMIAnticipMealEvidence,
