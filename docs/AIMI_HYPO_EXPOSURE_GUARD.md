@@ -1,6 +1,6 @@
 # AIMI hypo history guard
 
-Status: **in code since 2026-11-06, mode "watch only" by default.** Not checked on a phone yet.
+Status: **in code since 2026-11-06, unit tests pass in CI, mode "watch only" by default.** Not checked on a phone yet.
 It is a change to the AIMI algorithm (not to the ATC3 driver). Idea and numbers from the
 auto-configuration of Boost V5 (tim2000s/Boost-in-AAPS_3.4, `BoostV5AutoConfig.kt`,
 `AggressionBudget.kt`).
@@ -30,7 +30,8 @@ What "extra insulin" means, and where it is applied (all under
   doses the user asked for are not changed.
 - **Autodrive dose cap per 5 min**: `AutoDriveState.hypoExposureScale` → `MpcController`.
 - **Adaptive basal**: the part above ×1.0 is scaled; hypo-prone removes it (×1.0).
-- **HighBG PKPD boost (SMB ×1.2)**: off when hypo-prone (`SmbInstructionExecutor`).
+- **HighBG PKPD boost (SMB ×1.2)** and the **high BG boosts ×1.5 / ×1.7** of the ML training path
+  (on only with "ML training"): off when hypo-prone (`SmbInstructionExecutor`).
 - **Learned factors** (unified reactivity in SMB factors and in the basal of the old modes, learned
   adaptive basal): when hypo-prone a learned factor above 1.0 is used as 1.0.
 

@@ -89,7 +89,7 @@ object SmbInstructionExecutor {
         val isConfirmedHighRise: Boolean = false, // 🚀 NEW: For meal confirmation
         /** Min BG (mg/dL) in lookback window; used for post-hypo MPC/PI blend dampening. */
         val minBgLookbackMgdl: Double = Double.MAX_VALUE,
-        /** Hypo history guard: the extra high BG SMB boost (×1.2) is off. See `HypoExposureGuard`. */
+        /** Hypo history guard: the extra high BG SMB boosts (×1.2, and ×1.5 / ×1.7 with ML training) are off. See `HypoExposureGuard`. */
         val stopExtraBoosts: Boolean = false,
     )
 
@@ -143,7 +143,10 @@ object SmbInstructionExecutor {
             predictedSmb = refined
 
             val maxIobPref = input.preferences.get(DoubleKey.ApsSmbMaxIob)
-            if (input.bg > 170 && input.delta > 4 && input.iob < maxIobPref) {
+            // Hypo history guard: these boosts (×1.7 / ×1.5) are off for a hypo-prone history.
+            if (input.stopExtraBoosts && input.bg > 150 && input.delta > 3 && input.iob < maxIobPref) {
+                input.rT.reason.appendLine("[Hypo history] high BG boost ×1.5/×1.7 is OFF.")
+            } else if (input.bg > 170 && input.delta > 4 && input.iob < maxIobPref) {
                 input.rT.reason.appendLine(
                     input.context.getString(
                         R.string.reason_boost_hyper,
