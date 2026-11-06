@@ -115,15 +115,15 @@ class ChildWeightLimitsTest {
             val case = "weight $weight kg, TDD $tdd U"
 
             val budget = InsulinLoadGovernor.physiologicalBudgetU(tdd, weight)
-            assertWithMessage(case).that(budget).isAtMost(oldBudgetU(tdd, weight))
+            assertWithMessage(case).that(budget).isAtMost(oldBudgetU(tdd, weight) + EPS)
             assertWithMessage(case).that(budget).isWithin(0.001).of(max(tdd * 8.0 / 55.0, weight * 8.0 / 75.0).coerceAtLeast(1.0))
 
             val iobTh = tightSpiralSmbCapIobThresholdU(tdd, weight)
-            assertWithMessage(case).that(iobTh).isAtMost(oldSpiralIobU(tdd, weight))
+            assertWithMessage(case).that(iobTh).isAtMost(oldSpiralIobU(tdd, weight) + EPS)
             assertWithMessage(case).that(iobTh).isAtLeast(1.0)
 
             val energyTh = tightSpiralSmbCapEnergyThresholdU(tdd)
-            assertWithMessage(case).that(energyTh).isAtMost((tdd * 7.0 / 55.0).coerceIn(3.0, 18.0))
+            assertWithMessage(case).that(energyTh).isAtMost((tdd * 7.0 / 55.0).coerceIn(3.0, 18.0) + EPS)
             assertWithMessage(case).that(energyTh).isAtLeast(1.0)
 
             // Autodrive keeps the real weight, so its dose cap (weight × U/kg) is never the 40 kg one.
@@ -193,6 +193,9 @@ class ChildWeightLimitsTest {
 
         /** From 20 kg (the lowest weight now) to an adult. */
         val WEIGHTS_KG = listOf(20.0, 22.5, 25.0, 30.0, 35.0, 40.0, 50.0, 75.0)
+
+        /** Rounding: the code and the test compute `w × (8 / 75)` and `w × 8 / 75`, a last-digit difference. */
+        const val EPS = 1e-9
 
         /** From 10 U a day up. */
         val TDDS_U = listOf(10.0, 12.0, 15.0, 17.0, 20.0, 25.0, 30.0, 40.0, 55.0)
