@@ -12,6 +12,9 @@ on:
 
 jobs:
   claude-review:
+    # Only pull requests opened by the owner of the repository: the review runs on the owner's Claude
+    # token, and in a public repository anyone can open a pull request.
+    if: github.event.pull_request.user.login == github.repository_owner && github.actor == github.repository_owner
     # Optional: Filter by PR author
     # if: |
     #   github.event.pull_request.user.login == 'external-contributor' ||
