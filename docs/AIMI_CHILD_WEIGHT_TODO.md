@@ -1,7 +1,7 @@
 # AIMI and the weight of a child
 
-Status: **limits fixed in code on 2026-11-06, waiting for the unit tests in CI and for a check on the
-phone.** Found on 2026-11-05 while reading AIMI (`dev_OAPSAIMI` snapshot `fd426643`). These are
+Status: **limits fixed in code on 2026-11-06; unit tests pass in CI (run 42196140223); waiting for a
+check on the phone.** Found on 2026-11-05 while reading AIMI (`dev_OAPSAIMI` snapshot `fd426643`). These are
 changes to the AIMI algorithm, not to the ATC3 driver. They should also go to the AIMI author.
 
 The case they are made for: a child of **25 kg**, TDD about **17 U** a day (Nightscout analyser,
@@ -43,7 +43,7 @@ Not changed: `UndeclaredCobEstimator` (carb cap = real weight × g/kg) and
 
 ## Still to do
 
-1. Run the tests in CI and look at the result.
+1. ~~Run the tests in CI~~: done, all pass (2026-11-06).
 2. On the phone: enter the real weight; keep Max IOB, Max SMB and the maximum basal low for the
    child (these limits do not depend on the weight and hold the doses most); keep the pump limits.
 3. Watch the first days with Autodrive: the logs show `AdaptiveBasal IOB-budget x/2.7U` and the
