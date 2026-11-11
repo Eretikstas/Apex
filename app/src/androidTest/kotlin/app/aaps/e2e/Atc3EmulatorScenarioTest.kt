@@ -26,6 +26,7 @@ import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.BooleanComposedKey
 import app.aaps.core.keys.BooleanNonKey
+import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.di.Atc3Emulation
@@ -114,10 +115,25 @@ class Atc3EmulatorScenarioTest {
         seedLocalProfile()
         activateSeededProfile()
 
-        startedAt = System.currentTimeMillis()
         status("scenario start")
         assertWithMessage("the driver is initialized after the first status read")
             .that(awaitTrue(INIT_TIMEOUT) { atc3Plugin.isInitialized() }).isTrue()
+        startInAFreshMinute()
+        startedAt = System.currentTimeMillis()
+    }
+
+    /**
+     * On a phone the pump was paired and the profile ran long before any bolus. Here both happen a few
+     * seconds before the scenario, and the pump logs to the minute: a record of that same minute would be
+     * older than the pump's registration in AAPS (which refuses it) or than the running profile (which
+     * refuses a bolus). So the scenario starts in the next minute after both.
+     */
+    private fun startInAFreshMinute() {
+        assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
+        val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
+        val nextMinute = (ready / 60_000L + 1) * 60_000L + 2_000L
+        val wait = nextMinute - System.currentTimeMillis()
+        if (wait > 0) SystemClock.sleep(wait)
     }
 
     @After
