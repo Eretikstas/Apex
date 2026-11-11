@@ -52,13 +52,17 @@ class EmulatedAtc3BLE(aapsLogger: AAPSLogger, context: Context, trace: Atc3Trace
 
     override var linkUpAtMs: Long
         get() = if (emulator != null) upAt else super.linkUpAtMs
-        set(value) {
+        protected set(value) {
+            // The real class sets it on a real link: kept there too, for when no emulator is in place.
             upAt = value
+            super.linkUpAtMs = value
         }
 
     override var linkProtection: Atc3LinkProtection
         get() = if (emulator != null) (if (isConnected) Atc3LinkProtection.PROTECTED else Atc3LinkProtection.UNKNOWN) else super.linkProtection
-        set(value) = Unit
+        protected set(value) {
+            super.linkProtection = value
+        }
 
     override fun isValidAddress(address: String): Boolean = if (emulator != null) true else super.isValidAddress(address)
 

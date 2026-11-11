@@ -30,7 +30,7 @@ class Atc3PumpEmulator(val pump: VirtualAtc3Pump) : PumpEmulatorControl {
     init {
         pump.sink = { chunk -> if (linkUp) onNotification?.invoke(chunk) }
         pump.onLinkDropped = { dropLink() }
-        speed = EmulatorSpeed.FAST
+        // Fast by default: the pump's own default tick is already the fast one.
     }
 
     val isLinkUp: Boolean get() = linkUp
