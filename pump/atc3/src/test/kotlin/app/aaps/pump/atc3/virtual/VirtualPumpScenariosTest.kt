@@ -42,6 +42,7 @@ import app.aaps.pump.atc3.manager.Atc3Manager
 import app.aaps.pump.atc3.state.Atc3PumpState
 import app.aaps.pump.atc3.store.Atc3Store
 import app.aaps.pump.atc3.trace.Atc3Trace
+import app.aaps.pump.atc3.emulator.VirtualAtc3Pump
 import app.aaps.pump.atc3.exchange.Atc3Exchange
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat

@@ -29,6 +29,8 @@ dependencies {
 
     // :core:objects is already an implementation dependency, so the tests see it too.
     testImplementation(project(":shared:tests"))
+    // The software pump of the virtual scenarios; tests only.
+    testImplementation(project(":pump:atc3-emulator"))
     testImplementation(libs.kotlinx.coroutines.test)
 
     ksp(libs.com.google.dagger.compiler)

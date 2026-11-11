@@ -1,6 +1,5 @@
-package app.aaps.pump.atc3.virtual
+package app.aaps.pump.atc3.emulator
 
-import app.aaps.pump.atc3.protocol.CrcUtil
 import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.Executors
@@ -95,6 +94,33 @@ class VirtualAtc3Pump(
     /** The link drops after this many raw steps of a bolus. */
     var dropLinkAtBolusRaw: Int? = null
 
+    /** A running bolus stops after this many raw steps with the no delivery alarm, as at an occlusion. Used once. */
+    @Volatile var bolusOccludesAt: Int? = null
+
+    /** One fault for the next frame that matches: class, code and payload size of the command. */
+    class FrameFault(val cls: Int, val code: Int, val payloadSize: Int? = null)
+
+    /** The next matching command does not reach the pump: nothing is done, nothing is answered. Used once. */
+    val loseCommands = mutableListOf<FrameFault>()
+
+    /** The pump runs the next matching command, but its direct answer is lost. Used once. */
+    val loseAnswers = mutableListOf<FrameFault>()
+
+    /** The thread whose answers are dropped now, see [loseAnswers]. */
+    @Volatile private var mutedThread: Thread? = null
+
+    private fun takeFault(faults: MutableList<FrameFault>, cls: Int, code: Int, payloadSize: Int): Boolean = synchronized(faults) {
+        val hit = faults.firstOrNull { it.cls == cls && it.code == code && (it.payloadSize == null || it.payloadSize == payloadSize) }
+        if (hit != null) faults.remove(hit)
+        hit != null
+    }
+
+    /** The pump raises an alarm now: it is active in the status and written to the alarm log. */
+    fun raiseAlarm(code: Int) {
+        synchronized(activeAlarms) { if (code !in activeAlarms) activeAlarms.add(0, code) }
+        synchronized(alarmLog) { alarmLog.add(0, AlarmRecord(pumpNow(), code)) }
+    }
+
     /** Called when the pump drops the link. */
     var onLinkDropped: (() -> Unit)? = null
 
@@ -123,7 +149,7 @@ class VirtualAtc3Pump(
         if (frame.size < 20) return true
         val length = (frame[1].toInt() and 0xFF) or ((frame[2].toInt() and 0xFF) shl 8)
         if (length != frame.size) return true
-        val crc = CrcUtil.crc16ModbusLeBytes(frame, frame.size - 2)
+        val crc = Crc16.modbusLeBytes(frame, frame.size - 2)
         if (crc[0] != frame[frame.size - 2] || crc[1] != frame[frame.size - 1]) return true
         // §2.1 says the marker is 0x35 for the official app; the driver also uses 0x55 for some
         // reads and the cancel, which it was bench tested with. Both are taken.
@@ -137,9 +163,15 @@ class VirtualAtc3Pump(
         val payload = frame.copyOfRange(18, frame.size - 2)
         synchronized(received) { received.add("%02x/%02x".format(cls, code)) }
         if (code in silentFor) return true
-        when (cls) {
-            0xA3 -> read(code, index)
-            0xA1 -> control(code, payload)
+        if (takeFault(loseCommands, cls, code, payload.size)) return true
+        if (takeFault(loseAnswers, cls, code, payload.size)) mutedThread = Thread.currentThread()
+        try {
+            when (cls) {
+                0xA3 -> read(code, index)
+                0xA1 -> control(code, payload)
+            }
+        } finally {
+            mutedThread = null
         }
         return true
     }
@@ -392,6 +424,14 @@ class VirtualAtc3Pump(
             override fun run() {
                 if (run.cancelled) return finishBolus(run, completed = false)
                 if (bolusStallsAt?.let { run.delivered >= it } == true) return
+                if (bolusOccludesAt?.let { run.delivered >= it } == true) {
+                    // What the real pump sends at an occlusion is not in the description: here the
+                    // bolus ends short, is logged, and the no delivery alarm (code 8) is active.
+                    bolusOccludesAt = null
+                    finishBolus(run, completed = false)
+                    raiseAlarm(8)
+                    return
+                }
                 if (dropLinkAtBolusRaw?.let { run.delivered >= it } == true) {
                     finishBolus(run, completed = false)
                     onLinkDropped?.invoke()
@@ -424,6 +464,17 @@ class VirtualAtc3Pump(
         addBolusRecord(atMs, raw, raw)
     }
 
+    /** The user stops or starts the insulin on the pump's own keypad: nothing is sent over the air. */
+    fun suspendOnKeypad(stop: Boolean) {
+        if (stop) {
+            suspended = true
+            val c = calendar(pumpNow())
+            stopHour = c.get(Calendar.HOUR_OF_DAY)
+            stopMinute = c.get(Calendar.MINUTE)
+            bolusRunning?.cancelled = true
+        } else suspended = false
+    }
+
     /** §4.4: 59 for the newest record of the minute, 58, 57 for the earlier ones. */
     private fun addBolusRecord(atMs: Long, requested: Int, delivered: Int) = synchronized(bolusLog) {
         val minute = minuteOf(atMs)
@@ -435,12 +486,13 @@ class VirtualAtc3Pump(
     /** Send the heartbeat `a5/03`, §2.5: its length field is the size without the CRC. */
     fun heartbeat() {
         val body = byteArrayOf(0xAA.toByte(), 0x06, 0x00, 0xA5.toByte(), heartbeatMinutes.toByte(), 0x00)
-        send(body + CrcUtil.crc16ModbusLeBytes(body))
+        send(body + Crc16.modbusLeBytes(body))
     }
 
     // Frames
 
     private fun send(frame: ByteArray) {
+        if (mutedThread === Thread.currentThread()) return
         // Long frames arrive in several notifications (§2.2): split at 20 bytes to test reassembly.
         var at = 0
         while (at < frame.size) {
@@ -460,7 +512,7 @@ class VirtualAtc3Pump(
         frame[4] = code.toByte()
         frame[5] = index.toByte()
         data.copyInto(frame, 6)
-        CrcUtil.crc16ModbusLeBytes(frame, total - 2).copyInto(frame, total - 2)
+        Crc16.modbusLeBytes(frame, total - 2).copyInto(frame, total - 2)
         return frame
     }
 

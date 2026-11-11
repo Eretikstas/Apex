@@ -305,7 +305,8 @@ dependencies {
     // buildFile.exists() skips the phantom :pump:omnipod container Gradle auto-creates from the
     // nested :pump:omnipod:* includes (it has no build script / no consumable variant).
     //  - :pump:apex is fork WIP (in settings.gradle but was never wired into app dependencies)
-    val pumpExclusions = setOf(":pump:virtual", ":pump:combov2:comboctl", ":pump:apex")
+    //  - :pump:atc3-emulator is a software pump for tests: only androidTest gets it (below), no APK
+    val pumpExclusions = setOf(":pump:virtual", ":pump:combov2:comboctl", ":pump:apex", ":pump:atc3-emulator")
     rootProject.subprojects
         .filter { it.path.startsWith(":pump:") && it.path !in pumpExclusions && it.buildFile.exists() }
         .forEach {
@@ -317,6 +318,8 @@ dependencies {
 
     testImplementation(project(":shared:tests"))
     androidTestImplementation(project(":shared:tests"))
+    // The software ATC3 pump of Atc3EmulatorScenarioTest; not a dependency of the app itself.
+    androidTestImplementation(project(":pump:atc3-emulator"))
     androidTestImplementation(libs.androidx.test.rules)
     // UiAutomator for the in-process E2E UI test (app/src/androidTest/.../e2e). Drives the real
     // Compose UI (booted under the Hilt test app) via the accessibility bridge.

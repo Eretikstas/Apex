@@ -289,7 +289,7 @@ jobs:
           rm -rv "$T/plugins/aps/openAPS" "$T/plugins/aps/openAPSAMA" "$T/plugins/aps/openAPSSMB" \
             "$T/plugins/aps/openAPSSMBAutoISF" "$T/plugins/aps/openAPSSMBDynamicISF" "$T/plugins/aps/logger"
 
-      - name: ATC3 UI smoke test on an emulator
+      - name: ATC3 UI smoke test and pump scenarios on an emulator
         run: |
           # Memory and disk every 30 s in this log, to see what ran out if the runner stops again.
           ( while true; do echo "RESOURCES $(date -u +%T) $(free -m | sed -n 2p) | $(free -m | sed -n 3p) | $(df -h / | tail -1)"; sleep 30; done ) &
@@ -300,7 +300,7 @@ jobs:
           ./gradlew :app:assembleFullDebug :app:assembleFullDebugAndroidTest --stacktrace
           ./gradlew --stop
           ./gradlew :app:emuFullDebugAndroidTest \
-            -Pandroid.testInstrumentationRunnerArguments.class=app.aaps.e2e.Atc3UiSmokeTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=app.aaps.e2e.Atc3UiSmokeTest,app.aaps.e2e.Atc3EmulatorScenarioTest \
             -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
             --stacktrace
 
