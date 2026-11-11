@@ -55,6 +55,7 @@ import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
@@ -344,6 +345,27 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
                 any(), eq(PumpRate(1.5)), any(), eq(true), anyOrNull(), any(), eq(PumpType.ATC3), eq(serial)
             )
         }
+    }
+
+    @Test
+    fun `a temporary basal whose answer is lost but which the pump runs is written now, not at time 0`() {
+        status()
+        synchronized(pump.loseAnswers) { pump.loseAnswers.add(VirtualAtc3Pump.FrameFault(0xA1, 0x02, 4)) }
+        val before = dateUtil.now()
+
+        val result = runBlocking { plugin.setTempBasalAbsolute(1.5, 30, false, PumpSync.TemporaryBasalType.NORMAL) }
+
+        assertThat(result.success).isTrue()
+        assertThat(pump.tbr).isNotNull()
+        val start = argumentCaptor<Long>()
+        runBlocking {
+            verify(pumpSync, atLeastOnce()).syncTemporaryBasalWithPumpId(
+                start.capture(), eq(PumpRate(1.5)), any(), eq(true), anyOrNull(), any(), eq(PumpType.ATC3), eq(serial)
+            )
+        }
+        // The row starts when the pump began, which is not before the pump's minute of it and not after now.
+        assertThat(start.lastValue).isAtLeast(before - before % 60_000L)
+        assertThat(start.lastValue).isAtMost(dateUtil.now())
     }
 
     @Test

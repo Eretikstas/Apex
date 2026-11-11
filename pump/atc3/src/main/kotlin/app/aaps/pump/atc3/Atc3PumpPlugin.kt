@@ -937,22 +937,29 @@ class Atc3PumpPlugin @Inject constructor(
 
     /** A temporary basal the pump has just accepted from this driver goes into the books and AAPS. */
     private suspend fun recordOwnTbr(result: Atc3TbrResult, type: PumpSync.TemporaryBasalType = PumpSync.TemporaryBasalType.NORMAL) {
+        // The pump's answer can be lost while its status proves it runs the command: then when it accepted it is not
+        // known, and now is the closest moment known. Without this the row would start at 0 and AAPS would refuse it,
+        // so AAPS would see no temporary basal while the pump runs one.
+        val acknowledged = result.acceptedAtMs > 0L
+        val acceptedAt = if (acknowledged) result.acceptedAtMs else dateUtil.now()
+        if (!acknowledged) aapsLogger.debug(LTag.PUMP, "ATC3: the pump's answer to the temporary basal was lost, its start is taken as now")
         // The pump's own record of the command, so AAPS's row carries the pump's start; used only when it is this command.
         val record = atc3Manager.readActiveTbr()
-        // Same rate and duration: how far its stamp sits from the acknowledgement feeds the clock watch.
-        if (record != null && isSameCommand(record, result)) {
-            val lagMs = result.acceptedAtMs - record.startTimestamp
+        // Same rate and duration: how far its stamp sits from the acknowledgement feeds the clock watch. Without an
+        // acknowledgement there is nothing to measure from.
+        if (acknowledged && record != null && isSameCommand(record, result)) {
+            val lagMs = acceptedAt - record.startTimestamp
             clockWatch.ownTbrStamped(lagMs, dateUtil.now())
             trace.event(Atc3TraceCat.TBR, "own_stamp", "lagMs" to lagMs, "clockSet" to clockWatch.needsSetting(dateUtil.now()))
         }
-        val pumpStart = record?.takeIf { isCommandOf(it, result) }
+        val pumpStart = record?.takeIf { isCommandOf(it, result, acceptedAt) }
         if (pumpStart == null) aapsLogger.debug(LTag.PUMP, "ATC3: the pump's start of the temporary basal just set is not known yet")
-        atc3HistorySync.tbrStartedByAaps(result.acceptedAtMs, result.rate, result.durationMinutes, pumpStart, type = type)
+        atc3HistorySync.tbrStartedByAaps(acceptedAt, result.rate, result.durationMinutes, pumpStart, type = type)
     }
 
-    /** Whether the pump's record is the command just accepted: same rate and duration, a start near the acknowledgement. */
-    private fun isCommandOf(record: Atc3TbrStatus, result: Atc3TbrResult): Boolean =
-        isSameCommand(record, result) && abs(record.startTimestamp - result.acceptedAtMs) <= OWN_TBR_START_MS
+    /** Whether the pump's record is the command just accepted: same rate and duration, a start near [acceptedAt]. */
+    private fun isCommandOf(record: Atc3TbrStatus, result: Atc3TbrResult, acceptedAt: Long): Boolean =
+        isSameCommand(record, result) && abs(record.startTimestamp - acceptedAt) <= OWN_TBR_START_MS
 
     /** Whether the pump's record has the same rate and duration, with a start it filled in. */
     private fun isSameCommand(record: Atc3TbrStatus, result: Atc3TbrResult): Boolean {
