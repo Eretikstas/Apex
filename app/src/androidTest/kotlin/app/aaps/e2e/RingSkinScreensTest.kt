@@ -13,6 +13,7 @@ import androidx.work.WorkManager
 import app.aaps.ComposeMainActivity
 import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.GV
+import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.SourceSensor
 import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.data.ue.Action
@@ -254,6 +255,7 @@ class RingSkinScreensTest {
                     " sensitivity=${sensitivity.javaClass.simpleName} maxAbsorptionH=${sensitivity.maxAbsorptionHours()}" +
                     " minImpact=${preferences.get(DoubleKey.ApsSmbMin5MinCarbsImpact)}" +
                     " isf=${profile?.getIsfMgdl("RingSkinScreensTest")} ic=${profile?.getIc()}" +
+                    " profile40mAgo=${runBlocking { profileFunction.getProfile(now - 40 * 60_000L) } != null}" +
                     " last=${calc.ads.getLastAutosensData("RingSkinScreensTest", aapsLogger, dateUtil)?.time?.let { (now - it) / 1000 }}s ago"
             )
             for (minutesAgo in 60 downTo 0 step 5) {
@@ -409,13 +411,23 @@ class RingSkinScreensTest {
         val switch = runBlocking {
             profileFunction.createProfileSwitch(
                 profileStore = store, profileName = PROFILE_NAME, durationInMinutes = 0, percentage = 100,
-                // Before the 7 days of seeded data: AAPS skips the COB / autosens calculation for any
-                // time without a running profile, so a switch made "now" gave no active carbs.
-                timeShiftInHours = 0, timestamp = dateUtil.now() - 8 * 24 * 3_600_000L, action = Action.PROFILE_SWITCH,
+                timeShiftInHours = 0, timestamp = dateUtil.now(), action = Action.PROFILE_SWITCH,
                 source = Sources.Aaps, listValues = emptyList(), iCfg = insulinManager.insulins.first()
             )
         }
         checkNotNull(switch) { "Could not activate the seeded local profile" }
+        // AAPS runs on the effective switch, which the pump makes "now". The COB / autosens calculation
+        // skips every 5 min step without a running profile, so copy it to before the seeded data.
+        val now = dateUtil.now()
+        val eps = checkNotNull(awaitNotNull(PROFILE_STORE_TIMEOUT) { runBlocking { persistenceLayer.getEffectiveProfileSwitchActiveAt(now) } }) {
+            "No effective profile switch"
+        }
+        runBlocking {
+            persistenceLayer.insertOrUpdateEffectiveProfileSwitch(
+                eps.copy(id = 0, version = 0, dateCreated = -1, ids = IDs(), timestamp = now - 8 * 24 * 3_600_000L, originalEnd = now)
+            )
+        }
+        Log.i(COB_TAG, "Effective profile switch copied 8 days back")
     }
 
     private fun singleValue(value: Double) = """[{"time":"00:00","timeAsSeconds":0,"value":$value}]"""
