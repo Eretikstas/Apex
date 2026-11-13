@@ -104,7 +104,7 @@ class Atc3PumpEmulator(val pump: VirtualAtc3Pump) : PumpEmulatorControl {
             EmulatedAlarm.LOW_BATTERY      -> 1
             EmulatedAlarm.OCCLUSION        -> 8
             EmulatedAlarm.EMPTY_RESERVOIR  -> 13
-            // No code for these two is known from the description.
+            // Codes 1, 8, 13 from the alarm table of the description. No code for these two is known: false.
             EmulatedAlarm.LOW_RESERVOIR,
             EmulatedAlarm.STOPPED_TOO_LONG -> return false
         }

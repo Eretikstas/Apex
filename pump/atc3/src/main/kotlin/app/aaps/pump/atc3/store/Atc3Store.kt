@@ -43,6 +43,12 @@ class Atc3Store @Inject constructor(
     val state: Atc3StoredState
         @Synchronized get() = loaded ?: load().also { loaded = it }
 
+    /** Drop the copy in memory: the next use reads the disk again, as a fresh start does (driver stop). */
+    @Synchronized
+    fun forgetMemory() {
+        loaded = null
+    }
+
     /** Change the state and write it, unless the change leaves it as it was. */
     @Synchronized
     fun update(change: (Atc3StoredState) -> Atc3StoredState) {

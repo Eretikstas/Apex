@@ -213,6 +213,8 @@ class Atc3PumpPlugin @Inject constructor(
         )
         basalPeriods.watch(pluginScope) { isEnabled() }
         linkKeeper.watch(pluginScope) { isEnabled() }
+        // Everything else comes from the disk (on first use) and from the pump: one status read now.
+        if (isEnabled()) atc3Queue.readStatus(rh.gs(R.string.atc3_driver_start_read))
     }
 
     override suspend fun onStop() {
@@ -222,6 +224,9 @@ class Atc3PumpPlugin @Inject constructor(
         databaseWatches.forEach { it.cancel() }
         databaseWatches = emptyList()
         disposable.clear()
+        // Nothing in memory that the next start would trust (AIMI acceptance D1); the disk keeps the rest.
+        pumpState.forget()
+        atc3HistorySync.forgetMemory()
         super.onStop()
     }
 

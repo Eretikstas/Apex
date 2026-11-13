@@ -465,6 +465,18 @@ class Atc3HistorySync @Inject constructor(
     fun ledgerSerial(): String? = store.state.ledger.serial.takeIf { it.isNotBlank() }
 
     /**
+     * The driver stops (AIMI acceptance D1): drop what is kept in memory only, so the next start takes
+     * nothing on trust and reads the disk and the pump again. What is on disk stays.
+     */
+    @Synchronized
+    fun forgetMemory() {
+        lastStatusAtMs = 0L
+        lastAnswerNewestUtcSeconds = 0L
+        passedOver.clear()
+        store.forgetMemory()
+    }
+
+    /**
      * Forget everything kept of the pump: another pump, the pump disconnected, or paired afresh. The
      * freshness marks go too, so the next command reads everything.
      *

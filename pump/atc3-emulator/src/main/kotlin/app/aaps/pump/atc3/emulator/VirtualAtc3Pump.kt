@@ -16,6 +16,11 @@ import kotlin.math.min
  * It is not the real firmware: what the description does not say (timings, an empty log, a wrong
  * password in detail) is kept simple, and is said where it is.
  *
+ * Source of each behaviour: the § of the description named next to it (as read 2026-11-11). Nothing
+ * here is measured on a real pump yet (spare ATC3, firmware 1.1.1, bench test pending). A behaviour
+ * the description does not give is marked `UNVERIFIED`, with what is guessed, to be checked on the bench
+ * (AIMI pump driver acceptance E2).
+ *
  * Offsets in this file are the description's: data starts at byte 6 of a response frame.
  */
 class VirtualAtc3Pump(
@@ -131,7 +136,7 @@ class VirtualAtc3Pump(
     /** Every command frame received, as `class/code` text, for checks. */
     val received = mutableListOf<String>()
 
-    /** Milliseconds between two bolus progress frames: about 1 s on a real pump, short here. */
+    /** Milliseconds between two bolus progress frames, short here. UNVERIFIED: about 1 s per 0.05 U on a real pump. */
     var bolusTickMs = 20L
 
     @Volatile private var bolusRunning: BolusRun? = null
@@ -429,13 +434,15 @@ class VirtualAtc3Pump(
                 if (run.cancelled) return finishBolus(run, completed = false)
                 if (bolusStallsAt?.let { run.delivered >= it } == true) return
                 if (bolusOccludesAt?.let { run.delivered >= it } == true) {
-                    // What the real pump sends at an occlusion is not in the description: here the
+                    // UNVERIFIED: what the real pump sends at an occlusion is not in the description: here the
                     // bolus ends short, is logged, and the no delivery alarm (code 8) is active.
                     bolusOccludesAt = null
                     finishBolus(run, completed = false)
                     raiseAlarm(8)
                     return
                 }
+                // UNVERIFIED: here a lost link ends the bolus short. A real pump may go on and finish it
+                // without the phone; the driver must count what the log says in both cases.
                 if (dropLinkAtBolusRaw?.let { run.delivered >= it } == true) {
                     finishBolus(run, completed = false)
                     onLinkDropped?.invoke()
@@ -468,7 +475,7 @@ class VirtualAtc3Pump(
         addBolusRecord(atMs, raw, raw)
     }
 
-    /** The user stops or starts the insulin on the pump's own keypad: nothing is sent over the air. */
+    /** The user stops or starts the insulin on the pump's own keypad. UNVERIFIED: nothing is sent over the air; a running bolus ends. */
     fun suspendOnKeypad(stop: Boolean) {
         if (stop) {
             suspended = true

@@ -719,6 +719,7 @@
     <string name="appearance">Внешний вид</string>
     <string name="aps_mode_title">Режим APS</string>
     <string name="askforpermission">Запросить права доступа</string>
+    <string name="atc3_driver_start_read">Apex: чтение помпы при запуске драйвера</string>
     <string name="authorization_status">Статус авторизации</string>
     <string name="authorized_clients_add">Добавить клиента</string>
     <string name="authorized_clients_comm_switch_summary">Разрешить сопряжённым клиентам отправлять подписанные команды через Nightscout. Выключите, чтобы остановить связь, не удаляя их.</string>

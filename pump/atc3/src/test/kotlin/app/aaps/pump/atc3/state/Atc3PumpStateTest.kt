@@ -128,4 +128,23 @@ class Atc3PumpStateTest {
         assertEquals(12.0, pump.deliveredTodayUnits)
         assertEquals(2_000L, pump.statusReadAtMs)
     }
+
+    @Test
+    fun `a stopped driver keeps nothing read from the pump`() {
+        val pump = Atc3PumpState()
+        pump.editStatus { it.copy(suspended = true) }
+        pump.lastConnection = 5_000L
+        pump.serialNumber = "12345678"
+        pump.lastBolus = Atc3PumpState.LastBolus(1_000L, 1.0)
+
+        pump.forget()
+
+        assertEquals(null, pump.statusCard)
+        assertEquals(0L, pump.lastConnection)
+        assertEquals("", pump.serialNumber)
+        assertEquals(null, pump.lastBolus)
+        assertEquals(null, pump.lastBolusTimeFlow.value)
+        assertEquals(0.0, pump.reservoirFlow.value.cU)
+        assertFalse(pump.suspended)
+    }
 }

@@ -123,6 +123,18 @@ class Atc3PumpState @Inject constructor() {
 
     @Volatile var profiles: Profiles? = null
 
+    /** The driver stops (AIMI acceptance D1): nothing read from the pump is kept for the next start. */
+    fun forget() {
+        statusCard = null
+        statusV2 = null
+        lastConnection = 0L
+        dayAccount = null
+        lastBolus = null
+        serialNumber = ""
+        version = null
+        profiles = null
+    }
+
     // Views of the last status report
 
     val lastStatus: Atc3StatusV1? get() = statusCard?.status
