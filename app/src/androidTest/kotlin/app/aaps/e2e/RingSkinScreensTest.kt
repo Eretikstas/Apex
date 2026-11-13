@@ -203,6 +203,7 @@ class RingSkinScreensTest {
         val points = (1..12).map { case.prediction(it * 5).toInt() }
         val rt = RT(
             algorithm = APSResult.Algorithm.AIMI,
+            runningDynamicIsf = false,
             timestamp = now,
             bg = LAST_BG,
             eventualBG = case.eventualMgdl,
