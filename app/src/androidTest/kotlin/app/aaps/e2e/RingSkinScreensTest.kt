@@ -409,7 +409,9 @@ class RingSkinScreensTest {
         val switch = runBlocking {
             profileFunction.createProfileSwitch(
                 profileStore = store, profileName = PROFILE_NAME, durationInMinutes = 0, percentage = 100,
-                timeShiftInHours = 0, timestamp = dateUtil.now(), action = Action.PROFILE_SWITCH,
+                // Before the 7 days of seeded data: AAPS skips the COB / autosens calculation for any
+                // time without a running profile, so a switch made "now" gave no active carbs.
+                timeShiftInHours = 0, timestamp = dateUtil.now() - 8 * 24 * 3_600_000L, action = Action.PROFILE_SWITCH,
                 source = Sources.Aaps, listValues = emptyList(), iCfg = insulinManager.insulins.first()
             )
         }
