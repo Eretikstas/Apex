@@ -11,6 +11,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.work.WorkManager
 import app.aaps.ComposeMainActivity
+import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.SourceSensor
 import app.aaps.core.data.model.TrendArrow
@@ -150,6 +151,7 @@ class RingSkinScreensTest {
         seedLocalProfile()
         activateSeededProfile()
         seedGlucose()
+        seedCarbs()
         device.executeShellCommand("settings put global heads_up_notifications_enabled 0")
 
         outDir = File(ctx.getExternalFilesDir(null), "screens").apply { deleteRecursively(); mkdirs() }
@@ -175,7 +177,35 @@ class RingSkinScreensTest {
                 }.onFailure { Log.w(TAG, "Case ${case.name} $theme failed: ${it.message}") }
             }
         }
+        pressButtons()
         Log.i(TAG, "Done: $shot screenshots")
+    }
+
+    /** Each button under the why card opens its screen; it is saved and closed with Back, never confirmed. */
+    private fun pressButtons() {
+        for (label in listOf("Углеводы", "Инсулин", "Калькулятор", "Цель")) {
+            runCatching {
+                if (!home()) return@runCatching
+                show(cases[0])
+                closeDialogs()
+                val w = device.displayWidth
+                val h = device.displayHeight
+                device.swipe(w / 2, h * 3 / 4, w / 2, h / 4, 30)
+                settle()
+                val button = device.findObject(By.pkg(PKG).text(label))
+                if (button == null) {
+                    save("Кнопка «$label» не найдена")
+                    return@runCatching
+                }
+                button.click()
+                settle()
+                SystemClock.sleep(DATA_MS)
+                save("Кнопка «$label»")
+                device.pressBack()
+                settle()
+                device.pressBack()
+            }.onFailure { Log.w(TAG, "Button $label failed: ${it.message}") }
+        }
     }
 
     // ---- data -------------------------------------------------------------------------------------
@@ -195,6 +225,17 @@ class RingSkinScreensTest {
         }.reversed()
         val inserted = runBlocking { persistenceLayer.insertCgmSourceData(Sources.Random, values, emptyList(), null) }.inserted.size
         Log.i(TAG, "Seeded $inserted glucose values")
+    }
+
+    /** 20 g of carbs 40 min ago, so the active carbs (COB) have a value. */
+    private fun seedCarbs() {
+        runBlocking {
+            persistenceLayer.insertOrUpdateCarbs(
+                CA(timestamp = dateUtil.now() - 40 * 60_000L, amount = 20.0, duration = 0L),
+                action = Action.CARBS, source = Sources.CarbDialog, note = null
+            )
+        }
+        Log.i(TAG, "Seeded 20 g carbs")
     }
 
     /** Puts [case] in as the last loop run and its prediction into the graph data. */
