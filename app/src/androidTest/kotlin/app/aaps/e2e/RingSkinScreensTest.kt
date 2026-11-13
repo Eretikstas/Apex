@@ -87,7 +87,8 @@ class RingSkinScreensTest {
     @Inject lateinit var persistenceLayer: PersistenceLayer
     @Inject lateinit var loop: Loop
     @Inject lateinit var apsResultProvider: Provider<APSResult>
-    @Inject lateinit var overviewDataCache: OverviewDataCache
+    /** A Provider: the cache reads the plugin list at creation, so it is made only after set up. */
+    @Inject lateinit var overviewDataCache: Provider<OverviewDataCache>
     @Inject lateinit var rxBus: RxBus
     @Suppress("unused") @Inject lateinit var staticInjector: StaticInjector
 
@@ -220,7 +221,7 @@ class RingSkinScreensTest {
             request = apsResultProvider.get().with(rt)
             lastAPSRun = now
         }
-        overviewDataCache.updatePredictions(points.mapIndexed { i, v ->
+        overviewDataCache.get().updatePredictions(points.mapIndexed { i, v ->
             BgDataPoint(
                 timestamp = now + (i + 1) * 5 * 60_000L, value = v.toDouble(),
                 range = if (v < 70) BgRange.LOW else if (v > 180) BgRange.HIGH else BgRange.IN_RANGE,
