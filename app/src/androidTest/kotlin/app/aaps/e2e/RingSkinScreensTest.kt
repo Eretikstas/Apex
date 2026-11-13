@@ -8,7 +8,6 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.work.WorkManager
 import app.aaps.ComposeMainActivity
@@ -261,12 +260,25 @@ class RingSkinScreensTest {
     }
 
     private fun capture(name: String) {
+        closeDialogs()
         save(name)
-        val list = runCatching { device.findObject(By.pkg(PKG).scrollable(true)) }.getOrNull() ?: return
-        if (runCatching { list.scroll(Direction.DOWN, 0.8f) }.getOrDefault(false)) {
+        // The home is a Compose column in an AndroidView: UiAutomator does not see it as scrollable, so swipe.
+        val w = device.displayWidth
+        val h = device.displayHeight
+        device.swipe(w / 2, h * 3 / 4, w / 2, h / 4, 30)
+        settle()
+        save("$name (низ)")
+        device.swipe(w / 2, h / 4, w / 2, h * 3 / 4, 30)
+        settle()
+    }
+
+    /** AIMI shows its own alert dialogs (e.g. hypo risk): saved once, then closed so the home is visible. */
+    private fun closeDialogs() {
+        repeat(3) {
+            val ok = device.findObject(By.pkg(PKG).text(Pattern.compile("OK|ОК|Ок", Pattern.CASE_INSENSITIVE))) ?: return
+            save("Окно AIMI")
+            runCatching { ok.click() }
             settle()
-            save("$name (низ)")
-            runCatching { list.scroll(Direction.UP, 1.0f) }
         }
     }
 

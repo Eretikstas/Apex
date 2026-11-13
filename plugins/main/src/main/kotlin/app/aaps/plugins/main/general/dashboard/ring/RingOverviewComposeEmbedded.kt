@@ -188,7 +188,7 @@ internal fun RingOverviewComposeEmbedded(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             StatusChips(status, p)
-            RingHero(status, adj, pred30, period, stats, mmol, p)
+            RingHero(status, adj, pred30, period, stats, mmol, lastBgTime, p)
             PeriodRow(period, stats, p) { period = it }
             HourTile(hour, readings, main, now, minPred, pred60, maxPred, why, mmol, p)
             WhyCard(why, adj, mmol, p)
@@ -206,8 +206,8 @@ private fun formatU(units: Double): String = String.format(Locale.getDefault(), 
 
 @Composable
 private fun StatusChips(status: StatusCardState?, p: RingPalette) {
-    val items = listOfNotNull(status?.pumpStatusText?.takeIf { it.isNotBlank() }, status?.sensorAgeText, status?.infusionAgeText, status?.reservoirText)
-        .filter { it.isNotBlank() }
+    // The pump line already has reservoir, catheter and sensor age in the app language.
+    val items = listOfNotNull(status?.pumpStatusText?.takeIf { it.isNotBlank() })
     if (items.isEmpty()) return
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
         items.take(4).forEach {
@@ -221,12 +221,17 @@ private fun StatusChips(status: StatusCardState?, p: RingPalette) {
 
 @Composable
 private fun RingHero(
-    status: StatusCardState?, adj: AdjustmentCardState?, pred30: Double?, period: RingPeriod, stats: RingStats?, mmol: Boolean, p: RingPalette,
+    status: StatusCardState?, adj: AdjustmentCardState?, pred30: Double?, period: RingPeriod, stats: RingStats?, mmol: Boolean,
+    lastBgTime: Long?, p: RingPalette,
 ) {
     val glass = LocalGlassHeroCommands.current
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.width(76.dp)) {
-            SideValue(stringResource(R.string.ring_iob_title), status?.iobText ?: "--", stringResource(R.string.ring_iob_sub), p, Alignment.Start)
+            SideValue(
+                stringResource(R.string.ring_iob_title),
+                status?.iobTotalU?.let { stringResource(R.string.ring_units, formatU(it)) } ?: "--",
+                stringResource(R.string.ring_iob_sub), p, Alignment.Start,
+            )
             SideValue(stringResource(R.string.ring_cob_title), status?.cobText ?: "--", stringResource(R.string.ring_cob_sub), p, Alignment.Start)
         }
         Box(
@@ -252,7 +257,7 @@ private fun RingHero(
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(status?.timeAgo ?: "", fontSize = 11.sp, color = p.muted)
+                Text(ageText(lastBgTime), fontSize = 11.sp, color = p.muted)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = status?.glucoseText ?: "--", fontSize = 60.sp, fontWeight = FontWeight.Bold, color = p.text,
@@ -267,7 +272,11 @@ private fun RingHero(
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(14.dp), horizontalAlignment = Alignment.End, modifier = Modifier.width(76.dp)) {
-            SideValue(stringResource(R.string.ring_basal_title), status?.tbrRateCompactText ?: status?.basalText ?: "--", "", p, Alignment.End)
+            SideValue(
+                stringResource(R.string.ring_basal_title),
+                status?.effectiveBasalRateUh?.let { stringResource(R.string.ring_rate, formatU(it)) } ?: "--",
+                "", p, Alignment.End,
+            )
             val isf = adj?.variableSens
             SideValue(
                 stringResource(R.string.ring_target_title),
@@ -277,6 +286,14 @@ private fun RingHero(
             )
         }
     }
+}
+
+/** "now" or "N min ago" for the last reading; empty when there is none. */
+@Composable
+private fun ageText(timestamp: Long?): String {
+    if (timestamp == null) return ""
+    val minutes = ((System.currentTimeMillis() - timestamp) / 60_000L).coerceAtLeast(0L).toInt()
+    return if (minutes == 0) stringResource(R.string.ring_axis_now) else stringResource(R.string.ring_ago, minutes)
 }
 
 @Composable

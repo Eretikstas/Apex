@@ -575,6 +575,9 @@
     <string name="ring_axis_future">+1 h</string>
     <string name="ring_why_title">WHY</string>
     <string name="ring_why_line" comment="%1$s=what the loop did, %2$s=why. Example: Gave 0.15 U: glucose rises without entered carbs">%1$s: %2$s</string>
+    <string name="ring_units" comment="%1$s=insulin units. Example: 0.45 U">%1$s U</string>
+    <string name="ring_rate" comment="%1$s=basal rate. Example: 0.35 U/h">%1$s U/h</string>
+    <string name="ring_ago" comment="%1$d=minutes since the last glucose reading. Example: 3 min ago">%1$d min ago</string>
     <string name="ring_act_smb" comment="%1$s=insulin units. Example: SMB 0.15 U">SMB %1$s U</string>
     <string name="ring_act_zero" comment="%1$d=minutes. Example: Zero temp basal for 30 min">Zero temp basal for %1$d min</string>
     <string name="ring_act_tbr" comment="%1$s=rate in U/h, %2$d=minutes. Example: Temp basal 0.45 U/h for 30 min">Temp basal %1$s U/h for %2$d min</string>

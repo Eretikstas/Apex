@@ -926,6 +926,7 @@ class OverviewViewModel(
             tbrRateCompactText = tbrRateCompactText,
             basalText = basalText,
             effectiveBasalText = effectiveBasalText,
+            effectiveBasalRateUh = effectiveBasalRateUh,
             stepsText = stepsText,
             hrText = hrText,
             cvText = cvText,
@@ -1586,6 +1587,8 @@ data class StatusCardState(
     val basalText: String? = null,
     /** Active TBR rate when present, otherwise scheduled profile basal; always formatted in U/h. */
     val effectiveBasalText: String? = null,
+    /** The same rate as [effectiveBasalText] as a number, U/h. */
+    val effectiveBasalRateUh: Double? = null,
     val stepsText: String? = null,
     val hrText: String? = null,
     val cvText: String? = null,
