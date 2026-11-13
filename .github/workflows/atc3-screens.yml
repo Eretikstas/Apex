@@ -3,6 +3,7 @@ name: ATC3 Russian screenshots
 # Walks through the app on an emulator with a Russian system language and saves a screenshot of
 # every screen it reaches (Atc3RuScreensTest), to read the translation on real screens.
 # Runs by hand, or on a push of these files with [screens] in the commit message.
+# With [ring] in the commit message it runs RingSkinScreensTest instead (the "Ring and why" home).
 
 on:
   workflow_dispatch:
@@ -13,6 +14,8 @@ on:
       - '.github/workflows/atc3-screens.yml'
       - 'tools/atc3_screens.sh'
       - 'app/src/androidTest/kotlin/app/aaps/e2e/Atc3RuScreensTest.kt'
+      - 'app/src/androidTest/kotlin/app/aaps/e2e/RingSkinScreensTest.kt'
+      - 'plugins/main/src/main/kotlin/app/aaps/plugins/main/general/dashboard/ring/**'
       - '**/values-ru-rRU/**'
 
 concurrency:
@@ -25,7 +28,7 @@ permissions:
 jobs:
   screens:
     # About 50 minutes of the limited Actions minutes: on a push only with [screens] in the commit message.
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[screens]') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[screens]') || contains(github.event.head_commit.message, '[ring]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
     env:
@@ -95,7 +98,7 @@ jobs:
           disk-size: 6000M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -change-locale ru-RU
           disable-animations: true
-          script: bash tools/atc3_screens.sh
+          script: SCREENS_TEST=${{ contains(github.event.head_commit.message, '[ring]') && 'app.aaps.e2e.RingSkinScreensTest' || 'app.aaps.e2e.Atc3RuScreensTest' }} bash tools/atc3_screens.sh
 
       - name: Upload the screenshots
         if: always()

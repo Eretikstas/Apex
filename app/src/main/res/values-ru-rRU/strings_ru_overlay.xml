@@ -2804,9 +2804,9 @@
     <string name="restart">перезапуск</string>
     <string name="revert_to_defaults">Восстановить по умолчанию</string>
     <string name="ring_act_none">Без изменений</string>
-    <string name="ring_act_smb">Дал %1$s ЕД</string>
+    <string name="ring_act_smb">SMB %1$s ЕД</string>
     <string name="ring_act_tbr">Временный базал %1$s ЕД/ч на %2$d мин</string>
-    <string name="ring_act_zero">Остановил базал на %1$d мин</string>
+    <string name="ring_act_zero">Нулевой временный базал на %1$d мин</string>
     <string name="ring_axis_future">+1 ч</string>
     <string name="ring_axis_now">сейчас</string>
     <string name="ring_axis_past">−3 ч</string>
@@ -2822,8 +2822,8 @@
     <string name="ring_cause_low">гликемия низкая или падает</string>
     <string name="ring_cause_meal">режим еды</string>
     <string name="ring_cause_no_data">нет свежих данных сенсора</string>
-    <string name="ring_cause_normal">гликемия в цели</string>
-    <string name="ring_cause_rise">гликемия растёт без введённых углеводов</string>
+    <string name="ring_cause_normal">гликемия в целевом диапазоне</string>
+    <string name="ring_cause_rise">гликемия растёт без внесённых углеводов</string>
     <string name="ring_cause_safety_stop">сработала проверка безопасности</string>
     <string name="ring_cause_unknown">подробности в журнале цикла</string>
     <string name="ring_chip_low_guard">Защита от гипо включена</string>
@@ -2857,7 +2857,7 @@
     <string name="ring_target_title">Цель</string>
     <string name="ring_why_details">Подробнее</string>
     <string name="ring_why_eventual">Итоговый прогноз: %1$s.</string>
-    <string name="ring_why_limited">Дозу урезал лимит.</string>
+    <string name="ring_why_limited">Дозу уменьшил лимит.</string>
     <string name="ring_why_limited_numbers">Хотел %1$s ЕД, лимит разрешил %2$s ЕД.</string>
     <string name="ring_why_line">%1$s: %2$s</string>
     <string name="ring_why_none">Цикл ещё не запускался.</string>

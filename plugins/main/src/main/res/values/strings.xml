@@ -575,8 +575,8 @@
     <string name="ring_axis_future">+1 h</string>
     <string name="ring_why_title">WHY</string>
     <string name="ring_why_line" comment="%1$s=what the loop did, %2$s=why. Example: Gave 0.15 U: glucose rises without entered carbs">%1$s: %2$s</string>
-    <string name="ring_act_smb" comment="%1$s=insulin units. Example: Gave 0.15 U">Gave %1$s U</string>
-    <string name="ring_act_zero" comment="%1$d=minutes. Example: Stopped basal for 30 min">Stopped basal for %1$d min</string>
+    <string name="ring_act_smb" comment="%1$s=insulin units. Example: SMB 0.15 U">SMB %1$s U</string>
+    <string name="ring_act_zero" comment="%1$d=minutes. Example: Zero temp basal for 30 min">Zero temp basal for %1$d min</string>
     <string name="ring_act_tbr" comment="%1$s=rate in U/h, %2$d=minutes. Example: Temp basal 0.45 U/h for 30 min">Temp basal %1$s U/h for %2$d min</string>
     <string name="ring_act_none">No change</string>
     <string name="ring_cause_no_data">no fresh sensor data</string>
@@ -588,7 +588,7 @@
     <string name="ring_cause_rise">glucose rises without entered carbs</string>
     <string name="ring_cause_activity">activity</string>
     <string name="ring_cause_honeymoon">honeymoon mode</string>
-    <string name="ring_cause_normal">glucose on target</string>
+    <string name="ring_cause_normal">glucose in target range</string>
     <string name="ring_cause_unknown">see the loop details</string>
     <string name="ring_why_eventual" comment="%1$s=glucose with unit. Example: Eventual prediction: 9.8.">Eventual prediction: %1$s.</string>
     <string name="ring_why_limited_numbers" comment="%1$s, %2$s=insulin units. Example: Wanted 0.22 U, the limit allowed 0.15 U.">Wanted %1$s U, the limit allowed %2$s U.</string>

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the emulator step of .github/workflows/atc3-screens.yml.
-# Sets the emulator to Russian, installs the app and its test APK, runs Atc3RuScreensTest and pulls
+# Sets the emulator to Russian, installs the app and its test APK, runs Atc3RuScreensTest (or the
+# class in SCREENS_TEST, e.g. app.aaps.e2e.RingSkinScreensTest) and pulls
 # the screenshots to out/screens.
 set -x
 mkdir -p out/screens
@@ -31,7 +32,7 @@ adb install -r -g "$APK"
 adb install -r -g "$TEST_APK"
 
 adb logcat -c
-adb shell am instrument -w -r -e class app.aaps.e2e.Atc3RuScreensTest \
+adb shell am instrument -w -r -e class "${SCREENS_TEST:-app.aaps.e2e.Atc3RuScreensTest}" \
   info.nightscout.androidaps.test/app.aaps.runners.HiltTestRunner | tee out/instrument.txt
 
 adb pull /sdcard/Android/data/info.nightscout.androidaps/files/screens/. out/screens/ || true
