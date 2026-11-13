@@ -141,7 +141,8 @@ internal fun RingOverviewComposeEmbedded(
 
         var period by remember { mutableStateOf(RingPeriod.DAY) }
         var stats by remember { mutableStateOf<RingStats?>(null) }
-        val lastBgTime = bgReadings.lastOrNull()?.timestamp
+        // The graph list is not always oldest first: take the newest by time.
+        val lastBgTime = bgReadings.maxOfOrNull { it.timestamp }
         LaunchedEffect(period, lastBgTime) {
             val now = System.currentTimeMillis()
             val values = withContext(Dispatchers.IO) {
@@ -155,6 +156,7 @@ internal fun RingOverviewComposeEmbedded(
         val now = System.currentTimeMillis()
         val readings = remember(bgReadings) {
             bgReadings.filter { it.type == BgType.REGULAR }.ifEmpty { bgReadings.filter { it.type == BgType.BUCKETED } }
+                .sortedBy { it.timestamp }
         }
         val future = predictions.filter { it.timestamp in (now + 1)..(now + 60 * 60_000L) }
         val main = future.filter { it.type == BgType.UAM_PREDICTION }.ifEmpty { future.filter { it.type == BgType.COB_PREDICTION } }
@@ -193,7 +195,8 @@ internal fun RingOverviewComposeEmbedded(
             HourTile(hour, readings, main, now, minPred, pred60, maxPred, why, mmol, p)
             WhyCard(why, adj, mmol, p)
             ActionButtons(p)
-            Spacer(Modifier.height(8.dp))
+            // Room under the buttons, so the app's floating buttons never cover them.
+            Spacer(Modifier.height(88.dp))
         }
     }
 }
@@ -300,7 +303,8 @@ private fun ageText(timestamp: Long?): String {
 private fun SideValue(title: String, value: String, sub: String, p: RingPalette, align: Alignment.Horizontal) {
     Column(horizontalAlignment = align, modifier = Modifier.heightIn(min = 44.dp)) {
         Text(title, fontSize = 11.sp, color = p.muted, maxLines = 1)
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = p.text, maxLines = 1)
+        // Long values ("0,35 ЕД/ч") get a smaller font so they fit the 76 dp side column.
+        Text(value, fontSize = if (value.length > 7) 15.sp else 18.sp, fontWeight = FontWeight.Bold, color = p.text, maxLines = 1, softWrap = false)
         if (sub.isNotBlank()) Text(sub, fontSize = 11.sp, color = p.muted, maxLines = 1)
     }
 }
