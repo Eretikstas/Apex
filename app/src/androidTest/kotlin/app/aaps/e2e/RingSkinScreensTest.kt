@@ -25,6 +25,9 @@ import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.insulin.InsulinManager
+import app.aaps.core.interfaces.iob.IobCobCalculator
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.plugin.ActivePlugin
 import app.aaps.core.interfaces.overview.graph.BgDataPoint
 import app.aaps.core.interfaces.overview.graph.BgRange
 import app.aaps.core.interfaces.overview.graph.BgType
@@ -38,6 +41,7 @@ import app.aaps.core.interfaces.rx.events.EventLoopUpdateGui
 import app.aaps.core.interfaces.rx.events.EventRefreshOverview
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
@@ -84,12 +88,15 @@ class RingSkinScreensTest {
     @Inject lateinit var profileRepository: ProfileRepository
     @Inject lateinit var insulinManager: InsulinManager
     @Inject lateinit var dateUtil: DateUtil
+    @Inject lateinit var aapsLogger: AAPSLogger
     @Inject lateinit var persistenceLayer: PersistenceLayer
     @Inject lateinit var loop: Loop
     @Inject lateinit var apsResultProvider: Provider<APSResult>
     /** A Provider: the cache reads the plugin list at creation, so it is made only after set up. */
     @Inject lateinit var overviewDataCache: Provider<OverviewDataCache>
     @Inject lateinit var rxBus: RxBus
+    @Inject lateinit var iobCobCalculator: Provider<IobCobCalculator>
+    @Inject lateinit var activePlugin: Provider<ActivePlugin>
     @Suppress("unused") @Inject lateinit var staticInjector: StaticInjector
 
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -154,6 +161,7 @@ class RingSkinScreensTest {
         seedCarbs()
         seedGlucose()
         SystemClock.sleep(CALC_MS)
+        logCob("after seeding")
         device.executeShellCommand("settings put global heads_up_notifications_enabled 0")
 
         outDir = File(ctx.getExternalFilesDir(null), "screens").apply { deleteRecursively(); mkdirs() }
@@ -179,6 +187,7 @@ class RingSkinScreensTest {
                 }.onFailure { Log.w(TAG, "Case ${case.name} $theme failed: ${it.message}") }
             }
         }
+        logCob("at the end")
         pressButtons()
         Log.i(TAG, "Done: $shot screenshots")
     }
@@ -228,6 +237,34 @@ class RingSkinScreensTest {
         }.reversed()
         val inserted = runBlocking { persistenceLayer.insertCgmSourceData(Sources.Random, values, emptyList(), null) }.inserted.size
         Log.i(TAG, "Seeded $inserted glucose values")
+    }
+
+    /**
+     * The COB calculation, 5 min step by step for the last hour, to the log (tag RING_COB): why the
+     * active carbs are what they are.
+     */
+    private fun logCob(stage: String) {
+        runCatching {
+            val calc = iobCobCalculator.get()
+            val now = dateUtil.now()
+            val profile = runBlocking { profileFunction.getProfile() }
+            val sensitivity = activePlugin.get().activeSensitivity
+            Log.i(
+                COB_TAG, "$stage: cobInfo=${runBlocking { calc.getCobInfo("RingSkinScreensTest") }}" +
+                    " sensitivity=${sensitivity.javaClass.simpleName} maxAbsorptionH=${sensitivity.maxAbsorptionHours()}" +
+                    " minImpact=${preferences.get(DoubleKey.ApsSmbMin5MinCarbsImpact)}" +
+                    " isf=${profile?.getIsfMgdl("RingSkinScreensTest")} ic=${profile?.getIc()}" +
+                    " last=${calc.ads.getLastAutosensData("RingSkinScreensTest", aapsLogger, dateUtil)?.time?.let { (now - it) / 1000 }}s ago"
+            )
+            for (minutesAgo in 60 downTo 0 step 5) {
+                val a = calc.ads.getAutosensDataAtTime(now - minutesAgo * 60_000L) ?: continue
+                Log.i(
+                    COB_TAG, "$stage -${minutesAgo}m t=${(now - a.time) / 1000}s cob=${a.cob} fromBolus=${a.carbsFromBolus}" +
+                        " absorbed=${a.this5MinAbsorption} dev=${a.deviation} sens=${a.sens} minRate=${a.failOverToMinAbsorptionRate}" +
+                        " past=${a.pastSensitivity}"
+                )
+            }
+        }.onFailure { Log.w(COB_TAG, "$stage: ${it.message}") }
     }
 
     /** 20 g of carbs 40 min ago, so the active carbs (COB) have a value. */
@@ -400,6 +437,7 @@ class RingSkinScreensTest {
     companion object {
 
         private const val TAG = "RING_SCREENS"
+        private const val COB_TAG = "RING_COB"
         private const val PKG = "info.nightscout.androidaps"
         private const val PROFILE_NAME = "LocalProfile1"
         private const val PROFILE_STORE_TIMEOUT = 20_000L
