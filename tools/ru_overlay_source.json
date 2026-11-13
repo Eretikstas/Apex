@@ -2876,6 +2876,7 @@
  "ring_iob_sub": "on board",
  "ring_iob_title": "Insulin",
  "ring_isf": "ISF %1$s",
+ "ring_percent": "%1$d%%",
  "ring_period_3h": "3 h",
  "ring_period_day": "24 h",
  "ring_period_week": "7 days",

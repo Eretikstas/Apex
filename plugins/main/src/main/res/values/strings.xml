@@ -584,6 +584,7 @@
     <string name="ring_chip_battery" comment="%1$d=pump battery percent. Example: Battery 80%">Battery %1$d%%</string>
     <string name="ring_age_days_hours" comment="%1$d=days, %2$d=hours. Example: 2 d 3 h">%1$d d %2$d h</string>
     <string name="ring_age_hours" comment="%1$d=hours. Example: 7 h">%1$d h</string>
+    <string name="ring_percent" comment="%1$d=percent. Example: 50%">%1$d%%</string>
     <string name="ring_act_smb" comment="%1$s=insulin units. Example: SMB 0.15 U">SMB %1$s U</string>
     <string name="ring_act_zero" comment="%1$d=minutes. Example: Zero temp basal for 30 min">Zero temp basal for %1$d min</string>
     <string name="ring_act_tbr" comment="%1$s=rate in U/h, %2$d=minutes. Example: Temp basal 0.45 U/h for 30 min">Temp basal %1$s U/h for %2$d min</string>

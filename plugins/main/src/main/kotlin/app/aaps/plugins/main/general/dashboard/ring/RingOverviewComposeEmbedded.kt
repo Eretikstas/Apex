@@ -1,5 +1,11 @@
 package app.aaps.plugins.main.general.dashboard.ring
 
+import app.aaps.core.ui.compose.icons.IcPumpBattery
+import app.aaps.core.ui.compose.icons.IcPumpCartridge
+import app.aaps.core.ui.compose.icons.IcCgmInsert
+import app.aaps.core.ui.compose.icons.IcCannulaChange
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -215,25 +221,51 @@ private fun formatU(units: Double): String = String.format(Locale.getDefault(), 
 private fun StatusChips(status: StatusCardState?, p: RingPalette) {
     if (status == null) return
     val now = System.currentTimeMillis()
+
+    /** One chip: the icon AAPS uses for it, the short value, the full sentence for screen readers, the level. */
+    class Chip(val icon: ImageVector, val value: String, val spoken: String, val level: RingLevel)
+
     val chips = listOfNotNull(
-        status.cannulaChangeAt?.let { stringResource(R.string.ring_chip_cannula, supplyAge(now - it)) to RingLogic.cannulaLevel(now - it) },
-        status.sensorChangeAt?.let { stringResource(R.string.ring_chip_sensor, supplyAge(now - it)) to RingLogic.sensorLevel(now - it) },
-        status.reservoirUnits?.let { stringResource(R.string.ring_chip_reservoir, formatUnits0(it)) to RingLogic.reservoirLevel(it) },
-        status.pumpBatteryPct?.let { stringResource(R.string.ring_chip_battery, it) to RingLogic.batteryLevel(it) },
+        status.cannulaChangeAt?.let {
+            val age = supplyAge(now - it)
+            Chip(IcCannulaChange, age, stringResource(R.string.ring_chip_cannula, age), RingLogic.cannulaLevel(now - it))
+        },
+        status.sensorChangeAt?.let {
+            val age = supplyAge(now - it)
+            Chip(IcCgmInsert, age, stringResource(R.string.ring_chip_sensor, age), RingLogic.sensorLevel(now - it))
+        },
+        status.reservoirUnits?.let {
+            val units = formatUnits0(it)
+            Chip(IcPumpCartridge, stringResource(R.string.ring_units, units), stringResource(R.string.ring_chip_reservoir, units), RingLogic.reservoirLevel(it))
+        },
+        status.pumpBatteryPct?.let {
+            Chip(IcPumpBattery, stringResource(R.string.ring_percent, it), stringResource(R.string.ring_chip_battery, it), RingLogic.batteryLevel(it))
+        },
     )
     if (chips.isEmpty()) return
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-        chips.forEach { (text, level) ->
-            val (bg, fg) = when (level) {
+    // Icons and numbers only, so the four fit in one row on a phone.
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        chips.forEach { chip ->
+            val (bg, fg) = when (chip.level) {
                 RingLevel.OK    -> p.okBg to p.okFg
                 RingLevel.WARN  -> p.warnBg to p.warnFg
                 RingLevel.ALARM -> p.stopBg to p.stopFg
             }
-            Text(
-                text = text, fontSize = 11.sp, color = fg, maxLines = 1,
-                fontWeight = if (level == RingLevel.OK) FontWeight.Normal else FontWeight.Bold,
-                modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(bg).padding(horizontal = 8.dp, vertical = 4.dp),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(bg)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .semantics(mergeDescendants = true) { contentDescription = chip.spoken },
+            ) {
+                Icon(chip.icon, contentDescription = null, tint = fg, modifier = Modifier.size(14.dp))
+                Text(
+                    text = chip.value, fontSize = 12.sp, color = fg, maxLines = 1,
+                    fontWeight = if (chip.level == RingLevel.OK) FontWeight.Normal else FontWeight.Bold,
+                )
+            }
         }
     }
 }

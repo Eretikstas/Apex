@@ -2852,6 +2852,7 @@
     <string name="ring_iob_sub">активный</string>
     <string name="ring_iob_title">Инсулин</string>
     <string name="ring_isf">ISF %1$s</string>
+    <string name="ring_percent">%1$d%%</string>
     <string name="ring_period_3h">3 ч</string>
     <string name="ring_period_day">сутки</string>
     <string name="ring_period_week">неделя</string>
