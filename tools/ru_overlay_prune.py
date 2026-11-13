@@ -35,6 +35,14 @@ R = re.compile(r'<string\s+name="([^"]+)"[^>]*>(.*?)</string>', re.S)
 PH = re.compile(r'%(?:\d+\$)?[-#+ 0,(]*\d*(?:\.\d+)?[sdfxXcbeEgGoh%]')
 
 
+CYRILLIC = re.compile(r"[\u0400-\u04FF]")
+
+
+def untranslated(v):
+    """An AIMI "Russian" string left in English (no Cyrillic letter) is not a translation."""
+    return CYRILLIC.search(v) is None and re.search(r"[A-Za-z]", v) is not None
+
+
 def placeholders(s):
     return sorted(p for p in PH.findall(s) if p != "%%")
 
@@ -53,7 +61,10 @@ def main():
                 continue
             names = {m.group(1): m.group(2) for m in R.finditer(open(f, encoding="utf-8").read())}
             if "/values-ru" in f:
-                others |= set(names)
+                # In another module an English copy can be overridden by the overlay (the app wins);
+                # in the overlay's own module a second definition would stop the build.
+                same_module = f.split("/")[0] == overlay.split("/")[0]
+                others |= {k for k, v in names.items() if same_module or not untranslated(v)}
             elif "/values/" in f:
                 for k, v in names.items():
                     english.setdefault(k, v)

@@ -16,6 +16,7 @@ from xml.dom import minidom
 R = re.compile(r'<string\s+name="([^"]+)"([^>]*)>(.*?)</string>', re.S)
 PH = re.compile(r'%(?:\d+\$)?[-#+ 0,(]*\d*(?:\.\d+)?[sdfxXcbeEgGoh%]')
 SOURCE = "tools/ru_overlay_source.json"
+CYRILLIC = re.compile(r"[\u0400-\u04FF]")
 
 
 def placeholders(s):
@@ -65,7 +66,10 @@ def main():
                     english.setdefault(k, v)
                 module_of.setdefault(k, "app") if not wear else module_of.setdefault("wear:" + k, "wear")
             elif "/values-ru" in f:
-                translated.add(k)
+                # An AIMI "translation" still in English (no Cyrillic) in a module other than app/
+                # can be overridden by the overlay: the app module wins when resources are merged.
+                if f.startswith("app/") or f.startswith("wear/") or CYRILLIC.search(v) or not re.search(r"[A-Za-z]", v):
+                    translated.add(k)
     added, refused = {"app": {}, "wear": {}}, 0
     for k, ru in new.items():
         if k.startswith("wear:"):

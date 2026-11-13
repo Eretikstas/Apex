@@ -1802,6 +1802,7 @@
  "home_icon_label": "Home",
  "hospital_icon_label": "Hospital",
  "hotel_icon_label": "Hotel",
+ "hypo_risk_notification_text": "Hypo risk: rapid drop detected. Check your glucose now.",
  "hypo_risk_notification_title": "Hypo Risk",
  "ic_dynamic_label_warning": "Your algorithm can provide dynamic calculation of IC. Values below cen be used only as a fallback in case of missing data or as a reference value only",
  "import_anyway_btn": "Import anyway",

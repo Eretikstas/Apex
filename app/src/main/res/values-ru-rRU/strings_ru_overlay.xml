@@ -1795,6 +1795,7 @@
     <string name="home_icon_label">Дом</string>
     <string name="hospital_icon_label">Больница</string>
     <string name="hotel_icon_label">Отель</string>
+    <string name="hypo_risk_notification_text">Риск гипогликемии: быстрое падение. Проверьте гликемию сейчас.</string>
     <string name="hypo_risk_notification_title">Риск гипо</string>
     <string name="ic_dynamic_label_warning">Алгоритм может обеспечить динамический расчет углеводного коэффициента IC. Значения ниже можно использовать только в качестве запасного варианта в случае отсутствия данных или только в качестве эталонного значения</string>
     <string name="import_anyway_btn">Импортировать всё равно</string>

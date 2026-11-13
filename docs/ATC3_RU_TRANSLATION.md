@@ -37,6 +37,13 @@ A few English texts have a literal `%` before a letter ("50% or more"), which lo
 those keys are listed in `tools/ru_overlay_literal_percent.txt`, and for them only the number of `%`
 signs is compared.
 
+## AIMI strings left in English
+
+Some strings in AIMI's own `values-ru-rRU` files are still the English text (no Cyrillic letter),
+for example `hypo_risk_notification_text`. The tools do not count these as translated when they are
+in a module other than `app/`: the overlay in `app/` wins when resources are merged, so it can
+translate them. A real Russian text in AIMI's files is never overridden.
+
 ## After an update of AIMI
 
 AIMI may now translate some strings that are in the overlay. A string defined twice in the app
