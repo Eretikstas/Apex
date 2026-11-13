@@ -28,10 +28,15 @@ fun VersionOverlay(
             else                                                                      -> colors.versionUncommitted
         }
         Text(
-            text = "${config.VERSION_NAME} (${config.HEAD.substring(0, minOf(4, config.HEAD.length))})",
+            // Only the product and its major.minor version ("AIMI 4.0"); the color still warns about the build.
+            text = shortVersion(config.VERSION_NAME),
             color = versionColor,
             fontSize = 10.sp,
             modifier = modifier.padding(top = 4.dp, end = 4.dp)
         )
     }
 }
+
+/** "4.0.0.0-dev.AIMI.211026" -> "AIMI 4.0". A name without a leading number is shown as it is. */
+internal fun shortVersion(versionName: String): String =
+    Regex("""^(\d+)\.(\d+)""").find(versionName)?.let { "AIMI ${it.groupValues[1]}.${it.groupValues[2]}" } ?: versionName

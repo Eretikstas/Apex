@@ -47,4 +47,30 @@ class RingLogicTest {
     fun `no readings give no stats`() {
         assertThat(RingLogic.stats(emptyList())).isNull()
     }
+
+    private val hour = 3_600_000L
+
+    @Test
+    fun `catheter warns from 72 h and alarms from 96 h`() {
+        assertThat(RingLogic.cannulaLevel(71 * hour)).isEqualTo(RingLevel.OK)
+        assertThat(RingLogic.cannulaLevel(72 * hour)).isEqualTo(RingLevel.WARN)
+        assertThat(RingLogic.cannulaLevel(96 * hour)).isEqualTo(RingLevel.ALARM)
+    }
+
+    @Test
+    fun `a 28 day sensor warns in its last 2 days and alarms in its last 12 h`() {
+        assertThat(RingLogic.sensorLevel(25 * 24 * hour)).isEqualTo(RingLevel.OK)
+        assertThat(RingLogic.sensorLevel(26 * 24 * hour)).isEqualTo(RingLevel.WARN)
+        assertThat(RingLogic.sensorLevel((28 * 24 - 12) * hour)).isEqualTo(RingLevel.ALARM)
+    }
+
+    @Test
+    fun `reservoir and battery levels`() {
+        assertThat(RingLogic.reservoirLevel(50.0)).isEqualTo(RingLevel.OK)
+        assertThat(RingLogic.reservoirLevel(20.0)).isEqualTo(RingLevel.WARN)
+        assertThat(RingLogic.reservoirLevel(8.0)).isEqualTo(RingLevel.ALARM)
+        assertThat(RingLogic.batteryLevel(80)).isEqualTo(RingLevel.OK)
+        assertThat(RingLogic.batteryLevel(25)).isEqualTo(RingLevel.WARN)
+        assertThat(RingLogic.batteryLevel(10)).isEqualTo(RingLevel.ALARM)
+    }
 }

@@ -5,7 +5,9 @@ not changed. Choose it in Preferences → Overview → Skin.
 
 ## The screen, top to bottom
 
-1. Status chips: pump link, sensor age, cannula age, reservoir.
+1. Status chips: catheter age, sensor age, reservoir, pump battery. Colors (`RingLogic`): catheter orange from
+   72 h, red from 96 h; sensor (28 day Sibionics 2) orange in the last 2 days, red in the last 12 h; reservoir
+   orange at 20 U, red at 10 U; battery orange at 25 %, red at 10 %. A value AAPS does not have is left out.
 2. A warning line, only when there is a reason (link lost, cannula near 3 days, sensor ending).
 3. The ring: BG, arrow, delta, prediction in 30 min, minutes ago; the ring itself is time in range for
    3 h / 24 h / 7 days. Left: insulin on board, carbs on board. Right: basal now, sensitivity.

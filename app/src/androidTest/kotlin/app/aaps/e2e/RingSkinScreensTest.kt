@@ -13,6 +13,8 @@ import androidx.work.WorkManager
 import app.aaps.ComposeMainActivity
 import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.GV
+import app.aaps.core.data.model.GlucoseUnit
+import app.aaps.core.data.model.TE
 import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.SourceSensor
 import app.aaps.core.data.model.TrendArrow
@@ -178,6 +180,7 @@ class RingSkinScreensTest {
         home()
         copyEffectiveProfileSwitchBack()
         seedCarbs()
+        seedSupplies()
         seedGlucose()
         SystemClock.sleep(CALC_MS)
         logCob("after seeding")
@@ -286,6 +289,16 @@ class RingSkinScreensTest {
             )
         }
         Log.i(COB_TAG, "Effective profile switch copied 8 days back")
+    }
+
+    /** Catheter changed 80 h ago (orange chip from 72 h), sensor 10 days ago (normal for a 28 day sensor). */
+    private fun seedSupplies() {
+        val now = dateUtil.now()
+        runBlocking {
+            persistenceLayer.insertOrUpdateTherapyEvent(TE(timestamp = now - 80 * 3_600_000L, type = TE.Type.CANNULA_CHANGE, glucoseUnit = GlucoseUnit.MMOL))
+            persistenceLayer.insertOrUpdateTherapyEvent(TE(timestamp = now - 10 * 24 * 3_600_000L, type = TE.Type.SENSOR_CHANGE, glucoseUnit = GlucoseUnit.MMOL))
+        }
+        Log.i(TAG, "Seeded catheter and sensor changes")
     }
 
     /** 20 g of carbs 40 min ago, so the active carbs (COB) have a value. */

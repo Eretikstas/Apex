@@ -645,6 +645,8 @@ class OverviewViewModel(
             else null
         
         // 3. Infusion Age (from CarePortal)
+        val cannulaChangeAt = persistenceLayer.getLastTherapyRecordUpToNow(TE.Type.CANNULA_CHANGE)?.timestamp
+        val sensorChangeAt = persistenceLayer.getLastTherapyRecordUpToNow(TE.Type.SENSOR_CHANGE)?.timestamp
         val infusionAgeText = persistenceLayer.getLastTherapyRecordUpToNow(TE.Type.CANNULA_CHANGE)?.let { event ->
             val ageMillis = dateUtil.now() - event.timestamp
             val hours = (ageMillis / (1000 * 60 * 60)).toInt()
@@ -920,6 +922,10 @@ class OverviewViewModel(
             infusionAgeText = infusionAgeText,
             pumpBatteryText = pumpBatteryText,
             sensorAgeText = sensorAgeText,
+            reservoirUnits = reservoirUnits.takeIf { it > 0 },
+            pumpBatteryPct = activePlugin.activePump.batteryLevel.value,
+            cannulaChangeAt = cannulaChangeAt,
+            sensorChangeAt = sensorChangeAt,
             lastSensorValueText = lastSensorValueText,
             activityPctText = activityPctText,
             tbrRateText = tbrRateText,
@@ -1578,6 +1584,11 @@ data class StatusCardState(
     val reservoirText: String? = null,
     val infusionAgeText: String? = null,
     val pumpBatteryText: String? = null,
+    /** Raw values for skins that format and color them themselves (Ring). */
+    val reservoirUnits: Double? = null,
+    val pumpBatteryPct: Int? = null,
+    val cannulaChangeAt: Long? = null,
+    val sensorChangeAt: Long? = null,
     val sensorAgeText: String? = null,
     val lastSensorValueText: String? = null,
     val activityPctText: String? = null,

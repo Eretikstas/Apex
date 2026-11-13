@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -207,20 +209,43 @@ internal fun formatBg(mgdl: Double, mmol: Boolean): String =
 
 private fun formatU(units: Double): String = String.format(Locale.getDefault(), "%.2f", units)
 
+/** Catheter, sensor, reservoir and pump battery, each colored by [RingLogic] limits. Missing values are left out. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StatusChips(status: StatusCardState?, p: RingPalette) {
-    // The pump line already has reservoir, catheter and sensor age in the app language.
-    val items = listOfNotNull(status?.pumpStatusText?.takeIf { it.isNotBlank() })
-    if (items.isEmpty()) return
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-        items.take(4).forEach {
+    if (status == null) return
+    val now = System.currentTimeMillis()
+    val chips = listOfNotNull(
+        status.cannulaChangeAt?.let { stringResource(R.string.ring_chip_cannula, supplyAge(now - it)) to RingLogic.cannulaLevel(now - it) },
+        status.sensorChangeAt?.let { stringResource(R.string.ring_chip_sensor, supplyAge(now - it)) to RingLogic.sensorLevel(now - it) },
+        status.reservoirUnits?.let { stringResource(R.string.ring_chip_reservoir, formatUnits0(it)) to RingLogic.reservoirLevel(it) },
+        status.pumpBatteryPct?.let { stringResource(R.string.ring_chip_battery, it) to RingLogic.batteryLevel(it) },
+    )
+    if (chips.isEmpty()) return
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+        chips.forEach { (text, level) ->
+            val (bg, fg) = when (level) {
+                RingLevel.OK    -> p.okBg to p.okFg
+                RingLevel.WARN  -> p.warnBg to p.warnFg
+                RingLevel.ALARM -> p.stopBg to p.stopFg
+            }
             Text(
-                text = it, fontSize = 11.sp, color = p.okFg, maxLines = 1,
-                modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(p.okBg).padding(horizontal = 8.dp, vertical = 4.dp),
+                text = text, fontSize = 11.sp, color = fg, maxLines = 1,
+                fontWeight = if (level == RingLevel.OK) FontWeight.Normal else FontWeight.Bold,
+                modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(bg).padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
     }
 }
+
+/** "5 д 3 ч" or "7 ч". */
+@Composable
+private fun supplyAge(ageMs: Long): String {
+    val hours = (ageMs / 3_600_000L).coerceAtLeast(0L).toInt()
+    return if (hours >= 24) stringResource(R.string.ring_age_days_hours, hours / 24, hours % 24) else stringResource(R.string.ring_age_hours, hours)
+}
+
+private fun formatUnits0(units: Double): String = String.format(Locale.getDefault(), "%.0f", units)
 
 @Composable
 private fun RingHero(

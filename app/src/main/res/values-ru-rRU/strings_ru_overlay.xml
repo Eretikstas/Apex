@@ -2808,6 +2808,8 @@
     <string name="ring_act_smb">SMB %1$s ЕД</string>
     <string name="ring_act_tbr">Временный базал %1$s ЕД/ч на %2$d мин</string>
     <string name="ring_act_zero">Нулевой временный базал на %1$d мин</string>
+    <string name="ring_age_days_hours">%1$d д %2$d ч</string>
+    <string name="ring_age_hours">%1$d ч</string>
     <string name="ring_ago">%1$d мин назад</string>
     <string name="ring_axis_future">+1 ч</string>
     <string name="ring_axis_now">сейчас</string>
@@ -2828,8 +2830,12 @@
     <string name="ring_cause_rise">гликемия растёт без внесённых углеводов</string>
     <string name="ring_cause_safety_stop">сработала проверка безопасности</string>
     <string name="ring_cause_unknown">подробности в журнале цикла</string>
+    <string name="ring_chip_battery">Батарея %1$d%%</string>
+    <string name="ring_chip_cannula">Катетер %1$s</string>
     <string name="ring_chip_low_guard">Защита от гипо включена</string>
     <string name="ring_chip_meal">Режим еды</string>
+    <string name="ring_chip_reservoir">Резервуар %1$s ЕД</string>
+    <string name="ring_chip_sensor">Сенсор %1$s</string>
     <string name="ring_chip_smb_off">SMB выключены</string>
     <string name="ring_cob_sub">активные</string>
     <string name="ring_cob_title">Углеводы</string>
