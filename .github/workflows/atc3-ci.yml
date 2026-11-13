@@ -10,7 +10,8 @@ on:
       - atc3-driver
 
 concurrency:
-  group: atc3-ci-v2-${{ github.ref }}
+  # A run started by hand is not cancelled by later pushes (they have their own group).
+  group: atc3-ci-v2-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
