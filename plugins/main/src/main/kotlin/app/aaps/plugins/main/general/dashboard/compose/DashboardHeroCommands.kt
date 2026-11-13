@@ -17,8 +17,6 @@ interface DashboardHeroCommands : CircleTopActionListener {
     fun openQuickWizardManagement()
     fun openTempTargetManagement()
 
-    /** The insulin entry dialog (Ring skin). */
-    fun openInsulinEntry() {}
 }
 
 object NoopDashboardHeroCommands : DashboardHeroCommands {

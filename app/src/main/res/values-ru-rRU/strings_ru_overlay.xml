@@ -2816,10 +2816,6 @@
     <string name="ring_axis_now">сейчас</string>
     <string name="ring_axis_past">−3 ч</string>
     <string name="ring_basal_title">Базал</string>
-    <string name="ring_btn_calc">Калькулятор</string>
-    <string name="ring_btn_carbs">Углеводы</string>
-    <string name="ring_btn_insulin">Инсулин</string>
-    <string name="ring_btn_target">Цель</string>
     <string name="ring_cause_activity">физическая активность</string>
     <string name="ring_cause_after_low">после гипогликемии цикл даёт меньше инсулина</string>
     <string name="ring_cause_enough_iob">активного инсулина уже достаточно</string>

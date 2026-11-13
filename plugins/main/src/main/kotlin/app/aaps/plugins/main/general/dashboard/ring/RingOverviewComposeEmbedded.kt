@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.FlowRow
@@ -69,7 +68,6 @@ import app.aaps.core.ui.UiMode
 import app.aaps.core.ui.compose.AapsTheme
 import app.aaps.core.ui.compose.LocalPreferences
 import app.aaps.plugins.main.R
-import app.aaps.plugins.main.general.dashboard.compose.LocalDashboardHeroCommands
 import app.aaps.plugins.main.general.dashboard.glass.LocalGlassHeroCommands
 import app.aaps.plugins.main.general.dashboard.viewmodel.AdjustmentCardState
 import app.aaps.plugins.main.general.dashboard.viewmodel.OverviewViewModel
@@ -202,8 +200,8 @@ internal fun RingOverviewComposeEmbedded(
             PeriodRow(period, stats, p) { period = it }
             HourTile(hour, readings, main, now, minPred, pred60, maxPred, why, mmol, p)
             WhyCard(why, adj, mmol, p)
-            ActionButtons(p)
-            // Room under the buttons, so the app's floating buttons never cover them.
+            // Room at the end, so the app's floating buttons never cover the last card. Treatments
+            // (carbs, insulin, calculator, target) are in the app's own Treatments menu below.
             Spacer(Modifier.height(88.dp))
         }
     }
@@ -532,32 +530,5 @@ private fun WhyCard(why: RingWhy?, adj: AdjustmentCardState?, mmol: Boolean, p: 
             text = stringResource(R.string.ring_why_details), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = p.brand,
             modifier = Modifier.clickable(role = Role.Button, onClick = { glass.openLoop() }).heightIn(min = 44.dp).padding(vertical = 12.dp),
         )
-    }
-}
-
-@Composable
-private fun ActionButtons(p: RingPalette) {
-    val hero = LocalDashboardHeroCommands.current
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        RingButton(stringResource(R.string.ring_btn_target), p, primary = false, modifier = Modifier.weight(1f)) { hero.openTempTargetManagement() }
-        RingButton(stringResource(R.string.ring_btn_carbs), p, primary = false, modifier = Modifier.weight(1f)) { hero.openCarbsEntry() }
-        RingButton(stringResource(R.string.ring_btn_insulin), p, primary = false, modifier = Modifier.weight(1f)) { hero.openInsulinEntry() }
-        RingButton(stringResource(R.string.ring_btn_calc), p, primary = true, modifier = Modifier.weight(1.35f)) { hero.openBolusWizard() }
-    }
-}
-
-@Composable
-private fun RingButton(text: String, p: RingPalette, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .heightIn(min = 48.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (primary) p.primary else p.card)
-            .then(if (primary) Modifier else Modifier.border(1.dp, p.btnLine, RoundedCornerShape(14.dp)))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 12.dp),
-    ) {
-        Text(text, fontSize = 13.sp, fontWeight = if (primary) FontWeight.Bold else FontWeight.SemiBold, color = if (primary) p.primaryText else p.text, maxLines = 1)
     }
 }

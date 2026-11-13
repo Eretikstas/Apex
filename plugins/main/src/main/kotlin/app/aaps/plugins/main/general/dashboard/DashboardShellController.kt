@@ -1474,10 +1474,6 @@ internal class DashboardShellController(
                 uiInteraction.openTempTargetManagementScreen(activity)
             }
 
-            // Same inlining rule as above: AppRoute.InsulinDialog in :app.
-            override fun openInsulinEntry() = withBolusProtection {
-                uiInteraction.openComposeMainAtRoute(host.context, "insulin_dialog")
-            }
         }
 
     private fun createGlassHeroCommands(): GlassHeroCommands =

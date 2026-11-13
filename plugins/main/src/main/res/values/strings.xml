@@ -608,8 +608,4 @@
     <string name="ring_chip_smb_off">SMB off</string>
     <string name="ring_chip_low_guard">Low protection on</string>
     <string name="ring_chip_meal">Meal mode</string>
-    <string name="ring_btn_target">Target</string>
-    <string name="ring_btn_carbs">Carbs</string>
-    <string name="ring_btn_insulin">Insulin</string>
-    <string name="ring_btn_calc">Calculator</string>
 </resources>

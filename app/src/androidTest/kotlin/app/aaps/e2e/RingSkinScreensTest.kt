@@ -196,36 +196,26 @@ class RingSkinScreensTest {
             }
         }
         logCob("at the end")
-        pressButtons()
+        showTreatmentsMenu()
         Log.i(TAG, "Done: $shot screenshots")
     }
 
-    /** Each button under the why card opens its screen; it is saved and closed with Back, never confirmed. */
-    private fun pressButtons() {
-        for (label in listOf("Углеводы", "Инсулин", "Калькулятор", "Цель")) {
-            runCatching {
-                if (!home()) return@runCatching
-                show(cases[0])
-                closeDialogs()
-                val w = device.displayWidth
-                val h = device.displayHeight
-                device.swipe(w / 2, h * 3 / 4, w / 2, h / 4, 30)
-                settle()
-                // "Углеводы" is also the title of the active carbs value: the button is the lowest one.
-                val button = device.findObjects(By.pkg(PKG).text(label)).maxByOrNull { it.visibleBounds.top }
-                if (button == null) {
-                    save("Кнопка «$label» не найдена")
-                    return@runCatching
-                }
-                button.click()
-                settle()
-                SystemClock.sleep(DATA_MS)
-                save("Кнопка «$label»")
-                device.pressBack()
-                settle()
-                device.pressBack()
-            }.onFailure { Log.w(TAG, "Button $label failed: ${it.message}") }
-        }
+    /** The treatments (carbs, insulin, calculator, target) are in the app's Treatments menu: saved once. */
+    private fun showTreatmentsMenu() {
+        runCatching {
+            if (!home()) return@runCatching
+            show(cases[0])
+            closeDialogs()
+            val item = device.findObject(By.pkg(PKG).text("Назначения"))
+            if (item == null) {
+                save("Меню «Назначения» не найдено")
+                return@runCatching
+            }
+            item.click()
+            settle()
+            save("Меню «Назначения»")
+            device.pressBack()
+        }.onFailure { Log.w(TAG, "Treatments menu failed: ${it.message}") }
     }
 
     // ---- data -------------------------------------------------------------------------------------

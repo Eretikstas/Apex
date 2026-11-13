@@ -14,7 +14,7 @@ not changed. Choose it in Preferences → Overview → Skin.
 4. Period switch (3 h / 24 h / 7 days) and the stats of that period: below 3.9, in range, above 10, CV.
 5. "Next hour" tile: Stable / Rising / Falling, a 3 h graph with 1 h prediction, one line why.
 6. "Why": the last loop decision in plain words, guard chips, two earlier decisions.
-7. Buttons: Target, Carbs, Insulin, Calculator.
+7. No buttons of its own (user, 13.11): carbs, insulin, calculator and target are in the app's Treatments menu.
 
 Day and night colors follow the app theme.
 
