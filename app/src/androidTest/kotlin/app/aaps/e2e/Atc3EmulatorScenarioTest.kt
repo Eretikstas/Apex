@@ -43,6 +43,8 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
+import app.aaps.core.interfaces.pump.emulator.EmulatedAlarm
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -297,7 +299,186 @@ class Atc3EmulatorScenarioTest {
             .that(awaitTrue(RECORD_TIMEOUT) { sameRate(aapsTempBasalRate(), onPump) }).isTrue()
     }
 
+    // Bolus stops (AIMI acceptance S4)
+
+    @Test
+    fun bolusStopWhoseAnswerIsLost_countsWhatThePumpGave() {
+        assertThat(emulator.loseAnswer(EmulatedCommand.BOLUS_STOP)).isTrue()
+
+        val result = bolusStoppedOnTheWay(2.0)
+        status("after a stop whose answer was lost")
+
+        val given = emulator.state().boluses.sum()
+        assertWithMessage("the answer AAPS got is what the pump gave").that(result.bolusDelivered).isWithin(EPS).of(given)
+        assertRecordIsWhatThePumpGave()
+        assertThat(aapsBoluses()).hasSize(1)
+    }
+
+    @Test
+    fun bolusStopThatIsLost_countsWhatThePumpGave() {
+        assertThat(emulator.loseCommand(EmulatedCommand.BOLUS_STOP)).isTrue()
+
+        val result = bolusStoppedOnTheWay(2.0)
+        status("after a lost stop")
+
+        // The stop never reached the pump, so it may have given it all (or the driver sent the stop again).
+        val given = emulator.state().boluses.sum()
+        assertWithMessage("the answer AAPS got is what the pump gave").that(result.bolusDelivered).isWithin(EPS).of(given)
+        assertRecordIsWhatThePumpGave()
+        assertThat(aapsBoluses()).hasSize(1)
+    }
+
+    // Temp basal cancels (S5) and the loop's steps (S3)
+
+    @Test
+    fun tempBasalCancelWhoseAnswerIsLost_isKnown() {
+        setTempBasal(TBR_RATE)
+        assertThat(emulator.loseAnswer(EmulatedCommand.TEMP_BASAL_STOP)).isTrue()
+
+        runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.cancelTempBasal(enforceNew = true) } }
+        status("after a cancel whose answer was lost")
+
+        assertThat(emulator.state().tempBasal).isNull()
+        assertWithMessage("AAPS knows the temp basal ended").that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate() == null }).isTrue()
+    }
+
+    @Test
+    fun tempBasalCancelWhoseCheckIsLostToo_isKnownAfterAStatusRead() {
+        setTempBasal(TBR_RATE)
+        assertThat(emulator.loseAnswer(EmulatedCommand.TEMP_BASAL_STOP)).isTrue()
+        assertThat(emulator.loseAnswer(EmulatedCommand.STATUS)).isTrue()
+
+        runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.cancelTempBasal(enforceNew = true) } }
+        status("first read after the cancel")
+        status("second read after the cancel")
+
+        assertThat(emulator.state().tempBasal).isNull()
+        assertWithMessage("AAPS knows the temp basal ended").that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate() == null }).isTrue()
+    }
+
+    @Test
+    fun tempBasalCancelThatIsLost_aapsAndThePumpAgree() {
+        setTempBasal(TBR_RATE)
+        assertThat(emulator.loseCommand(EmulatedCommand.TEMP_BASAL_STOP)).isTrue()
+
+        runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.cancelTempBasal(enforceNew = true) } }
+        status("after a lost cancel")
+
+        // The pump may still run it (cancel lost) or not (the driver sent it again): AAPS must say the same.
+        val onPump = emulator.state().tempBasal?.absolute
+        assertWithMessage("AAPS and the pump agree on the temp basal, the pump runs $onPump")
+            .that(awaitTrue(RECORD_TIMEOUT) { sameRate(aapsTempBasalRate(), onPump) }).isTrue()
+    }
+
+    @Test
+    fun theLoopsTempBasals_twelveInARow_reachThePump() {
+        val rates = listOf(0.0, 0.25, 0.75, 1.0, 0.5, 0.0, 1.25, 0.35, 0.6, 0.0, 0.9, 0.45)
+        for ((i, rate) in rates.withIndex()) {
+            setTempBasal(rate)
+            assertWithMessage("step ${i + 1}: the pump runs $rate U/h")
+                .that(emulator.state().tempBasal?.absolute ?: -1.0).isWithin(0.026).of(rate)
+        }
+        val last = rates.last()
+        assertWithMessage("AAPS shows the last temp basal")
+            .that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate()?.let { abs(it - last) < 0.026 } == true }).isTrue()
+    }
+
+    // On the pump (S8) and its alarms (S9)
+
+    @Test
+    fun suspendOnThePump_isRecorded_andTheResumeToo() {
+        assertThat(emulator.suspendOnPump(true)).isTrue()
+        status("after a stop on the pump")
+        assertWithMessage("AAPS records the stop as a zero temp basal")
+            .that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate()?.let { it < EPS } == true }).isTrue()
+
+        assertThat(emulator.suspendOnPump(false)).isTrue()
+        status("after a resume on the pump")
+        assertWithMessage("AAPS ends the stop").that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate() == null }).isTrue()
+    }
+
+    @Test
+    fun emptyReservoir_stopsThePump_andAapsKnows() {
+        assertThat(emulator.raise(EmulatedAlarm.EMPTY_RESERVOIR)).isTrue()
+
+        status("after an empty reservoir")
+
+        assertWithMessage("the driver stops a pump that cannot deliver").that(awaitTrue(RECORD_TIMEOUT) { emulator.state().suspended }).isTrue()
+        status("read the stop")
+        assertWithMessage("AAPS records the stop").that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate()?.let { it < EPS } == true }).isTrue()
+        assertThat(bolus(0.5).success).isFalse()
+        assertThat(emulator.state().boluses).isEmpty()
+    }
+
+    // The driver itself (S7) and the profile (S6)
+
+    @Test
+    fun aDriverReload_keepsThePump() {
+        val reservoir = atc3Plugin.reservoirLevel.value.cU
+
+        runBlocking {
+            atc3Plugin.onStop()
+            atc3Plugin.onStart()
+        }
+        status("after a driver reload")
+
+        assertThat(atc3Plugin.isInitialized()).isTrue()
+        assertThat(atc3Plugin.reservoirLevel.value.cU).isWithin(0.5).of(reservoir)
+        assertThat(bolus(0.5).success).isTrue()
+        assertThat(emulator.state().boluses).containsExactly(0.5)
+        assertRecordIsWhatThePumpGave()
+        assertThat(aapsBoluses()).hasSize(1)
+    }
+
+    @Test
+    fun aProfileWhoseAnswerIsLost_isKnown() {
+        assertThat(emulator.loseAnswer(EmulatedCommand.BASAL_PROFILE)).isTrue()
+
+        switchProfile(percentage = 150)
+        status("after a profile whose answer was lost")
+
+        // The seeded basal is 0.5 U/h, so 150 % is 0.75 U/h in every hour.
+        assertWithMessage("the pump runs the new basal ${emulator.state().basal}")
+            .that(awaitTrue(STEP_TIMEOUT) { emulator.state().basal?.all { abs(it - 0.75) < 0.026 } == true }).isTrue()
+        assertWithMessage("AAPS runs the new profile")
+            .that(awaitTrue(RECORD_TIMEOUT) { runBlocking { persistenceLayer.getEffectiveProfileSwitchActiveAt(dateUtil.now()) }?.originalPercentage == 150 })
+            .isTrue()
+    }
+
     // Steps
+
+    /** Starts a bolus through the queue and stops it while the pump gives it, as the user's Stop does. */
+    private fun bolusStoppedOnTheWay(units: Double): PumpEnactResult {
+        pump.bolusTickMs = 100
+        val result = AtomicReference<PumpEnactResult?>(null)
+        val thread = Thread { result.set(bolus(units)) }
+        thread.start()
+        assertWithMessage("the bolus runs").that(awaitTrue(RECORD_TIMEOUT) { emulator.state().bolusRunning }).isTrue()
+        SystemClock.sleep(600)
+        commandQueue.cancelAllBoluses(null)
+        thread.join(STEP_TIMEOUT)
+        return checkNotNull(result.get()) { "the bolus command did not end" }
+    }
+
+    private fun setTempBasal(rate: Double) {
+        val result = runBlocking {
+            withTimeout(STEP_TIMEOUT) { commandQueue.tempBasalAbsolute(rate, TBR_MINUTES, enforceNew = true, profile(), PumpSync.TemporaryBasalType.NORMAL) }
+        }
+        assertWithMessage("a temp basal of $rate U/h is set").that(result.success).isTrue()
+    }
+
+    private fun switchProfile(percentage: Int) {
+        val store = checkNotNull(profileRepository.profile.value) { "No profile store" }
+        val switch = runBlocking {
+            profileFunction.createProfileSwitch(
+                profileStore = store, profileName = PROFILE_NAME, durationInMinutes = 0, percentage = percentage,
+                timeShiftInHours = 0, timestamp = dateUtil.now(), action = Action.PROFILE_SWITCH,
+                source = Sources.Aaps, listValues = emptyList(), iCfg = insulinManager.insulins.first()
+            )
+        }
+        checkNotNull(switch) { "Could not switch to $percentage %" }
+    }
+
 
     private fun status(reason: String): PumpEnactResult = runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.readStatus(reason) } }
 

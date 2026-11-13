@@ -98,7 +98,11 @@ class VirtualAtc3Pump(
     @Volatile var bolusOccludesAt: Int? = null
 
     /** One fault for the next frame that matches: class, code and payload size of the command. */
-    class FrameFault(val cls: Int, val code: Int, val payloadSize: Int? = null)
+    class FrameFault(val cls: Int, val code: Int, val payloadSize: Int? = null, val alsoCodes: Set<Int> = emptySet()) {
+
+        fun matches(cls: Int, code: Int, payloadSize: Int): Boolean =
+            this.cls == cls && (this.code == code || code in alsoCodes) && (this.payloadSize == null || this.payloadSize == payloadSize)
+    }
 
     /** The next matching command does not reach the pump: nothing is done, nothing is answered. Used once. */
     val loseCommands = mutableListOf<FrameFault>()
@@ -110,7 +114,7 @@ class VirtualAtc3Pump(
     @Volatile private var mutedThread: Thread? = null
 
     private fun takeFault(faults: MutableList<FrameFault>, cls: Int, code: Int, payloadSize: Int): Boolean = synchronized(faults) {
-        val hit = faults.firstOrNull { it.cls == cls && it.code == code && (it.payloadSize == null || it.payloadSize == payloadSize) }
+        val hit = faults.firstOrNull { it.matches(cls, code, payloadSize) }
         if (hit != null) faults.remove(hit)
         hit != null
     }
