@@ -150,8 +150,10 @@ class RingSkinScreensTest {
         config.initCompleted()
         seedLocalProfile()
         activateSeededProfile()
-        seedGlucose()
+        // Carbs first: the glucose insert starts the COB calculation, which then sees them.
         seedCarbs()
+        seedGlucose()
+        SystemClock.sleep(CALC_MS)
         device.executeShellCommand("settings put global heads_up_notifications_enabled 0")
 
         outDir = File(ctx.getExternalFilesDir(null), "screens").apply { deleteRecursively(); mkdirs() }
@@ -405,6 +407,7 @@ class RingSkinScreensTest {
         private const val IDLE_MS = 300L
         private const val SETTLE_MS = 1_500L
         private const val DATA_MS = 5_000L
+        private const val CALC_MS = 20_000L
 
         private const val MEAN = 125.0
         private const val AMPLITUDE = 62.0
