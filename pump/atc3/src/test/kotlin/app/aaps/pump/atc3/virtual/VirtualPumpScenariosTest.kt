@@ -369,6 +369,33 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
     }
 
     @Test
+    fun `settings whose answer is lost but which the pump stored are reported as done`() {
+        status()
+        val now = checkNotNull(manager.readStatus()?.settings)
+        val wanted = now.copy(brightnessLevel = if (now.brightnessLevel == 0) 1 else 0)
+        synchronized(pump.loseAnswers) { pump.loseAnswers.add(VirtualAtc3Pump.FrameFault(0xA1, 0x32)) }
+
+        val failure = manager.writeSettings(wanted)
+
+        assertThat(failure).isNull()
+        assertThat(checkNotNull(manager.readStatus()?.settings).brightnessLevel).isEqualTo(wanted.brightnessLevel)
+    }
+
+    @Test
+    fun `settings that never reached the pump are reported as failed`() {
+        status()
+        val now = checkNotNull(manager.readStatus()?.settings)
+        val wanted = now.copy(brightnessLevel = if (now.brightnessLevel == 0) 1 else 0)
+        synchronized(pump.loseCommands) { pump.loseCommands.add(VirtualAtc3Pump.FrameFault(0xA1, 0x32)) }
+
+        val failure = manager.writeSettings(wanted)
+
+        assertThat(failure).isNotNull()
+        assertThat(failure!!.refused).isFalse()
+        assertThat(checkNotNull(manager.readStatus()?.settings).brightnessLevel).isEqualTo(now.brightnessLevel)
+    }
+
+    @Test
     fun `cancelling a temporary basal cancels it on the pump`() {
         status()
         runBlocking { plugin.setTempBasalAbsolute(1.5, 30, false, PumpSync.TemporaryBasalType.NORMAL) }

@@ -423,19 +423,26 @@ class Atc3Manager @Inject constructor(
      * @return null on success, else what did not match
      */
     fun writeSettings(wanted: Atc3Settings): Atc3Failure? {
-        when (exchange.sendControlAndWait(Atc3Protocol.ControlOpcode.WRITE_SETTINGS, wanted.toPayload())) {
-            Atc3Answer.REFUSED  -> return Atc3Failure("the pump refused the settings", refused = true)
-            Atc3Answer.NONE     -> return Atc3Failure("the pump did not acknowledge the settings")
-            Atc3Answer.ACCEPTED -> Unit
-        }
-        // Remembered only once accepted: a refused write sets nothing.
-        preferences.put(Atc3IntNonKey.AlarmDuration, wanted.alarmDuration)
+        val answer = exchange.sendControlAndWait(Atc3Protocol.ControlOpcode.WRITE_SETTINGS, wanted.toPayload())
+        if (answer == Atc3Answer.REFUSED) return Atc3Failure("the pump refused the settings", refused = true)
+        // A lost answer is not a refusal: the pump may have stored the block. Its settings are read back
+        // before the write is called done or failed.
+        val acknowledged = answer == Atc3Answer.ACCEPTED
+        // The alarm duration is not in the status, so it is kept on the pump's word (or on a matching read below).
+        if (acknowledged) preferences.put(Atc3IntNonKey.AlarmDuration, wanted.alarmDuration)
 
-        var lastProblem = "the pump did not report its settings back"
+        var lastProblem = if (acknowledged) "the pump did not report its settings back" else "the pump did not acknowledge the settings"
         repeat(Atc3Const.EFFECT_POLL_ATTEMPTS) {
             SystemClock.sleep(Atc3Const.EFFECT_POLL_INTERVAL_MS)
             val stored = readStatus()?.settings ?: return@repeat
-            if (wanted.mirroredFieldsMatch(stored)) return null
+            if (wanted.mirroredFieldsMatch(stored)) {
+                if (!acknowledged) {
+                    preferences.put(Atc3IntNonKey.AlarmDuration, wanted.alarmDuration)
+                    aapsLogger.debug(LTag.PUMP, "ATC3: the settings answer was lost, but the pump stored them")
+                }
+                return null
+            }
+            if (!acknowledged) return Atc3Failure("the pump did not acknowledge the settings")
             lastProblem = "the pump stored different settings"
             aapsLogger.debug(LTag.PUMP, "ATC3: settings read back does not match yet, wanted $wanted got $stored")
         }
