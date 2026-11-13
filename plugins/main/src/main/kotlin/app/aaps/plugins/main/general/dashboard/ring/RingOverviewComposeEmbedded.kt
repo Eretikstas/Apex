@@ -90,7 +90,7 @@ internal data class RingPalette(
     companion object {
 
         val Day = RingPalette(
-            bg = Color(0xFFF4F6F5), card = Color(0xFFFFFFFF), text = Color(0xFF14201C), soft = Color(0xFF33433E),
+            bg = Color(0xFFE8F3EE), card = Color(0xFFFFFFFF), text = Color(0xFF14201C), soft = Color(0xFF33433E),
             muted = Color(0xFF4F5E59), line = Color(0xFFE1E6E4), track = Color(0xFFE1E6E4), brand = Color(0xFF0F6B55),
             inRange = Color(0xFF1F9E7A), high = Color(0xFFE08A1E), low = Color(0xFF8F2D0A), bandAlpha = 0.10f,
             okBg = Color(0xFFE3ECE8), okFg = Color(0xFF0F4D3E), warnBg = Color(0xFFFBE9D3), warnFg = Color(0xFF7A4306),
