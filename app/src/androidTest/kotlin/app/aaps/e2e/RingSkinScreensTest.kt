@@ -158,11 +158,6 @@ class RingSkinScreensTest {
         config.initCompleted()
         seedLocalProfile()
         activateSeededProfile()
-        // Carbs first: the glucose insert starts the COB calculation, which then sees them.
-        seedCarbs()
-        seedGlucose()
-        SystemClock.sleep(CALC_MS)
-        logCob("after seeding")
         device.executeShellCommand("settings put global heads_up_notifications_enabled 0")
 
         outDir = File(ctx.getExternalFilesDir(null), "screens").apply { deleteRecursively(); mkdirs() }
@@ -177,6 +172,15 @@ class RingSkinScreensTest {
 
     @Test
     fun ringScreens() {
+        // The pump makes the effective profile switch once the app runs: open it first, then copy that
+        // switch to before the seeded data (the COB / autosens calculation skips every 5 min step
+        // without a running profile), then seed carbs (first) and glucose (this starts the calculation).
+        home()
+        copyEffectiveProfileSwitchBack()
+        seedCarbs()
+        seedGlucose()
+        SystemClock.sleep(CALC_MS)
+        logCob("after seeding")
         for (theme in listOf("light", "dark")) {
             preferences.put(StringKey.GeneralDarkMode, theme)
             val themeName = if (theme == "light") "день" else "ночь"
@@ -267,6 +271,21 @@ class RingSkinScreensTest {
                 )
             }
         }.onFailure { Log.w(COB_TAG, "$stage: ${it.message}") }
+    }
+
+    private fun copyEffectiveProfileSwitchBack() {
+        val now = dateUtil.now()
+        val eps = awaitNotNull(EPS_TIMEOUT) { runBlocking { persistenceLayer.getEffectiveProfileSwitchActiveAt(dateUtil.now()) } }
+        if (eps == null) {
+            Log.w(COB_TAG, "No effective profile switch after ${EPS_TIMEOUT / 1000} s")
+            return
+        }
+        runBlocking {
+            persistenceLayer.insertOrUpdateEffectiveProfileSwitch(
+                eps.copy(id = 0, version = 0, dateCreated = -1, ids = IDs(), timestamp = now - 8 * 24 * 3_600_000L, originalEnd = now)
+            )
+        }
+        Log.i(COB_TAG, "Effective profile switch copied 8 days back")
     }
 
     /** 20 g of carbs 40 min ago, so the active carbs (COB) have a value. */
@@ -416,18 +435,6 @@ class RingSkinScreensTest {
             )
         }
         checkNotNull(switch) { "Could not activate the seeded local profile" }
-        // AAPS runs on the effective switch, which the pump makes "now". The COB / autosens calculation
-        // skips every 5 min step without a running profile, so copy it to before the seeded data.
-        val now = dateUtil.now()
-        val eps = checkNotNull(awaitNotNull(PROFILE_STORE_TIMEOUT) { runBlocking { persistenceLayer.getEffectiveProfileSwitchActiveAt(now) } }) {
-            "No effective profile switch"
-        }
-        runBlocking {
-            persistenceLayer.insertOrUpdateEffectiveProfileSwitch(
-                eps.copy(id = 0, version = 0, dateCreated = -1, ids = IDs(), timestamp = now - 8 * 24 * 3_600_000L, originalEnd = now)
-            )
-        }
-        Log.i(COB_TAG, "Effective profile switch copied 8 days back")
     }
 
     private fun singleValue(value: Double) = """[{"time":"00:00","timeAsSeconds":0,"value":$value}]"""
@@ -460,6 +467,7 @@ class RingSkinScreensTest {
         private const val SETTLE_MS = 1_500L
         private const val DATA_MS = 5_000L
         private const val CALC_MS = 20_000L
+        private const val EPS_TIMEOUT = 90_000L
 
         private const val MEAN = 125.0
         private const val AMPLITUDE = 62.0
