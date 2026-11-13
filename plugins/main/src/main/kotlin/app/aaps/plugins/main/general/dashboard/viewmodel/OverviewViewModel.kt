@@ -1054,6 +1054,11 @@ class OverviewViewModel(
             basal = loop.lastRun?.request?.rate,
             detailedReason = loop.lastRun?.request?.reason,
             isHypoRisk = loop.lastRun?.request?.isHypoRisk ?: false,
+            // For the Ring skin (docs/RING_SKIN.md): what the last decision set, read from its numbers.
+            tbrDuration = loop.lastRun?.request?.duration,
+            tempBasalRequested = loop.lastRun?.request?.isTempBasalRequested ?: false,
+            eventualBg = (loop.lastRun?.request?.rawData() as? RT)?.eventualBG,
+            variableSens = loop.lastRun?.request?.variableSens,
             // 🌀 Trajectory Visualization
             trajectoryTitle = (loop.lastRun?.request?.rawData() as? RT)?.trajectoryType?.let { name ->
                 val type = TrajectoryType.entries.find { it.name == name }
@@ -1678,5 +1683,13 @@ data class AdjustmentCardState(
     val trajectoryTitle: String? = null,
     val trajectoryAscii: String? = null,
     val trajectoryMetrics: String? = null,
-    val trajectoryRelevance: Double? = null
+    val trajectoryRelevance: Double? = null,
+    /** Ring skin: duration of the temp basal the last decision set, minutes. */
+    val tbrDuration: Int? = null,
+    /** Ring skin: the last decision set a temp basal. */
+    val tempBasalRequested: Boolean = false,
+    /** Ring skin: eventual BG of the last decision, mg/dL. */
+    val eventualBg: Double? = null,
+    /** Ring skin: sensitivity the last decision used, mg/dL per U. */
+    val variableSens: Double? = null,
 ) : Serializable

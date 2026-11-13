@@ -10,6 +10,7 @@ import app.aaps.plugins.main.skins.SkinLowRes
 import app.aaps.plugins.main.skins.SkinMinimal
 import app.aaps.plugins.main.skins.SkinProvider
 import app.aaps.plugins.main.skins.SkinProviderImpl
+import app.aaps.plugins.main.skins.SkinRing
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -48,6 +49,12 @@ open class SkinsModule {
     @IntoMap
     @IntKey(6)
     fun bindsSkinGlass(skinGlass: SkinGlass): SkinInterface = skinGlass
+
+    @Provides
+    @Skin
+    @IntoMap
+    @IntKey(7)
+    fun bindsSkinRing(skinRing: SkinRing): SkinInterface = skinRing
 
     @Provides
     @Skin

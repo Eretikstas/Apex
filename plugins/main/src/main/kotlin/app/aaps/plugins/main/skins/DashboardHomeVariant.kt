@@ -5,4 +5,7 @@ enum class DashboardHomeVariant {
     OVERVIEW,
     DASHBOARD_V1,
     GLASS,
+
+    /** The Ring skin: ring, "next hour" tile and plain "why" (docs/RING_SKIN.md). */
+    RING,
 }

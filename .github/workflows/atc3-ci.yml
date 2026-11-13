@@ -85,7 +85,7 @@ jobs:
         run: >-
           ./gradlew
           :database:impl:testFullDebugUnitTest --tests '*SyncPumpTemporaryBasalTransactionTest*'
-          :plugins:main:testFullDebugUnitTest --tests '*RingWhyMapperTest*'
+          :plugins:main:testFullDebugUnitTest --tests '*RingWhyMapperTest*' --tests '*RingLogicTest*' --tests '*DashboardHomeVariantResolverTest*'
           --stacktrace
 
       - name: Build the app

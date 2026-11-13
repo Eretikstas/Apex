@@ -541,4 +541,65 @@
     <string name="aimi_adaptation_metric_value_percent" comment="%1$.1f=a percentage value. Example: 82.5%">%1$.1f%%</string>
     <string name="aimi_adaptation_metric_value_units" comment="%1$.2f=insulin units. Example: 0.50 U">%1$.2f U</string>
     <string name="aimi_adaptation_metric_value_mgdl" comment="%1$.1f=a glucose prediction error in mg/dL. Example: 12.5 mg/dL">%1$.1f mg/dL</string>
+
+    <!-- Ring skin (docs/RING_SKIN.md) -->
+    <string name="ring_skin_description">Ring and why</string>
+    <string name="ring_iob_title">Insulin</string>
+    <string name="ring_iob_sub">on board</string>
+    <string name="ring_cob_title">Carbs</string>
+    <string name="ring_cob_sub">on board</string>
+    <string name="ring_basal_title">Basal</string>
+    <string name="ring_target_title">Target</string>
+    <string name="ring_isf" comment="ISF = insulin sensitivity factor. %1$s=glucose drop per unit. Example: ISF 7.9">ISF %1$s</string>
+    <string name="ring_pred_30" comment="%1$s=predicted glucose with its unit. Example: in 30 min ≈ 8.1">in 30 min ≈ %1$s</string>
+    <string name="ring_period_3h">3 h</string>
+    <string name="ring_period_day">24 h</string>
+    <string name="ring_period_week">7 days</string>
+    <string name="ring_stats_low" comment="%1$d=percent of time below range. Example: 3% ↓">%1$d%% ↓</string>
+    <string name="ring_stats_in" comment="%1$d=percent of time in range. Example: 84%">%1$d%%</string>
+    <string name="ring_stats_high" comment="%1$d=percent of time above range. Example: 13% ↑">%1$d%% ↑</string>
+    <string name="ring_stats_cv" comment="CV = coefficient of variation of glucose. %1$d=percent. Example: CV 31%">CV %1$d%%</string>
+    <string name="ring_stats_cd" comment="Read aloud. %1$d=below range, %2$d=in range, %3$d=above range, %4$d=CV, all percent">Below range %1$d%%, in range %2$d%%, above range %3$d%%, CV %4$d%%</string>
+    <string name="ring_stats_none">No readings</string>
+    <string name="ring_hour_title">Next hour</string>
+    <string name="ring_hour_stable">Stable</string>
+    <string name="ring_hour_rising">Rising · risk of high glucose</string>
+    <string name="ring_hour_falling">Falling · risk of low glucose</string>
+    <string name="ring_hour_why_stable" comment="%1$s, %2$s=lowest and highest predicted glucose with unit. Example: Prediction for the hour: 5.8–6.6.">Prediction for the hour: %1$s–%2$s.</string>
+    <string name="ring_hour_why_rising" comment="%1$s=predicted glucose in 1 h with unit. Example: Prediction in 1 h: 9.8.">Prediction in 1 h: %1$s.</string>
+    <string name="ring_hour_why_rising_capped" comment="%1$s=predicted glucose in 1 h with unit. Example: Prediction in 1 h: 9.8. SMB is at its limit.">Prediction in 1 h: %1$s. SMB is at its limit.</string>
+    <string name="ring_hour_why_falling" comment="%1$s=lowest predicted glucose within the hour with unit. Example: Lowest prediction within the hour: 3.6.">Lowest prediction within the hour: %1$s.</string>
+    <string name="ring_hour_no_prediction">No prediction yet.</string>
+    <string name="ring_axis_past">−3 h</string>
+    <string name="ring_axis_now">now</string>
+    <string name="ring_axis_future">+1 h</string>
+    <string name="ring_why_title">WHY</string>
+    <string name="ring_why_line" comment="%1$s=what the loop did, %2$s=why. Example: Gave 0.15 U: glucose rises without entered carbs">%1$s: %2$s</string>
+    <string name="ring_act_smb" comment="%1$s=insulin units. Example: Gave 0.15 U">Gave %1$s U</string>
+    <string name="ring_act_zero" comment="%1$d=minutes. Example: Stopped basal for 30 min">Stopped basal for %1$d min</string>
+    <string name="ring_act_tbr" comment="%1$s=rate in U/h, %2$d=minutes. Example: Temp basal 0.45 U/h for 30 min">Temp basal %1$s U/h for %2$d min</string>
+    <string name="ring_act_none">No change</string>
+    <string name="ring_cause_no_data">no fresh sensor data</string>
+    <string name="ring_cause_safety_stop">a safety check stopped the dose</string>
+    <string name="ring_cause_low">glucose is low or falling</string>
+    <string name="ring_cause_after_low">after a low the loop gives less insulin</string>
+    <string name="ring_cause_enough_iob">enough insulin on board already</string>
+    <string name="ring_cause_meal">meal mode</string>
+    <string name="ring_cause_rise">glucose rises without entered carbs</string>
+    <string name="ring_cause_activity">activity</string>
+    <string name="ring_cause_honeymoon">honeymoon mode</string>
+    <string name="ring_cause_normal">glucose on target</string>
+    <string name="ring_cause_unknown">see the loop details</string>
+    <string name="ring_why_eventual" comment="%1$s=glucose with unit. Example: Eventual prediction: 9.8.">Eventual prediction: %1$s.</string>
+    <string name="ring_why_limited_numbers" comment="%1$s, %2$s=insulin units. Example: Wanted 0.22 U, the limit allowed 0.15 U.">Wanted %1$s U, the limit allowed %2$s U.</string>
+    <string name="ring_why_limited">A limit cut the dose.</string>
+    <string name="ring_why_details">Details</string>
+    <string name="ring_why_none">The loop has not run yet.</string>
+    <string name="ring_chip_smb_off">SMB off</string>
+    <string name="ring_chip_low_guard">Low protection on</string>
+    <string name="ring_chip_meal">Meal mode</string>
+    <string name="ring_btn_target">Target</string>
+    <string name="ring_btn_carbs">Carbs</string>
+    <string name="ring_btn_insulin">Insulin</string>
+    <string name="ring_btn_calc">Calculator</string>
 </resources>

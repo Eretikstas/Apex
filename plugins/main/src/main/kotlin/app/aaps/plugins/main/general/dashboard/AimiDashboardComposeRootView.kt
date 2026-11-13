@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import app.aaps.core.ui.compose.LocalPreferences
 import app.aaps.plugins.main.general.dashboard.compose.LocalDashboardHeroCommands
 import app.aaps.plugins.main.general.dashboard.compose.NoopDashboardHeroCommands
+import app.aaps.plugins.main.general.dashboard.ring.RingOverviewComposeEmbedded
 import app.aaps.plugins.main.general.dashboard.glass.GlassOverviewComposeEmbedded
 import app.aaps.plugins.main.general.dashboard.glass.LocalGlassHeroCommands
 import app.aaps.plugins.main.general.dashboard.glass.NoopGlassHeroCommands
@@ -131,6 +132,24 @@ class AimiDashboardComposeRootView @JvmOverloads constructor(
                                 embeddedState = embeddedComposeState,
                                 availablePluginClassNames = availablePluginClassNames,
                                 onToolAction = onToolAction,
+                            )
+                        }
+
+                        DashboardHomeVariant.RING -> {
+                            val auditorHost = remember { FrameLayout(context) }
+                            LaunchedEffect(Unit) {
+                                onShellBindingReady(
+                                    DashboardShellBinding.fromComposeEmbeddedColumn(
+                                        shellPostRoot = this@AimiDashboardComposeRootView,
+                                        auditorHost = auditorHost,
+                                        glucoseGraph = null,
+                                    ),
+                                )
+                            }
+                            RingOverviewComposeEmbedded(
+                                overviewViewModel = viewModel,
+                                graphViewModel = graphViewModel,
+                                persistenceLayer = deps.persistenceLayer,
                             )
                         }
 
