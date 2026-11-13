@@ -192,7 +192,8 @@ class RingSkinScreensTest {
                 val h = device.displayHeight
                 device.swipe(w / 2, h * 3 / 4, w / 2, h / 4, 30)
                 settle()
-                val button = device.findObject(By.pkg(PKG).text(label))
+                // "Углеводы" is also the title of the active carbs value: the button is the lowest one.
+                val button = device.findObjects(By.pkg(PKG).text(label)).maxByOrNull { it.visibleBounds.top }
                 if (button == null) {
                     save("Кнопка «$label» не найдена")
                     return@runCatching
