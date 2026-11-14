@@ -136,7 +136,6 @@
     <string name="atc3_trace_title">Write the driver trace</string>
     <string name="atc3_trace_summary">One line per event in the AAPS log, for measuring how often the pump is contacted and in what order things happen</string>
     <string name="atc3_half_hour_read">Apex: reading the pump\'s count at the half hour</string>
-    <string name="atc3_driver_start_read">Apex: reading the pump at driver start</string>
     <string name="atc3_hold_link_title">Keep the pump connection open</string>
     <string name="atc3_hold_link_summary">Stay connected between exchanges instead of reconnecting every few minutes. The pump sends a signal every three minutes, and the connection is dropped and rebuilt if that stops arriving. Turn this off only if the connection proves unreliable on this phone.</string>
     <string name="atc3_password_given_up">The pump refused the Bluetooth password ten times, so the driver has stopped trying. Read the current B/P from the pump status screen and enter it in the Apex settings.</string>

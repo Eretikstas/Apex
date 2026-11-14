@@ -213,8 +213,8 @@ class Atc3PumpPlugin @Inject constructor(
         )
         basalPeriods.watch(pluginScope) { isEnabled() }
         linkKeeper.watch(pluginScope) { isEnabled() }
-        // Everything else comes from the disk (on first use) and from the pump: one status read now.
-        if (isEnabled()) atc3Queue.readStatus(rh.gs(R.string.atc3_driver_start_read))
+        // Nothing else to load here: the stored state is read from the disk on first use, and the pump's
+        // state is read at the loop's next decision, since a forgotten state counts as never read.
     }
 
     override suspend fun onStop() {

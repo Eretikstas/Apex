@@ -715,7 +715,6 @@
  "appearance": "Appearance",
  "aps_mode_title": "APS Mode",
  "askforpermission": "Ask for permission",
- "atc3_driver_start_read": "Apex: reading the pump at driver start",
  "authorization_status": "Authorization Status",
  "authorized_clients_add": "Add client",
  "authorized_clients_comm_switch_summary": "Let paired clients send signed commands over Nightscout. Turn off to stop communication without removing them.",
