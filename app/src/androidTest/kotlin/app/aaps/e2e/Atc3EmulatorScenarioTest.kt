@@ -541,7 +541,10 @@ class Atc3EmulatorScenarioTest {
         pairing.disconnect()
         assertThat(pairing.isPaired).isFalse()
         val bolusesBefore = emulator.state().boluses.size
-        assertWithMessage("no bolus without a paired pump").that(bolus(0.5).success).isFalse()
+        // AAPS itself answers for a pump that is not set up: done as nothing ("pump not configured"), nothing enacted.
+        val afterUnpair = bolus(0.5)
+        assertWithMessage("no bolus without a paired pump").that(afterUnpair.enacted).isFalse()
+        assertThat(afterUnpair.bolusDelivered).isWithin(EPS).of(0.0)
         assertThat(emulator.state().boluses).hasSize(bolusesBefore)
         assertRecordIsWhatThePumpGave()
     }
