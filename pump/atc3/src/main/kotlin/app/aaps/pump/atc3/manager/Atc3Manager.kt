@@ -235,12 +235,14 @@ class Atc3Manager @Inject constructor(
             }
         }
 
-        if (exchange.sendControlAndWait(Atc3Protocol.ControlOpcode.WRITE_BASAL_PROFILE, Atc3Payload.basalProfile(rates)) != Atc3Answer.ACCEPTED) {
-            return "pump did not acknowledge the basal profile"
-        }
+        val answer = exchange.sendControlAndWait(Atc3Protocol.ControlOpcode.WRITE_BASAL_PROFILE, Atc3Payload.basalProfile(rates))
+        if (answer == Atc3Answer.REFUSED) return "pump refused the basal profile"
+        // A lost answer is not a refusal: the pump may have stored the profile, so it is read back before the
+        // write is called done or failed (official AAPS pump driver acceptance D7).
+        val acknowledged = answer == Atc3Answer.ACCEPTED
 
         // Read back, a few times: the stored profile follows the acknowledgement with a delay.
-        var lastProblem = "pump did not return the basal profiles"
+        var lastProblem = if (acknowledged) "pump did not return the basal profiles" else "pump did not acknowledge the basal profile"
         repeat(Atc3Const.EFFECT_POLL_ATTEMPTS) {
             SystemClock.sleep(Atc3Const.EFFECT_POLL_INTERVAL_MS)
             if (!readBasalProfiles(target)) return@repeat
@@ -250,7 +252,12 @@ class Atc3Manager @Inject constructor(
                 return@repeat
             }
             val differing = Atc3PumpState.differingSlots(rates, stored, tolerance)
-            if (differing.isEmpty()) return null
+            if (differing.isEmpty()) {
+                if (!acknowledged) aapsLogger.debug(LTag.PUMP, "ATC3: the basal profile answer was lost, but the pump stored it")
+                return null
+            }
+            // Unacknowledged and not stored: the write did not reach the pump, nothing to wait for.
+            if (!acknowledged) return "pump did not acknowledge the basal profile"
             lastProblem = "pump stored different rates: " + differing.joinToString(", ", limit = 5) {
                 "${Atc3PumpState.slotLabel(it)} wanted ${rates[it]} got ${stored[it]}"
             }

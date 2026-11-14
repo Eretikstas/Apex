@@ -130,7 +130,7 @@ class Atc3PumpStateTest {
     }
 
     @Test
-    fun `a stopped driver keeps nothing read from the pump`() {
+    fun `a stopped driver keeps nothing read from the pump but its identity`() {
         val pump = Atc3PumpState()
         pump.editStatus { it.copy(suspended = true) }
         pump.lastConnection = 5_000L
@@ -141,7 +141,7 @@ class Atc3PumpStateTest {
 
         assertEquals(null, pump.statusCard)
         assertEquals(0L, pump.lastConnection)
-        assertEquals("", pump.serialNumber)
+        assertEquals("the serial stays: a link can outlive the stop", "12345678", pump.serialNumber)
         assertEquals(null, pump.lastBolus)
         assertEquals(null, pump.lastBolusTimeFlow.value)
         assertEquals(0.0, pump.reservoirFlow.value.cU)

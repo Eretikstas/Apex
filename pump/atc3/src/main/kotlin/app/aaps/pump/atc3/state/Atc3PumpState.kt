@@ -123,15 +123,18 @@ class Atc3PumpState @Inject constructor() {
 
     @Volatile var profiles: Profiles? = null
 
-    /** The driver stops (AIMI acceptance D1): nothing read from the pump is kept for the next start. */
+    /**
+     * The driver stops (official AAPS acceptance D1): what was read of the pump's state is not kept for the next start.
+     * Its identity stays: the serial and the firmware are set only when a link comes up, and a link can outlive the
+     * stop; without the serial every record would go to AAPS as from another pump and be refused (found by
+     * `Atc3EmulatorScenarioTest.aDriverReload_keepsThePump`).
+     */
     fun forget() {
         statusCard = null
         statusV2 = null
         lastConnection = 0L
         dayAccount = null
         lastBolus = null
-        serialNumber = ""
-        version = null
         profiles = null
     }
 

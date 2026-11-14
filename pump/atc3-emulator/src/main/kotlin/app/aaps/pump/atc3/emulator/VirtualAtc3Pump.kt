@@ -103,7 +103,11 @@ class VirtualAtc3Pump(
     @Volatile var bolusOccludesAt: Int? = null
 
     /** One fault for the next frame that matches: class, code and payload size of the command. */
-    class FrameFault(val cls: Int, val code: Int, val payloadSize: Int? = null, val alsoCodes: Set<Int> = emptySet()) {
+    /**
+     * @param skip how many matching frames go through before this fault fires, so that a test can name which read
+     * of several is lost (e.g. the check after a command rather than the read before it)
+     */
+    class FrameFault(val cls: Int, val code: Int, val payloadSize: Int? = null, val alsoCodes: Set<Int> = emptySet(), var skip: Int = 0) {
 
         fun matches(cls: Int, code: Int, payloadSize: Int): Boolean =
             this.cls == cls && (this.code == code || code in alsoCodes) && (this.payloadSize == null || this.payloadSize == payloadSize)
@@ -119,9 +123,13 @@ class VirtualAtc3Pump(
     @Volatile private var mutedThread: Thread? = null
 
     private fun takeFault(faults: MutableList<FrameFault>, cls: Int, code: Int, payloadSize: Int): Boolean = synchronized(faults) {
-        val hit = faults.firstOrNull { it.matches(cls, code, payloadSize) }
-        if (hit != null) faults.remove(hit)
-        hit != null
+        val hit = faults.firstOrNull { it.matches(cls, code, payloadSize) } ?: return false
+        if (hit.skip > 0) {
+            hit.skip--
+            return false
+        }
+        faults.remove(hit)
+        true
     }
 
     /** The pump raises an alarm now: it is active in the status and written to the alarm log. */

@@ -346,7 +346,10 @@ class Atc3EmulatorScenarioTest {
     fun tempBasalCancelWhoseCheckIsLostToo_isKnownAfterAStatusRead() {
         setTempBasal(TBR_RATE)
         assertThat(emulator.loseAnswer(EmulatedCommand.TEMP_BASAL_STOP)).isTrue()
-        assertThat(emulator.loseAnswer(EmulatedCommand.STATUS)).isTrue()
+        // The driver reads the status before it cancels: that read goes through, the check after the cancel is lost.
+        synchronized(pump.loseAnswers) {
+            pump.loseAnswers.add(VirtualAtc3Pump.FrameFault(0xA3, 0x00, alsoCodes = setOf(0x0A, 0x0C), skip = 1))
+        }
 
         runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.cancelTempBasal(enforceNew = true) } }
         status("first read after the cancel")
@@ -354,6 +357,20 @@ class Atc3EmulatorScenarioTest {
 
         assertThat(emulator.state().tempBasal).isNull()
         assertWithMessage("AAPS knows the temp basal ended").that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate() == null }).isTrue()
+    }
+
+    @Test
+    fun tempBasalCancelWhoseFirstReadIsLost_isNotSent_andAapsAndThePumpAgree() {
+        setTempBasal(TBR_RATE)
+        assertThat(emulator.loseAnswer(EmulatedCommand.STATUS)).isTrue()
+
+        runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.cancelTempBasal(enforceNew = true) } }
+        status("after a cancel that could not read the pump first")
+
+        // Without a status the driver does not cancel blind: the pump keeps it, and AAPS must say the same.
+        val onPump = emulator.state().tempBasal?.absolute
+        assertWithMessage("AAPS and the pump agree on the temp basal, the pump runs $onPump")
+            .that(awaitTrue(RECORD_TIMEOUT) { sameRate(aapsTempBasalRate(), onPump) }).isTrue()
     }
 
     @Test
