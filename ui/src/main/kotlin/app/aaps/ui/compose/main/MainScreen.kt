@@ -161,6 +161,8 @@ fun MainScreen(
     /** True only for the GLASS dashboard skin — swaps in [GlassNavigationBar] instead of the default
      *  [MainNavigationBar]. Does not affect OVERVIEW/DASHBOARD_V1, which keep using MainNavigationBar. */
     isGlassSkin: Boolean = false,
+    /** False when the home shows the version itself (Ring skin), so it does not float over the content. */
+    showVersionOverlay: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     LocalDateUtil.current
@@ -382,11 +384,13 @@ fun MainScreen(
                         }
 
                         // Version overlay
-                        VersionOverlay(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(contentPadding)
-                        )
+                        if (showVersionOverlay) {
+                            VersionOverlay(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(contentPadding)
+                            )
+                        }
 
                         // Status bar protection scrim — keeps system icons legible
                         // against the floating search bar / graph content

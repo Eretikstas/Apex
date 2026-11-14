@@ -892,6 +892,7 @@ class ComposeMainActivity : AppCompatActivity() {
                         null
                     },
                     isGlassSkin = dashboardHomeVariant == DashboardHomeVariant.GLASS,
+                    showVersionOverlay = dashboardHomeVariant != DashboardHomeVariant.RING,
                 )
                 }
             }

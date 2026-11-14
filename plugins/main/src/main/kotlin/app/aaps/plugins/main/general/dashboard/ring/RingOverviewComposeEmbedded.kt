@@ -1,5 +1,6 @@
 package app.aaps.plugins.main.general.dashboard.ring
 
+import app.aaps.core.ui.compose.VersionLabel
 import app.aaps.core.ui.compose.icons.IcPumpBattery
 import app.aaps.core.ui.compose.icons.IcPumpCartridge
 import app.aaps.core.ui.compose.icons.IcCgmInsert
@@ -240,9 +241,13 @@ private fun StatusChips(status: StatusCardState?, p: RingPalette) {
             Chip(IcPumpBattery, stringResource(R.string.ring_percent, it), stringResource(R.string.ring_chip_battery, it), RingLogic.batteryLevel(it))
         },
     )
-    if (chips.isEmpty()) return
-    // Icons and numbers only, so the four fit in one row on a phone.
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+    // Icons and numbers only, so the four fit in one row on a phone. The version ends the row: on this
+    // home it scrolls with the content instead of floating over it.
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
         chips.forEach { chip ->
             val (bg, fg) = when (chip.level) {
                 RingLevel.OK    -> p.okBg to p.okFg
@@ -265,6 +270,8 @@ private fun StatusChips(status: StatusCardState?, p: RingPalette) {
                 )
             }
         }
+        Spacer(Modifier.weight(1f))
+        VersionLabel(modifier = Modifier.align(Alignment.CenterVertically))
     }
 }
 
