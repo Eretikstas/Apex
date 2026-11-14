@@ -7,6 +7,11 @@ name: ATC3 Russian screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      ring:
+        description: 'Screenshots of the Ring skin only (RingSkinScreensTest) instead of the full walk'
+        type: boolean
+        default: false
   push:
     branches:
       - atc3-driver
@@ -98,7 +103,7 @@ jobs:
           disk-size: 6000M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -change-locale ru-RU
           disable-animations: true
-          script: SCREENS_TEST=${{ contains(github.event.head_commit.message, '[ring]') && 'app.aaps.e2e.RingSkinScreensTest' || 'app.aaps.e2e.Atc3RuScreensTest' }} bash tools/atc3_screens.sh
+          script: SCREENS_TEST=${{ (inputs.ring || contains(github.event.head_commit.message, '[ring]')) && 'app.aaps.e2e.RingSkinScreensTest' || 'app.aaps.e2e.Atc3RuScreensTest' }} bash tools/atc3_screens.sh
 
       - name: Upload the screenshots
         if: always()
