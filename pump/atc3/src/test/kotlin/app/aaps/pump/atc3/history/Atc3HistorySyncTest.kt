@@ -98,14 +98,15 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
             whenever(persistenceLayer.getBolusesFromTimeIncludingInvalid(any(), any())).thenAnswer { rows.toList() }
         }
         runBlocking {
+            // As AAPS does: a row with a known pump id is updated (answer false), a new one is inserted (answer true).
             whenever(pumpSync.syncExtendedBolusWithPumpId(any(), any(), any(), any(), any(), any(), any())).thenAnswer {
-                extendedRows.add(
-                    EB(
-                        timestamp = it.getArgument(0), amount = it.getArgument<PumpRate>(1).cU, duration = it.getArgument(2),
-                        ids = IDs(pumpId = it.getArgument(4), pumpSerial = it.getArgument(6))
-                    )
+                val row = EB(
+                    timestamp = it.getArgument(0), amount = it.getArgument<PumpRate>(1).cU, duration = it.getArgument(2),
+                    ids = IDs(pumpId = it.getArgument(4), pumpSerial = it.getArgument(6))
                 )
-                true
+                val index = extendedRows.indexOfFirst { held -> held.ids.pumpId == row.ids.pumpId }
+                if (index >= 0) extendedRows[index] = row else extendedRows.add(row)
+                index < 0
             }
         }
         runBlocking {
@@ -406,6 +407,47 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         verify(uiInteraction, times(1)).addNotification(eq(Notification.PUMP_WARNING), anyOrNull(), eq(Notification.NORMAL))
         // Both parts count for the comparison with the pump's own count.
         assertThat(sync.bolusesLearnedAfter(0L)).isWithin(1e-9).of(3.0)
+    }
+
+    @Test
+    fun `two extended boluses read together keep all their insulin, the first ending where the second starts`() = runTest {
+        adoptedLongAgo()
+        val first = now - 3 * 60 * 60_000L
+        val second = now - 60 * 60_000L
+        val records = listOf(
+            Atc3BolusRecord(1, second, Atc3StatusV1.wallClockUtcSeconds(second), 0, 0, 20, 20),
+            Atc3BolusRecord(0, first, Atc3StatusV1.wallClockUtcSeconds(first), 0, 0, 40, 40)
+        )
+
+        sync.reconcileBoluses(records, 2)
+
+        val rows = extendedRows.sortedBy { it.timestamp }
+        assertThat(rows).hasSize(2)
+        assertThat(rows[0].amount).isWithin(1e-9).of(1.0)
+        assertThat(rows[0].timestamp + rows[0].duration).isEqualTo(minuteOf(second))
+        assertThat(rows[1].amount).isWithin(1e-9).of(0.5)
+        assertThat(rows[1].timestamp + rows[1].duration).isEqualTo(now)
+    }
+
+    @Test
+    fun `an extended row written earlier is shortened, not cut, when the next one starts before its end`() = runTest {
+        adoptedLongAgo()
+        val first = now - 50 * 60_000L
+        sync.reconcileBoluses(listOf(Atc3BolusRecord(0, first, Atc3StatusV1.wallClockUtcSeconds(first), 0, 0, 40, 40)), 1)
+        // Its row ends at this read; the next extended bolus began 10 min before it.
+        val second = now - 10 * 60_000L
+
+        sync.reconcileBoluses(
+            listOf(
+                Atc3BolusRecord(1, second, Atc3StatusV1.wallClockUtcSeconds(second), 0, 0, 20, 20),
+                Atc3BolusRecord(0, first, Atc3StatusV1.wallClockUtcSeconds(first), 0, 0, 40, 40)
+            ), 2
+        )
+
+        val rows = extendedRows.sortedBy { it.timestamp }
+        assertThat(rows).hasSize(2)
+        assertThat(rows[0].amount).isWithin(1e-9).of(1.0)
+        assertThat(rows[0].timestamp + rows[0].duration).isEqualTo(minuteOf(second))
     }
 
     @Test
