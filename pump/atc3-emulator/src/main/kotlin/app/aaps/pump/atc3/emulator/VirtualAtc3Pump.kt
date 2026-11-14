@@ -326,12 +326,12 @@ class VirtualAtc3Pump(
         return d
     }
 
-    /** §4.10, 10 bytes: today first, the rest empty. */
+    /** §4.10, 10 bytes: bolus 0..1, basal 2..3, temp basal 4..5, date 6..8. Today first (its boluses only), the rest empty. */
     private fun dailyRecord(i: Int): ByteArray {
         val d = ByteArray(10)
         val day = pumpNow() - i * 86_400_000L
         val c = calendar(day)
-        if (i == 0) putU16(d, 2, deliveredTodayRaw)
+        if (i == 0) putU16(d, 0, deliveredTodayRaw)
         d[6] = (c.get(Calendar.YEAR) - 2000).toByte()
         d[7] = (c.get(Calendar.MONTH) + 1).toByte()
         d[8] = c.get(Calendar.DAY_OF_MONTH).toByte()
