@@ -260,7 +260,8 @@ class Atc3EmulatorScenarioTest {
         val extended = aapsExtended().single()
         assertThat(extended.amount).isWithin(EPS).of(0.5)
         assertThat(extended.timestamp).isEqualTo(startedOnPump - startedOnPump % 60_000L)
-        assertThat(extended.end).isAtMost(System.currentTimeMillis())
+        // The row ends when its record is read, but lasts at least one minute.
+        assertThat(extended.end).isAtMost(maxOf(System.currentTimeMillis(), extended.timestamp + 60_000L))
         assertWithMessage("the loop runs again once the record is in").that(loopAllowed()).isTrue()
 
         status("read again")

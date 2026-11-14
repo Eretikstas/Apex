@@ -141,6 +141,7 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
             whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true)
             whenever(pumpSync.createOrUpdateTotalDailyDose(any(), any(), any(), any(), anyOrNull(), any(), any())).thenReturn(true)
             whenever(persistenceLayer.getBolusesFromTimeIncludingInvalid(any(), any())).thenAnswer { synchronized(rows) { rows.toList() } }
+            whenever(persistenceLayer.getExtendedBolusStartingFromTimeIncludingInvalid(any(), any())).thenReturn(emptyList())
             whenever(aapsJournal.bolusesBetween(any(), any())).thenReturn(0.0)
         }
 
