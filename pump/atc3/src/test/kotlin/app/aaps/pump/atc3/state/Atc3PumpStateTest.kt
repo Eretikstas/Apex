@@ -141,7 +141,7 @@ class Atc3PumpStateTest {
 
         assertEquals(null, pump.statusCard)
         assertEquals(0L, pump.lastConnection)
-        assertEquals("the serial stays: a link can outlive the stop", "12345678", pump.serialNumber)
+        assertEquals("12345678", pump.serialNumber, "the serial stays: a link can outlive the stop")
         assertEquals(null, pump.lastBolus)
         assertEquals(null, pump.lastBolusTimeFlow.value)
         assertEquals(0.0, pump.reservoirFlow.value.cU)
