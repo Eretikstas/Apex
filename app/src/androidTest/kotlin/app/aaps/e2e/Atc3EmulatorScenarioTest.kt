@@ -310,7 +310,10 @@ class Atc3EmulatorScenarioTest {
             assertWithMessage("a bolus of $units U is delivered").that(result.success).isTrue()
             assertWithMessage("the answer for $units U").that(result.bolusDelivered).isWithin(EPS).of(units)
         }
-        assertWithMessage("the pump gave ${emulator.state().boluses}").that(emulator.state().boluses).containsExactlyElementsIn(asked)
+        val given = emulator.state().boluses
+        assertWithMessage("the pump gave $given").that(given).hasSize(asked.size)
+        // The pump counts in 0.05 U steps, so compare with a small tolerance, not exactly.
+        asked.zip(given).forEach { (a, g) -> assertWithMessage("the pump gave $given").that(g).isWithin(EPS).of(a) }
         assertRecordIsWhatThePumpGave()
         assertThat(aapsBoluses()).hasSize(asked.size)
     }
