@@ -36,6 +36,7 @@ import app.aaps.pump.atc3.Atc3PumpPlugin
 import app.aaps.pump.atc3.emulator.Atc3PumpEmulator
 import app.aaps.pump.atc3.emulator.VirtualAtc3Pump
 import app.aaps.pump.atc3.keys.Atc3StringKey
+import app.aaps.pump.atc3.link.Atc3Pairing
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -83,6 +84,7 @@ class Atc3EmulatorScenarioTest {
     @Inject lateinit var insulinManager: InsulinManager
     @Inject lateinit var dateUtil: DateUtil
     @Inject lateinit var persistenceLayer: PersistenceLayer
+    @Inject lateinit var pairing: Atc3Pairing
     @Suppress("unused") @Inject lateinit var staticInjector: StaticInjector
 
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -489,6 +491,56 @@ class Atc3EmulatorScenarioTest {
         assertWithMessage("AAPS runs the new profile")
             .that(awaitTrue(RECORD_TIMEOUT) { runBlocking { persistenceLayer.getEffectiveProfileSwitchActiveAt(dateUtil.now()) }?.originalPercentage == 150 })
             .isTrue()
+    }
+
+    // A whole working day in one run (official acceptance S1)
+
+    @Test
+    fun fullRun_aDayOfWorkInOneGo() {
+        // Status
+        assertThat(atc3Plugin.isInitialized()).isTrue()
+        assertThat(atc3Plugin.reservoirLevel.value.cU).isWithin(0.5).of(200.0)
+
+        // A bolus
+        assertThat(bolus(1.0).success).isTrue()
+        assertRecordIsWhatThePumpGave()
+
+        // A bolus the user stops on the way
+        val stopped = bolusStoppedOnTheWay(2.0)
+        val given = emulator.state().boluses
+        assertWithMessage("the stopped bolus gave less than asked: $given").that(given.last()).isLessThan(2.0)
+        assertWithMessage("the answer is what the pump gave").that(stopped.bolusDelivered).isWithin(EPS).of(given.last())
+        assertRecordIsWhatThePumpGave()
+
+        // A temp basal and its cancel
+        setTempBasal(TBR_RATE)
+        assertThat(emulator.state().tempBasal?.absolute ?: -1.0).isWithin(EPS).of(TBR_RATE)
+        assertThat(awaitTrue(RECORD_TIMEOUT) { sameRate(aapsTempBasalRate(), TBR_RATE) }).isTrue()
+        assertThat(runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.cancelTempBasal(enforceNew = true) } }.success).isTrue()
+        assertThat(emulator.state().tempBasal).isNull()
+        assertThat(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate() == null }).isTrue()
+
+        // A profile switch reaches the pump
+        switchProfile(percentage = 120)
+        assertWithMessage("the pump runs 120 % (0.6 U/h): ${emulator.state().basal}")
+            .that(awaitTrue(STEP_TIMEOUT) { emulator.state().basal?.all { abs(it - 0.6) < 0.026 } == true }).isTrue()
+
+        // The pump's daily totals reach AAPS: today's boluses as the pump counts them
+        assertThat(runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.loadTDDs() } }.success).isTrue()
+        val pumpGave = emulator.state().boluses.sum()
+        assertWithMessage("today's bolus total in AAPS is what the pump gave ($pumpGave U)").that(
+            awaitTrue(RECORD_TIMEOUT) {
+                runBlocking { persistenceLayer.getLastTotalDailyDoses(1, ascending = false) }.firstOrNull()?.let { abs(it.bolusAmount - pumpGave) < 0.026 } == true
+            }
+        ).isTrue()
+
+        // Unpair: the pump is forgotten, and no insulin goes to it after that
+        pairing.disconnect()
+        assertThat(pairing.isPaired).isFalse()
+        val bolusesBefore = emulator.state().boluses.size
+        assertWithMessage("no bolus without a paired pump").that(bolus(0.5).success).isFalse()
+        assertThat(emulator.state().boluses).hasSize(bolusesBefore)
+        assertRecordIsWhatThePumpGave()
     }
 
     // Steps
