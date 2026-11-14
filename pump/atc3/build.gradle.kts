@@ -8,6 +8,8 @@ plugins {
     id("kotlinx-serialization")
     id("android-module-dependencies")
     id("test-module-dependencies")
+    // Robolectric (and the JUnit 4 bridge) for the Bluetooth contract test of the radio code.
+    id("compose-test-module-dependencies")
     id("jacoco-module-dependencies")
 }
 

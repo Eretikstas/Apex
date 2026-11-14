@@ -405,7 +405,12 @@ class VirtualAtc3Pump(
                 ack()
             }
 
-            0x35 -> ack()
+            // UNVERIFIED: the six digits of the change command are taken as the new password as sent
+            // (value + 65536, see Atc3BtPassword.candidatesFor); which one the real pump keeps is a bench check.
+            0x35 -> {
+                if (payload.size == 6 && payload.all { it in 0..9 }) btPassword = payload.joinToString("") { it.toString() }
+                ack()
+            }
             else -> ack()
         }
     }

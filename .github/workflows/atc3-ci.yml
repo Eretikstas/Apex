@@ -303,7 +303,7 @@ jobs:
           ./gradlew :app:assembleFullDebug :app:assembleFullDebugAndroidTest --stacktrace
           ./gradlew --stop
           ./gradlew :app:emuFullDebugAndroidTest \
-            -Pandroid.testInstrumentationRunnerArguments.class=app.aaps.e2e.Atc3UiSmokeTest,app.aaps.e2e.Atc3EmulatorScenarioTest \
+            -Pandroid.testInstrumentationRunnerArguments.class=app.aaps.e2e.Atc3UiSmokeTest,app.aaps.e2e.Atc3EmulatorScenarioTest,app.aaps.e2e.Atc3EmulatorUiTest \
             -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect \
             --stacktrace
 

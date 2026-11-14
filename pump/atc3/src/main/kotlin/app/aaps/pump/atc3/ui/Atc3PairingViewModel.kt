@@ -1,5 +1,8 @@
 package app.aaps.pump.atc3.ui
 
+import android.os.Build
+import android.content.pm.PackageManager
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -162,6 +165,13 @@ class Atc3PairingViewModel @Inject constructor(
     @SuppressLint("MissingPermission")
     private fun startScan(): Boolean {
         if (scanningWith != null) return true
+        // Asked first: without it the stack throws or, on some phones, scans and reports nothing.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED
+        ) {
+            aapsLogger.error(LTag.PUMPBTCOMM, "ATC3: no Bluetooth scan permission, not scanning")
+            return false
+        }
         val scanner = bluetoothAdapter?.bluetoothLeScanner ?: return false
         return try {
             scanner.startScan(scanCallback)

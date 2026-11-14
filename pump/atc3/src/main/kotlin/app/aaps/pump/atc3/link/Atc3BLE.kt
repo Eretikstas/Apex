@@ -1,5 +1,7 @@
 package app.aaps.pump.atc3.link
 
+import android.content.pm.PackageManager
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -215,6 +217,14 @@ open class Atc3BLE @Inject constructor(
         }
         val adapter = bluetoothAdapter() ?: run {
             aapsLogger.error(LTag.PUMPBTCOMM, "ATC3: no Bluetooth adapter")
+            return false
+        }
+        // Without it the stack throws on every call: asked here, nothing is touched (official AAPS BLE contract).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            aapsLogger.error(LTag.PUMPBTCOMM, "ATC3: no Bluetooth connect permission, not connecting")
+            trace.event(Atc3TraceCat.BLE, "connect_refused", "why" to "no permission")
             return false
         }
         watchAdapterState()
