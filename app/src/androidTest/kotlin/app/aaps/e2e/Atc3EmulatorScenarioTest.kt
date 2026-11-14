@@ -525,7 +525,10 @@ class Atc3EmulatorScenarioTest {
         assertWithMessage("the pump runs 120 % (0.6 U/h): ${emulator.state().basal}")
             .that(awaitTrue(STEP_TIMEOUT) { emulator.state().basal?.all { abs(it - 0.6) < 0.026 } == true }).isTrue()
 
-        // The pump's daily totals reach AAPS: today's boluses as the pump counts them
+        // The pump's daily totals reach AAPS: today's boluses as the pump counts them. AAPS stamps a daily total at
+        // midnight and takes no record older than the pump's registration, so the pump is taken as paired since
+        // yesterday, as on a phone (here it was registered a minute ago).
+        preferences.put(LongNonKey.ActivePumpChangeTimestamp, startedAt - 2 * 86_400_000L)
         assertThat(runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.loadTDDs() } }.success).isTrue()
         val pumpGave = emulator.state().boluses.sum()
         assertWithMessage("today's bolus total in AAPS is what the pump gave ($pumpGave U)").that(
