@@ -12,6 +12,7 @@ import app.aaps.pump.atc3.state.Atc3PumpState
 import app.aaps.pump.atc3.trace.Atc3Trace
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -92,7 +93,7 @@ class Atc3ManagerBusyTest : TestBaseWithProfile() {
         whenever(preferences.get(Atc3StringKey.Atc3SerialNumber)).thenReturn("12345678")
         whenever(atc3BLE.write(any())).thenReturn(true)
 
-        val answered = java.util.concurrent.atomic.AtomicBoolean(true)
+        val answered = AtomicBoolean(true)
         val reader = Thread { answered.set(manager.readStatus() != null) }
         reader.start()
         // Let the read get as far as waiting, then drop the link under it.

@@ -25,7 +25,7 @@ class Atc3StatusV1Test {
     fun `the clock encoder is the exact inverse of the decoder`() {
         // They have to agree: a clock written from the phone that read back as a different time
         // would have the driver correcting it again on every connection, for ever.
-        val moment = java.util.Calendar.getInstance()
+        val moment = Calendar.getInstance()
             .apply { clear(); set(2026, 7, 21, 14, 37, 2) }.timeInMillis
 
         val bytes = Atc3StatusV1.encodeClock(moment)
@@ -43,16 +43,16 @@ class Atc3StatusV1Test {
         )
         val frame = Atc3ResponseParser().feed(body + CrcUtil.crc16ModbusLeBytes(body)).single()
 
-        val decoded = java.util.Calendar.getInstance().apply {
+        val decoded = Calendar.getInstance().apply {
             timeInMillis = Atc3StatusV1.decodeClock(frame, 2)
         }
 
-        assertEquals(2026, decoded.get(java.util.Calendar.YEAR))
-        assertEquals(8, decoded.get(java.util.Calendar.MONTH) + 1)
-        assertEquals(21, decoded.get(java.util.Calendar.DAY_OF_MONTH))
-        assertEquals(14, decoded.get(java.util.Calendar.HOUR_OF_DAY))
-        assertEquals(37, decoded.get(java.util.Calendar.MINUTE))
-        assertEquals(2, decoded.get(java.util.Calendar.SECOND))
+        assertEquals(2026, decoded.get(Calendar.YEAR))
+        assertEquals(8, decoded.get(Calendar.MONTH) + 1)
+        assertEquals(21, decoded.get(Calendar.DAY_OF_MONTH))
+        assertEquals(14, decoded.get(Calendar.HOUR_OF_DAY))
+        assertEquals(37, decoded.get(Calendar.MINUTE))
+        assertEquals(2, decoded.get(Calendar.SECOND))
     }
 
     @Test

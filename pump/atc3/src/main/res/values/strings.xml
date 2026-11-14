@@ -5,7 +5,6 @@
     <string name="atc3_pump_description">Pump integration for Apex</string>
 
     <string name="atc3_scan_title">Apex pump connection</string>
-    <string name="atc3_scan_hint">1. Enter the eight digit serial number printed on the pump and press Find. Only the pump with this serial is looked for: no other pump nearby can be connected by mistake.\n2. Once the pump is found, enter its Bluetooth password, the six digits shown as B/P on the pump status screen.\n3. Press Connect. The serial and the password are kept only if the pump answers.</string>
     <string name="atc3_scan_enter_serial">Enter the serial number of your pump</string>
     <string name="atc3_scan_looking_for">Looking for %1$s. Bring the pump close and wake its screen so it advertises.</string>
 
@@ -28,7 +27,6 @@
     <string name="atc3_bolus_unanswered_found">The pump did not answer the bolus command, but its history shows a new bolus. It was added to AAPS. Check the pump before you give another bolus.</string>
     <string name="atc3_bolus_unanswered_not_found">The pump did not answer the bolus command. Its history shows no new bolus yet, but the bolus may still be running. Check the pump before you give another bolus.</string>
     <string name="atc3_bolus_unanswered_unknown">The pump did not answer the bolus command. It is not known if the bolus was given. Check the pump before you give another bolus.</string>
-    <string name="atc3_bolus_cancelled">Bolus cancelled, no insulin was delivered</string>
     <string name="atc3_bolus_zero">Nothing to deliver</string>
     <string name="atc3_bolus_unconfirmed">Bolus delivered, but the pump has not written it in its history yet. AAPS adds it as soon as the record appears.</string>
     <string name="atc3_journal_fault_own">Pump journal failure: the pump did not write down the bolus of %1$s. %2$.2f U, the last amount seen of it, were entered as a bolus without delivery. Check the pump.</string>
@@ -68,24 +66,14 @@
 
 
     <!-- Pump screen. -->
-    <string name="atc3_title">#WeAreNotWaiting</string>
     <string name="atc3_select_pump">Select pump</string>
     <string name="atc3_change_pump">Change pump</string>
     <string name="atc3_no_serial">Not selected</string>
-    <string name="atc3_units_short">U</string>
-    <string name="atc3_reservoir_eyebrow">REMAINING</string>
-    <string name="atc3_reservoir_of">of %1$d U</string>
     <string name="atc3_battery_label">Battery</string>
-    <string name="atc3_percent_short">%</string>
-    <string name="atc3_battery_volts">%1$.2f V</string>
     <string name="atc3_connection_label">Link</string>
     <string name="atc3_connection_connected">Connected</string>
     <string name="atc3_connection_connecting">Connecting…</string>
     <string name="atc3_connection_waiting">Waiting</string>
-    <string name="atc3_days_label">Insulin left</string>
-    <string name="atc3_days_value">≈ %1$s days</string>
-    <string name="atc3_days_caption">at %1$d-day average use</string>
-    <string name="atc3_days_no_data">not enough history yet</string>
 
     <!-- How long ago the pump was last heard from. -->
     <string name="atc3_just_now">just now</string>
@@ -107,29 +95,15 @@
     <string name="atc3_state_unknown">Not read yet</string>
     <string name="atc3_never_connected">Never connected</string>
 
-    <string name="atc3_settings_eyebrow">SETTINGS</string>
-    <string name="atc3_settings_heading">Limits and link</string>
     <string name="atc3_placeholder_value">—</string>
 
     <!-- Settings screens. Every row here is one field of the pump's own settings block. -->
-    <string name="atc3_settings_need_read">Waiting for the pump to report its settings. Pull down on the status screen to read it now.</string>
     <string name="atc3_settings_no_bluetooth">Bluetooth is off on the phone, so the pump cannot be reached.</string>
     <string name="atc3_settings_no_pump">No pump selected yet. Pick one on the status screen.</string>
-    <string name="atc3_settings_sending">Sending to the pump…</string>
-    <string name="atc3_settings_failed">The pump did not take the change: %1$s</string>
-    <string name="atc3_save">Save</string>
-    <string name="atc3_discard">Discard</string>
-    <plurals name="atc3_unsaved">
-        <item quantity="one">%d setting not sent to the pump yet</item>
-        <item quantity="other">%d settings not sent to the pump yet</item>
-    </plurals>
 
     <string name="atc3_max_bolus_label">Maximum bolus</string>
-    <string name="atc3_max_bolus_caption">per single delivery</string>
     <string name="atc3_max_basal_label">Maximum basal</string>
-    <string name="atc3_max_basal_caption">upper rate limit</string>
     <string name="atc3_bolus_speed_label">Bolus speed</string>
-    <string name="atc3_bolus_speed_caption">how fast insulin leaves the pump</string>
     <string name="atc3_bolus_speed_normal">Normal</string>
     <string name="atc3_bolus_speed_low">Low</string>
 
@@ -152,7 +126,6 @@
     <string name="atc3_firmware_unknown">unknown</string>
 
     <string name="atc3_password_label">Bluetooth password</string>
-    <string name="atc3_password_caption">Tap to set a new one on the pump</string>
     <string name="atc3_password_none">not set</string>
     <string name="atc3_password_dialog_title">Bluetooth password</string>
     <string name="atc3_password_dialog_hint">6 digits</string>
@@ -164,13 +137,10 @@
 
     <string name="atc3_password_random">Random</string>
 
-    <string name="atc3_hold_link_caption">Stay connected between exchanges instead of reconnecting each time</string>
     <string name="atc3_driver_version_label">Driver version</string>
     <string name="atc3_day_account_label">Delivered today: AAPS and the pump</string>
     <string name="atc3_day_account_value">AAPS %1$.3f U · pump %2$.3f U · difference %3$+.3f U</string>
     <string name="atc3_day_account_none">not compared yet</string>
-    <string name="atc3_trace_label">Driver trace</string>
-    <string name="atc3_trace_caption">Machine readable log for bench captures, off unless one is being taken</string>
 
     <string name="atc3_password_change_hint">Give the pump a new Bluetooth password. To enter the one it already uses, open the pump selection screen instead.</string>
     <string name="atc3_scanner_password_hint">2. Bluetooth password (B/P on the pump screen), 6 digits</string>

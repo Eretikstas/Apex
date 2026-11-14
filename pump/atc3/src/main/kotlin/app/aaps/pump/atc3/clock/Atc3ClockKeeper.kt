@@ -4,7 +4,6 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.resources.ResourceHelper
-import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.pump.atc3.Atc3Const
 import app.aaps.pump.atc3.Atc3Notices
@@ -30,7 +29,6 @@ import kotlin.math.abs
 class Atc3ClockKeeper @Inject constructor(
     private val aapsLogger: AAPSLogger,
     private val rh: ResourceHelper,
-    private val rxBus: RxBus,
     private val notices: Atc3Notices,
     private val dateUtil: DateUtil,
     private val pumpState: Atc3PumpState,

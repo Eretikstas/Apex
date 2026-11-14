@@ -13,6 +13,7 @@ import app.aaps.core.interfaces.pump.DetailedBolusInfo
 import app.aaps.core.interfaces.pump.PumpEnactResult
 import app.aaps.core.interfaces.pump.PumpSync
 import app.aaps.core.interfaces.queue.CommandQueue
+import app.aaps.core.interfaces.queue.CustomCommand
 import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
 import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.pump.atc3.basal.Atc3BasalPeriodKeeper
@@ -165,14 +166,14 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         whenever(persistenceLayer.observeChanges(GV::class.java)).thenReturn(glucoseChanges)
         whenever(persistenceLayer.observeChanges(RM::class.java)).thenReturn(runningModeChanges)
         val trace = Atc3Trace(aapsLogger, preferences)
-        clockKeeper = Atc3ClockKeeper(aapsLogger, rh, rxBus, uiInteraction, dateUtil, pumpState, atc3Manager, atc3HistorySync, clockWatch, trace)
+        clockKeeper = Atc3ClockKeeper(aapsLogger, rh, uiInteraction, dateUtil, pumpState, atc3Manager, atc3HistorySync, clockWatch, trace)
         store = Atc3Store(aapsLogger, preferences, uiInteraction, rh)
         val journalFault = Atc3JournalFault(aapsLogger, rh, dateUtil, uiInteraction, pumpSync, atc3Manager, atc3HistorySync, pumpState, trace)
         val reconciliation = Atc3Reconciliation(aapsLogger, rh, rxBus, uiInteraction, pumpState, atc3Manager, atc3HistorySync, journalFault, aapsJournal, store, trace)
         val basalPeriods = Atc3BasalPeriodKeeper(
             aapsLogger, rh, store, dateUtil, atc3Queue, pumpState, atc3Manager, atc3HistorySync, aapsJournal, reconciliation, trace, Atc3BasalSpread()
         )
-        linkKeeper = Atc3LinkKeeper(aapsLogger, rh, preferences, store, dateUtil, atc3Queue, rxBus, uiInteraction, pumpState, atc3Connection, atc3HistorySync, trace)
+        linkKeeper = Atc3LinkKeeper(aapsLogger, rh, preferences, store, dateUtil, atc3Queue, uiInteraction, pumpState, atc3Connection, atc3HistorySync, trace)
         plugin = Atc3PumpPlugin(
             aapsLogger, rh, preferences, commandQueue, pumpState, atc3Manager, bolusDelivery, rxBus,
             uiInteraction,
@@ -590,7 +591,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
     @Test
     fun `an unknown custom command is not swallowed`() = runTest {
-        val other = object : app.aaps.core.interfaces.queue.CustomCommand {
+        val other = object : CustomCommand {
             override val statusDescription = "SOMETHING ELSE"
         }
         assertThat(plugin.executeCustomCommand(other)).isNull()
@@ -935,7 +936,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     @Test
     fun `a temporary basal reads the pump's boluses first`() = runTest {
         whenever(atc3Manager.setTempBasal(any(), any())).thenReturn(
-            app.aaps.pump.atc3.command.Atc3TbrResult(now, 1.0, 30, "not the point of this test")
+            Atc3TbrResult(now, 1.0, 30, "not the point of this test")
         )
 
         plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
@@ -948,7 +949,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     fun `a temporary basal reads them again however recently they were read`() = runTest {
         // A bolus given on the pump between two commands has to reach AAPS before the second.
         whenever(atc3Manager.setTempBasal(any(), any())).thenReturn(
-            app.aaps.pump.atc3.command.Atc3TbrResult(now, 1.0, 30, "not the point of this test")
+            Atc3TbrResult(now, 1.0, 30, "not the point of this test")
         )
 
         plugin.setTempBasalAbsolute(1.0, 30, false, tbrTypeNormal)
@@ -1253,7 +1254,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     @Test
     fun `a microbolus is delivered when nothing unknown turned up`() = runTest {
         pumpAnswersWithCount(10.0)
-        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(app.aaps.pump.atc3.command.Atc3BolusOutcome.NotSent)
+        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(Atc3BolusOutcome.NotSent)
 
         plugin.deliverTreatment(smb(0.5, lastKnownBolusTime = now - 120_000L))
 
@@ -1281,7 +1282,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     @Test
     fun `a microbolus goes through when the pump counted insulin its journal does not explain`() = runTest {
         pumpCountedMoreThanTheJournal(1.2)
-        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(app.aaps.pump.atc3.command.Atc3BolusOutcome.NotSent)
+        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(Atc3BolusOutcome.NotSent)
 
         plugin.deliverTreatment(smb(0.5, lastKnownBolusTime = now - 120_000L))
 
@@ -1359,7 +1360,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     @Test
     fun `a microbolus goes through when the pump's count and the journal agree`() = runTest {
         pumpCountedMoreThanTheJournal(0.0)
-        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(app.aaps.pump.atc3.command.Atc3BolusOutcome.NotSent)
+        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(Atc3BolusOutcome.NotSent)
 
         plugin.deliverTreatment(smb(0.5, lastKnownBolusTime = now - 120_000L))
 
@@ -1369,7 +1370,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     @Test
     fun `a bolus the user asked for goes through whatever the comparison said`() = runTest {
         pumpCountedMoreThanTheJournal(1.2)
-        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(app.aaps.pump.atc3.command.Atc3BolusOutcome.NotSent)
+        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(Atc3BolusOutcome.NotSent)
 
         plugin.deliverTreatment(manualBolus(0.5, lastKnownBolusTime = now - 120_000L))
 
@@ -1383,7 +1384,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         whenever(atc3HistorySync.reconcileBoluses(any(), any())).thenReturn(
             Atc3HistorySync.ReconcileResult(newestImportedAtMs = now - 60_000L)
         )
-        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(app.aaps.pump.atc3.command.Atc3BolusOutcome.NotSent)
+        whenever(bolusDelivery.bolus(any(), any(), any())).thenReturn(Atc3BolusOutcome.NotSent)
 
         plugin.deliverTreatment(manualBolus(0.5, lastKnownBolusTime = now - 120_000L))
 
@@ -1406,7 +1407,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
     companion object {
 
-        private val tbrTypeNormal = app.aaps.core.interfaces.pump.PumpSync.TemporaryBasalType.NORMAL
+        private val tbrTypeNormal = PumpSync.TemporaryBasalType.NORMAL
     }
 
     // A temporary basal set or cancelled on the pump is recorded, and nothing is sent back

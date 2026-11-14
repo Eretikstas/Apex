@@ -61,17 +61,6 @@ data class Atc3Settings(
     /** True when every field the pump reports back matches [other]; [alarmDuration] is never reported, so it is left out. */
     fun mirroredFieldsMatch(other: Atc3Settings): Boolean = copy(alarmDuration = other.alarmDuration) == other
 
-    /** How many separate settings differ from [other], for the screen that collects edits before the block is written. */
-    fun differenceCount(other: Atc3Settings): Int =
-        fields().zip(other.fields()).count { (mine, theirs) -> mine != theirs }
-
-    private fun fields(): List<Any> = listOf(
-        lowBolusSpeed, keypadLock, autoOff, basalPatterns, dailyLimitEnabled, english,
-        alarmSignalType, brightnessLevel, autoOffHours, lowInsulinUnits, lowInsulinHalfHours,
-        extendedBolusAllowed, bgReminder, alarmDuration, screenTimeoutRaw, dailyLimitUnits,
-        maxBasalRaw, maxBolusRaw
-    )
-
     fun toPayload(): ByteArray {
         val payload = ByteArray(Payload.PAYLOAD_LENGTH)
         var switches = 0

@@ -40,6 +40,7 @@ import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.ui.R as CoreUiR
 import app.aaps.core.ui.compose.icons.IcGenericIcon
 import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
 import app.aaps.pump.atc3.basal.Atc3BasalPeriodKeeper
@@ -252,7 +253,7 @@ class Atc3PumpPlugin @Inject constructor(
         val maxBasal = pumpState.settings?.maxBasal ?: return absoluteRate
         absoluteRate.setIfSmaller(
             maxBasal,
-            rh.gs(app.aaps.core.ui.R.string.limitingbasalratio, maxBasal, rh.gs(app.aaps.core.ui.R.string.pumplimit)),
+            rh.gs(CoreUiR.string.limitingbasalratio, maxBasal, rh.gs(CoreUiR.string.pumplimit)),
             Apex
         )
         return absoluteRate
@@ -263,7 +264,7 @@ class Atc3PumpPlugin @Inject constructor(
         val maxBolus = pumpState.settings?.maxBolus ?: return insulin
         insulin.setIfSmaller(
             maxBolus,
-            rh.gs(app.aaps.core.ui.R.string.limitingbolus, maxBolus, rh.gs(app.aaps.core.ui.R.string.pumplimit)),
+            rh.gs(CoreUiR.string.limitingbolus, maxBolus, rh.gs(CoreUiR.string.pumplimit)),
             Apex
         )
         return insulin
@@ -555,13 +556,13 @@ class Atc3PumpPlugin @Inject constructor(
         return if (failure == null) {
             notices.dismiss(Notification.FAILED_UPDATE_PROFILE)
             notices.addNotificationValidFor(
-                Notification.PROFILE_SET_OK, rh.gs(app.aaps.core.ui.R.string.profile_set_ok), Notification.INFO, 60
+                Notification.PROFILE_SET_OK, rh.gs(CoreUiR.string.profile_set_ok), Notification.INFO, 60
             )
             pumpEnactResultProvider.get().success(true).enacted(true)
         } else {
             aapsLogger.error(LTag.PUMP, "ATC3: setNewBasalProfile failed, $failure")
             notices.addNotification(
-                Notification.FAILED_UPDATE_PROFILE, rh.gs(app.aaps.core.ui.R.string.failed_update_basal_profile), Notification.URGENT
+                Notification.FAILED_UPDATE_PROFILE, rh.gs(CoreUiR.string.failed_update_basal_profile), Notification.URGENT
             )
             failed(failure)
         }

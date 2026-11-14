@@ -157,11 +157,11 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
         val historyEvents = Atc3HistoryEvents(aapsLogger, rh, preferences, pumpSync, dateUtil, pumpState, trace, registration)
         val journalFault = Atc3JournalFault(aapsLogger, rh, dateUtil, notices, pumpSync, manager, historySync, pumpState, trace)
         val reconciliation = Atc3Reconciliation(aapsLogger, rh, rxBus, notices, pumpState, manager, historySync, journalFault, aapsJournal, store, trace)
-        val clockKeeper = Atc3ClockKeeper(aapsLogger, rh, rxBus, notices, dateUtil, pumpState, manager, historySync, clockWatch, trace)
+        val clockKeeper = Atc3ClockKeeper(aapsLogger, rh, notices, dateUtil, pumpState, manager, historySync, clockWatch, trace)
         val basalPeriods = Atc3BasalPeriodKeeper(
             aapsLogger, rh, store, dateUtil, atc3Queue, pumpState, manager, historySync, aapsJournal, reconciliation, trace, Atc3BasalSpread()
         )
-        val linkKeeper = Atc3LinkKeeper(aapsLogger, rh, preferences, store, dateUtil, atc3Queue, rxBus, notices, pumpState, connection, historySync, trace)
+        val linkKeeper = Atc3LinkKeeper(aapsLogger, rh, preferences, store, dateUtil, atc3Queue, notices, pumpState, connection, historySync, trace)
         plugin = Atc3PumpPlugin(
             aapsLogger, rh, preferences, commandQueue, pumpState, manager, bolusDelivery, rxBus, notices,
             historySync, historyEvents, reconciliation, clockWatch, dateUtil, aapsSchedulers, fabricPrivacy, pumpEnactResultProvider,
