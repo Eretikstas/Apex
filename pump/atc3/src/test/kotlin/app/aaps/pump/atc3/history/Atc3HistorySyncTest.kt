@@ -1,6 +1,7 @@
 package app.aaps.pump.atc3.history
 
 import app.aaps.core.data.model.BS
+import app.aaps.core.data.model.EB
 import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
@@ -62,6 +63,9 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
     /** The bolus rows AAPS holds: every row written here lands in it, as the reconciler reads them back. */
     private val rows = ArrayList<BS>()
 
+    /** The extended rows AAPS holds, filled the same way. */
+    private val extendedRows = ArrayList<EB>()
+
     private lateinit var pumpState: Atc3PumpState
     private lateinit var clockWatch: Atc3ClockWatch
     private lateinit var sync: Atc3HistorySync
@@ -92,6 +96,20 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         }
         runBlocking {
             whenever(persistenceLayer.getBolusesFromTimeIncludingInvalid(any(), any())).thenAnswer { rows.toList() }
+        }
+        runBlocking {
+            whenever(pumpSync.syncExtendedBolusWithPumpId(any(), any(), any(), any(), any(), any(), any())).thenAnswer {
+                extendedRows.add(
+                    EB(
+                        timestamp = it.getArgument(0), amount = it.getArgument<PumpRate>(1).cU, duration = it.getArgument(2),
+                        ids = IDs(pumpId = it.getArgument(4), pumpSerial = it.getArgument(6))
+                    )
+                )
+                true
+            }
+        }
+        runBlocking {
+            whenever(persistenceLayer.getExtendedBolusStartingFromTimeIncludingInvalid(any(), any())).thenAnswer { extendedRows.toList() }
         }
         runBlocking {
             whenever(pumpSync.createOrUpdateTotalDailyDose(any(), any(), any(), any(), anyOrNull(), any(), any())).thenReturn(true)
@@ -154,6 +172,15 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
         }
         whenever(preferences.get(LongNonKey.ActivePumpChangeTimestamp)).thenReturn(now - 600_000L)
         sync.reconcileBoluses(listOf(record(3600, 40)), 1)
+    }
+
+    /** Take the first pass with AAPS having adopted the pump almost a day ago, so records of the last hours are new. */
+    private suspend fun adoptedLongAgo() {
+        runBlocking {
+            whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(true)
+        }
+        whenever(preferences.get(LongNonKey.ActivePumpChangeTimestamp)).thenReturn(now - 23 * 60 * 60_000L)
+        sync.reconcileBoluses(emptyList(), 0)
     }
 
     /** The start of the minute [timestamp] lies in: where a row made of a record is dated. */
@@ -362,23 +389,61 @@ class Atc3HistorySyncTest : TestBaseWithProfile() {
     }
 
     @Test
-    fun `an extended bolus becomes a note and a warning, not a row, and only once`() = runTest {
-        afterFirstPass()
-        runBlocking {
-            whenever(pumpSync.insertTherapyEventIfNewWithTimestamp(any(), any(), anyOrNull(), anyOrNull(), any(), any())).thenReturn(true, false)
-        }
-        val record = Atc3BolusRecord(0, now - 60_000L, (now - 60_000L) / 1000L, 40, 40, 80, 80)
+    fun `a dual bolus becomes a bolus row and an extended row ending when it is read, and only once`() = runTest {
+        adoptedLongAgo()
+        val start = now - 46 * 60_000L
+        val record = Atc3BolusRecord(0, start, Atc3StatusV1.wallClockUtcSeconds(start), 40, 40, 80, 80)
 
         sync.reconcileBoluses(listOf(record), 1)
         sync.reconcileBoluses(listOf(record), 1)
 
+        verify(pumpSync, times(1)).syncBolusWithPumpId(eq(minuteOf(start)), eq(PumpInsulin(1.0)), anyOrNull(), any(), eq(PumpType.ATC3), eq(serial))
+        val extended = extendedRows.single()
+        assertThat(extended.timestamp).isEqualTo(minuteOf(start))
+        assertThat(extended.amount).isWithin(1e-9).of(2.0)
+        // It ends now, when its record is read: the pump keeps no length.
+        assertThat(extended.timestamp + extended.duration).isEqualTo(now)
+        verify(uiInteraction, times(1)).addNotification(eq(Notification.PUMP_WARNING), anyOrNull(), eq(Notification.NORMAL))
+        // Both parts count for the comparison with the pump's own count.
+        assertThat(sync.bolusesLearnedAfter(0L)).isWithin(1e-9).of(3.0)
+    }
+
+    @Test
+    fun `an extended bolus read long after is held to the longest length`() = runTest {
+        adoptedLongAgo()
+        val start = now - 20 * 60 * 60_000L
+        val record = Atc3BolusRecord(0, start, Atc3StatusV1.wallClockUtcSeconds(start), 0, 0, 40, 40)
+
+        sync.reconcileBoluses(listOf(record), 1)
+
+        assertThat(extendedRows.single().duration).isEqualTo(Atc3HistorySync.EXTENDED_LONGEST_MS)
         verify(pumpSync, never()).syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())
-        verify(pumpSync, times(2)).insertTherapyEventIfNewWithTimestamp(
-            eq(minuteOf(record.timestamp)), eq(TE.Type.NOTE), anyOrNull(), eq(minuteOf(record.timestamp)), eq(PumpType.ATC3), eq(serial)
-        )
-        verify(uiInteraction, times(1)).addNotification(eq(Notification.PUMP_ERROR), anyOrNull(), eq(Notification.URGENT))
-        // Not learned either: the count stays above the journal until the user enters it or the cycle starts over.
+    }
+
+    @Test
+    fun `an extended row AAPS refuses is said aloud and not counted, and offered again`() = runTest {
+        adoptedLongAgo()
+        runBlocking { whenever(pumpSync.syncExtendedBolusWithPumpId(any(), any(), any(), any(), any(), any(), any())).thenReturn(false) }
+        val start = now - 30 * 60_000L
+        val record = Atc3BolusRecord(0, start, Atc3StatusV1.wallClockUtcSeconds(start), 0, 0, 40, 40)
+
+        sync.reconcileBoluses(listOf(record), 1)
+        sync.reconcileBoluses(listOf(record), 1)
+
+        verify(pumpSync, times(2)).syncExtendedBolusWithPumpId(any(), any(), any(), any(), any(), any(), any())
+        verify(uiInteraction, times(2)).addNotification(eq(Notification.PUMP_SYNC_ERROR), anyOrNull(), eq(Notification.URGENT))
         assertThat(sync.bolusesLearnedAfter(0L)).isWithin(1e-9).of(0.0)
+    }
+
+    @Test
+    fun `a written extended bolus lets the loop stop waiting for its progress to go quiet`() = runTest {
+        adoptedLongAgo()
+        pumpState.extendedRunningSeenAtMs = now - 60_000L
+        val start = now - 30 * 60_000L
+
+        sync.reconcileBoluses(listOf(Atc3BolusRecord(0, start, Atc3StatusV1.wallClockUtcSeconds(start), 0, 0, 40, 40)), 1)
+
+        assertThat(pumpState.extendedRunningSeenAtMs).isEqualTo(0L)
     }
 
     // The boluses the delivery check counts: learned when the record is read

@@ -769,6 +769,12 @@ class Atc3PumpPlugin @Inject constructor(
         // the pump is set to allow them.
         if (pumpState.settings?.extendedBolusAllowed == true)
             value.set(false, rh.gs(R.string.atc3_extended_loop_blocked), Apex)
+        // An extended bolus is running (started on the pump, then the setting turned off, or seen before the
+        // settings were read): its insulin reaches AAPS only when the pump records it at the end. The progress
+        // comes every few minutes; once it has been quiet for [Atc3Const.EXTENDED_RUNNING_HOLD_MS] it is over.
+        val extendedSeenAt = pumpState.extendedRunningSeenAtMs
+        if (extendedSeenAt > 0L && dateUtil.now() - extendedSeenAt < Atc3Const.EXTENDED_RUNNING_HOLD_MS)
+            value.set(false, rh.gs(R.string.atc3_extended_running_loop_blocked), Apex)
         // No answer for half an hour: nothing is known of the pump, and nothing is decided for it
         // until it has answered and the time without an answer is written. See [Atc3LinkWatch].
         if (linkKeeper.isHeldStopped) value.set(false, rh.gs(R.string.atc3_link_loop_blocked), Apex)

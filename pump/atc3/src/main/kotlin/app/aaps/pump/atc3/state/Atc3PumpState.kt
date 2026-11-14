@@ -118,6 +118,12 @@ class Atc3PumpState @Inject constructor() {
     /** Firmware and protocol versions, null until read: they say whether the link can have a password. */
     @Volatile var version: Atc3Version? = null
 
+    /**
+     * Phone time of the last word from the pump that an extended bolus is running (its progress), 0 when none or
+     * when the pump said a bolus ended. Started on the pump only: the driver never gives one.
+     */
+    @Volatile var extendedRunningSeenAtMs: Long = 0L
+
     /** The basal profiles read from the pump, and the profile active when they were read. */
     class Profiles(val rates: Array<DoubleArray>, val readForIndex: Int?)
 
@@ -136,6 +142,7 @@ class Atc3PumpState @Inject constructor() {
         dayAccount = null
         lastBolus = null
         profiles = null
+        extendedRunningSeenAtMs = 0L
     }
 
     // Views of the last status report

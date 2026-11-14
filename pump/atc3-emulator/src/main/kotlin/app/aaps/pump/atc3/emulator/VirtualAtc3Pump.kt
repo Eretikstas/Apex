@@ -63,7 +63,13 @@ class VirtualAtc3Pump(
 
     var btPassword = "487613"
 
-    class Bolus(val atMs: Long, var position: Int, val requested: Int, var delivered: Int)
+    class Bolus(val atMs: Long, var position: Int, val requested: Int, var delivered: Int, val extendedRequested: Int = 0, val extendedDelivered: Int = 0)
+
+    /**
+     * An extended bolus given on the keypad is running, this much (raw) given so far; null when none. While it runs,
+     * each status read is followed by its progress `a1/a1` (§4.12), as the pump sends it to a phone that is connected.
+     */
+    @Volatile var extendedRunningRaw: Int? = null
 
     /** Newest first, §4.4. */
     val bolusLog = mutableListOf<Bolus>()
@@ -190,6 +196,8 @@ class VirtualAtc3Pump(
         } finally {
             mutedThread = null
         }
+        // Unasked, after the answer: the progress of an extended bolus started on the keypad.
+        if (cls == 0xA3 && code == 0x00) extendedRunningRaw?.let { send(response(0xA1, 0xA1, 0x00, 0x00, u16Bytes(it))) }
         return true
     }
 
@@ -312,6 +320,8 @@ class VirtualAtc3Pump(
         d[5] = b.position.toByte()
         putU16(d, 6, b.requested)
         putU16(d, 8, b.delivered)
+        putU16(d, 10, b.extendedRequested)
+        putU16(d, 12, b.extendedDelivered)
         return d
     }
 
@@ -488,6 +498,20 @@ class VirtualAtc3Pump(
         addBolusRecord(atMs, raw, raw)
     }
 
+    /**
+     * An extended or dual bolus given on the keypad has ended: [nowUnits] at once and [extendedUnits] over time, from
+     * [startedAtMs]. The pump writes one record, dated at the start, only now (§4.4, research steps 041, 047), and keeps
+     * no length in it.
+     */
+    fun extendedOnKeypadEnded(nowUnits: Double, extendedUnits: Double, startedAtMs: Long) {
+        val now = Math.round(nowUnits / 0.025).toInt()
+        val extended = Math.round(extendedUnits / 0.025).toInt()
+        deliveredTodayRaw += now + extended
+        reservoirMilliUnits -= (now + extended) * 25L
+        extendedRunningRaw = null
+        addBolusRecord(startedAtMs, now, now, extended, extended)
+    }
+
     /** The user stops or starts the insulin on the pump's own keypad. UNVERIFIED: nothing is sent over the air; a running bolus ends. */
     fun suspendOnKeypad(stop: Boolean) {
         if (stop) {
@@ -500,10 +524,10 @@ class VirtualAtc3Pump(
     }
 
     /** §4.4: 59 for the newest record of the minute, 58, 57 for the earlier ones. */
-    private fun addBolusRecord(atMs: Long, requested: Int, delivered: Int) = synchronized(bolusLog) {
+    private fun addBolusRecord(atMs: Long, requested: Int, delivered: Int, extendedRequested: Int = 0, extendedDelivered: Int = 0) = synchronized(bolusLog) {
         val minute = minuteOf(atMs)
         bolusLog.filter { it.atMs == minute }.forEach { it.position-- }
-        bolusLog.add(0, Bolus(minute, 59, requested, delivered))
+        bolusLog.add(0, Bolus(minute, 59, requested, delivered, extendedRequested, extendedDelivered))
         while (bolusLog.size > 128) bolusLog.removeAt(bolusLog.size - 1)
     }
 

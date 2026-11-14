@@ -14,6 +14,7 @@ import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.insulin.InsulinManager
+import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
@@ -29,6 +30,7 @@ import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.objects.constraints.ConstraintObject
 import app.aaps.di.Atc3Emulation
 import app.aaps.implementation.plugin.PluginStore
 import app.aaps.plugins.aps.utils.StaticInjector
@@ -85,6 +87,7 @@ class Atc3EmulatorScenarioTest {
     @Inject lateinit var dateUtil: DateUtil
     @Inject lateinit var persistenceLayer: PersistenceLayer
     @Inject lateinit var pairing: Atc3Pairing
+    @Inject lateinit var aapsLogger: AAPSLogger
     @Suppress("unused") @Inject lateinit var staticInjector: StaticInjector
 
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
@@ -232,6 +235,37 @@ class Atc3EmulatorScenarioTest {
 
         assertRecordIsWhatThePumpGave()
         assertThat(aapsBoluses()).hasSize(1)
+    }
+
+    /**
+     * A dual bolus given on the pump's keypad (allowed there, then the setting turned off): while it runs the loop
+     * waits, and when it ends AAPS has the part given at once as a bolus and the rest as an extended bolus, the way
+     * other drivers write it. The pump keeps no length, so the extended row ends when its record is read.
+     */
+    @Test
+    fun dualBolusGivenOnThePump_reachesAapsAsBolusAndExtended() {
+        val startedOnPump = System.currentTimeMillis()
+        assertWithMessage("the loop may run before").that(loopAllowed()).isTrue()
+
+        pump.extendedRunningRaw = 4
+        status("an extended bolus runs on the pump")
+        assertWithMessage("the loop waits while an extended bolus runs").that(awaitTrue(RECORD_TIMEOUT) { !loopAllowed() }).isTrue()
+
+        pump.extendedOnKeypadEnded(nowUnits = 1.0, extendedUnits = 0.5, startedAtMs = startedOnPump)
+        status("after a dual bolus on the pump")
+
+        assertRecordIsWhatThePumpGave()
+        assertThat(aapsBoluses()).containsExactly(1.0)
+        assertWithMessage("the extended part is an extended bolus").that(awaitTrue(RECORD_TIMEOUT) { aapsExtended().isNotEmpty() }).isTrue()
+        val extended = aapsExtended().single()
+        assertThat(extended.amount).isWithin(EPS).of(0.5)
+        assertThat(extended.timestamp).isEqualTo(startedOnPump - startedOnPump % 60_000L)
+        assertThat(extended.end).isAtMost(System.currentTimeMillis())
+        assertWithMessage("the loop runs again once the record is in").that(loopAllowed()).isTrue()
+
+        status("read again")
+        assertThat(aapsExtended()).hasSize(1)
+        assertThat(aapsBoluses()).containsExactly(1.0)
     }
 
     @Test
@@ -594,6 +628,13 @@ class Atc3EmulatorScenarioTest {
     /** The boluses AAPS has on record since the scenario started, in units. */
     private fun aapsBoluses(): List<Double> =
         runBlocking { persistenceLayer.getBolusesFromTime(startedAt - 2 * 60_000L, ascending = true) }.filter { it.amount > 0.0 }.map { it.amount }
+
+    /** The extended boluses AAPS has on record since the scenario started. */
+    private fun aapsExtended() =
+        runBlocking { persistenceLayer.getExtendedBolusesStartingFromTime(startedAt - 2 * 60_000L, ascending = true) }
+
+    /** What the driver says of running the loop now. */
+    private fun loopAllowed(): Boolean = atc3Plugin.isLoopInvocationAllowed(ConstraintObject(true, aapsLogger)).value()
 
     private fun aapsTempBasalRate(): Double? = runBlocking { persistenceLayer.getTemporaryBasalActiveAt(System.currentTimeMillis()) }?.rate
 

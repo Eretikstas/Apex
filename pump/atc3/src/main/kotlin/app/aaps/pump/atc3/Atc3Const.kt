@@ -57,6 +57,13 @@ object Atc3Const {
     /** How far back a record may be and still be imported, milliseconds. */
     const val RECONCILE_MAX_AGE_MS = 24 * 60 * 60 * 1000L
 
+    /**
+     * How long the loop waits after the last progress of an extended bolus started on the pump. The progress comes
+     * once per 0.025 U (protocol research: every 67 to 135 s in the cases seen), so a quiet half hour means it ended
+     * or was stopped; the record it then leaves is read on the next journal read.
+     */
+    const val EXTENDED_RUNNING_HOLD_MS = 30 * 60 * 1000L
+
     /** How far ahead a temporary basal the driver did not start is written while its length is not known: longer than AAPS's slowest poll. */
     const val TBR_HORIZON_MS = 20 * 60 * 1000L
 

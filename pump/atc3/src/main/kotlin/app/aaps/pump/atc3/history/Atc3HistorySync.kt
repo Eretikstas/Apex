@@ -1,7 +1,6 @@
 package app.aaps.pump.atc3.history
 
 import app.aaps.core.data.model.BS
-import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.logging.AAPSLogger
@@ -227,7 +226,8 @@ class Atc3HistorySync @Inject constructor(
             rows = rowsOfLastDay(now),
             ledger = ledger(),
             phoneNow = now,
-            earliestAcceptedMs = preferences.get(LongNonKey.ActivePumpChangeTimestamp)
+            earliestAcceptedMs = preferences.get(LongNonKey.ActivePumpChangeTimestamp),
+            extendedHeld = extendedRowsOfLastDay(now)
         )
         // A day without the record: nothing is coming, and nothing is held for it any longer.
         store(outcome.ledger.copy(expected = outcome.ledger.expected.filter { now - it.acceptedAtMs < Atc3Const.RECONCILE_MAX_AGE_MS }))
@@ -258,7 +258,7 @@ class Atc3HistorySync @Inject constructor(
             // Counted for the comparison from now on; ours began when the pump accepted it, another's within its minute.
             learn(write.units, write.expected?.acceptedAtMs ?: write.timestamp)
         }
-        outcome.extended.forEach { announceExtended(it.timestamp, it.units) }
+        val extendedWritten = outcome.extended.filter { writeExtended(it, now) }
         outcome.writes.maxByOrNull { it.timestamp }?.let { pumpState.lastBolus = Atc3PumpState.LastBolus(it.timestamp, it.units) }
 
         val imported = outcome.writes.filter { it.expected == null }
@@ -269,14 +269,14 @@ class Atc3HistorySync @Inject constructor(
             "held" to recordCount,
             "written" to outcome.writes.size,
             "ours" to outcome.writes.size - imported.size,
-            "extended" to outcome.extended.size,
+            "extended" to extendedWritten.size,
             "beyond" to outcome.rowsBeyond,
             "expected" to outcome.ledger.expected.size
         )
         return ReconcileResult(
             confirmed = outcome.writes.mapNotNull { write -> write.expected?.let { it.acceptedAtMs to write.units } }.toMap(),
-            newestImportedAtMs = imported.maxOfOrNull { it.timestamp },
-            importedUnits = imported.sumOf { it.units }
+            newestImportedAtMs = (imported.map { it.timestamp } + extendedWritten.map { it.timestamp }).maxOrNull(),
+            importedUnits = imported.sumOf { it.units } + extendedWritten.sumOf { it.units }
         )
     }
 
@@ -285,6 +285,13 @@ class Atc3HistorySync @Inject constructor(
         persistenceLayer.getBolusesFromTimeIncludingInvalid(Atc3BolusReconciler.minuteStartOf(now - Atc3Const.RECONCILE_MAX_AGE_MS), true)
             .filter { it.ids.pumpSerial == serial }
             .map { Atc3BolusRow(it.timestamp, Atc3HistoryLedger.raw(it.amount)) }
+
+    /** The pump ids of the extended rows AAPS holds of this pump over the last day, deleted ones included. */
+    private suspend fun extendedRowsOfLastDay(now: Long): Set<Long> =
+        persistenceLayer.getExtendedBolusStartingFromTimeIncludingInvalid(Atc3BolusReconciler.minuteStartOf(now - Atc3Const.RECONCILE_MAX_AGE_MS), true)
+            .filter { it.ids.pumpSerial == serial }
+            .mapNotNull { it.ids.pumpId }
+            .toSet()
 
     /** True when the pump holds records this answer left out, see [Atc3BolusReconciler.recordsMissing]. */
     fun recordsMissing(history: Atc3BolusHistory): Boolean =
@@ -546,6 +553,15 @@ class Atc3HistorySync @Inject constructor(
         /** How far the pump's start of one temporary basal may read apart in two of its objects, seconds. */
         const val TBR_SAME_START_SECONDS = 2L
 
+        /** The shortest extended row written: an extended bolus stopped at once still lasted a little. */
+        const val EXTENDED_SHORTEST_MS = 60_000L
+
+        /**
+         * The longest extended row written when its record is read late. UNVERIFIED: the pump's longest extended
+         * bolus is not known from the research; 12 h is taken as the outer bound.
+         */
+        const val EXTENDED_LONGEST_MS = 12 * 60 * 60_000L
+
         /** How long a learned bolus is kept: longer than any window may wait to be closed. */
         const val LEARNED_KEPT_MS = 3 * 60 * 60_000L
 
@@ -620,15 +636,50 @@ class Atc3HistorySync @Inject constructor(
     }
 
     /**
-     * An extended or dual bolus the pump gave: no row, as the loop cannot count it. Said once, as a note
-     * in the journal and aloud, and the user enters the insulin themselves. The journal keeps it from
-     * being said again: a note at that minute is not inserted twice.
+     * Write the extended part of an extended or dual bolus the pump gave as an extended bolus row, the way
+     * other drivers do (Medtrum, Dana RS), so AAPS counts its insulin over time. The part given at once is
+     * a bolus row already, see [Atc3BolusReconciler].
+     *
+     * The pump writes the record only when the bolus ends or is stopped, and keeps no length in it
+     * (protocol research, steps 030, 041, 046, 047). So the row ends now, when the record is first read:
+     * with the journal read every few minutes that is a few minutes late at most, and a late end only
+     * spreads the insulin later, which keeps the loop on the careful side. A record read long after
+     * (the phone was away) is held to [EXTENDED_LONGEST_MS].
+     *
+     * @return true when AAPS took the row
      */
-    private suspend fun announceExtended(timestamp: Long, units: Double) {
-        val text = rh.gs(R.string.atc3_extended_not_counted, units, dateUtil.timeString(timestamp))
-        if (!pumpSync.insertTherapyEventIfNewWithTimestamp(timestamp, TE.Type.NOTE, text, timestamp, PumpType.ATC3, serial)) return
-        aapsLogger.warn(LTag.PUMP, "ATC3: extended or dual bolus of $units U at $timestamp, which the loop does not count")
-        trace.event(Atc3TraceCat.HIST, "extended_bolus", "units" to units, "at" to timestamp)
-        notices.addNotification(Notification.PUMP_ERROR, text, Notification.URGENT)
+    private suspend fun writeExtended(extended: Atc3BolusReconciler.Extended, now: Long): Boolean {
+        val duration = (now - extended.timestamp).coerceIn(EXTENDED_SHORTEST_MS, EXTENDED_LONGEST_MS)
+        val written = pumpSync.syncExtendedBolusWithPumpId(
+            timestamp = extended.timestamp,
+            rate = PumpRate(extended.units),
+            duration = duration,
+            isEmulatingTB = false,
+            pumpId = extended.pumpId,
+            pumpType = PumpType.ATC3,
+            pumpSerial = serial
+        )
+        val minutes = (duration / 60_000L).toInt()
+        trace.event(Atc3TraceCat.HIST, "extended_bolus", "units" to extended.units, "at" to extended.timestamp, "minutes" to minutes, "ok" to written)
+        if (!written) {
+            aapsLogger.error(LTag.PUMP, "ATC3: AAPS refused the extended bolus of ${extended.units} U at ${extended.timestamp}, id ${extended.pumpId}")
+            notices.addNotification(
+                Notification.PUMP_SYNC_ERROR,
+                rh.gs(R.string.atc3_extended_row_refused, extended.units, dateUtil.timeString(extended.timestamp)),
+                Notification.URGENT
+            )
+            return false
+        }
+        aapsLogger.info(LTag.PUMP, "ATC3: extended bolus of ${extended.units} U from ${extended.timestamp} written over $minutes min, id ${extended.pumpId}")
+        notices.addNotification(
+            Notification.PUMP_WARNING,
+            rh.gs(R.string.atc3_extended_written, extended.units, dateUtil.timeString(extended.timestamp), minutes),
+            Notification.NORMAL
+        )
+        // Counted for the comparison with the pump's own count, as every bolus is.
+        learn(extended.units, extended.timestamp)
+        // Its record is there, so it has ended: the loop need not wait for the progress to go quiet.
+        pumpState.extendedRunningSeenAtMs = 0L
+        return true
     }
 }

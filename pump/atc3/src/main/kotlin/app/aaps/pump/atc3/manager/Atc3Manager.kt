@@ -559,12 +559,18 @@ class Atc3Manager @Inject constructor(
                     aapsLogger.error(LTag.PUMPCOMM, "ATC3: pump refused the command")
 
                 Atc3Protocol.ObjectType.BOLUS_PROGRESS          -> bolusDelivery.onProgress(frame)
-                Atc3Protocol.ObjectType.BOLUS_COMPLETED         -> bolusDelivery.onCompleted(frame)
+                Atc3Protocol.ObjectType.BOLUS_COMPLETED         -> {
+                    // The same frame ends a standard and an extended bolus (protocol research, step 047).
+                    pumpState.extendedRunningSeenAtMs = 0L
+                    bolusDelivery.onCompleted(frame)
+                }
 
                 Atc3Protocol.ObjectType.EXTENDED_BOLUS_PROGRESS -> {
                     // Started elsewhere: the driver never asks for an extended bolus.
                     val delivered = if (frame.has(2, 2)) frame.u16le(2) * Atc3Protocol.DOSE_SCALE else 0.0
                     aapsLogger.debug(LTag.PUMPCOMM, "ATC3: extended bolus progress $delivered U, not ours")
+                    // The loop waits while it runs: the pump writes its record only when it ends.
+                    pumpState.extendedRunningSeenAtMs = dateUtil.now()
                 }
 
                 else                                         ->

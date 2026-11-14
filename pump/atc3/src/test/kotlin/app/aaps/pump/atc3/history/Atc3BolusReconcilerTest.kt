@@ -197,11 +197,54 @@ class Atc3BolusReconcilerTest {
     // An extended or dual bolus
 
     @Test
-    fun `an extended or dual bolus is no row, and is reported with everything it delivered`() {
+    fun `a dual bolus is a bolus row of the part given at once and an extended row of the rest`() {
         val outcome = reconcile(listOf(record(minute, 40, 40, extReq = 80, extDlv = 80)))
+        val write = outcome.writes.single()
+        assertEquals(minute, write.timestamp)
+        assertEquals(1.0, write.units, 1e-9)
+        assertNull(write.expected)
+        val extended = outcome.extended.single()
+        assertEquals(minute, extended.timestamp)
+        assertEquals(2.0, extended.units, 1e-9)
+        assertEquals(minute + 59, extended.pumpId)
+    }
+
+    @Test
+    fun `a plain extended bolus is no bolus row, only an extended one`() {
+        val outcome = reconcile(listOf(record(minute, 0, 0, extReq = 40, extDlv = 8)))
         assertTrue(outcome.writes.isEmpty())
-        assertEquals(minute, outcome.extended.single().timestamp)
-        assertEquals(3.0, outcome.extended.single().units, 1e-9)
+        assertEquals(0.2, outcome.extended.single().units, 1e-9)
+    }
+
+    @Test
+    fun `an extended bolus stopped before it gave anything is nothing to write`() {
+        val outcome = reconcile(listOf(record(minute, 0, 0, extReq = 40, extDlv = 0)))
+        assertTrue(outcome.writes.isEmpty())
+        assertTrue(outcome.extended.isEmpty())
+    }
+
+    @Test
+    fun `an extended row AAPS holds, deleted or not, is not written again, and its bolus row neither`() {
+        val dual = record(minute, 40, 40, extReq = 80, extDlv = 80)
+        val outcome = Atc3BolusReconciler.reconcile(
+            listOf(dual), listOf(row(minute, 40)), ready(), phoneNow, 0L, extendedHeld = setOf(Atc3BolusReconciler.extendedPumpId(dual))
+        )
+        assertTrue(outcome.writes.isEmpty())
+        assertTrue(outcome.extended.isEmpty())
+    }
+
+    @Test
+    fun `two extended boluses in one minute have their own ids`() {
+        val outcome = reconcile(listOf(record(minute, 0, 0, position = 59, extReq = 40, extDlv = 40), record(minute, 0, 0, position = 58, extReq = 20, extDlv = 20)))
+        assertEquals(setOf(minute + 59, minute + 58), outcome.extended.map { it.pumpId }.toSet())
+    }
+
+    @Test
+    fun `a dual bolus of the same first dose as ours is never taken for ours`() {
+        val ours = expected(minute + 5_000L, 1.0)
+        val outcome = reconcile(listOf(record(minute, 40, 40, extReq = 40, extDlv = 40)), ledger = ready().withExpected(ours))
+        assertNull(outcome.writes.single().expected)
+        assertEquals(listOf(ours), outcome.ledger.expected)
     }
 
     // The import boundary

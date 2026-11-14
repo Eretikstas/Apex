@@ -15,8 +15,13 @@ data class Atc3BolusRow(val timestamp: Long, val rawUnits: Int)
  * each minute, as many records of a dose as AAPS has rows of are the ones AAPS has, and the rest are
  * written. Nothing is remembered about the records: the rows are the memory, and a row the user
  * deleted is still a row. The pump's past, from before the import boundary, records older than a day
- * and empty records are passed over. An extended or dual bolus becomes no row: the loop cannot count
- * it, so the user is told to enter it.
+ * and empty records are passed over.
+ *
+ * An extended or dual bolus given on the pump is written the way other drivers write it (Medtrum, Dana RS):
+ * the part given at once as a bolus row, the extended part as an extended bolus row. The pump writes the
+ * record only when the bolus ends (or is stopped) and keeps no length in it, so the length is set when the
+ * record is first read, see `Atc3HistorySync.writeExtended`. An extended row is known by its pump id: the
+ * start of its minute plus the record's place in that minute.
  */
 object Atc3BolusReconciler {
 
@@ -27,8 +32,11 @@ object Atc3BolusReconciler {
      */
     data class Write(val timestamp: Long, val units: Double, val pumpId: Long, val expected: ExpectedBolus?)
 
-    /** An extended or dual bolus the pump gave, which no row carries. */
-    data class Extended(val timestamp: Long, val units: Double)
+    /**
+     * The extended part of an extended or dual bolus the pump gave, which no extended row carries yet:
+     * started at [timestamp], [units] delivered over it, known by [pumpId].
+     */
+    data class Extended(val timestamp: Long, val units: Double, val pumpId: Long)
 
     data class Outcome(
         val writes: List<Write>,
@@ -45,6 +53,7 @@ object Atc3BolusReconciler {
     /**
      * @param records what the pump returned, in any order
      * @param rows the rows AAPS holds of this pump over the records' minutes, deleted ones included
+     * @param extendedHeld the pump ids of the extended rows AAPS holds of this pump, deleted ones included
      * @param phoneNow the phone's clock now
      * @param earliestAcceptedMs the moment AAPS adopted this pump: anything older it refuses
      */
@@ -53,7 +62,8 @@ object Atc3BolusReconciler {
         rows: List<Atc3BolusRow>,
         ledger: Atc3HistoryLedger,
         phoneNow: Long,
-        earliestAcceptedMs: Long
+        earliestAcceptedMs: Long,
+        extendedHeld: Set<Long> = emptySet()
     ): Outcome {
         var current = ledger
         if (!current.firstPassDone) {
@@ -62,20 +72,25 @@ object Atc3BolusReconciler {
             current = current.withWatermark(Atc3StatusV1.wallClockUtcSeconds(from), from)
         }
         val (skipped, fresh) = records.partition { isPast(it, current, phoneNow, earliestAcceptedMs) }
-        val extended = fresh.filter { it.carriesExtendedPart }.map { Extended(minuteStartOf(it.timestamp), it.totalDeliveredUnits) }
+        // The extended part: nothing to write when it gave nothing (stopped at once), or when AAPS has its row.
+        val extended = fresh.filter { it.rawExtendedDelivered > 0 }
+            .map { Extended(maxOf(minuteStartOf(it.timestamp), earliestAcceptedMs), it.extendedDeliveredUnits, extendedPumpId(it)) }
+            .filterNot { it.pumpId in extendedHeld }
 
         val writes = ArrayList<Write>()
         var expected = current.expected
         val shifts = ArrayList<Int>()
         var rowsBeyond = 0
-        for ((minute, ofMinute) in fresh.filterNot { it.carriesExtendedPart }.groupBy { minuteStartOf(it.timestamp) }.toSortedMap()) {
+        // The part given at once: a standard bolus, or the first part of a dual one. A plain extended bolus has none.
+        for ((minute, ofMinute) in fresh.filter { it.rawRequested != 0 || it.rawDelivered != 0 }.groupBy { minuteStartOf(it.timestamp) }.toSortedMap()) {
             val held = rows.filter { it.timestamp in minute until minute + 60_000L }.map { it.rawUnits }.toMutableList()
             var next = held.size
             // Still inside the minute: a record dated before the adoption moment was skipped above.
             val at = maxOf(minute, earliestAcceptedMs)
             for (record in ofMinute) {
                 if (held.remove(record.rawDelivered)) continue
-                val own = expected.firstOrNull { fits(record, it) }
+                // The driver never gives an extended or dual bolus: such a record is never ours.
+                val own = if (record.carriesExtendedPart) null else expected.firstOrNull { fits(record, it) }
                 if (own != null) {
                     expected = expected - own
                     shifts.add((minuteOf(record.pumpClockUtcSeconds) - minuteOf(own.startUtcSeconds)).toInt())
@@ -116,6 +131,10 @@ object Atc3BolusReconciler {
     private fun fits(record: Atc3BolusRecord, expected: ExpectedBolus): Boolean =
         record.rawRequested == Atc3HistoryLedger.raw(expected.units) &&
             minuteOf(record.pumpClockUtcSeconds) in (minuteOf(expected.startUtcSeconds) - 1)..(minuteOf(expected.startUtcSeconds) + 1)
+
+    /** The pump id of a record's extended row: the start of its minute plus its place in the minute, the same on every read. */
+    fun extendedPumpId(record: Atc3BolusRecord): Long =
+        minuteStartOf(record.timestamp) + Math.floorMod(record.pumpClockUtcSeconds, 60L)
 
     /** The minute a pump clock key falls in, counted in minutes. */
     private fun minuteOf(utcSeconds: Long): Long = Math.floorDiv(utcSeconds, 60L)

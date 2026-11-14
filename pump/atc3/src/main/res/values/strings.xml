@@ -55,7 +55,9 @@
     <string name="atc3_alarm_unknown">alarm code %1$d</string>
     <string name="atc3_smb_data_changed">Microbolus refused: a bolus the loop did not know of was found on the pump, or its records could not be read. The loop will recalculate.</string>
     <string name="atc3_smb_stale_iob">Microbolus refused: insulin was delivered on the pump after the loop calculated. The loop will recalculate with it included.</string>
-    <string name="atc3_extended_not_counted">The pump gave an extended or dual bolus of %1$.2f U at %2$s. The loop does not count it: enter %1$.2f U as a bolus without delivery.</string>
+    <string name="atc3_extended_written" comment="%1$.2f=units, %2$s=start time, %3$d=minutes. Example: 1.00 U, 17:26, 45">The pump gave an extended bolus of %1$.2f U from %2$s. AAPS counts it over %3$d min: the pump does not record how long it ran, so the end is when its record was read.</string>
+    <string name="atc3_extended_row_refused" comment="%1$.2f=units, %2$s=start time. Example: 1.00 U, 17:26">AAPS did not accept the pump\'s record of an extended bolus of %1$.2f U from %2$s. The loop runs without this insulin. Enter it by hand.</string>
+    <string name="atc3_extended_running_loop_blocked">The pump is giving an extended bolus. The loop waits until it ends and the pump has recorded it.</string>
     <string name="atc3_history_start">AAPS starts recording this Apex pump now. Anything it delivered earlier is not imported.</string>
     <string name="atc3_clock_follows_phone">Apex: the phone time changed, the pump clock was set to follow it.</string>
     <string name="atc3_clock_set_after_drift">Apex: the pump clock was %1$d min away from the phone and was set to the phone time.</string>
