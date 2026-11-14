@@ -299,6 +299,32 @@ class Atc3EmulatorScenarioTest {
             .that(awaitTrue(RECORD_TIMEOUT) { sameRate(aapsTempBasalRate(), onPump) }).isTrue()
     }
 
+    // Amounts (official AAPS acceptance S2): rounded to the pump's step, never cut. 1.15 / 0.025 is 45.999... in floating
+    // point, and a cut gives 1.125 U.
+
+    @Test
+    fun oddBoluses_reachThePumpAsAsked_andAreRecordedAsGiven() {
+        val asked = listOf(1.15, 0.35, 0.05)
+        for (units in asked) {
+            val result = bolus(units)
+            assertWithMessage("a bolus of $units U is delivered").that(result.success).isTrue()
+            assertWithMessage("the answer for $units U").that(result.bolusDelivered).isWithin(EPS).of(units)
+        }
+        assertWithMessage("the pump gave ${emulator.state().boluses}").that(emulator.state().boluses).containsExactlyElementsIn(asked)
+        assertRecordIsWhatThePumpGave()
+        assertThat(aapsBoluses()).hasSize(asked.size)
+    }
+
+    @Test
+    fun oddTempBasals_reachThePumpAsAsked() {
+        for (rate in listOf(0.35, 0.45, 0.05, 1.15)) {
+            setTempBasal(rate)
+            assertWithMessage("the pump runs $rate U/h").that(emulator.state().tempBasal?.absolute ?: -1.0).isWithin(EPS).of(rate)
+            assertWithMessage("AAPS shows $rate U/h")
+                .that(awaitTrue(RECORD_TIMEOUT) { aapsTempBasalRate()?.let { abs(it - rate) < EPS } == true }).isTrue()
+        }
+    }
+
     // Bolus stops (AIMI acceptance S4)
 
     @Test
