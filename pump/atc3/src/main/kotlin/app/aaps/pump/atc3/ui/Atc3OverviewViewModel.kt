@@ -93,7 +93,7 @@ class Atc3OverviewViewModel(
 ) : ViewModel() {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val communicationStatus = PumpCommunicationStatus(rxBus, commandQueue, context, scope)
+    private val communicationStatus = PumpCommunicationStatus(rxBus, commandQueue, rh, scope)
 
     private val _events = MutableSharedFlow<Atc3OverviewEvent>(extraBufferCapacity = 5)
     val events: SharedFlow<Atc3OverviewEvent> = _events
