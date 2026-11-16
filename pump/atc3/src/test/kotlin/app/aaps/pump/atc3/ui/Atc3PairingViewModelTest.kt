@@ -56,8 +56,8 @@ class Atc3PairingViewModelTest {
     private val adapter: BluetoothAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
     private val scheduler = TestCoroutineScheduler()
     private val rh: ResourceHelper = mock {
-        on { gs(any()) } doReturn "text"
-        on { gs(any(), anyVararg()) } doReturn "text"
+        on { gs(any<Int>()) } doReturn "text"
+        on { gs(any<Int>(), anyVararg()) } doReturn "text"
     }
     private val preferences: Preferences = mock()
     private val pairing: Atc3Pairing = mock()
