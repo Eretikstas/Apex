@@ -56,7 +56,8 @@ data class InterfaceIDs @Ignore constructor(
         CACHE,
         CARELEVO,
         EQUIL,
-        APEX;
+        APEX,
+        ATC3;
 
         companion object {
 

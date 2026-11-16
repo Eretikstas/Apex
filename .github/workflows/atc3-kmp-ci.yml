@@ -1,0 +1,87 @@
+name: ATC3 driver on the KMP base
+
+# Trial port of the ATC3 (Apex TruCare III) pump driver onto the AIMI KMP branch
+# (kmp-aimi-migration-study, Metro instead of Hilt). It only checks that the driver builds and that
+# its tests pass here. Nothing from this branch is meant for a phone.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Also build the app (fullDebug)'
+        type: boolean
+        default: false
+  push:
+    branches:
+      - atc3-kmp
+
+concurrency:
+  group: atc3-kmp-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  driver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
+        -Dkotlin.daemon.jvm.options="-Xmx2g"
+        -Dkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.workers.max=2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          sudo swapoff -a || true
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          df -h /
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Compile the driver
+        run: ./gradlew --console=plain :pump:atc3:compileDebugKotlin --stacktrace
+
+      - name: Compile the driver tests
+        run: ./gradlew --console=plain :pump:atc3:compileDebugUnitTestKotlin --stacktrace
+
+      - name: Driver unit tests
+        run: ./gradlew --console=plain :pump:atc3:testDebugUnitTest --continue --stacktrace
+
+      - name: Core change tests (temporary basal safeguard)
+        if: ${{ !cancelled() }}
+        run: ./gradlew --console=plain :database:impl:testAndroidHostTest --tests '*SyncPumpTemporaryBasalTransactionTest*' --stacktrace
+
+      - name: Build the app
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.app }}
+        run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
+
+      - name: Upload test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: atc3-kmp-test-reports
+          path: |
+            pump/atc3/build/reports/tests
+            database/impl/build/reports/tests
+          if-no-files-found: ignore

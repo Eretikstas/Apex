@@ -287,7 +287,7 @@ dependencies {
     //  - :pump:apex is fork WIP (in settings.gradle but was never wired into app dependencies). The
     //    driver compiles, but it has never been tested with a real pump, so it stays out of the app
     //    and no user can select it - the same as on dev_OAPSAIMI.
-    val pumpExclusions = setOf(":pump:virtual", ":pump:apex")
+    val pumpExclusions = setOf(":pump:virtual", ":pump:apex", ":pump:atc3-emulator")
     rootProject.subprojects
         .filter { it.path.startsWith(":pump:") && it.path !in pumpExclusions && it.buildFile.exists() }
         .forEach { pump ->
