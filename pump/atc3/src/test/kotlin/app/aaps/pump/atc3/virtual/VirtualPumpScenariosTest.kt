@@ -121,8 +121,8 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
 
         whenever(atc3Queue.readStatus(any())).thenReturn(true)
         whenever(ch.isU100()).thenReturn(true)
-        whenever(persistenceLayer.observeChanges(GV::class.java)).thenReturn(MutableSharedFlow())
-        whenever(persistenceLayer.observeChanges(RM::class.java)).thenReturn(MutableSharedFlow())
+        whenever(persistenceLayer.observeChanges(GV::class)).thenReturn(MutableSharedFlow())
+        whenever(persistenceLayer.observeChanges(RM::class)).thenReturn(MutableSharedFlow())
         whenever(pumpSync.verifyPumpIdentification(any(), any())).thenReturn(true)
         runBlocking {
             whenever(pumpSync.syncBolusWithPumpId(any(), any(), anyOrNull(), any(), any(), any())).thenAnswer {

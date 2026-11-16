@@ -163,8 +163,8 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         whenever(atc3Queue.readStatus(any())).thenReturn(true)
         // U100 insulin, the only one the driver runs the loop with.
         whenever(ch.isU100()).thenReturn(true)
-        whenever(persistenceLayer.observeChanges(GV::class.java)).thenReturn(glucoseChanges)
-        whenever(persistenceLayer.observeChanges(RM::class.java)).thenReturn(runningModeChanges)
+        whenever(persistenceLayer.observeChanges(GV::class)).thenReturn(glucoseChanges)
+        whenever(persistenceLayer.observeChanges(RM::class)).thenReturn(runningModeChanges)
         val trace = Atc3Trace(aapsLogger, preferences)
         clockKeeper = Atc3ClockKeeper(aapsLogger, rh, uiInteraction, dateUtil, pumpState, atc3Manager, atc3HistorySync, clockWatch, trace)
         store = Atc3Store(aapsLogger, preferences, uiInteraction, rh)

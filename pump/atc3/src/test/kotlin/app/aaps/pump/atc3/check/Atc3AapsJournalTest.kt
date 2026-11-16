@@ -50,7 +50,8 @@ class Atc3AapsJournalTest : TestBaseWithProfile() {
             whenever(persistenceLayer.getBolusesFromTimeToTime(any(), any(), any())).thenReturn(emptyList())
         }
         runBlocking {
-            whenever(persistenceLayer.getTemporaryBasalsActiveBetweenTimeAndTime(any(), any())).thenReturn(emptyList())
+            whenever(persistenceLayer.getTemporaryBasalsActiveAt(any())).thenReturn(emptyList())
+            whenever(persistenceLayer.getTemporaryBasalsStartingFromTimeToTime(any(), any(), any())).thenReturn(emptyList())
         }
         runBlocking {
             whenever(persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(any(), any(), any()))
