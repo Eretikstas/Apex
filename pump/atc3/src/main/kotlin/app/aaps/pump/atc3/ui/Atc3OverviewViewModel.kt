@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import app.aaps.core.data.pump.defs.PumpType
+import app.aaps.core.interfaces.InterfacesStrings
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.queue.CommandQueue
@@ -164,7 +165,7 @@ class Atc3OverviewViewModel(
             ),
             PumpInfoRow(
                 label = rh.gs(R.string.atc3_max_bolus_label),
-                value = settings?.let { rh.gs(CoreUiR.string.format_insulin_units, it.maxBolus) } ?: noValue
+                value = settings?.let { rh.gs(InterfacesStrings.format_insulin_units, it.maxBolus) } ?: noValue
             ),
             PumpInfoRow(
                 label = rh.gs(R.string.atc3_max_basal_label),
