@@ -2,11 +2,12 @@ package app.aaps.pump.atc3.keys
 
 import app.aaps.core.keys.interfaces.BooleanPreferenceKey
 import app.aaps.core.keys.interfaces.IntentPreferenceKey
+import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.pump.atc3.R
 
 enum class Atc3IntentKey(
     override val key: String,
-    override val titleResId: Int,
+    private val titleResId: Int,
     override val defaultedBySM: Boolean = false,
     override val showInApsMode: Boolean = true,
     override val showInNsClientMode: Boolean = true,
@@ -19,4 +20,7 @@ enum class Atc3IntentKey(
 
     /** Opens the scan screen where the pump is picked from a list. */
     PumpSelector(key = "atc3_pump_selector", titleResId = R.string.atc3_select_pump)
+    ;
+
+    override val title: TextRef = TextRef.AndroidRes(titleResId)
 }

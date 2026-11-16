@@ -37,7 +37,9 @@ class Atc3AapsJournal(
         profileFunction.getProfile(toMs) ?: return null
         val serial = pumpState.serialNumber
 
-        val rows = persistenceLayer.getTemporaryBasalsActiveBetweenTimeAndTime(fromMs, toMs)
+        // Every temporary basal that runs in the interval: the one running at its start and those starting in it.
+        val rows = (persistenceLayer.getTemporaryBasalsActiveAt(fromMs) + persistenceLayer.getTemporaryBasalsStartingFromTimeToTime(fromMs, toMs, true))
+            .distinctBy { it.id }
             .filter { it.isValid && it.ids.pumpSerial == serial }
             .map {
                 Atc3JournalArithmetic.Row(

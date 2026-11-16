@@ -2,13 +2,14 @@ package app.aaps.pump.atc3.keys
 
 import app.aaps.core.keys.interfaces.BooleanPreferenceKey
 import app.aaps.core.keys.interfaces.StringPreferenceKey
+import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.link.Atc3BtPassword
 
 enum class Atc3StringKey(
     override val key: String,
     override val defaultValue: String,
-    override val titleResId: Int,
+    private val titleResId: Int,
     override val defaultedBySM: Boolean = false,
     override val showInApsMode: Boolean = true,
     override val showInNsClientMode: Boolean = true,
@@ -37,5 +38,8 @@ enum class Atc3StringKey(
      * The other password the pump may hold after a change, empty when there is no doubt, see
      * [app.aaps.pump.atc3.link.Atc3BtPassword.candidatesFor]. Not exportable: it lives for one connection.
      */
-    Atc3BtPasswordAlternate("atc3_bt_password_alternate", "", R.string.atc3_password_label, exportable = false),
+    Atc3BtPasswordAlternate("atc3_bt_password_alternate", "", R.string.atc3_password_label, exportable = false)
+    ;
+
+    override val title: TextRef = TextRef.AndroidRes(titleResId)
 }

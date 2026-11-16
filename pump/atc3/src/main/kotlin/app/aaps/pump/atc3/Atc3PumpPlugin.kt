@@ -17,6 +17,7 @@ import app.aaps.core.interfaces.insulin.ConcentrationHelper
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.profile.Profile
@@ -36,12 +37,12 @@ import app.aaps.core.interfaces.pump.defs.fillFor
 import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.queue.CustomCommand
 import app.aaps.core.interfaces.resources.ResourceHelper
-import app.aaps.core.interfaces.rx.AapsSchedulers
 import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.rx.events.EventAPSCalculationFinished
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.ui.R as CoreUiR
 import app.aaps.core.ui.compose.icons.IcGenericIcon
 import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
@@ -87,8 +88,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.IntKey as MetroIntKey
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import io.reactivex.rxjava3.disposables.CompositeDisposable
-import io.reactivex.rxjava3.kotlin.plusAssign
 import kotlin.math.abs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -121,7 +120,6 @@ class Atc3PumpPlugin(
     private val reconciliation: Atc3Reconciliation,
     private val clockWatch: Atc3ClockWatch,
     private val dateUtil: DateUtil,
-    private val aapsSchedulers: AapsSchedulers,
     private val fabricPrivacy: FabricPrivacy,
     private val pumpEnactResultProvider: () -> PumpEnactResult,
     private val trace: Atc3Trace,
@@ -133,23 +131,20 @@ class Atc3PumpPlugin(
     private val bolusProgressData: BolusProgressData,
     private val persistenceLayer: PersistenceLayer,
     private val blePreCheck: BlePreCheck,
-    private val ch: ConcentrationHelper
+    private val ch: ConcentrationHelper,
+    notificationManager: NotificationManager
 ) : PumpPluginBase(
     pluginDescription = PluginDescription()
         .mainType(PluginType.PUMP)
         .icon(IcGenericIcon)
-        .pluginName(R.string.atc3_name)
-        .shortName(R.string.atc3_name_short)
-        .description(R.string.atc3_pump_description)
+        .pluginName(TextRef.AndroidRes(R.string.atc3_name))
+        .description(TextRef.AndroidRes(R.string.atc3_pump_description))
         .composeContent { _ -> Atc3ComposeContent(blePreCheck) },
-    ownPreferences = listOf(
-        Atc3StringKey::class.java, Atc3IntentKey::class.java, Atc3StringNonKey::class.java,
-        Atc3IntNonKey::class.java, Atc3BooleanKey::class.java, Atc3LongNonKey::class.java
-    ),
-    aapsLogger, rh, preferences, commandQueue
+    ownPreferences = Atc3StringKey.entries + Atc3IntentKey.entries + Atc3StringNonKey.entries +
+        Atc3IntNonKey.entries + Atc3BooleanKey.entries + Atc3LongNonKey.entries,
+    aapsLogger, rh, preferences, commandQueue, notificationManager
 ), Pump, PluginConstraints {
 
-    private val disposable = CompositeDisposable()
 
     /** The watchers of new glucose and of the loop's mode, see [onStart]; the driver waits in [pluginScope], off the thread that asked. */
     private var databaseWatches: List<Job> = emptyList()
@@ -207,13 +202,19 @@ class Atc3PumpPlugin(
         aapsLogger.debug(LTag.PUMP, "ATC3: driver version ${Atc3Const.DRIVER_VERSION}")
         // A quiet held link is questioned through the queue, see [Atc3ProbeLink].
         atc3Connection.askForProbe = { atc3Queue.customCommand(Atc3ProbeLink()) }
-        disposable += rxBus
-            .toObservable(EventAPSCalculationFinished::class.java)
-            .observeOn(aapsSchedulers.io)
-            .subscribe({ readStateIfStale("decided", Atc3Const.STATUS_FRESH_MS) }, fabricPrivacy::logException)
         // AAPS 4.0 has no bus events for a new glucose value or a change of the loop's mode: the
         // database is watched for new rows of each instead.
         databaseWatches = listOf(
+            pluginScope.launch {
+                rxBus.toFlow(EventAPSCalculationFinished::class).collect {
+                    // A failed read must not end the watch: the next decision asks again.
+                    try {
+                        readStateIfStale("decided", Atc3Const.STATUS_FRESH_MS)
+                    } catch (e: Exception) {
+                        fabricPrivacy.logException(e)
+                    }
+                }
+            },
             pluginScope.launch {
                 persistenceLayer.observeChanges<RM>().collect { clockKeeper.modeChanged() }
             },
@@ -233,7 +234,6 @@ class Atc3PumpPlugin(
         linkKeeper.stop()
         databaseWatches.forEach { it.cancel() }
         databaseWatches = emptyList()
-        disposable.clear()
         // Nothing in memory that the next start would trust (AIMI acceptance D1); the disk keeps the rest.
         pumpState.forget()
         atc3HistorySync.forgetMemory()
@@ -1194,7 +1194,7 @@ class Atc3PumpPlugin(
     override fun getPreferenceScreenContent(): PreferenceSubScreenDef =
         PreferenceSubScreenDef(
             key = "atc3_settings",
-            titleResId = R.string.atc3_name,
+            title = TextRef.AndroidRes(R.string.atc3_name),
             items = listOf(
                 Atc3BooleanKey.HoldLink,
                 Atc3BooleanKey.Trace

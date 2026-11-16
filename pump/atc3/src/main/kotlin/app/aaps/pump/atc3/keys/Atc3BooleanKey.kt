@@ -1,14 +1,15 @@
 package app.aaps.pump.atc3.keys
 
 import app.aaps.core.keys.interfaces.BooleanPreferenceKey
+import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.trace.Atc3Trace
 
 enum class Atc3BooleanKey(
     override val key: String,
     override val defaultValue: Boolean,
-    override val titleResId: Int,
-    override val summaryResId: Int? = null,
+    private val titleResId: Int,
+    private val summaryResId: Int? = null,
     override val calculatedDefaultValue: Boolean = false,
     override val engineeringModeOnly: Boolean = false,
     override val defaultedBySM: Boolean = false,
@@ -28,5 +29,9 @@ enum class Atc3BooleanKey(
      * Keep the link open between exchanges: setting a link up is the fragile part, and a held link is
      * watched by the pump's heartbeat. On by default; off for a phone that handles a long link badly.
      */
-    HoldLink("atc3_hold_link", true, R.string.atc3_hold_link_title, R.string.atc3_hold_link_summary),
+    HoldLink("atc3_hold_link", true, R.string.atc3_hold_link_title, R.string.atc3_hold_link_summary)
+    ;
+
+    override val title: TextRef = TextRef.AndroidRes(titleResId)
+    override val summary: TextRef? = summaryResId?.let { TextRef.AndroidRes(it) }
 }

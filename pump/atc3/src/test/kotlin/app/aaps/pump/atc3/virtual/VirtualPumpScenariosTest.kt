@@ -164,8 +164,8 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
         val linkKeeper = Atc3LinkKeeper(aapsLogger, rh, preferences, store, dateUtil, atc3Queue, notices, pumpState, connection, historySync, trace)
         plugin = Atc3PumpPlugin(
             aapsLogger, rh, preferences, commandQueue, pumpState, manager, bolusDelivery, rxBus, notices,
-            historySync, historyEvents, reconciliation, clockWatch, dateUtil, aapsSchedulers, fabricPrivacy, pumpEnactResultProvider,
-            trace, clockKeeper, basalPeriods, linkKeeper, connection, atc3Queue, bolusProgressData, persistenceLayer, blePreCheck, ch
+            historySync, historyEvents, reconciliation, clockWatch, dateUtil, fabricPrivacy, pumpEnactResultProvider,
+            trace, clockKeeper, basalPeriods, linkKeeper, connection, atc3Queue, bolusProgressData, persistenceLayer, blePreCheck, ch, notificationManager
         )
 
         // The pump's notifications reach the driver as the Bluetooth stack would hand them over.

@@ -177,7 +177,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         plugin = Atc3PumpPlugin(
             aapsLogger, rh, preferences, commandQueue, pumpState, atc3Manager, bolusDelivery, rxBus,
             uiInteraction,
-            atc3HistorySync, historyEvents, reconciliation, clockWatch, dateUtil, aapsSchedulers, fabricPrivacy, pumpEnactResultProvider,
+            atc3HistorySync, historyEvents, reconciliation, clockWatch, dateUtil, fabricPrivacy, pumpEnactResultProvider,
             trace,
             clockKeeper,
             basalPeriods,
@@ -187,7 +187,8 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
             bolusProgressData,
             persistenceLayer,
             blePreCheck,
-            ch
+            ch,
+            notificationManager
         )
     }
 
