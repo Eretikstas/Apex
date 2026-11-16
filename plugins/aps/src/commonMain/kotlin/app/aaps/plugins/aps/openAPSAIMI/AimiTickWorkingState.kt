@@ -1,0 +1,314 @@
+package app.aaps.plugins.aps.openAPSAIMI
+
+import app.aaps.plugins.aps.openAPSAIMI.activity.EffortActivityBelief
+import app.aaps.plugins.aps.openAPSAIMI.basal.BasalStackTerminalCap
+import app.aaps.plugins.aps.openAPSAIMI.basal.CoffeeRiseMode
+import app.aaps.plugins.aps.openAPSAIMI.basal.DynamicBasalStackCap
+import app.aaps.plugins.aps.openAPSAIMI.basal.EngineHyperRateBound
+import app.aaps.plugins.aps.openAPSAIMI.context.ContextSnapshot
+import app.aaps.plugins.aps.openAPSAIMI.effects.RbtLiveCommitResult
+import app.aaps.plugins.aps.openAPSAIMI.inflammatory.InflammationAdjuster
+import app.aaps.plugins.aps.openAPSAIMI.orchestration.PredictionAuthorityApplyResult
+import app.aaps.plugins.aps.openAPSAIMI.patient.HarmoniaDecision
+import app.aaps.plugins.aps.openAPSAIMI.patient.HarmoniaHarmonizer
+import app.aaps.plugins.aps.openAPSAIMI.patient.HarmoniaProductionDecision
+import app.aaps.plugins.aps.openAPSAIMI.patient.MealCertainty
+import app.aaps.plugins.aps.openAPSAIMI.patient.PatientModeOrchestrator
+import app.aaps.plugins.aps.openAPSAIMI.patient.PatientStateSnapshot
+import app.aaps.plugins.aps.openAPSAIMI.patient.PhysiologicalTreeSnapshot
+import app.aaps.plugins.aps.openAPSAIMI.physio.MealAbsorptionPhaseEngine
+import app.aaps.plugins.aps.openAPSAIMI.physio.MealAbsorptionRuntime
+import app.aaps.plugins.aps.openAPSAIMI.physio.PhysioMultipliersMTR
+import app.aaps.plugins.aps.openAPSAIMI.physio.PhysiologicalPhaseClassifier
+import app.aaps.plugins.aps.openAPSAIMI.physio.pattern.PhysiologicalPatternSnapshot
+import app.aaps.plugins.aps.openAPSAIMI.physio.thyroid.ThyroidEffects
+import app.aaps.plugins.aps.openAPSAIMI.pkpd.AdvancedPredictionCurves
+import app.aaps.plugins.aps.openAPSAIMI.pkpd.InsulinActionState
+import app.aaps.plugins.aps.openAPSAIMI.quality.SmbBindingTrace
+import app.aaps.plugins.aps.openAPSAIMI.recursive.RbtChaosEvaluator
+import app.aaps.plugins.aps.openAPSAIMI.recursive.RbtResolutionBridge
+import app.aaps.plugins.aps.openAPSAIMI.recursive.RecursiveBeliefAuthorityGate
+import app.aaps.plugins.aps.openAPSAIMI.recursive.RecursiveBeliefSnapshot
+import app.aaps.plugins.aps.openAPSAIMI.release.HyperTrajectoryReleaseResult
+import app.aaps.plugins.aps.openAPSAIMI.risk.DecisionPredictionAuthority
+import app.aaps.plugins.aps.openAPSAIMI.risk.SafetyPredictionTerminals
+import app.aaps.plugins.aps.openAPSAIMI.safety.CorrectionAggressionBasalCap
+import app.aaps.plugins.aps.openAPSAIMI.safety.CorrectionAggressionGate
+import app.aaps.plugins.aps.openAPSAIMI.safety.HyperClampTubeBound
+import app.aaps.plugins.aps.openAPSAIMI.safety.InsulinStackingStance
+import app.aaps.plugins.aps.openAPSAIMI.safety.PostHypoDeliveryAuthority
+import app.aaps.plugins.aps.openAPSAIMI.wcycle.WCycleInfo
+
+
+/**
+ * Tick-local scratch for one `determine_basal` execution.
+ *
+ * Created fresh at the start of every tick and never read by the next tick.
+ * Fields moved here from `DetermineBasalAIMI2` are pure working state:
+ * BG/delta, IOB/COB, predictions, meal flags, SMB seal counters, console buffers.
+ * CACHE, EFFECT and LEARNER_STATE fields stay in the owning class.
+ *
+ * See `_docs/kmp/annex-8-state-replay-and-extraction-contract.md`, lot E2.
+ */
+internal class AimiTickWorkingState {
+    var lastPostHypoDeliveryAuthority: PostHypoDeliveryAuthority.Decision =
+        PostHypoDeliveryAuthority.INACTIVE
+    var mealModeSmbReason: String? = null
+    var consoleError = mutableListOf<String>()
+    var consoleLog = mutableListOf<String>()
+    var bgacc = 0.0
+    var predictedSMB = 0.0f
+
+    /** True once this tick has staged its training row, so the tick tail does not stage a second one. */
+    var smbTrainingRowEnqueuedThisTick: Boolean = false
+
+    /**
+     * The model output of this tick, or `null` when the SMB stage never ran.
+     *
+     * Not read from [predictedSMB]: that field keeps the previous tick's value on a tick that
+     * returns early, and writing a stale model output next to a fresh label would be worse than
+     * writing a zero.
+     */
+    var predictedSmbForTrainingThisTick: Float? = null
+    var eventualBG = 0.0
+    var iob = 0.0f
+    var cob = 0.0f
+    var tags0to60minAgo = ""
+    var lastDecisionPredictionAuthority: DecisionPredictionAuthority? = null
+    var lastPredictionAuthorityApplyResult: PredictionAuthorityApplyResult? = null
+    var tubeDoseBaseline: DetermineBasalaimiSMB2.TubeDoseBaseline? = null
+    var tubeAppliedFromDoseSnapshotThisTick: Boolean = false
+    var lastAdvancedPredictionCurves: AdvancedPredictionCurves? = null
+    var lastSafetyTerminalsForRbt: SafetyPredictionTerminals? = null
+    var lastHyperTrajectoryRelease: HyperTrajectoryReleaseResult? = null
+    var lastRecursiveBeliefSnapshot: RecursiveBeliefSnapshot? = null
+    var lastRecursiveAuthorityGateDecision: RecursiveBeliefAuthorityGate.Decision? = null
+    var lastT3cHistoricalBypassNeutralizedThisTick: Boolean = false
+    var lastT3cRuntimeOwnership: AimiDecisionContext.T3cRuntimeOwnershipExport? = null
+    var lastRbtChaosEvaluation: RbtChaosEvaluator.Result? = null
+    var lastRbtAppliedHints: RbtResolutionBridge.AppliedHints? = null
+    var rbtResolvedThisTick = false
+    var lastRbtLiveCommitResult: RbtLiveCommitResult? = null
+    var currentTickDecisionEventId: String? = null
+    var lastLoadGovernorMultiplierG: Double = 1.0
+    var lastPhysiologicalPhaseOutput: PhysiologicalPhaseClassifier.Output? = null
+    var lastPhysiologicalPatternSnapshot: PhysiologicalPatternSnapshot? = null
+    var lastMealAbsorptionOutput: MealAbsorptionPhaseEngine.Output? = null
+    var lastMealIntentSource: String? = null
+    var lastInsulinStackingEvaluation: InsulinStackingStance.Evaluation? = null
+    var lastBasePhysioMultipliers: PhysioMultipliersMTR = PhysioMultipliersMTR.NEUTRAL
+    var lastFusedPhysioMultipliers: PhysioMultipliersMTR? = null
+    var lastScenarioBestCappedForPhysio: Boolean = false
+    var pendingTrajSpiralBasal: DetermineBasalaimiSMB2.PendingTrajSpiralBasal? = null
+
+    /** What the Traj-Bridge asked for on this tick. Null when it never fired. Reset at tick start. */
+    var lastTrajBridgeRequest: DetermineBasalaimiSMB2.TrajBridgeRequest? = null
+
+    /** True when `TrajBridgeSurvival` really lowered the delivered rate on this tick. */
+    var trajBridgeSurvivedThisTick: Boolean = false
+
+    /** The rate `TrajBridgeSurvival` would produce, whether or not the key let it through. */
+    var trajBridgeWouldReduceToUph: Double? = null
+    var tags60to120minAgo = ""
+    var tags120to180minAgo = ""
+    var tags180to240minAgo = ""
+    var wCycleInfoForRun: WCycleInfo? = null
+    var wCycleReasonLogged: Boolean = false
+    var normalBgThreshold = 110.0f
+    var lastsmbtime = 0
+    var acceleratingUp: Int = 0
+    var decceleratingUp: Int = 0
+    var acceleratingDown: Int = 0
+    var decceleratingDown: Int = 0
+    var stable: Int = 0
+    var maxIob = 0.0
+    var maxSMB = 0.5
+    var maxSMBHB = 0.5
+    var lastBolusSMBUnit = 0.0f
+    var hourOfDay: Int = 0
+    var weekend: Int = 0
+    var basalaimi = 0.0f
+    var endoSmbMult = 1.0  // Written by applyEndoAndActivityAdjustments each cycle
+    var activityProtectionMode = false  // Written by applyEndoAndActivityAdjustments
+    var activityStateIntense = false     // Written by applyEndoAndActivityAdjustments
+    var aimilimit = 0.0f
+    var ci = 0.0f
+    var sleepTime = false
+    var sportTime = false
+    var aimiContextActivityActive = false
+    var exerciseInsulinLockoutActive = false
+    var exerciseHyperBasalOverrideActive = false
+    var tickCombinedDelta = 0f
+    var snackTime = false
+    var lowCarbTime = false
+    var mealTime = false
+    var fastingTime = false
+    var stopTime = false
+    var iscalibration = false
+    var mealruntime: Long = 0
+    var bfastruntime: Long = 0
+    var lunchruntime: Long = 0
+    var dinnerruntime: Long = 0
+    var highCarbrunTime: Long = 0
+    var snackrunTime: Long = 0
+
+    /** Last declared meal note, up to 5 h back. The *runtime clocks above stop at 60 min. PK/PD curve gate only. */
+    var lastDeclaredMeal: Therapy.DeclaredMeal? = null
+    var peakintermediaire = 0.0
+    var latestAdjustedDia: Double = 0.0 // Captured for logging
+    var insulinPeakTime = 0.0
+    var iobActivityNow: Double = 0.0
+    var lastBolusAgeMinutes: Double = Double.NaN
+    var pkpdAbsorptionGuardAppliedThisTick: Boolean = false
+    var isConfirmedHighRiseThisTick: Boolean = false
+    var criticalSafetyZeroedThisTick: Boolean = false
+    var tickCobGrams: Double = Double.NaN
+    var aimiDecisionExportedThisTick: Boolean = false
+    var pendingDecisionCtxForExport: AimiDecisionContext? = null
+    var basalChannelGuardBlockedT3cCount: Int = 0
+    var basalChannelGuardBlockedHarmoniaCount: Int = 0
+    var correctionAggressionDecision: CorrectionAggressionGate.Decision? = null
+
+    /** Inputs of this tick's last post-hypo authority evaluation, to re-evaluate it when the mode changes. */
+    var lastPostHypoAuthorityInputs: Pair<Float, CorrectionAggressionGate.PostHypoHint>? = null
+
+    // DynamicBasalStackCap verdicts of this tick (engine PI fallback, setTempBasal). Export only.
+    var lastDynamicStackCapEngine: DynamicBasalStackCap.Verdict? = null
+    var lastDynamicStackCapSetTemp: DynamicBasalStackCap.Verdict? = null
+
+    // BasalStackTerminalCap (end of setTempBasal), EngineHyperRateBound and MealAbsorptionRuntime of this tick. Export only.
+    var lastStackTerminalVerdict: BasalStackTerminalCap.Verdict? = null
+    var lastEngineHyperBound: EngineHyperRateBound.Verdict? = null
+    var lastMealAbsorptionRuntime: MealAbsorptionRuntime.Result? = null
+
+    /**
+     * Tier ceiling record of the meal-absorption basal boost of this tick, `null` when that branch did
+     * not produce a rate. Export only (`baseline_state.meal_boost_*`), never read by a dose.
+     */
+    var mealBoostCapRecord: CorrectionAggressionBasalCap.MealBoostCapRecord? = null
+
+    /**
+     * What the engine / rT basal merge saw this tick. Export only (`engine_rate_uph`, `rt_rate_uph`,
+     * `merge_mode`, `merge_winner`), nothing reads it back.
+     */
+    var basalMergeRecord: AimiBasalMergeRecord? = null
+
+    // "coffee" note of this tick (see CoffeeRiseMode) and the profile values its basal band needs.
+    var coffeeNote: Therapy.CoffeeNote? = null
+    var coffeeProfileBasalUph: Double = 0.0
+    var coffeeMaxBasalUph: Double = 0.0
+    var lastCoffeeVerdict: CoffeeRiseMode.Verdict? = null
+    var lastCoffeeSmbCutFromU: Double? = null
+    var lastCoffeeBasalChange: String? = null
+    var raEstimatorRunCountAtTickStart: Long = -1L
+    var mealAbsorptionDeltaPrevForTick: Double? = null
+    var mealAbsorptionDeltaPrevLatched: Boolean = false
+    var lastHtrRaFloorMgdlPerMin: Double? = null
+    var smbTerminalSealed: Boolean = false
+    var smbSealRefusedCount: Int = 0
+    var smbSealRefusedTotalU: Double = 0.0
+    var smbSealAllowedRaiseCount: Int = 0
+    var lastSlopeFromMinDeviation: Double? = null
+    var raNetCombinedDelta: Float = 0.0f
+    var raNetShortAvgDeltaAdj: Float = 0.0f
+    var lastPostHypoSmbBeforeCapU: Double? = null
+    var lastPostHypoSmbAfterCapU: Double? = null
+
+    /** "Enable SMB" for this tick (`microBolusAllowed`), read by every SMB writer through `SmbSwitchGate`. */
+    var smbSwitchOnThisTick: Boolean = true
+    var lastEffortSmbFactorRaw: Double? = null
+    var lastEffortSmbFactorApplied: Double? = null
+    var lastEffortSmbBeforeU: Double? = null
+    var lastEffortSmbAfterU: Double? = null
+    var mealAdvisorOneShotThisTick: Boolean = false
+    var lastTubeAdvisorSmbCapScale: Double? = null
+
+    /** True when the tube veto fired on a railed min-pred AND the plateau band accepted the tick. */
+    var lastTubeFloorArtefactStrict: Boolean = false
+
+    /** Same test without the 160 mg/dL plateau band. Exported only, never applied. */
+    var lastTubeFloorArtefactWide: Boolean = false
+
+    /** This tick's `HyperClampTubeBound` verdict, exported in `tube_advisor`. Reset at tick start. */
+    var lastHyperClampVerdict: HyperClampTubeBound.Verdict? = null
+    var lastInflammationResult: InflammationAdjuster.InflammationResult? = null
+    var tickInsulinActionState: InsulinActionState? = null
+    var tickEffectiveDiaHours: Double? = null
+    var tickEffectivePeakMinutes: Double? = null
+    var lastDecisionSource: String = "AIMI"
+    var lastSafetySource: String = "NONE"
+    var lastPredictionAvailable: Boolean = false
+    var lastPredictionSize: Int = 0
+    var lastEventualBgSnapshot: Double = 0.0
+    var lastSmbProposed: Double = 0.0
+    var lastSmbBindingTraceDraft = SmbBindingTrace.Draft()
+    var lastEffortAssessment: EffortActivityBelief.Assessment? = null
+    var lastContextSmbCeilingU: Double? = null
+    var lastContextSuppressSmb: Boolean = false
+    var lastContextSnapshot: ContextSnapshot? = null
+    var lastPatientState: PatientStateSnapshot? = null
+    var lastPatientModeDecision: PatientModeOrchestrator.Decision? = null
+    var lastPhysiologicalTreeSnapshot: PhysiologicalTreeSnapshot? = null
+    var lastNgrBasalMultiplier: Double = 1.0
+    var lastHarmoniaDecision: HarmoniaDecision? = null
+    var lastMealCertainty: MealCertainty? = null
+    var lastHarmonizerOutcome: HarmoniaHarmonizer.Outcome? = null
+    var lastHarmoniaProductionDecision: HarmoniaProductionDecision? = null
+    var tickIobEffectiveU: Double? = null
+    var lastSmbCapped: Double = 0.0
+    var currentThyroidEffects = ThyroidEffects()
+    var lastSmbFinal: Double = 0.0
+    var duraISFminutes: Double = 0.0
+    var duraISFaverage: Double = 0.0
+    var iobNet: Double = 0.0 // Corrected IOB for learning
+    var pkpdThrottleIntervalAdd: Int = 0       // 🚀 PKPD interval boost (0 si normal/modes repas)
+    var pkpdPreferTbrBoost: Double = 1.0       // 🚀 PKPD TBR boost factor (1.0 si normal/modes repas)
+}
+
+/**
+ * What a new tick takes from the one before it.
+ *
+ * dev_OAPSAIMI kept these in fields that lived from one tick to the next, and some stages read
+ * them before this tick writes them. Starting them from their empty value changed the dose:
+ * - [AimiTickWorkingState.pkpdThrottleIntervalAdd]: the SMB interval and the refractory window
+ *   are worked out before finalize writes the new value, so they used the previous tick's extra
+ *   minutes. With 0 the SMB could come back sooner than on dev_OAPSAIMI.
+ * - [AimiTickWorkingState.pkpdPreferTbrBoost]: the temp basals set before finalize (MAX_IOB gate,
+ *   Autodrive V3, meal advisor, SMB switched off, post-hypo) used the previous tick's boost.
+ * - [AimiTickWorkingState.activityProtectionMode]: the scenario projection reads it before the
+ *   activity stage writes it, so it used the previous tick's value. With false, sport was never
+ *   seen by the projection.
+ * - [AimiTickWorkingState.basalaimi]: Harmonia's environment reads it before the basal stage
+ *   writes it. With 0 it fell back to 1.0 U/h, so the Harmonia basal was worked out on 1.0 U/h
+ *   instead of the patient's basal.
+ * - [AimiTickWorkingState.lastPatientState] and [AimiTickWorkingState.lastPatientModeDecision]:
+ *   the basal neural net reads them at the physiology bootstrap, before the decision-context stage
+ *   clears them for the tick. Both branches clear them at that same point, so carrying them only
+ *   restores the bootstrap read.
+ * - [AimiTickWorkingState.mealTime] and [AimiTickWorkingState.snackTime]: the early PKPD meal
+ *   context reads them before the therapy stage writes them. The other meal flags are class fields
+ *   and already carried.
+ * - [AimiTickWorkingState.hourOfDay]: the tick clock sets it later in the tick, but the G6 BYODA
+ *   check and the reactivity learner read it earlier. 0 read as night, so the G6 day compensation
+ *   never ran. This one takes [hourNow], the real hour. dev_OAPSAIMI read the previous tick's hour,
+ *   so the two differ on the first tick of an hour (and on the first tick after a start). That is a
+ *   deliberate deviation: the real hour is the intent.
+ *
+ * Everything else stays tick-local on purpose. dev_OAPSAIMI also never reset these, but they are
+ * stale values, not memory, so they are not copied:
+ * - `cob`: kept a value until the app restarted.
+ * - `lastInsulinStackingEvaluation`: an old stacking verdict could block a basal-first plan or cap
+ *   the SMB on a tick where the recursive belief resolve left early.
+ * - `lastEventualBgSnapshot`: an old eventual BG used as a fallback on ticks without a scenario.
+ */
+internal fun AimiTickWorkingState.takeCarryOverFrom(previous: AimiTickWorkingState, hourNow: Int) {
+    pkpdThrottleIntervalAdd = previous.pkpdThrottleIntervalAdd
+    pkpdPreferTbrBoost = previous.pkpdPreferTbrBoost
+    activityProtectionMode = previous.activityProtectionMode
+    basalaimi = previous.basalaimi
+    lastPatientState = previous.lastPatientState
+    lastPatientModeDecision = previous.lastPatientModeDecision
+    mealTime = previous.mealTime
+    snackTime = previous.snackTime
+    hourOfDay = hourNow
+}

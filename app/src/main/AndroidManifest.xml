@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets the bypass-DND alarm channels ring through Do Not Disturb and bedtime modes for urgent
+         alarms. Special access: the user must still grant it in the system settings. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+
+    <uses-permission-sdk-23 android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+
+    <!-- ComposeMainActivity hides the overlays of other apps, so they cannot trick a tap (tapjacking). -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
+
+    <!-- To receive data from xdrip. -->
+    <uses-permission android:name="com.eveningoutpost.dexdrip.permissions.RECEIVE_BG_ESTIMATE" />
+
+    <!-- To receive data from Aidex -->
+    <uses-permission android:name="com.microtechmd.cgms.aidex.permissions.RECEIVE_BG_ESTIMATE" />
+
+    <!-- Health Connect, read only, for the AIMI physiological assistant. Must match
+         AIMIHealthConnectPermissions: Health Connect refuses, with no dialog, a permission that is
+         asked for but not declared here. -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_SKIN_TEMPERATURE" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_BODY_TEMPERATURE" />
+
+    <!-- Lets the app see whether Health Connect is installed (Android 13 and older). -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+    </queries>
+
+    <application
+        android:name="app.aaps.MainApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="${appIcon}"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="${appIconRound}"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme.Launcher">
+        <profileable android:shell="true" />
+
+        <!-- Samsung One UI 7+ shows the persistent notification in its own "Live Notifications"
+             drawer section and lock-screen "Now Bar" through a proprietary mechanism, separate
+             from (and not yet replaced by) Android's standard promoted-notification APIs used in
+             PersistentNotificationPlugin. This meta-data is required for Samsung's system UI to
+             consider the app eligible; see the "android.ongoingActivityNoti.*" notification
+             extras added in PersistentNotificationPlugin.applySamsungLiveUpdate(). -->
+        <meta-data
+            android:name="com.samsung.android.support.ongoing_activity"
+            android:value="true" />
+
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
+
+        <meta-data
+            android:name="com.google.android.backup.api_key"
+            android:value="AEdPqrEAAAAI3JiApyMrbP2QFzZ2fYfCPsgjkRp53Dm2S1-zPQ" />
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <activity
+            android:name="app.aaps.ComposeMainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/AppTheme.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Shown instead of the app when its settings cannot be opened. -->
+        <activity
+            android:name="app.aaps.settingsstore.SettingsUnreadableActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme.NoActionBar" />
+
+        <!-- Powers the screen on for a background alarm without USE_FULL_SCREEN_INTENT.
+             Fired by AlarmManager.setAlarmClock() from AlarmNotificationManager. -->
+        <receiver
+            android:name="app.aaps.implementation.androidNotification.AlarmScreenWakeReceiver"
+            android:exported="false" />
+
+        <!-- "Mute" action on the background alarm notification → silences the looping alarm. -->
+        <receiver
+            android:name="app.aaps.implementation.androidNotification.AlarmMuteReceiver"
+            android:exported="false" />
+
+        <!-- "Hypo treated" action on the low glucose alarm notification: holds the alarm 20 min. -->
+        <receiver
+            android:name="app.aaps.implementation.androidNotification.HypoTreatedReceiver"
+            android:exported="false" />
+
+        <!-- "Acknowledge" action on a CGM alarm notification: quiet for the repeat time of the alarm. -->
+        <receiver
+            android:name="app.aaps.implementation.androidNotification.CgmAlarmAcknowledgeReceiver"
+            android:exported="false" />
+
+        <!-- "Time to eat" timer: its alarm (setAlarmClock) and the Stop / +5 min notification buttons. -->
+        <receiver
+            android:name="app.aaps.implementation.alerts.EatReminderReceiver"
+            android:exported="false" />
+
+        <!-- Receive new BG readings from other local apps -->
+        <receiver
+            android:name="app.aaps.receivers.DataReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <!-- Receiver from xDrip -->
+                <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
+                <!-- Receiver from 640g uploader -->
+                <action android:name="com.eveningoutpost.dexdrip.NS_EMULATOR" />
+                <!-- Receiver from glimp -->
+                <action android:name="it.ct.glicemia.ACTION_GLUCOSE_MEASURED" />
+                <!-- Receiver from Dexcom -->
+                <action android:name="com.dexcom.cgm.EXTERNAL_BROADCAST" />
+                <action android:name="com.dexcom.g7.EXTERNAL_BROADCAST" />
+                <!-- Receiver from Poctech -->
+                <action android:name="com.china.poctech.data" />
+                <!-- Receiver from Tomato -->
+                <action android:name="com.fanqies.tomatofn.BgEstimate" />
+                <!-- Receiver from GlucoRx Aidex -->
+                <action android:name="com.microtechmd.cgms.aidex.action.BgEstimate" />
+                <!-- Receiver from patched Ottai app (International) -->
+                <action android:name="info.nightscout.androidaps.action.OTTAI_APP" />
+                <!-- Receiver from patched Syai Tag app -->
+                <action android:name="info.nightscout.androidaps.action.SYAI_TAG_APP" />
+                <!-- Receiver from patched Ottai app (China) -->
+                <action android:name="cn.diyaps.sharing.OT_APP" />
+                <!-- Receiver from patched SI app -->
+                <action android:name="cn.diyaps.sharing.SI_APP" />
+                <!-- Receiver from Sibionics app, handled by the same plugin as SI app -->
+                <action android:name="com.diyaps.sharing.SIBIO_APP" />
+                <!-- Receiver from patched Sino app -->
+                <action android:name="cn.diyaps.sharing.SINO_APP" />
+                <!-- Receiver from Instara App -->
+                <!-- NOTE: The action name for Instara App is still called Teljane -->
+                <action android:name="info.nightscout.androidaps.action.Teljane_APP" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receive new SMS messages -->
+        <receiver
+            android:name="app.aaps.receivers.SmsReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receive ignore 5m, 15m, 30m requests for carb notifications -->
+        <receiver
+            android:name="app.aaps.receivers.CarbSuggestionReceiver"
+            android:exported="false" />
+
+        <!-- Auto start -->
+        <receiver
+            android:name="app.aaps.receivers.AutoStartReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Moved here from :plugins:main together with the class. The service field injects, and a
+             members injector is generated code, which a multiplatform module cannot produce. -->
+        <service
+            android:name="app.aaps.persistentNotification.DummyService"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps AndroidAPS alive for continuous automated insulin delivery (artificial pancreas loop)." />
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
+
+        <uses-library
+            android:name="org.apache.http.legacy"
+            android:required="false" />
+
+        <!-- Health Connect shows its permission dialog only to an app with an Activity for this
+             intent, the "why we need it" page. Without it "Grant access" is refused at once. -->
+        <activity
+            android:name="app.aaps.plugins.aps.openAPSAIMI.physio.AimiHealthConnectPermissionActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                <category android:name="androidx.health.category.HEALTH_PERMISSIONS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- The same page, for the "Manage access" link of Android 14 and newer. -->
+        <activity-alias
+            android:name="app.aaps.plugins.aps.openAPSAIMI.physio.AimiHealthConnectPermissionUsage"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity="app.aaps.plugins.aps.openAPSAIMI.physio.AimiHealthConnectPermissionActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- WorkManager on-demand initialization: remove the default initializer so MainApp's
+             Configuration.Provider (with MetroWorkerFactory) is used instead. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
+        <!-- Glance sends a tap through one of these activities when the click sits in a list, and
+             they throw "List adapter activity trampoline invoked without specifying target intent"
+             when the intent that reaches them carries no target. The throw is in the library's own
+             onCreate, so the app cannot catch it, and it killed AAPS for users who tapped a widget
+             (Crashlytics, 4.0.0). Our widgets have no list: a tap starts ComposeMainActivity
+             directly, checked on the emulator for every widget, so these activities only sit here
+             waiting to crash. -->
+        <activity
+            android:name="androidx.glance.appwidget.action.ActionTrampolineActivity"
+            tools:node="remove" />
+        <activity
+            android:name="androidx.glance.appwidget.action.InvisibleActionTrampolineActivity"
+            tools:node="remove" />
+
+    </application>
+
+</manifest>

@@ -1,0 +1,150 @@
+package app.aaps.plugins.aps.openAPSAIMI.steps
+
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.interfaces.concurrent.aapsIoDispatcher
+
+import app.aaps.core.data.model.SC
+import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.plugins.aps.openAPSAIMI.StepService
+import app.aaps.plugins.aps.openAPSAIMI.aimiWallClockMs
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.AppScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+/**
+ * 📱 AIMI Phone Steps Sync Service - MTR Implementation
+ * 
+ * Periodically syncs step count data from phone sensor (StepService) to AAPS database.
+ * This complements the existing in-memory StepService by persisting data to DB.
+ * 
+ * Architecture:
+ * - Runs every 5 minutes
+ * - Reads steps from StepService (in-memory)
+ * - Writes to StepsCount table via PersistenceLayer
+ * - Allows DetermineBasalAIMI2 & Dashboard to use unified DB source
+ * 
+ * @author MTR & Lyra AI - AIMI Steps Integration
+ */
+@SingleIn(AppScope::class)
+class AIMIPhoneStepsSyncServiceMTR @Inject constructor(
+    private val persistenceLayer: PersistenceLayer,
+    private val preferences: Preferences,
+    private val aapsLogger: AAPSLogger
+) {
+    private val ioScope = CoroutineScope(SupervisorJob() + aapsIoDispatcher)
+    
+    companion object {
+        private const val TAG = "PhoneStepsSync"
+        private const val SYNC_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
+        private const val SOURCE_DEVICE = "PhoneSensor"
+    }
+
+    private var syncJob: Job? = null
+    
+    /**
+     * Starts periodic synchronization
+     */
+    fun start() {
+        if (!isEnabled()) {
+            aapsLogger.debug(LTag.APS, "[$TAG] Phone steps sync disabled")
+            return
+        }
+        
+        if (syncJob != null) {
+            aapsLogger.debug(LTag.APS, "[$TAG] Already running")
+            return
+        }
+        
+        aapsLogger.info(LTag.APS, "[$TAG] Starting phone steps sync (every 5 min)")
+        
+        // Was java.util.Timer.scheduleAtFixedRate(task, 30_000L, SYNC_INTERVAL_MS), which does not
+        // exist outside the JVM. The deadline is kept absolute so the cadence stays fixed-rate: a run
+        // that takes longer than the period makes the next wait zero rather than pushing every later
+        // tick back, which is what the Timer did.
+        syncJob = ioScope.launch {
+            var nextRunAtMs = aimiWallClockMs() + 30_000L // First sync after 30s
+            while (isActive) {
+                delay((nextRunAtMs - aimiWallClockMs()).coerceAtLeast(0L))
+                try {
+                    syncStepsToDatabase()
+                } catch (e: Exception) {
+                    aapsLogger.error(LTag.APS, "[$TAG] Sync error", e)
+                }
+                nextRunAtMs += SYNC_INTERVAL_MS
+            }
+        }
+    }
+    
+    /**
+     * Stops synchronization
+     */
+    fun stop() {
+        syncJob?.cancel()
+        syncJob = null
+        aapsLogger.info(LTag.APS, "[$TAG] Stopped")
+    }
+    
+    /**
+     * Syncs StepService data → Database
+     */
+    private fun syncStepsToDatabase() {
+        try {
+            val now = aimiWallClockMs()
+            
+            // Read all windows from StepService. Unknown (null) becomes 0 and is not written: only steps5 > 0 is stored.
+            val steps5 = StepService.getRecentStepCount5Min() ?: 0
+            val steps10 = StepService.getRecentStepCount10Min() ?: 0
+            val steps15 = StepService.getRecentStepCount15Min() ?: 0
+            val steps30 = StepService.getRecentStepCount30Min() ?: 0
+            val steps60 = StepService.getRecentStepCount60Min() ?: 0
+            val steps180 = StepService.getRecentStepCount180Min() ?: 0
+            
+            // Only write if we have data
+            if (steps5 > 0) {
+                val sc = SC(
+                    timestamp = now,
+                    duration = SYNC_INTERVAL_MS,
+                    steps5min = steps5,
+                    steps10min = steps10,
+                    steps15min = steps15,
+                    steps30min = steps30,
+                    steps60min = steps60,
+                    steps180min = steps180,
+                    device = SOURCE_DEVICE
+                )
+                
+                ioScope.launch {
+                    try {
+                        persistenceLayer.insertOrUpdateStepsCount(sc)
+                        aapsLogger.debug(
+                            LTag.APS,
+                            "[$TAG] ✅ Synced: $steps5 steps (5min), 15min=$steps15, 30min=$steps30"
+                        )
+                    } catch (e: Exception) {
+                        aapsLogger.error(LTag.APS, "[$TAG] ❌ DB insert failed", e)
+                    }
+                }
+            } else {
+                aapsLogger.debug(LTag.APS, "[$TAG] No steps to sync (StepService returned 0)")
+            }
+        } catch (e: Exception) {
+            aapsLogger.error(LTag.APS, "[$TAG] Sync failed", e)
+        }
+    }
+    
+    /**
+     * Checks if phone steps sync is enabled
+     */
+    private fun isEnabled(): Boolean {
+        return preferences.get(BooleanKey.AimiPhoneStepsSyncEnable)
+    }
+}

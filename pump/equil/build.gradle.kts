@@ -1,0 +1,44 @@
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.metro)
+    id("android-module-dependencies")
+    id("test-module-dependencies")
+    id("jacoco-module-dependencies")
+}
+
+
+android {
+
+    namespace = "app.aaps.pump.equil"
+}
+
+ksp {
+    arg("room.incremental", "true")
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+dependencies {
+    api(project(":pump:equil:protocol"))
+    implementation(project(":pump:equil:emulator"))
+    implementation(project(":core:data"))
+    implementation(project(":core:interfaces"))
+    implementation(project(":core:keys"))
+    implementation(project(":core:objects"))
+    implementation(project(":core:utils"))
+    implementation(project(":core:ui"))
+
+    testImplementation(project(":shared:tests"))
+    // The shared Bluetooth transport contract runs on Robolectric, a JUnit 4 runner.
+    testImplementation(libs.org.robolectric)
+    testRuntimeOnly(libs.org.junit.vintage.engine)
+
+    implementation(libs.androidx.ui.tooling.preview)
+    debugImplementation(libs.androidx.ui.tooling)
+    implementation(libs.com.github.bumptech.glide.compose)
+    implementation(libs.com.google.code.gson)
+
+    api(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+}

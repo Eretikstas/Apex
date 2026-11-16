@@ -1,0 +1,204 @@
+import java.net.URI
+
+plugins {
+    id("kmp-android-library")
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.compose.multiplatform)
+    // Metro, so this module can wire its own Android entry points.
+    alias(libs.plugins.metro)
+}
+
+registerKeyStrings("aps")
+
+kotlin {
+    android {
+        namespace = "app.aaps.plugins.aps"
+        androidResources { enable = true }
+        // isIncludeAndroidResources is what makes Robolectric work - see :core:ui for the detail.
+        withHostTest {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
+    // The iOS and jvm targets come from the kmp-android-library convention.
+    // Explicit: the manual dependsOn below would otherwise switch the automatic hierarchy off
+    // and silently unwire iosMain.
+    applyDefaultHierarchyTemplate()
+
+    sourceSets {
+        // Hold wiring lives here so the Android variant of :plugins:aps does not depend on
+        // :plugins:aimi-engine (that module has no Android target, and the Android tick is unchanged).
+        val appleJvmMain = create("appleJvmMain") {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":plugins:aimi-contracts"))
+                implementation(project(":plugins:aimi-engine"))
+                implementation(project(":database:impl"))
+                implementation(project(":database:persistence"))
+            }
+        }
+        jvmMain.get().dependsOn(appleJvmMain)
+        iosMain.get().dependsOn(appleJvmMain)
+
+        iosMain {
+            dependencies {
+                // Darwin runs on NSURLSession, so an iOS build gets the system's own connection
+                // handling rather than a second HTTP stack. Same engine :core:nssdk already picked.
+                // ktor-client-core itself arrives through :core:nssdk, which exposes it with `api`.
+                implementation(libs.io.ktor.client.darwin)
+            }
+        }
+
+        val appleJvmTest = create("appleJvmTest") {
+            dependsOn(commonTest.get())
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(project(":plugins:aimi-testkit"))
+            }
+        }
+        jvmTest.get().dependsOn(appleJvmTest)
+        jvmTest {
+            kotlin.srcDir("src/tfliteParity/kotlin")
+            kotlin.srcDir("src/tfliteJvm/kotlin")
+            dependencies {
+                implementation(libs.androidx.sqlite.bundled)
+            }
+        }
+        iosTest.get().dependsOn(appleJvmTest)
+        iosTest.get().kotlin.srcDir("src/tfliteParity/kotlin")
+
+        commonMain {
+            dependencies {
+                implementation(project(":core:data"))
+                implementation(project(":core:interfaces"))
+                implementation(project(":core:keys"))
+                implementation(project(":core:nssdk"))
+                implementation(project(":core:objects"))
+                implementation(project(":core:utils"))
+                implementation(project(":core:ui"))
+                // Only for AimiParityCaptureBuilder, the one builder of parity captures that both
+                // phones share. Not a new module edge for the module: it already depends on this
+                // module in appleJvmMain and androidMain. The same build, now seen by commonMain.
+                implementation(project(":plugins:aimi-contracts"))
+                // The profile viewer of the Autotune screen. Was on androidMain until Autotune moved here.
+                implementation(project(":core:graph"))
+
+                implementation(libs.androidx.collection)
+                implementation(libs.jetbrains.lifecycle.runtime.compose)
+                implementation(libs.com.patrykandpatrick.vico.compose)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.datetime)
+                implementation(libs.jetbrains.compose.runtime)
+                implementation(libs.jetbrains.compose.ui.tooling.preview)
+                api(kotlin("reflect"))
+            }
+        }
+
+        androidMain {
+            dependencies {
+                // AimiParityCaptureHook turns the real Android tick into contract types so the run
+                // can be replayed against the shared engine. That hook is the thing that proves the
+                // two platforms agree, so it has to sit beside the Android tick it captures.
+                // :plugins:aimi-contracts has no Android target and does not need one: an Android
+                // consumer resolves its jvm variant, the same way :core:data is consumed here.
+                implementation(project(":plugins:aimi-contracts"))
+                // TensorFlow Lite for AimiModelHandler's UAM inference. Dropped when upstream rewrote
+                // this module for KMP. The model stays: modelUAM.tflite has its own architecture, so
+                // re-expressing it would change behaviour on an SMB path. Android only.
+                //
+                // No tensorflow-lite-gpu: nothing in AimiModelHandler ever constructs a GpuDelegate -
+                // grepped, zero hits - and this 2.4.0 (2020) release of it shares AGP's newly enforced
+                // unique-namespace check with tensorflow-lite itself (both declare
+                // org.tensorflow.lite), which fails :app's manifest merge. The fork's build predates
+                // that AGP check. Dropping the unused artifact is the narrow fix; a real GPU delegate,
+                // if ever added, would need a newer TFLite release with distinct namespaces.
+                implementation("org.tensorflow:tensorflow-lite:2.4.0")
+                implementation("org.tensorflow:tensorflow-lite-support:0.1.0")
+                implementation("org.tensorflow:tensorflow-lite-metadata:0.1.0")
+                // ONNX Runtime for OrefOnnxScorer's hypo/hyper/bg-change classifiers (assets/oref/*.onnx).
+                // Same story as TensorFlow Lite above: dropped when upstream rewrote this module for KMP,
+                // restored here because the exported models stay. Android only.
+                implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+                // Health Connect for AIMIPhysioDataRepositoryMTR's HRV/sleep/temperature/steps read path.
+                // Same story again: dropped in the KMP rewrite, restored for the same reason.
+                implementation("androidx.health.connect:connect-client:1.1.0")
+                implementation(libs.androidx.compose.ui.tooling.preview)
+                implementation(libs.androidx.work.runtime)
+                // APS (it should be androidTestImplementation but it doesn't work)
+                runtimeOnly(libs.org.mozilla.rhino)
+            }
+        }
+
+        // Hand written rather than taken from test-module-dependencies, which applies
+        // com.android.library and so cannot be used here. Same approach as :plugins:main.
+        // Tests of commonMain classes belong here, not in androidHostTest: that source set runs on the
+        // JVM only, so code that ships to iOS would be verified on Android alone. Mockito is JVM
+        // only, so anything moved here uses hand written fakes instead.
+        getByName("commonTest") {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
+        getByName("androidHostTest") {
+            kotlin.srcDir("src/tfliteParity/kotlin")
+            kotlin.srcDir("src/tfliteJvm/kotlin")
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(project(":shared:tests"))
+                // AndroidAutotuneFileStore, which AutotuneFSTest runs for real. Already on the test runtime
+                // classpath through :shared:tests.
+                implementation(project(":implementation"))
+                implementation(project(":pump:virtual"))
+                implementation(libs.org.junit.jupiter)
+                implementation(libs.org.junit.jupiter.api)
+                implementation(libs.org.mockito.junit.jupiter)
+                implementation(libs.org.mockito.kotlin)
+                implementation(libs.com.google.truth)
+                implementation(libs.kotlinx.coroutines.test)
+                // Compose UI tests (AutotuneScreenTest). Restated from compose-test-module-dependencies,
+                // which applies com.android.library and so cannot be used here.
+                implementation(project.dependencies.platform(libs.androidx.compose.bom))
+                implementation(libs.androidx.compose.ui.test.junit4)
+                implementation(libs.androidx.compose.ui.test.manifest)
+                implementation(libs.org.robolectric)
+                // The real org.json: isReturnDefaultValues makes the platform stub answer null rather
+                // than throwing, which NPEs the shared profile fixtures.
+                implementation(libs.org.json.android)
+                runtimeOnly(libs.org.mozilla.rhino)
+                runtimeOnly(libs.org.junit.vintage.engine)
+                runtimeOnly(libs.org.junit.platform.launcher)
+            }
+        }
+    }
+
+    // TensorFlow Lite C 2.4.0 built from tag v2.4.0. The scripts under
+    // src/tfliteParity produce the two static libraries before this link, on
+    // macOS only. Kotlin 2.4 cinterop ignores -linker-option, so the archive
+    // is named here. The published TensorFlowLiteC pod is not a linker input.
+    // -force_load keeps the RUY kernels. CoreFoundation resolves absl cctz.
+    // -map records which archive the link pulled. One thread and no delegate
+    // are in IosUamTflite and the header.
+    targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+        if (name != "iosArm64" && name != "iosSimulatorArm64") return@configureEach
+        val libDir = if (name == "iosArm64") "tflite-24-device-arm64" else "tflite-24-sim-arm64"
+        val include = layout.projectDirectory.dir("src/nativeInterop/cinterop").asFile.absolutePath
+        val staticLib = layout.buildDirectory.file("$libDir/libtensorflow-lite.a").get().asFile.absolutePath
+        compilations.getByName("main").cinterops.create("tflite") {
+            definitionFile.set(layout.projectDirectory.file("src/nativeInterop/cinterop/tflite.def"))
+            extraOpts("-compiler-option", "-I$include")
+        }
+        binaries.configureEach {
+            val binaryName = this.name
+            val mapFile = layout.buildDirectory.file("$libDir/$binaryName-link.map").get().asFile.absolutePath
+            linkerOpts(
+                "-force_load", staticLib,
+                "-lc++",
+                "-framework", "CoreFoundation",
+                "-map", mapFile,
+            )
+        }
+    }
+}

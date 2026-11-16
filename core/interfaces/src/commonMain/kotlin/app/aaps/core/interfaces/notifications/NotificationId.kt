@@ -1,0 +1,354 @@
+package app.aaps.core.interfaces.notifications
+
+import app.aaps.core.interfaces.notifications.NotificationCategory.AUTOMATION
+import app.aaps.core.interfaces.notifications.NotificationCategory.CGM
+import app.aaps.core.interfaces.notifications.NotificationCategory.LOOP
+import app.aaps.core.interfaces.notifications.NotificationCategory.PROFILE
+import app.aaps.core.interfaces.notifications.NotificationCategory.PUMP
+import app.aaps.core.interfaces.notifications.NotificationCategory.SYNC
+import app.aaps.core.interfaces.notifications.NotificationCategory.SYSTEM
+import app.aaps.core.interfaces.notifications.NotificationId.Companion.fromOrdinal
+import app.aaps.core.interfaces.notifications.NotificationLevel.ANNOUNCEMENT
+import app.aaps.core.interfaces.notifications.NotificationLevel.IMPORTANT
+import app.aaps.core.interfaces.notifications.NotificationLevel.INFO
+import app.aaps.core.interfaces.notifications.NotificationLevel.LOW
+import app.aaps.core.interfaces.notifications.NotificationLevel.NORMAL
+import app.aaps.core.interfaces.notifications.NotificationLevel.URGENT
+
+/**
+ * Identity + intrinsic severity of every AAPS notification.
+ *
+ * [defaultLevel] is the single source of truth for severity — a caller should not normally
+ * override it at the post site. [NotificationLevel.URGENT] is the alarm tier (sound + ramp +
+ * full-screen) and is reserved for acute insulin-delivery failures, critical BG, and
+ * user-configured alarms.
+ *
+ * The system-notification id is derived from [Enum.ordinal] (see [fromOrdinal]); there is no
+ * hand-assigned integer id anymore (the old pre-enum `legacyId` was a fossil with no external
+ * consumer).
+ */
+@Suppress("unused")
+enum class NotificationId(
+    val defaultLevel: NotificationLevel,
+    val category: NotificationCategory,
+    val allowMultiple: Boolean = false,
+    /** Extra action button carried by this alarm's system notification, if any. */
+    val alarmAction: AlarmAction? = null
+) {
+
+    // Profile
+    PROFILE_SET_OK(INFO, PROFILE),
+
+    // Basal profile failed to write to the pump (wrong basal until fixed). Also covers the old
+    // DanaR-only PROFILE_SET_FAILED, which was merged here.
+    FAILED_UPDATE_PROFILE(URGENT, PROFILE),
+    INVALID_PROFILE_NOT_ACCEPTED(NORMAL, PROFILE),
+
+    // Pump — general
+    EXTENDED_BOLUS_DISABLED(IMPORTANT, PUMP),
+    PUMP_ERROR(URGENT, PUMP),
+
+    // Equil low-battery alarm. MUST stay on its own id (historically it mis-used FAILED_UPDATE_PROFILE): the
+    // unified profile-set logic may dismiss FAILED_UPDATE_PROFILE on a successful write, which would otherwise
+    // silently clear a live Equil battery alarm.
+    EQUIL_LOW_BATTERY(URGENT, PUMP),
+
+    // A user/remote (non-SMB) bolus failed to deliver — surfaced once, here, from the executor (the entry
+    // dialog is gone by the time the async result arrives). SMB failures stay silent (the loop self-corrects).
+    BOLUS_DELIVERY_FAILED(URGENT, PUMP),
+
+    // The same bolus never reached the pump, but because the queue was cleared on purpose (a settings import) —
+    // nothing failed on the pump, so this is NOT the alarm tier. It still has to be said: the user pressed bolus,
+    // no insulin was given, and nobody re-sends it (unlike a temp basal, which the loop re-issues next cycle).
+    BOLUS_CANCELLED(IMPORTANT, PUMP),
+    WRONG_SERIAL_NUMBER(NORMAL, PUMP),
+    WRONG_BASAL_STEP(NORMAL, PUMP),
+    WRONG_DRIVER(NORMAL, PUMP),
+    PUMP_UNREACHABLE(URGENT, PUMP),
+    UNSUPPORTED_FIRMWARE(IMPORTANT, PUMP),
+    MINIMAL_BASAL_VALUE_REPLACED(NORMAL, PUMP),
+    BASAL_PROFILE_NOT_ALIGNED_TO_HOURS(NORMAL, PUMP),
+    WRONG_PUMP_PASSWORD(IMPORTANT, PUMP),
+    MAXIMUM_BASAL_VALUE_REPLACED(NORMAL, PUMP),
+    DEVICE_NOT_PAIRED(NORMAL, PUMP),
+    UNSUPPORTED_ACTION_IN_PUMP(NORMAL, PUMP),
+    WRONG_PUMP_DATA(NORMAL, PUMP),
+    PUMP_SUSPENDED(NORMAL, PUMP),
+    BLUETOOTH_NOT_ENABLED(INFO, PUMP),
+    PATCH_NOT_ACTIVE(NORMAL, PUMP),
+    PUMP_SETTINGS_FAILED(NORMAL, PUMP),
+
+    // Pump clock / time-zone update failed (Medtrum, Omnipod Eros). MUST stay on its own id (Eros historically
+    // mis-used FAILED_UPDATE_PROFILE): the unified profile-set logic dismisses FAILED_UPDATE_PROFILE on a successful
+    // write, which would otherwise silently clear a live time-update-failed card (and vice-versa).
+    PUMP_TIMEZONE_UPDATE_FAILED(NORMAL, PUMP),
+    BLUETOOTH_NOT_SUPPORTED(IMPORTANT, PUMP),
+    PUMP_WARNING(NORMAL, PUMP),
+    PUMP_SYNC_ERROR(NORMAL, PUMP),
+    BASAL_VALUE_BELOW_MINIMUM(NORMAL, PUMP),
+
+    // Pump — Combo
+    COMBO_PUMP_ALARM(URGENT, PUMP),
+    COMBO_UNKNOWN_TBR(LOW, PUMP),
+
+    // Pump — Medtronic
+    MEDTRONIC_PUMP_ALARM(URGENT, PUMP),
+    RILEYLINK_CONNECTION(NORMAL, PUMP),
+    MDT_INVALID_HISTORY_DATA(NORMAL, PUMP),
+
+    // Pump — Insight
+    INSIGHT_DATE_TIME_UPDATED(INFO, PUMP),
+    INSIGHT_TIMEOUT_DURING_HANDSHAKE(NORMAL, PUMP),
+
+    // Pump — Omnipod
+    OMNIPOD_POD_NOT_ATTACHED(NORMAL, PUMP),
+    OMNIPOD_POD_SUSPENDED(NORMAL, PUMP),
+    OMNIPOD_POD_ALERTS_UPDATED(INFO, PUMP),
+    OMNIPOD_POD_ALERTS(URGENT, PUMP),
+    OMNIPOD_TBR_ALERTS(LOW, PUMP),
+    OMNIPOD_POD_FAULT(URGENT, PUMP),
+    OMNIPOD_UNCERTAIN_SMB(NORMAL, PUMP),
+    OMNIPOD_UNKNOWN_TBR(LOW, PUMP),
+    OMNIPOD_STARTUP_STATUS_REFRESH_FAILED(NORMAL, PUMP),
+    OMNIPOD_TIME_OUT_OF_SYNC(LOW, PUMP),
+
+    // Pump — EOPatch
+    EOFLOW_PATCH_ALERT(URGENT, PUMP, allowMultiple = true),
+
+    // Pump — Equil
+    EQUIL_ALARM(URGENT, PUMP),
+    EQUIL_ALARM_INSULIN(URGENT, PUMP),
+
+    // Pump — Dana
+    DANA_PUMP_ALARM(URGENT, PUMP),
+
+    // "Bolus block" enabled in pump settings - blocks all bolus delivery (wrong configuration for AAPS)
+    DANA_BOLUS_BLOCK(URGENT, PUMP),
+
+    // Pump — Dana emulator
+    PUMP_EMULATOR_DISPLAY(INFO, PUMP),
+
+    // Pump — Carelevo
+    CARELEVO_PATCH_ALERT(URGENT, PUMP, allowMultiple = true),
+
+    // CGM
+    BG_READINGS_MISSED(URGENT, CGM),
+    SENSOR_CHANGE_DETECTED(NORMAL, CGM),
+
+    // CGM — Aidex
+    AIDEX_SENSOR_EXPIRED(IMPORTANT, CGM),
+    AIDEX_SENSOR_ERROR(IMPORTANT, CGM),
+    AIDEX_SENSOR_STABILIZING(NORMAL, CGM),
+    AIDEX_REPLACE_SENSOR(NORMAL, CGM),
+    AIDEX_SIGNAL_LOST(NORMAL, CGM),
+
+    // CGM - Eversense (fork native plugin, Android only)
+    EVERSENSE_ALARM(URGENT, CGM, allowMultiple = true),
+    EVERSENSE_FIRMWARE(INFO, CGM),
+    EVERSENSE_PLACEMENT(URGENT, CGM),
+    EVERSENSE_CREDENTIALS(URGENT, CGM),
+    EVERSENSE_NO_CLOUD_KEY(URGENT, CGM),
+
+    // Loop / APS
+    EASY_MODE_ENABLED(IMPORTANT, LOOP),
+    UD_MODE_ENABLED(IMPORTANT, LOOP),
+    SHORT_DIA(IMPORTANT, LOOP),
+    CARBS_REQUIRED(NORMAL, LOOP),
+    SMB_FALLBACK(NORMAL, LOOP),
+    DYN_ISF_FALLBACK(NORMAL, LOOP),
+
+    // Sync — Nightscout
+    OLD_NS(IMPORTANT, SYNC),
+    NSCLIENT_NO_WRITE_PERMISSION(NORMAL, SYNC),
+    NS_ANNOUNCEMENT(ANNOUNCEMENT, SYNC),
+    NS_ALARM(URGENT, SYNC),
+    NS_URGENT_ALARM(URGENT, SYNC),
+    NS_MALFUNCTION(IMPORTANT, SYNC),
+    NSCLIENT_VERSION_DOES_NOT_MATCH(NORMAL, SYNC),
+    NSCLIENT_PAIRING_ORPHAN(NORMAL, SYNC),
+    OPEN_HUMANS_SIGNED_OUT(NORMAL, SYNC),
+
+    // Sync — SMS
+    INVALID_PHONE_NUMBER(IMPORTANT, SYNC),
+    INVALID_MESSAGE_BODY(NORMAL, SYNC),
+    APPROACHING_DAILY_LIMIT(IMPORTANT, SYNC),
+
+    // System
+    TOAST_ALARM(URGENT, SYSTEM),
+    DST_LOOP_DISABLED(IMPORTANT, SYSTEM),
+    DST_IN_24H(LOW, SYSTEM),
+    DISK_FULL(IMPORTANT, SYSTEM),
+    OVER_24H_TIME_CHANGE_REQUESTED(LOW, SYSTEM),
+    INVALID_VERSION(IMPORTANT, SYSTEM),
+    TIME_OR_TIMEZONE_CHANGE(NORMAL, SYSTEM),
+    NEW_VERSION_DETECTED(NORMAL, SYSTEM),
+    VERSION_EXPIRE(IMPORTANT, SYSTEM),
+    INSULIN_MIGRATION_DEFAULT_USED(IMPORTANT, SYSTEM),
+    IMPORTED_INSULIN_ADDED(IMPORTANT, SYSTEM),
+    IDENTIFICATION_NOT_SET(NORMAL, SYSTEM),
+    MASTER_PASSWORD_NOT_SET(IMPORTANT, SYSTEM),
+    AAPS_DIR_NOT_SELECTED(NORMAL, SYSTEM),
+
+    // The AAPS directory IS selected, but the permission behind it is gone - Android drops a
+    // persisted SAF grant on reinstall and on "clear storage". Separate from the id above because
+    // the two need different words and different weight: that one is "you have not set this up
+    // yet", this one is "something that was working has stopped and nothing said so". While it is
+    // true, local settings export is silently off - the button just goes grey - so a user with no
+    // cloud configured has no backup at all and no sign of it. Found on a real phone in September
+    // 2026 where the last local backup was four months old.
+    //
+    // IMPORTANT, not URGENT: the backups have stopped, which has to be said plainly and has to
+    // persist, but it is not the alarm tier - that is reserved for insulin delivery and BG.
+    AAPS_DIR_ACCESS_LOST(IMPORTANT, SYSTEM),
+    GOOGLE_DRIVE_ERROR(IMPORTANT, SYSTEM),
+    SETTINGS_EXPORT_RESULT(INFO, SYSTEM),
+    SNACKBAR_FALLBACK(NORMAL, SYSTEM, allowMultiple = true),
+
+    // Automation — general notification action (NOT the "Alarm" action, which uses the system
+    // alarm clock via TimerUtil.scheduleReminder, not this notification path).
+    AUTOMATION_MESSAGE(IMPORTANT, AUTOMATION, allowMultiple = true),
+
+    // Scenes
+    SCENE_ENDED(INFO, AUTOMATION, allowMultiple = true),
+    SCENE_CHAINED(INFO, AUTOMATION, allowMultiple = true),
+    SCENE_CHAIN_SKIPPED(NORMAL, AUTOMATION, allowMultiple = true),
+    SCENE_CHAIN_ERROR(IMPORTANT, AUTOMATION, allowMultiple = true),
+
+    /** Bolus succeeded but the accompanying carbs could not be persisted — the user must re-enter them. */
+    CARBS_STORE_FAILED(URGENT, PUMP),
+
+    // A plugin's onStart threw. It stays ENABLED on purpose - disabling a failed pump driver makes
+    // ActivePlugin.activePumpInternal throw "No pump selected" - so this alarm is how the user finds out
+    // that a plugin is running only half built. Appended at the END: [fromOrdinal] maps a stored ordinal
+    // back to an id, so inserting in the middle would renumber every id after it.
+    //
+    // allowMultiple, because one id is shared by every plugin. Without it a second failing plugin would
+    // replace the first one's card, and one plugin starting cleanly would dismiss the card of another that
+    // is still broken - leaving a blocked pump with no alarm to explain it. Same reason EQUIL_LOW_BATTERY
+    // keeps its own id above. [app.aaps.core.interfaces.plugin.PluginBase] dismisses by handle, not by id.
+    PLUGIN_START_FAILED(URGENT, SYSTEM, allowMultiple = true),
+
+    // Work the plugin launched itself ended with an error. Separate from PLUGIN_START_FAILED because the
+    // plugin did start - it is a polling loop or a queued command that died, so the text has to say
+    // something else. Same reasons for allowMultiple.
+    PLUGIN_WORK_FAILED(URGENT, SYSTEM, allowMultiple = true),
+
+    // The pump is disconnected (or a super bolus runs) in AAPS, but the zero temp basal that stops the
+    // insulin is not on the pump, and sending it again did not help. The pump may still give basal
+    // while the user believes it does not. Appended at the END for the same reason as above.
+    ZERO_DELIVERY_NOT_SET(URGENT, PUMP),
+
+    // One command has been running in the queue for too long, so nothing else reaches the pump (#5209).
+    // Appended at the END for the same reason as above.
+    PUMP_DRIVER_NOT_RESPONDING(URGENT, PUMP),
+
+    // The Combo reported an error, so the driver does not connect until the user has handled it. Its own
+    // id, so that this hint does not replace the card that names the error (COMBO_PUMP_ALARM) (#5263).
+    // Appended at the END for the same reason as above.
+    COMBO_PUMP_ERROR_LOCKOUT(NORMAL, PUMP),
+
+    // ---- New upstream entries ----
+    // Kept before the fork entries so the fork IDs stay at the end of the list.
+    // A scene can leave its temporary profile active after it ends; the user has to choose a profile to restore normal delivery.
+    // Appended at the END for the same reason as above.
+    SCENE_PROFILE_NOT_RESTORED(IMPORTANT, AUTOMATION),
+    // A Garmin watch connected to a client sent carbs or a pump disconnect. A client does not store them, because
+    // they would never reach the master, and the watch cannot show why. Appended at the END for the same reason as above.
+    GARMIN_NOT_ON_CLIENT(NORMAL, SYNC),
+
+    // The Combo gave the bolus, but its history also had boluses that AAPS did not know about. Its own id,
+    // so that it does not replace the low reservoir warning of the same bolus on COMBO_PUMP_ALARM (#5379).
+    // Appended at the END of the upstream block for the same reason as above.
+    COMBO_UNKNOWN_BOLUS(URGENT, PUMP),
+
+    // Desktop only: no OS key store was found (Linux without a keyring), so the keys that protect the settings
+    // and the pairing secrets are plain files next to the data. IMPORTANT, not URGENT: nothing is wrong with
+    // therapy, but a copy of the folder gives everything away, and the user can fix it. Appended at the END of
+    // the upstream block for the same reason as above.
+    SECRETS_NOT_PROTECTED(IMPORTANT, SYSTEM),
+
+    // A real pump is selected, but AAPS has no Bluetooth (Nearby devices) permission, so no command can reach the
+    // pump and the queue fails them (#5440). It removes itself once the permission is back. IMPORTANT, not URGENT:
+    // a bolus that fails because of it raises its own alarm. Appended at the END of the upstream block for the
+    // same reason as above.
+    BLUETOOTH_PERMISSION_MISSING(IMPORTANT, PUMP),
+
+    // ---- Fork entries (ONE+/Libre 3 native, AIMI, calibration) ----
+    // Kept after the upstream block on purpose: upstream keeps appending at its end, so a future
+    // merge renumbers only these, which this fork controls, rather than any upstream id.
+
+    /** AIMI predicted hypo risk. Urgent loop alarm. Multiple can be posted. */
+    HYPO_RISK_ALARM(URGENT, LOOP, allowMultiple = true),
+
+    /** AIMI AI Decision Auditor — new insight available (in-app + optional system notification). */
+    AIMI_AUDITOR_INSIGHT(INFO, LOOP),
+
+    /**
+     * The active calibration plugin needs attention: not enough entries yet, the fit was rejected
+     * as unsafe, entries are too clustered to fit a slope, or the last accepted entry is old. Only
+     * one of these reasons is shown at a time (see `LinearCalibrationPlugin`'s health check) and it
+     * is dismissed once the situation resolves. Appended last on purpose, because the system
+     * notification id is the ordinal.
+     */
+    CALIBRATION_HEALTH(NORMAL, CGM),
+
+    /**
+     * A pre-soak sensor (ONE+ / G7 or Libre 3) was switched to production by itself, without the
+     * user pressing the promote button. Appended last on purpose, see the comment above.
+     */
+    CGM_STAGING_AUTO_PROMOTED(NORMAL, CGM),
+
+    /**
+     * The ONE+ / G7 sensor on iPhone: pairing, warm-up and the time left. Android shows the same
+     * through its own warm-up notification. Appended last on purpose, see the comment above.
+     */
+    DEXCOM_ONEPLUS_WARMUP(NORMAL, CGM),
+
+    /** A ONE+ / G7 problem the person must see on iPhone: silent sensor, wrong sensor, failure. Appended last on purpose. */
+    DEXCOM_ONEPLUS_ALERT(IMPORTANT, CGM),
+
+    // CGM - glucose alarms the user sets up (low, high, rapid fall). They work for any CGM source.
+    // They only notify; they never change dosing. Appended last on purpose, see the comment above.
+    BG_HYPO(URGENT, CGM, alarmAction = AlarmAction.HYPO_TREATED),
+    BG_HYPER(IMPORTANT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    BG_RAPID_FALL(URGENT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+
+    /** A bolus asked for by the Garmin watch was refused or limited; the watch cannot show why. Appended last on purpose. */
+    GARMIN_BOLUS(IMPORTANT, SYNC),
+
+    /**
+     * Fork driver :pump:apex (in the build, not in the app). A message from the Apex driver that only
+     * engineering mode shows, such as pump data it could not read. Appended last on purpose.
+     */
+    APEX_SERVICE_MSG(INFO, PUMP),
+
+    /** Fork driver :pump:apex: the Apex pump is locked and will not take commands. Appended last on purpose. */
+    PUMP_IS_LOCKED(URGENT, PUMP),
+
+    // CGM alarms (`CgmAlarmType` in :implementation). With BG_HYPO, BG_HYPER and BG_RAPID_FALL above
+    // they are the one CGM alarm layer, for every BG source. The sensor ones are raised only for a
+    // source that reports its sensor state ([app.aaps.core.interfaces.source.CgmSensorAlertProvider]).
+    // They only notify; they never change dosing. An alarm the user gave a sound is posted URGENT,
+    // whatever its level here. Appended last on purpose, see the comment above.
+    CGM_URGENT_LOW(URGENT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    CGM_URGENT_LOW_SOON(URGENT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    CGM_RAPID_RISE(IMPORTANT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    CGM_SENSOR_FAILED(URGENT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    CGM_SENSOR_EXPIRED(URGENT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    CGM_SENSOR_EXPIRING(IMPORTANT, CGM),
+    CGM_SIGNAL_LOST(IMPORTANT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    CGM_SENSOR_ISSUE(IMPORTANT, CGM, alarmAction = AlarmAction.CGM_ACKNOWLEDGE),
+    CGM_WARMUP_DONE(NORMAL, CGM),
+    CGM_SECOND_SENSOR_READY(NORMAL, CGM),
+
+    /** The test button of a CGM alarm: its sound and text, once, until the user dismisses it. */
+    CGM_ALARM_TEST(URGENT, CGM),
+
+    /** The user stopped AAPS on this phone (`AapsStop`). Shown until it is started again. Appended last on purpose. */
+    AAPS_STOPPED(IMPORTANT, SYSTEM);
+
+    companion object {
+
+        fun fromOrdinal(ordinal: Int): NotificationId? = entries.getOrNull(ordinal)
+    }
+}

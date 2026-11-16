@@ -1,0 +1,41 @@
+package app.aaps.pump.medtrum.ios
+
+import app.aaps.core.keys.PreferenceType
+import app.aaps.core.keys.interfaces.BooleanPreferenceKey
+import app.aaps.core.keys.interfaces.IntentPreferenceKey
+import app.aaps.core.keys.interfaces.TextRef
+import app.aaps.pump.medtrum.MedtrumStrings
+
+/**
+ * The screens this plugin offers in its settings on an iPhone: choosing the pump, and changing the
+ * patch with the shared patch wizard.
+ *
+ * `iosMain`, so none of this is in the Android preference schema.
+ */
+enum class MedtrumIosIntentKey(
+    override val key: String,
+    override val title: TextRef,
+    override val summary: TextRef? = null,
+    override val preferenceType: PreferenceType = PreferenceType.CLICK,
+    override val defaultedBySM: Boolean = false,
+    override val showInApsMode: Boolean = true,
+    override val showInNsClientMode: Boolean = true,
+    override val showInPumpControlMode: Boolean = true,
+    override val dependency: BooleanPreferenceKey? = null,
+    override val negativeDependency: BooleanPreferenceKey? = null,
+    override val hideParentScreenIfHidden: Boolean = false,
+    override val exportable: Boolean = false
+) : IntentPreferenceKey {
+
+    PickPump(
+        key = "medtrum_ios_pick_pump",
+        title = MedtrumStrings.medtrum_pick_pump_title,
+        summary = MedtrumStrings.medtrum_pick_pump_summary
+    ),
+
+    /** The same entry as on the Android overview: it opens the page that fits the pump state. */
+    ChangePatch(
+        key = "medtrum_ios_change_patch",
+        title = MedtrumStrings.change_patch_label
+    )
+}

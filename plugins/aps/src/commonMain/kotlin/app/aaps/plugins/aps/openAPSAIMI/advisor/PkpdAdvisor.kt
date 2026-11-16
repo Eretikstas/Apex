@@ -1,0 +1,286 @@
+package app.aaps.plugins.aps.openAPSAIMI.advisor
+
+import app.aaps.core.interfaces.resources.TextResolver
+import app.aaps.plugins.aps.ApsStrings
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefAnalysisReport
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefDataSufficiency
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefGlycemicPriority
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefPersonalSignalGate
+import app.aaps.plugins.aps.openAPSAIMI.model.*
+import app.aaps.plugins.aps.openAPSAIMI.pkpd.PkpdSmbTailDamping
+import kotlin.math.min
+import kotlin.math.round
+import kotlin.math.max
+
+/**
+ * =============================================================================
+ * PKPD ADVISOR ENGINE
+ * =============================================================================
+ *
+ * Deterministic analysis of PKPD settings based on 7-day metrics.
+ * Produces suggestions for tuning DIA, Peak time, Damping, etc.
+ *
+ * Fix #1a: Raised trigger thresholds (hyper 25%→40%, hypo 4%→7%) to avoid
+ *           systematic/empirical recommendations on well-managed users.
+ * Fix #1c: Added Trend Guard — suppresses all recs if today's TIR >= 7-day avg.
+ * =============================================================================
+ */
+class PkpdAdvisor {
+
+    fun analysePkpd(
+        metrics: AdvisorMetrics,
+        pkpd: PkpdPrefsSnapshot,
+        rh: TextResolver,
+        oref: OrefAnalysisReport? = null,
+    ): List<AimiRecommendation> {
+        val suggestions = mutableListOf<AimiRecommendation>()
+        // Stop when the period was not measured. These suggestions change insulin settings, so a
+        // missing number must mean "say nothing", never "assume an average patient".
+        if (metrics.isInsufficient) return suggestions
+        val tir70_180 = metrics.tir70_180 ?: return suggestions
+        val timeBelow70 = metrics.timeBelow70 ?: return suggestions
+        val timeAbove180 = metrics.timeAbove180 ?: return suggestions
+
+        // 1. Check if Enabled
+        if (!pkpd.pkpdEnabled) {
+            // Only suggest enabling if control is significantly poor
+            if (tir70_180 < 0.70) { // Raised threshold: was 80%
+                val action = AimiAction.PreferenceUpdate(
+                    key = app.aaps.core.keys.BooleanKey.OApsAIMIPkpdEnabled,
+                    newValue = true,
+                    reason = rh.gs(ApsStrings.aimi_pkpd_advisor_disabled),
+                    domain = AimiDomain.Pkpd,
+                    priority = AimiPriority.High
+                )
+                suggestions += AimiRecommendation(
+                    title = ApsStrings.aimi_pkpd_title_enable,
+                    description = ApsStrings.aimi_pkpd_advisor_disabled,
+                    priority = AimiPriority.High,
+                    domain = AimiDomain.Pkpd,
+                    action = action
+                )
+            }
+            return suggestions
+        }
+
+        // ── Fix #1c: Trend Guard (OREF-aware) ─────────────────────────────────────
+        // If today's TIR >= 7-day average, skip PKPD tuning unless on-device OREF/ML still flags risk.
+        val isImproving = metrics.todayTir != null && metrics.todayTir >= tir70_180
+        val orefStillRisky = orefContradictsQuietPeriod(oref)
+        if (isImproving && !orefStillRisky) return suggestions
+        // ─────────────────────────────────────────────────────────────────────────
+
+        val hypoTrigger = hypoPkpdTrigger(timeBelow70, oref)
+        val hyperTrigger = hyperPkpdTrigger(timeBelow70, timeAbove180, oref)
+        val mode = resolvePkpdMode(hypoTrigger, hyperTrigger, timeBelow70, timeAbove180, oref)
+
+        // 2. HYPERS Analysis
+        // Default threshold 40% >180 (conservative). When OREF marks hyper priority with exposure, allow earlier PKPD hints.
+        // Never run hypo + hyper blocks together: same knob would get contradictory +0.5 / -0.5 DIA recommendations.
+        if (mode == PkpdMode.HYPER_DOMINANT) {
+
+            // The DIA and peak rules that wrote OApsAIMIPkpdInitialDiaH / OApsAIMIPkpdInitialPeakMin
+            // were removed: those keys never changed dosing, and the learner now starts from the
+            // profile insulin.
+
+            // C) ISF Fusion too restrictive?
+            if (pkpd.isfFusionMaxFactor < 1.4) {
+                val newFactor = min(2.0, pkpd.isfFusionMaxFactor + 0.1)
+                // The text shows the one-step value that is written (step A1), not the 2.0 cap.
+                val newFactorText = displayValue(newFactor)
+                val explanation = rh.gs(ApsStrings.aimi_pkpd_hyper_isf, newFactorText)
+                val action = AimiAction.PreferenceUpdate(
+                    key = app.aaps.core.keys.DoubleKey.OApsAIMIIsfFusionMaxFactor,
+                    newValue = newFactor,
+                    reason = explanation,
+                    domain = AimiDomain.Pkpd,
+                    priority = AimiPriority.Medium
+                )
+                suggestions += AimiRecommendation(
+                    title = ApsStrings.aimi_pkpd_title_isf,
+                    description = ApsStrings.aimi_pkpd_hyper_isf,
+                    priority = AimiPriority.Medium,
+                    domain = AimiDomain.Pkpd,
+                    action = action,
+                    descriptionArgs = listOf(newFactorText)
+                )
+            }
+
+            // D) Tail damping very strong while hypers dominate and hypos are rare — allow slightly more tail delivery.
+            // Stored pref is a multiplicative FLOOR (lower = stronger damping): weakening the guard means RAISING the floor.
+            val effectiveDampingHyper = PkpdSmbTailDamping.effectiveStoredValue(pkpd.smbTailDamping)
+            if (effectiveDampingHyper < PkpdSmbTailDamping.DAMPING_LIGHT - 0.02 && timeBelow70 < 0.035) {
+                val newDamping = PkpdSmbTailDamping.clampForAdvisor(effectiveDampingHyper + 0.08)
+                if (newDamping > effectiveDampingHyper + 0.01) {
+                    val explanation = rh.gs(ApsStrings.aimi_pkpd_hyper_damping_reduce, displayValue(effectiveDampingHyper), displayValue(newDamping))
+                    val action = AimiAction.PreferenceUpdate(
+                        key = app.aaps.core.keys.DoubleKey.OApsAIMISmbTailDamping,
+                        newValue = newDamping,
+                        reason = explanation,
+                        domain = AimiDomain.Pkpd,
+                        priority = AimiPriority.Medium
+                    )
+                    suggestions += AimiRecommendation(
+                        title = ApsStrings.aimi_pkpd_title_damping,
+                        description = ApsStrings.aimi_pkpd_hyper_damping_reduce,
+                        priority = AimiPriority.Medium,
+                        domain = AimiDomain.Pkpd,
+                        action = action,
+                        descriptionArgs = listOf(displayValue(effectiveDampingHyper), displayValue(newDamping))
+                    )
+                }
+            }
+        }
+
+        // 3. HYPOS Analysis
+        // Default threshold 7% <70. When OREF marks hypo priority and data are usable, allow ~5.5% + corroboration.
+        if (mode == PkpdMode.HYPO_DOMINANT) {
+
+            // The DIA and peak rules were removed here too (see the hyper block).
+
+            // C) Tail damping too weak for the hypo pattern?
+            // Stored pref is a multiplicative FLOOR (lower = stronger damping): strengthening the guard means LOWERING the floor.
+            val effectiveDampingHypo = PkpdSmbTailDamping.effectiveStoredValue(pkpd.smbTailDamping)
+            if (effectiveDampingHypo > PkpdSmbTailDamping.DAMPING_STRONG + 0.05) {
+                val newDamping = PkpdSmbTailDamping.clampForAdvisor(effectiveDampingHypo - 0.1)
+                if (newDamping < effectiveDampingHypo - 0.01) {
+                    // The reason carries the new floor; before step A1 it showed the raw placeholder.
+                    val newDampingText = displayValue(newDamping)
+                    val explanation = rh.gs(ApsStrings.aimi_pkpd_hypo_damping, newDampingText)
+                    val action = AimiAction.PreferenceUpdate(
+                        key = app.aaps.core.keys.DoubleKey.OApsAIMISmbTailDamping,
+                        newValue = newDamping,
+                        reason = explanation,
+                        domain = AimiDomain.Pkpd,
+                        priority = AimiPriority.Critical
+                    )
+                    suggestions += AimiRecommendation(
+                        title = ApsStrings.aimi_pkpd_title_damping,
+                        description = ApsStrings.aimi_pkpd_hypo_damping,
+                        priority = AimiPriority.Critical,
+                        domain = AimiDomain.Pkpd,
+                        action = action,
+                        descriptionArgs = listOf(newDampingText)
+                    )
+                }
+            }
+
+            // D) ISF fusion headroom already high — reduce max fusion to cap aggressive corrections during lows
+            if (pkpd.isfFusionMaxFactor > 1.35) {
+                val newFactor = max(1.0, pkpd.isfFusionMaxFactor - 0.1)
+                if (newFactor < pkpd.isfFusionMaxFactor - 0.01) {
+                    val explanation = rh.gs(ApsStrings.aimi_pkpd_hypo_isf_reduce, displayValue(pkpd.isfFusionMaxFactor), displayValue(newFactor))
+                    val action = AimiAction.PreferenceUpdate(
+                        key = app.aaps.core.keys.DoubleKey.OApsAIMIIsfFusionMaxFactor,
+                        newValue = newFactor,
+                        reason = explanation,
+                        domain = AimiDomain.Pkpd,
+                        priority = AimiPriority.High
+                    )
+                    suggestions += AimiRecommendation(
+                        title = ApsStrings.aimi_pkpd_title_isf,
+                        description = ApsStrings.aimi_pkpd_hypo_isf_reduce,
+                        priority = AimiPriority.High,
+                        domain = AimiDomain.Pkpd,
+                        action = action,
+                        descriptionArgs = listOf(displayValue(pkpd.isfFusionMaxFactor), displayValue(newFactor))
+                    )
+                }
+            }
+        }
+
+        return suggestions
+    }
+
+    private enum class PkpdMode { HYPO_DOMINANT, HYPER_DOMINANT, NEITHER }
+
+    /**
+     * When hypo and hyper triggers both fire, pick one dominant context so we never recommend opposite steps for the same parameter.
+     */
+    /**
+     * [value] for a proposal text, with at most two decimals: 1.1 + 0.1 is 1.2000000000000002 as a
+     * double. Only the text is rounded; the proposal writes [value] itself.
+     */
+    private fun displayValue(value: Double): String = (round(value * 100.0) / 100.0).toString()
+
+    private fun resolvePkpdMode(
+        hypoTrigger: Boolean,
+        hyperTrigger: Boolean,
+        timeBelow70: Double,
+        timeAbove180: Double,
+        oref: OrefAnalysisReport?,
+    ): PkpdMode {
+        if (!hypoTrigger && !hyperTrigger) return PkpdMode.NEITHER
+        if (hypoTrigger && !hyperTrigger) return PkpdMode.HYPO_DOMINANT
+        if (hyperTrigger && !hypoTrigger) return PkpdMode.HYPER_DOMINANT
+        when (oref?.priority) {
+            OrefGlycemicPriority.HYPO -> return PkpdMode.HYPO_DOMINANT
+            OrefGlycemicPriority.HYPER -> return PkpdMode.HYPER_DOMINANT
+            OrefGlycemicPriority.BOTH -> {
+                if (timeBelow70 >= 0.06) return PkpdMode.HYPO_DOMINANT
+                if (timeAbove180 >= 0.30 && timeBelow70 < 0.045) return PkpdMode.HYPER_DOMINANT
+                return if (timeBelow70 * 1.3 >= timeAbove180) {
+                    PkpdMode.HYPO_DOMINANT
+                } else {
+                    PkpdMode.HYPER_DOMINANT
+                }
+            }
+            else -> {
+                if (timeBelow70 >= 0.06) return PkpdMode.HYPO_DOMINANT
+                if (timeAbove180 >= 0.35 && timeBelow70 < 0.035) return PkpdMode.HYPER_DOMINANT
+                return if (timeBelow70 * 1.2 >= timeAbove180) {
+                    PkpdMode.HYPO_DOMINANT
+                } else {
+                    PkpdMode.HYPER_DOMINANT
+                }
+            }
+        }
+    }
+
+    // The three gates below read three OREF inputs each. The measured outcome history and the calibrated ONNX
+    // risk are unchanged. The third one, the personal on-device signal, is read through OrefPersonalSignalGate
+    // because it is not calibrated: it reports a compressed sigmoid, never below 50 %, so on its own it would
+    // open these gates for nearly every patient. The gate holds it off until it is calibrated; the thresholds
+    // themselves are left as they are.
+
+    private fun orefContradictsQuietPeriod(oref: OrefAnalysisReport?): Boolean {
+        val o = oref ?: return false
+        if (o.dataSufficiency == OrefDataSufficiency.INSUFFICIENT) return false
+        val hypoFocus = o.priority == OrefGlycemicPriority.HYPO || o.priority == OrefGlycemicPriority.BOTH
+        val hyperFocus = o.priority == OrefGlycemicPriority.HYPER || o.priority == OrefGlycemicPriority.BOTH
+        val hypoSignal = hypoFocus &&
+            ((o.actualHypo4hPct ?: 0.0) >= 12.0 ||
+                (o.meanCalHypoRiskPct ?: 0.0) >= 20.0 ||
+                OrefPersonalSignalGate.tripsDecision(o.personalMeanHypoSignalPct, 52.0))
+        val hyperSignal = hyperFocus &&
+            ((o.actualHyper4hPct ?: 0.0) >= 18.0 ||
+                (o.meanCalHyperRiskPct ?: 0.0) >= 25.0 ||
+                OrefPersonalSignalGate.tripsDecision(o.personalMeanHyperSignalPct, 52.0))
+        return hypoSignal || hyperSignal
+    }
+
+    private fun hypoPkpdTrigger(timeBelow70: Double, oref: OrefAnalysisReport?): Boolean {
+        if (timeBelow70 > 0.07) return true
+        if (timeBelow70 <= 0.055) return false
+        val o = oref ?: return false
+        if (o.dataSufficiency == OrefDataSufficiency.INSUFFICIENT) return false
+        val hypoFocus = o.priority == OrefGlycemicPriority.HYPO || o.priority == OrefGlycemicPriority.BOTH
+        if (!hypoFocus) return false
+        return (o.actualHypo4hPct ?: 0.0) >= 10.0 ||
+            (o.meanCalHypoRiskPct ?: 0.0) >= 18.0 ||
+            OrefPersonalSignalGate.tripsDecision(o.personalMeanHypoSignalPct, 48.0)
+    }
+
+    private fun hyperPkpdTrigger(timeBelow70: Double, timeAbove180: Double, oref: OrefAnalysisReport?): Boolean {
+        val calmHypos = timeBelow70 < 0.06
+        if (timeAbove180 > 0.40 && timeBelow70 < 0.02) return true
+        if (!calmHypos || timeAbove180 <= 0.20) return false
+        val o = oref ?: return false
+        if (o.dataSufficiency == OrefDataSufficiency.INSUFFICIENT) return false
+        val hyperFocus = o.priority == OrefGlycemicPriority.HYPER || o.priority == OrefGlycemicPriority.BOTH
+        if (!hyperFocus) return false
+        return (o.actualHyper4hPct ?: 0.0) >= 18.0 ||
+            (o.meanCalHyperRiskPct ?: 0.0) >= 25.0 ||
+            OrefPersonalSignalGate.tripsDecision(o.personalMeanHyperSignalPct, 52.0)
+    }
+}

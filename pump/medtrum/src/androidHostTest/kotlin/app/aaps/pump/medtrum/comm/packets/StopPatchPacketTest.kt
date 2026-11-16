@@ -1,0 +1,52 @@
+package app.aaps.pump.medtrum.comm.packets
+
+import app.aaps.pump.medtrum.MedtrumTestBase
+import com.google.common.truth.Truth.assertThat
+import org.junit.jupiter.api.Test
+
+class StopPatchPacketTest : MedtrumTestBase() {
+
+    /** Test packet specific behavior */
+
+
+    @Test fun getRequestGivenPacketWhenCalledThenReturnOpCode() {
+        // Inputs
+        val opCode = 31
+
+        // Call
+        val packet = StopPatchPacket(medtrumPump)
+        val result = packet.getRequest()
+
+        // Expected values
+        assertThat(result).asList().containsExactly(opCode.toByte())
+    }
+
+    @Test fun handleResponseGivenPacketWhenValuesSetThenReturnCorrectValues() {
+        // Inputs
+        val response = byteArrayOf(11, 31, 10, 0, 0, 0, 23, 0, -110, 0, -5, 0)
+
+        // Call
+        val packet = StopPatchPacket(medtrumPump)
+        val result = packet.handleResponse(response)
+
+        // Expected values
+        val expectedPatchId = 146L
+        val expectedStopSequence = 23
+        assertThat(result).isTrue()
+        assertThat(medtrumPump.lastStopPatchId).isEqualTo(expectedPatchId)
+        assertThat(medtrumPump.lastStopSequence).isEqualTo(expectedStopSequence)
+    }
+
+    @Test fun handleResponseGivenResponseWhenMessageTooShortThenResultFalse() {
+        // Inputs
+        val response = byteArrayOf(11, 31, 10, 0, 0, 0, 23, 0, -110)
+
+        // Call
+        val packet = StopPatchPacket(medtrumPump)
+        val result = packet.handleResponse(response)
+
+        // Expected values
+        assertThat(result).isFalse()
+        assertThat(packet.failed).isTrue()
+    }
+}

@@ -1,0 +1,455 @@
+package app.aaps.plugins.source
+
+import androidx.compose.runtime.remember
+import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.interfaces.concurrent.AapsLock
+import app.aaps.core.interfaces.concurrent.withLock
+import app.aaps.core.interfaces.configuration.ConfigBuilder
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.notifications.NotificationId
+import app.aaps.core.interfaces.notifications.NotificationManager
+import app.aaps.core.interfaces.resources.TextResolver
+import app.aaps.core.interfaces.source.SensorSlot
+import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.IntKey
+import app.aaps.core.keys.interfaces.PreferenceItem
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.keys.interfaces.TextRef
+import app.aaps.core.keys.interfaces.withCompose
+import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.compose.ComposeScreenContent
+import app.aaps.core.ui.compose.navigation.LocalPluginNavigationRequest
+import app.aaps.core.ui.compose.navigation.NavigationRequest
+import app.aaps.plugins.dexcomoneplus.OnePlusCgmDriver
+import app.aaps.plugins.dexcomoneplus.OnePlusCgmDriverStub
+import app.aaps.plugins.dexcomoneplus.OnePlusCommLog
+import app.aaps.plugins.dexcomoneplus.OnePlusCgmDrivers
+import app.aaps.plugins.dexcomoneplus.OnePlusGlucoseWatcher
+import app.aaps.plugins.dexcomoneplus.OnePlusInstalledApps
+import app.aaps.plugins.dexcomoneplus.OnePlusIosPlatform
+import app.aaps.plugins.dexcomoneplus.OnePlusWarmupState
+import app.aaps.plugins.dexcomoneplus.identity.OnePlusSensorStore
+import app.aaps.plugins.dexcomoneplus.scan.OnePlusBleScanner
+import app.aaps.plugins.source.compose.DexcomOnePlusStartScreen
+import app.aaps.plugins.source.compose.DexcomOnePlusWarmupScreen
+import app.aaps.plugins.source.compose.OnePlusBlePermissionGate
+import app.aaps.plugins.source.keys.DexcomOnePlusBooleanKey
+import app.aaps.plugins.source.keys.DexcomOnePlusIntentKey
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
+import kotlin.concurrent.Volatile
+import kotlin.time.Clock
+
+/**
+ * [DexcomOnePlusHost] on iPhone.
+ *
+ * ## The plugin can be switched on, and says what is different here
+ *
+ * [notUsableReason] is null, so nothing locks the switch: the owner asked for the iPhone to be
+ * testable on a real sensor, and that call is theirs to make. What stays is [platformNote], which
+ * replaces the plugin description with the limits below. The person reads them in the place they
+ * switch the plugin on, and then decides.
+ *
+ * ## What is there now and what is not
+ *
+ * The driver itself is no longer missing. `OnePlusCgmDriverReal` is shared code: the same class
+ * runs the scan, the connect, the KEKS handshake, the Control/EGV loop and the reconnect ladder on
+ * both phones, and everything the phone itself owns is behind `OnePlusPlatform`, which
+ * `OnePlusIosPlatform` now answers over CoreBluetooth and `NSUserDefaults`. So there **is** an
+ * iPhone object that connects, authenticates and parses glucose. These are the steps still between
+ * that and a reading a person could rely on:
+ *
+ * - **Nothing has met a sensor.** The handshake matches the Java byte for byte on recorded
+ *   exchanges, and two branches have no recorded exchange at all - the unbonded four digit
+ *   pairing, and the short reconnect with a saved key. Nothing in this lot changes that.
+ * - **A new sensor pairs through the iPhone dialog.** An unbonded pairing reaches a point where
+ *   the sensor asks for an OS pairing. CoreBluetooth has no API for that and pairs by itself on
+ *   the next encrypted operation, showing its own dialog; `OnePlusGattClientIos` lets the
+ *   handshake go on and waits for the person to accept. Not yet tried with a real sensor.
+ * - **An ended app is woken only if the plugin starts again.** `bluetooth-central` in the
+ *   Info.plist lets a *suspended* app be woken by a connected peripheral, which is the five minute
+ *   heartbeat every iOS loop app relies on. The ONE+ central is opened with its own restore
+ *   identifier, so iOS can also start an ended app again for a pending scan or connect. The
+ *   restored link itself is not taken over - `OnePlusIosRadio` says why - and the driver connects
+ *   again from the stored sensor, as at every plugin start. Whether the app starts this plugin
+ *   during such a background launch is decided outside this module and has not been tried. After
+ *   a force quit or a phone restart iOS starts nothing.
+ * - **A missed reading is told even when the app cannot run.** After each reading,
+ *   [onReadingStored] arms a local notification at "reading + stale limit" with the text of the
+ *   missed BG alarm, and the next reading moves it. See `DexcomOnePlusMissedReadingAlarm`.
+ * - **There is no wake lock.** Android holds the processor through connect and authenticate;
+ *   `OnePlusIosCpuLease` answers "no lease" because iOS has nothing with that meaning. The session
+ *   already treats that as "the work goes ahead, less protected", and the background mode above is
+ *   what stands in its place. It has not been measured on a phone.
+ * - **Three screens.** Start, Warm-up and a status summary are shared code and open from this
+ *   plugin's settings. The pre-soak slot is the same shared screens as Android. It can be turned
+ *   off with [DexcomOnePlusBooleanKey.IosPreSoak], which is on by default; off is today's
+ *   single-sensor behaviour. The two slots share one CoreBluetooth scan, see `OnePlusIosScanBus`.
+ *
+ * ## The one that is not a missing feature
+ *
+ * A Dexcom ONE+ or G7 admits **one display at a time**. `OnePlusMacArbiter` records that two
+ * sessions on one transmitter is not a race that sometimes bites but a certainty. So an attempt
+ * from an iPhone can take a running sensor away from the Dexcom app or from the person's Android
+ * phone. That is why [platformNote] says it first: no amount of code here removes it, the person
+ * has to know not to run both.
+ *
+ * ## What the members below do
+ *
+ * Every member below is now reachable, because the plugin can start:
+ *
+ * - [productionDriver] is `OnePlusCgmDrivers.default()`, the same shared real driver Android uses;
+ * - [stagingDriver] is the real pre-soak driver while [DexcomOnePlusBooleanKey.IosPreSoak] is on,
+ *   and the stub when it is off. The two drivers share one scan and keep two connections; see
+ *   `OnePlusIosPlatform`;
+ * - [slotStore] is a real store on this phone, because that part does work here;
+ * - [setSessionServiceWanted] has no iPhone equivalent, so it writes one line rather than
+ *   pretending the session is protected;
+ * - [showWarmup], [cancelWarmupNotification] and [alert] go to the shared [NotificationManager],
+ *   which shows a card in the app and an iOS notification. Android shows the same messages in an
+ *   ongoing, silent status-bar notification; iOS has none, and every post is a banner, so
+ *   `DexcomOnePlusIosNotices` posts a message only when it changes.
+ */
+@ContributesBinding(AppScope::class, binding = binding<DexcomOnePlusHost>())
+@SingleIn(AppScope::class)
+@Inject
+class DexcomOnePlusIosHost(
+    private val aapsLogger: AAPSLogger,
+    // A function, not the type: ConfigBuilder reaches every plugin through ActivePlugin, and this
+    // host is built as part of one of them. Asking for it late keeps that out of the graph build.
+    private val configBuilder: () -> ConfigBuilder,
+    // Functions too, for two reasons. The plugin is built with this host, so nothing the plugin
+    // graph needs may be pulled in while the host itself is built. And a unit test on the simulator
+    // can build the host without faking four interfaces it never reaches.
+    private val notificationManager: () -> NotificationManager,
+    private val rh: () -> TextResolver,
+    private val dateUtil: () -> DateUtil,
+    private val preferences: () -> Preferences,
+) : DexcomOnePlusHost {
+
+    /**
+     * Built on first use, never while the dependency graph is being assembled.
+     *
+     * The iOS graph is built eagerly at startup, and building this opens a `CBCentralManager`,
+     * which is what raises the Bluetooth permission prompt. Only the plugin's start path asks for
+     * it, and that path does not run while the plugin is locked off.
+     */
+    private val platform: OnePlusIosPlatform by lazy { OnePlusIosPlatform() }
+
+    override val stagingNamespace: String = OnePlusCgmDrivers.STAGING_NAMESPACE
+
+    /** Nothing stops the plugin here any more - the limits are in [platformNote]. */
+    override val notUsableReason: TextRef? = null
+
+    /**
+     * The BG source a fresh install starts with on an iPhone. Android has the Dexcom (BYODA) source
+     * for that, which does not exist here, and the Nightscout source is the default only for a
+     * follower phone: without this, start-up stopped with "Default plugin not found". With no
+     * sensor stored, this source starts nothing.
+     */
+    override val isDefaultBgSource: Boolean = true
+
+    override val platformNote: TextRef = SourceStrings.dexcom_oneplus_ios_caution
+
+    override fun attachPlatform(driver: OnePlusCgmDriver) {
+        driver.attach(platform)
+    }
+
+    override fun slotStore(namespace: String?): OnePlusSensorStore = OnePlusSensorStore(namespace)
+
+    override fun productionDriver(): OnePlusCgmDriver = OnePlusCgmDrivers.default()
+
+    /**
+     * The real pre-soak driver while [iosPreSoakEnabled] is on, and the stub when it is off.
+     *
+     * Off does not build a second driver, so the phone behaves as it did with one sensor.
+     */
+    override fun stagingDriver(): OnePlusCgmDriver =
+        if (iosPreSoakEnabled()) OnePlusCgmDrivers.staging() else OnePlusCgmDriverStub.instance
+
+    override fun existingProductionDriver(): OnePlusCgmDriver? = OnePlusCgmDrivers.existingProduction()
+
+    /**
+     * The pre-soak driver if one was built, even when the switch is now off, so the plugin can
+     * stop it. Null when the slot was never started.
+     */
+    override fun existingStagingDriver(): OnePlusCgmDriver? = OnePlusCgmDrivers.existingStaging()
+
+    override fun attachProductionDriver(watcher: OnePlusGlucoseWatcher): OnePlusCgmDriver =
+        OnePlusCgmDrivers.production(watcher)
+
+    override fun promoteStagingInstance(): OnePlusCgmDriver? = OnePlusCgmDrivers.promoteStagingInstance()
+
+    /**
+     * Reads [DexcomOnePlusBooleanKey.IosPreSoak]. Tests replace it so they do not need a
+     * preferences implementation.
+     */
+    internal var iosPreSoakEnabled: () -> Boolean = {
+        preferences().get(DexcomOnePlusBooleanKey.IosPreSoak)
+    }
+
+    override fun setSessionServiceWanted(wanted: Boolean) {
+        aapsLogger.info(
+            LTag.BGSOURCE,
+            "DEXCOM_ONEPLUS_SESSION: iPhone has no foreground service, wanted=$wanted changed nothing",
+        )
+    }
+
+    /** Decides which warm-up states become a message; see `DexcomOnePlusIosNotices`. */
+    private val notices = DexcomOnePlusIosNotices()
+
+    /**
+     * [showWarmup] is called from the driver's threads and from the plugin, and [onReadingStored]
+     * from the plugin's IO scope; their state is changed one caller at a time.
+     */
+    private val noticesLock = AapsLock()
+
+    private val missedReadingAlarm by lazy { DexcomOnePlusMissedReadingAlarm(aapsLogger) }
+
+    /** Time of the newest reading that armed [missedReadingAlarm], so an older one cannot move it back. */
+    private var newestReadingMs = 0L
+
+    override fun showWarmup(state: OnePlusWarmupState) {
+        val decision = noticesLock.withLock { notices.decide(state, nowMs()) }
+        when (decision) {
+            is DexcomOnePlusIosNotices.Decision.Post -> {
+                val args = listOfNotNull<Any>(decision.minutes, decision.endsAtMs?.let { dateUtil().timeString(it) })
+                val text = rh().gs(decision.text, *args.toTypedArray())
+                notificationManager().post(WARMUP_NOTICE_ID, text)
+                aapsLogger.info(LTag.BGSOURCE, "DEXCOM_ONEPLUS_WARMUP: phase=${state.phase} posted to the person")
+            }
+
+            DexcomOnePlusIosNotices.Decision.Dismiss -> notificationManager().dismiss(WARMUP_NOTICE_ID)
+            DexcomOnePlusIosNotices.Decision.Keep    -> Unit
+        }
+    }
+
+    override fun cancelWarmupNotification() {
+        noticesLock.withLock { notices.reset() }
+        notificationManager().dismiss(WARMUP_NOTICE_ID)
+    }
+
+    override fun alert(message: String) {
+        aapsLogger.warn(LTag.BGSOURCE, "DEXCOM_ONEPLUS: alert to the person: $message")
+        notificationManager().post(ALERT_NOTICE_ID, message)
+    }
+
+    /**
+     * Moves the missed-reading alarm to "this reading + stale limit".
+     *
+     * Reads the same two settings as `LocalAlertUtils.checkStaleBGAlert`: whether the alarm is on,
+     * and the stale limit. With the alarm off, an armed one is taken down.
+     */
+    override fun onReadingStored(timestampMs: Long) {
+        val prefs = preferences()
+        if (!prefs.get(BooleanKey.AlertMissedBgReading)) {
+            missedReadingAlarm.disarm()
+            return
+        }
+        // A backfilled reading is older than the newest one and must not pull the alarm earlier.
+        val newest = noticesLock.withLock {
+            if (timestampMs <= newestReadingMs) {
+                false
+            } else {
+                newestReadingMs = timestampMs
+                true
+            }
+        }
+        if (!newest) return
+        val delaySeconds = DexcomOnePlusMissedReadingAlarm.delaySeconds(
+            readingAtMs = timestampMs,
+            nowMs = nowMs(),
+            enabled = true,
+            staleLimitMinutes = prefs.get(IntKey.AlertsStaleDataThreshold),
+        ) ?: return
+        val resolver = rh()
+        missedReadingAlarm.arm(
+            delaySeconds = delaySeconds,
+            title = resolver.gs(CoreUiStrings.urgent_alarm),
+            text = resolver.gs(CoreUiStrings.missed_bg_readings),
+            breakThroughFocus = prefs.get(BooleanKey.AlertOverrideDoNotDisturb),
+        )
+    }
+
+    override fun cancelMissedReadingAlarm() {
+        noticesLock.withLock { newestReadingMs = 0L }
+        missedReadingAlarm.disarm()
+    }
+
+    private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
+
+    /**
+     * The start screen's scanner. It shares the one CoreBluetooth scan with the drivers and is
+     * dropped when the screen stops, so closing the screen does not stop a scan a driver still needs
+     * and does not disconnect the sensor that feeds the loop.
+     */
+    override fun screenScanner(): OnePlusBleScanner = platform.screenScanner()
+
+    /**
+     * None. An iPhone app cannot list the other apps on the phone, so the start screen leaves the
+     * warning about the Dexcom app, xDrip+ and Juggluco out here rather than say "none found".
+     */
+    override val installedApps: OnePlusInstalledApps? = null
+
+    /**
+     * The two setup screens, in the Android order: Start, Warm-up.
+     *
+     * Both are shared code, so what a person reads and the order they do things in are the same as
+     * on Android. They open inside the settings tree through [withCompose] rather than through an
+     * Activity, which is how every other shared screen reaches iOS. The status screen of the
+     * plugin tab opens them there too, see [openScreen]. One screen cannot open another from the
+     * settings tree, so the buttons that do that on Android are not drawn here.
+     *
+     * Status is not in this list: it is the sensor button of the plugin tab, the same as on
+     * Android. The pre-soak card is on that screen while [supportsStaging] is true.
+     *
+     * - **Start** is the shared start screen. The pre-soak slot is drawn while the switch is on:
+     *   `onStagingDriver` is the real staging driver, so the screen offers the slot chooser, the
+     *   conflict dialog and cancel. Promotion itself stays on the status screen, which owns the
+     *   confirmation and the gates; the conflict dialog opens that plugin tab. With the switch off,
+     *   `onStagingDriver` is null and the chooser is not drawn. A started sensor closes the screen;
+     *   the warm-up is the next entry. There is no applicator scan button: the camera bridge of
+     *   this app takes photos and does not read a barcode, so the code is typed.
+     * - **Warm-up** is the shared countdown screen. Its log, start and status buttons are not
+     *   drawn, for the reason above.
+     *
+     * Switching the plugin on after a sensor is adopted goes through [ConfigBuilder], exactly as
+     * the Android Activity does, so the BG source is selected the same way on both phones.
+     */
+    override fun screenItems(plugin: DexcomOnePlusPlugin): List<PreferenceItem> = listOf(
+        DexcomOnePlusIntentKey.Start.withCompose(
+            ComposeScreenContent { onBack ->
+                val navigate = LocalPluginNavigationRequest.current
+                val preSoak = iosPreSoakEnabled()
+                // The slot the opening button asked for, read once: the settings entry asks for none,
+                // so it starts production, as before.
+                val initialSlot = remember { takeRequestedStartSlot() }
+                DexcomOnePlusStartScreen(
+                    host = this@DexcomOnePlusIosHost,
+                    initialSlot = initialSlot,
+                    // iOS has no permission to check before a scan: CoreBluetooth prompts on the
+                    // first one.
+                    permissions = OnePlusBlePermissionGate.NoSeparateStep,
+                    onBack = onBack,
+                    onEnsureDriver = {
+                        plugin.syncDriverFromPrefs()
+                        OnePlusCgmDrivers.default()
+                    },
+                    onActivatePlugin = {
+                        configBuilder().performPluginSwitch(
+                            changedPlugin = plugin,
+                            enabled = true,
+                            type = PluginType.BGSOURCE,
+                        )
+                    },
+                    isPluginStopped = { plugin.isStopped() },
+                    onStarted = { onBack() },
+                    onBeginStaging = { plugin.beginStaging(it) },
+                    onIsStagingSensor = { plugin.isStagingSensor(it) },
+                    onCancelStaging = { plugin.cancelStaging() },
+                    onOpenPromote = {
+                        // The status screen owns the promote button and its confirmation. On iPhone
+                        // that screen is the sensor button of this plugin's tab.
+                        navigate(
+                            NavigationRequest.Plugin(
+                                DexcomOnePlusPlugin::class.simpleName.orEmpty(),
+                            ),
+                        )
+                        onBack()
+                    },
+                    onStagingDriver = if (preSoak) {
+                        { OnePlusCgmDrivers.staging() }
+                    } else {
+                        null
+                    },
+                    onSensorSessionStarted = { address, previousMac ->
+                        plugin.onSensorSessionStarted(address, previousMac)
+                    },
+                    // The camera bridge of this app takes photos and reads no barcode, so the code
+                    // is typed and the scan button is not drawn.
+                    applicatorScanner = null,
+                )
+            },
+        ),
+        DexcomOnePlusIntentKey.Warmup.withCompose(
+            ComposeScreenContent { onBack ->
+                DexcomOnePlusWarmupScreen(
+                    storedSession = { slotStore(OnePlusCgmDrivers.storeNamespace(SensorSlot.PRODUCTION)).load() },
+                    onBack = onBack,
+                    onRetry = {
+                        plugin.syncDriverFromPrefs()
+                        OnePlusCgmDrivers.default().resumeStoredSession()
+                    },
+                    onOpenLog = null,
+                    onOpenStart = null,
+                    onOpenStatus = null,
+                    formatTime = { epochMs -> dateUtil().timeString(epochMs) },
+                )
+            },
+        ),
+    )
+
+    /** The shared pre-soak slot, unless [DexcomOnePlusBooleanKey.IosPreSoak] is off. */
+    override val supportsStaging: Boolean
+        get() = iosPreSoakEnabled()
+
+    /** The switch lives in this plugin's settings on iPhone only. Android does not show it. */
+    override val offersIosPreSoakSwitch: Boolean = true
+
+    /**
+     * The slot the next Start screen opens locked on. The Start screen is one entry of the settings
+     * tree for both buttons of the status screen, so the button says which slot it wants here and
+     * the screen takes it once ([takeRequestedStartSlot]). Android passes it in the Intent instead.
+     */
+    @Volatile private var requestedStartSlot: SensorSlot? = null
+
+    /** The slot asked for by the last [openScreen], or production; cleared, so it is used once. */
+    private fun takeRequestedStartSlot(): SensorSlot =
+        (requestedStartSlot ?: SensorSlot.PRODUCTION).also { requestedStartSlot = null }
+
+    /** The setup screens live in the settings tree on this phone, see [screenItems]. */
+    override fun openScreen(screen: DexcomOnePlusHost.Screen, navigate: (NavigationRequest) -> Unit) {
+        val key = when (screen) {
+            DexcomOnePlusHost.Screen.START         -> {
+                requestedStartSlot = SensorSlot.PRODUCTION
+                DexcomOnePlusIntentKey.Start.key
+            }
+            DexcomOnePlusHost.Screen.START_PRESOAK -> {
+                requestedStartSlot = SensorSlot.STAGING
+                DexcomOnePlusIntentKey.Start.key
+            }
+            DexcomOnePlusHost.Screen.WARMUP        -> DexcomOnePlusIntentKey.Warmup.key
+        }
+        navigate(
+            NavigationRequest.PluginPreferences(
+                pluginKey = DexcomOnePlusPlugin::class.simpleName.orEmpty(),
+                composeScreenKey = key,
+            ),
+        )
+    }
+
+    /** No AAPS log file on this phone yet, so the lines kept in memory by the iOS log sink. */
+    override suspend fun driverLog(): DexcomOnePlusHost.DriverLog = DexcomOnePlusHost.DriverLog(
+        lines = OnePlusCommLog.shared.lines(nowMs()).map { line ->
+            "${dateUtil().timeString(line.atMs)} ${line.level} ${line.text}"
+        },
+        note = SourceStrings.dexcom_oneplus_log_note_memory,
+    )
+
+    /** No share from the log screen on this phone; the lines can still be selected and copied. */
+    override val logSharer: ((String) -> Unit)? = null
+
+    internal companion object {
+
+        /** The card for warm-up and connection messages. */
+        val WARMUP_NOTICE_ID = NotificationId.DEXCOM_ONEPLUS_WARMUP
+
+        /** The card for [alert]. */
+        val ALERT_NOTICE_ID = NotificationId.DEXCOM_ONEPLUS_ALERT
+    }
+}

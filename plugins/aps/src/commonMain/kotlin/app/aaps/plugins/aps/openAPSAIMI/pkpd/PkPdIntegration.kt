@@ -1,0 +1,854 @@
+package app.aaps.plugins.aps.openAPSAIMI.pkpd
+
+import app.aaps.plugins.aps.openAPSAIMI.ports.AimiBehaviorProfileSource
+import app.aaps.core.interfaces.concurrent.AapsLock
+import app.aaps.core.interfaces.concurrent.withLock
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.LongNonKey
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.plugins.aps.openAPSAIMI.aimiFmt2
+import app.aaps.plugins.aps.openAPSAIMI.patient.CausalStateId
+import app.aaps.plugins.aps.openAPSAIMI.patient.CausalStatePosterior
+import app.aaps.plugins.aps.openAPSAIMI.patient.PatientEventMemory
+import app.aaps.plugins.aps.openAPSAIMI.physio.PhysioLatentState
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.max
+
+class PkPdIntegration(
+    private val preferences: Preferences,
+    private val learnedState: PkPdLearnedState,
+    private val behaviorProfileSource: AimiBehaviorProfileSource,
+) {
+
+    companion object {
+        /** Minimum learned DIA change (hours) before writing prefs again. */
+        const val DIA_PERSIST_MIN_DELTA_H = 0.005
+
+        /** Minimum learned peak change (minutes) before writing prefs again. */
+        const val PEAK_PERSIST_MIN_DELTA_MIN = 0.05
+
+        /** [PkpdLearningTrace.diaLearnBlockedBy]: this call does not learn, it only reads. */
+        const val LEARN_BLOCKED_READ_ONLY_PATH = "read_only_path"
+
+        /** [PkpdLearningTrace.diaLearnBlockedBy]: the causal state was not clean enough to learn from. */
+        const val LEARN_BLOCKED_CAUSAL_UNCLEAN = "causal_unclean"
+
+        /**
+         * [PkpdLearningTrace.diaLearnBlockedBy]: start of the value used when
+         * [CausalKineticsModulator] refuses structural learning. The modulator's own reason is
+         * added after it, so the exported value says which causal branch closed the gate.
+         */
+        const val LEARN_BLOCKED_CAUSAL_MODULATOR_PREFIX = "causal_modulator:"
+
+        /**
+         * [PkpdLearningTrace.diaLearnBlockedBy]: start of the value used when the armed
+         * [PkpdLearningWindowGate] refuses the tick. The gate's own reason is added after it.
+         */
+        const val LEARN_BLOCKED_CURVE_PREFIX = "curve:"
+
+        /**
+         * PK/PD status card only: start of the value used when the gates passed but
+         * [AdaptivePkPdEstimator.update] refused the step. The [PkPdUpdateReason] follows in lower
+         * case, for example `estimator_iob_too_low`. There is no colon, so each estimator reason
+         * stays its own category in [PkpdLearningSummary.reasonCategory].
+         */
+        const val LEARN_BLOCKED_ESTIMATOR_PREFIX = "estimator_"
+
+        /**
+         * Why one learning tick did not learn, for the PK/PD status card.
+         *
+         * @param gateBlockedBy the gate that blocked the tick before the estimator, or null
+         * @param accepted the estimator accepted a learning step on this tick
+         * @param estimatorReason [AdaptivePkPdStatusSnapshot.latestReason] after the tick
+         * @return the gate, else the estimator reason, else null when a step was accepted
+         */
+        fun learningTickBlockedBy(
+            gateBlockedBy: String?,
+            accepted: Boolean,
+            estimatorReason: PkPdUpdateReason,
+        ): String? = when {
+            gateBlockedBy != null -> gateBlockedBy
+            accepted -> null
+            estimatorReason == PkPdUpdateReason.ACCEPTED || estimatorReason == PkPdUpdateReason.NOT_UPDATED -> null
+            else -> LEARN_BLOCKED_ESTIMATOR_PREFIX + estimatorReason.name.lowercase()
+        }
+    }
+
+    /**
+     * Loop-facing configuration that must not include learned DIA/peak state.
+     * Learned values live in prefs and in [estimator]; comparing them here used to
+     * reset the estimator on every successful persist.
+     */
+    private data class StructuralConfig(
+        val bounds: PkPdBounds,
+        val isfBounds: IsfFusionBounds,
+        val tailPolicy: TailAwareSmbPolicy,
+        val anchorDiaHrs: Double,
+        val anchorPeakMin: Double,
+    )
+
+    private var cachedStructuralConfig: StructuralConfig? = null
+    private var fusion: IsfFusion? = null
+    private var lastFusionBounds: IsfFusionBounds? = null
+    private var damping: SmbDamping? = null
+    private var lastTailPolicy: TailAwareSmbPolicy? = null
+    private var recentBolusSamples: List<PkpdBolusSample> = emptyList()
+
+    // Dedicated lock: @Synchronized is JVM-only. Same monitor contract as before:
+    // reentrant and blocking, and it guards exactly the state the annotation guarded.
+    private val lock = AapsLock()
+
+    // Only the learning call feeds it, once per tick, under this class's lock.
+    private val learningWindowGate = PkpdLearningWindowGate()
+
+    // The learned state lives in [PkPdLearnedState], so both consumers read one single value.
+    // These are views on the holder, not fields: the rest of the class does not change.
+    private var estimator: AdaptivePkPdEstimator?
+        get() = learnedState.estimator
+        set(value) {
+            learnedState.estimator = value
+        }
+    private var lastBounds: PkPdBounds?
+        get() = learnedState.lastBounds
+        set(value) {
+            learnedState.lastBounds = value
+        }
+    private var lastLearningCfg: PkPdLearningConfig?
+        get() = learnedState.lastLearningCfg
+        set(value) {
+            learnedState.lastLearningCfg = value
+        }
+    private var lastPersisted: PkPdParams?
+        get() = learnedState.lastPersisted
+        set(value) {
+            learnedState.lastPersisted = value
+        }
+
+    /**
+     * Last generation counter this instance acted on.
+     * `null` means it was never read yet (fresh process): adopt the value without resetting,
+     * because prefs are already the seed source on the first tick. Only a *change* between two
+     * ticks means someone wrote the learned state from outside the loop.
+     */
+    private var seenLearnedStateGeneration: Long?
+        get() = learnedState.seenLearnedStateGeneration
+        set(value) {
+            learnedState.seenLearnedStateGeneration = value
+        }
+
+    fun setRecentBolusSamples(samples: List<PkpdBolusSample>) {
+        lock.withLock {
+            recentBolusSamples = samples
+                .asSequence()
+                .filter { it.units > 0.0 && it.ageMin.isFinite() && it.ageMin >= 0.0 }
+                .toList()
+        }
+    }
+
+    fun reconstructedIobUnits(): Double {
+        return lock.withLock {
+            val est = estimator ?: return 0.0
+            recentBolusSamples.sumOf { sample ->
+                sample.units * est.iobResidualAt(sample.ageMin)
+            }.coerceAtLeast(0.0)
+        }
+    }
+
+    fun learningStatusSnapshot(): AdaptivePkPdStatusSnapshot? = estimator?.statusSnapshot()
+
+    fun computeRuntime(
+        epochMillis: Long,
+        bg: Double,
+        deltaMgDlPer5: Double,
+        iobU: Double,
+        carbsActiveG: Double,
+        windowMin: Int,
+        exerciseFlag: Boolean,
+        profileIsf: Double,
+        tdd24h: Double,
+        mealContext: MealAggressionContext? = null,
+        consoleLog: MutableList<String>? = null,
+        combinedDelta: Double? = null,
+        uamConfidence: Double = 0.0,
+        patientWeightKg: Double? = null,
+        physioLatentState: PhysioLatentState? = null,
+        estimatedRaMgdlPerMin: Double? = null,
+        causalStatePosterior: CausalStatePosterior? = null,
+        allowLearning: Boolean = true,
+        /**
+         * Only the per-tick dosing path may consume the ISF slew budget and move the anchor.
+         * Read-only callers get a bounded value without touching state.
+         * Defaults to allowLearning: same "one writer per tick" rule as the estimator.
+         */
+        isfRateLimitAuthority: Boolean = allowLearning,
+        patientEventMemory: PatientEventMemory? = null,
+        /** Minutes since the last declared meal note (FCL, lunch, ...), `null` when none. Learning gate only. */
+        declaredMealAgeMin: Long? = null,
+        /** That declared meal was high-carb. Learning gate only. */
+        declaredMealHighCarb: Boolean = false,
+        /**
+         * Insulin of the running profile (`iCfg.dia`, `iCfg.peak`): seed, anchor and bounds of the
+         * learner. `null` only for read-only callers that do not know it: they use the last one a
+         * caller gave ([PkpdProfileInsulinMemory.lastSeen]). With none at all there is no runtime.
+         */
+        profileInsulin: ProfileInsulin?,
+    ): PkPdRuntime? {
+        return lock.withLock {
+            adoptExternalLearnedStateReset()
+            // One-shot: the old wizard pace (NORMAL) becomes FASTER, before the pace is read below.
+            if (PkpdLearningBounds.migrateOldWizardPaceOnce(preferences)) {
+                consoleLog?.add("PKPD_PACE: old wizard pace 0.5 h/day, 5 min/day moved to FASTER 2 h/day, 20 min/day")
+            }
+            // Before the structural compare, for the same reason as the external reset: a new profile
+            // insulin also changes the bounds, and the compare would persist the old in-memory value.
+            // It also runs with PK/PD off, so an insulin change made while PK/PD is off still starts
+            // the learned state again, and the one-shot migration runs only on the first tick after
+            // the update.
+            if (profileInsulin != null) {
+                adoptProfileInsulin(profileInsulin, readStructuralConfig(profileInsulin).bounds, consoleLog)
+            }
+            if (!preferences.get(BooleanKey.OApsAIMIPkpdEnabled)) {
+                consoleLog?.add("PKPD Debug: Config ENABLED is FALSE. Check OApsAIMIPkpdEnabled preference.")
+                clearAllCaches()
+                return null
+            }
+            val profile = profileInsulin ?: PkpdProfileInsulinMemory.lastSeen(preferences)
+            if (profile == null) {
+                consoleLog?.add("PKPD Debug: no profile insulin known yet, PK/PD skipped this call.")
+                return null
+            }
+            val structural = readStructuralConfig(profile)
+            val previousStructural = cachedStructuralConfig
+            if (previousStructural != null && previousStructural != structural) {
+                applyStructuralConfigChange(previousStructural, structural)
+            }
+            cachedStructuralConfig = structural
+
+            if (lastPersisted == null) {
+                lastPersisted = readLearnedSeed(structural.bounds)
+            }
+
+            val learningCfg = buildLearningConfig(structural)
+            val estimator = ensureEstimator(structural.bounds, learningCfg)
+            val fusion = ensureFusion(structural.isfBounds)
+            val damping = ensureDamping(structural.tailPolicy)
+            val tddIsf = computeTddIsf(tdd24h, profileIsf)
+            IsfTddProvider.set(tddIsf)
+            val epochMin = epochMillis / 60_000L
+            val learningWindowMin = windowMin.coerceIn(
+                AdaptivePkPdEstimator.LEARNING_WINDOW_MIN_MIN,
+                AdaptivePkPdEstimator.LEARNING_WINDOW_MAX_MIN,
+            )
+            if (learningWindowMin != windowMin) {
+                consoleLog?.add(
+                    "PKPD_LEARN: windowMin=$windowMin clamped to $learningWindowMin for estimator.update " +
+                        "(bounds ${AdaptivePkPdEstimator.LEARNING_WINDOW_MIN_MIN}-${AdaptivePkPdEstimator.LEARNING_WINDOW_MAX_MIN})",
+                )
+            }
+            // The curve verdict is computed on every learning tick, armed or not, so the export can show
+            // what the gate would do before anyone turns it on. Read-only calls never touch the history.
+            val curveGateArmed = preferences.get(BooleanKey.OApsAIMIPkpdCurveLearningGate)
+            val curveVerdict = if (allowLearning) {
+                learningWindowGate.evaluate(
+                    epochMin = epochMin,
+                    deltaMgDlPer5 = deltaMgDlPer5,
+                    mealConfidence = causalStatePosterior?.mealConfidence,
+                    declaredMealAgeMin = declaredMealAgeMin,
+                    declaredMealHighCarb = declaredMealHighCarb,
+                ).also { learningWindowGate.record(epochMin, deltaMgDlPer5, bg) }
+            } else {
+                null
+            }
+            val learningQualityMin =
+                if (curveGateArmed) PkpdLearningWindowGate.QUALITY_MIN_WHEN_ARMED else CausalStatePosterior.LEARNING_QUALITY_MIN
+            val learningContextClean = causalStatePosterior?.learningContextClean(learningQualityMin) ?: true
+            val causalModulation = CausalKineticsModulator.modulate(causalStatePosterior, learningQualityMin)
+            val causalLearningAllowed = causalModulation.learningAllowed
+            val curveAllowsLearning = !curveGateArmed || curveVerdict?.pass != false
+            // Same three booleans as the guard below, read where the guard is really taken.
+            // The snapshot used to rebuild this decision later in the tick from a newer causal state,
+            // so it could not be trusted. This value is exported as PkpdLearningTrace.diaLearnBlockedBy.
+            val learnBlockedBy: String? = when {
+                !allowLearning         -> LEARN_BLOCKED_READ_ONLY_PATH
+                !learningContextClean  -> LEARN_BLOCKED_CAUSAL_UNCLEAN
+                !causalLearningAllowed -> LEARN_BLOCKED_CAUSAL_MODULATOR_PREFIX + causalModulation.reason
+                !curveAllowsLearning   -> LEARN_BLOCKED_CURVE_PREFIX + curveVerdict?.blockedBy
+                else                   -> null
+            }
+            logPkpdLearningSkipReason(
+                bg = bg,
+                iobU = iobU,
+                carbsActiveG = carbsActiveG,
+                deltaMgDlPer5 = deltaMgDlPer5,
+                exerciseFlag = exerciseFlag,
+                causalStatePosterior = causalStatePosterior,
+                learningContextClean = learningContextClean && causalLearningAllowed,
+                consoleLog = consoleLog,
+            )
+            val acceptedBefore = estimator.statusSnapshot().acceptedUpdateCount
+            if (allowLearning && learningContextClean && causalLearningAllowed && curveAllowsLearning) {
+                estimator.update(
+                    epochMin = epochMin,
+                    bg = bg,
+                    deltaMgDlPer5 = deltaMgDlPer5,
+                    iobU = iobU,
+                    carbsActiveG = carbsActiveG,
+                    windowMin = learningWindowMin,
+                    exerciseFlag = exerciseFlag
+                )
+            } else if (allowLearning && learningContextClean && !causalLearningAllowed) {
+                consoleLog?.add("PKPD_LEARN skip: causal_modulator_learningAllowed=false")
+            } else if (allowLearning && learningContextClean && !curveAllowsLearning) {
+                consoleLog?.add("PKPD_LEARN skip: curve_gate=${curveVerdict?.blockedBy}")
+            }
+            if (allowLearning) {
+                // For the PK/PD status card: one entry per learning tick, never on the read-only calls.
+                // A step the estimator refuses after the gates passed counts as blocked too, with its reason.
+                val statusAfter = estimator.statusSnapshot()
+                val accepted = statusAfter.acceptedUpdateCount > acceptedBefore
+                PkpdTickTelemetry.learning.record(
+                    atMs = epochMillis,
+                    accepted = accepted,
+                    blockedBy = learningTickBlockedBy(learnBlockedBy, accepted, statusAfter.latestReason),
+                )
+            }
+            val params = estimator.params()
+            persistStateIfNeeded(params, structural.bounds)
+            val tailFraction = estimator.iobResidualAt(windowMin.toDouble()).coerceIn(0.0, 1.0)
+            val baselineActivityState = estimator.activityStateAt(windowMin.toDouble())
+            val activityState = aggregateActivityState(
+                estimator = estimator,
+                baseline = baselineActivityState,
+                iobU = iobU
+            )
+            val freshness = (1.0 - activityState.postWindowFraction).coerceIn(0.0, 1.0)
+            val activityBlend = (0.6 * activityState.relativeActivity + 0.4 * freshness).coerceIn(0.0, 1.0)
+            val anticipatoryBoost = activityState.anticipationWeight * 0.1
+            val mealBoost = mealContext?.let { ctx ->
+                if (!ctx.mealModeActive) return@let 0.0
+                val predicted = ctx.predictedBgMgdl
+                val target = ctx.targetBgMgdl
+                val normalizedRise = if (predicted != null && target != null) {
+                    ((predicted - target).coerceAtLeast(0.0) / 70.0).coerceIn(0.0, 1.0)
+                } else 0.0
+                0.05 + 0.15 * normalizedRise
+            } ?: 0.0
+            val behaviorProfile = behaviorProfileSource.read(preferences)
+            val weightKineticFactor = buildWeightKineticFactor(patientWeightKg)
+            val rawPhysioAbsorptionFactor = buildPhysioAbsorptionFactor(
+                physioLatentState = physioLatentState,
+                causalStatePosterior = causalStatePosterior,
+                mealContext = mealContext,
+                estimatedRaMgdlPerMin = estimatedRaMgdlPerMin,
+                patientEventMemory = patientEventMemory,
+            )
+            val physioAbsorptionFactor = blendTowardNeutral(
+                value = rawPhysioAbsorptionFactor,
+                blendFraction = behaviorProfile.pkpdPhysioBlendFraction(),
+            )
+            val familyMealFactor = behaviorProfile.pkpdMealAbsorptionFactor(mealContext?.mealModeActive == true)
+            val minScale = if (mealContext?.mealModeActive == true) 0.9 else 0.8
+            val maxScale = if (mealContext?.mealModeActive == true) 1.5 else 1.4
+            val pkpdScale = (
+                1.0 +
+                    0.12 * tailFraction +
+                    0.22 * activityBlend +
+                    anticipatoryBoost +
+                    mealBoost
+                )
+                .times(weightKineticFactor)
+                .times(physioAbsorptionFactor)
+                .times(familyMealFactor)
+                .coerceIn(minScale * 0.92, maxScale * 1.06)
+
+            val effectiveDelta = combinedDelta ?: deltaMgDlPer5
+            val isRising = effectiveDelta > 0.5
+
+            var aggressionMultiplier = if (effectiveDelta > 1.5) {
+                val rawFactor = exp(-0.04 * (effectiveDelta - 1.5))
+                rawFactor.coerceIn(0.60, 1.0)
+            } else 1.0
+
+            if (uamConfidence > 0.5) {
+                val uamBoost = 1.0 - (uamConfidence - 0.5) * 0.4
+                aggressionMultiplier *= uamBoost.coerceIn(0.8, 1.0)
+                consoleLog?.add("🧠 UAM detected (conf=${aimiFmt2(uamConfidence)}) -> Extra ISF Boost")
+            }
+            val rawPhysioSiFactor = buildPhysioSiFactor(
+                physioLatentState = physioLatentState,
+                causalStatePosterior = causalStatePosterior,
+                patientEventMemory = patientEventMemory,
+            )
+            val physioSiFactor = blendTowardNeutral(
+                value = rawPhysioSiFactor,
+                blendFraction = behaviorProfile.pkpdPhysioBlendFraction(),
+            )
+            aggressionMultiplier = (
+                aggressionMultiplier *
+                    physioSiFactor *
+                    behaviorProfile.pkpdCorrectionAggressionFactor() *
+                    behaviorProfile.pkpdStabilityAggressionFactor(isRising)
+                )
+                .coerceIn(0.55, 1.08)
+            physioLatentState?.takeIf { it.isActive() }?.let { latent ->
+                consoleLog?.add(
+                    "PKPD_PHYSIO: wK=${aimiFmt2(weightKineticFactor)} " +
+                        "abs=${aimiFmt2(physioAbsorptionFactor)} si=${aimiFmt2(physioSiFactor)} " +
+                        "meal=${aimiFmt2(latent.mealProb)} endo=${aimiFmt2(latent.endogenousGlucoseDrive)} " +
+                        "resist=${aimiFmt2(latent.transientResistanceProb)} postHypo=${aimiFmt2(latent.postHypoReboundProb)} " +
+                        "cause=${causalStatePosterior?.dominant?.name ?: "UNKNOWN"} " +
+                        "learnQ=${aimiFmt2(causalStatePosterior?.learningQuality ?: 0.0)}"
+                )
+            }
+            consoleLog?.add(
+                "PKPD_FAMILY: prot=${behaviorProfile.protectionLevel} meal=${behaviorProfile.mealCaptureLevel} " +
+                    "stab=${behaviorProfile.stabilityLevel} phys=${behaviorProfile.physioLevel} auto=${behaviorProfile.autonomyLevel} " +
+                    "mealF=${aimiFmt2(familyMealFactor)} physBlend=${aimiFmt2(behaviorProfile.pkpdPhysioBlendFraction())}",
+            )
+
+            val fusedIsf = fusion.fused(
+                profileIsf = profileIsf,
+                tddIsf = tddIsf,
+                pkpdScale = pkpdScale,
+                nowMs = epochMillis,
+                authoritative = isfRateLimitAuthority,
+                isRising = isRising,
+                aggressionMultiplier = aggressionMultiplier
+            )
+            return PkPdRuntime(
+                params = params,
+                tailFraction = tailFraction,
+                fusedIsf = fusedIsf,
+                profileIsf = profileIsf,
+                tddIsf = tddIsf,
+                pkpdScale = pkpdScale,
+                weightKineticFactor = weightKineticFactor,
+                physioAbsorptionFactor = physioAbsorptionFactor,
+                physioSiFactor = physioSiFactor,
+                damping = damping,
+                activity = activityState,
+                learningTrace = buildLearningTrace(estimator, structural.bounds, learnBlockedBy, curveGateArmed, curveVerdict),
+            )
+        }
+    }
+
+    /**
+     * Small read-only view of the DIA learning loop, exported in the intelligence snapshot.
+     * It makes a frozen DIA and a too short insulin tail visible without reading the source.
+     */
+    private fun buildLearningTrace(
+        estimator: AdaptivePkPdEstimator,
+        bounds: PkPdBounds,
+        learnBlockedBy: String?,
+        curveGateArmed: Boolean,
+        curveVerdict: PkpdLearningWindowGate.Verdict?,
+    ): PkpdLearningTrace {
+        val status = estimator.statusSnapshot()
+        return PkpdLearningTrace(
+            diaAtFloor = abs(status.params.diaHrs - bounds.diaMinH) <= 0.01,
+            diaRegPullH = status.lastDiaRegPullH,
+            diaLearnStepH = status.lastDiaLearnStepH,
+            iobResidual120Min = estimator.iobResidualAt(120.0),
+            diaAcceptedUpdates = status.acceptedUpdateCount,
+            diaLearnBlockedBy = learnBlockedBy,
+            curveGateArmed = curveGateArmed,
+            curveGateWouldBlock = curveVerdict?.blockedBy,
+            curveGateMaxRecentDeltaMgdl = curveVerdict?.maxRecentDeltaMgdl,
+            curveGateDeclaredMealAgeMin = curveVerdict?.declaredMealAgeMin,
+            curveGateDetectedRiseAgeMin = curveVerdict?.detectedRiseAgeMin,
+        )
+    }
+
+    /**
+     * Detects a learned-state write done outside this instance (a profile insulin change seen by
+     * the other consumer, a backup restore).
+     * Drops the in-memory learner so this tick re-seeds from prefs via [readLearnedSeed].
+     * It does not touch the fusion/damping caches on purpose: they hold no learned PK/PD state.
+     *
+     * It must run first in the tick, before the structural config is compared. A profile insulin
+     * change moves the bounds and writes the learned state together, and
+     * [applyStructuralConfigChange] persists the old in-memory value when the bounds change. With
+     * the learner already dropped here, that persist is a no-op and cannot overwrite the new
+     * value. Running it while PK/PD is off is safe too: [clearAllCaches] wipes everything anyway.
+     */
+    private fun adoptExternalLearnedStateReset() {
+        val generation = preferences.get(LongNonKey.OApsAIMIPkpdLearnedStateGeneration)
+        val seen = seenLearnedStateGeneration
+        seenLearnedStateGeneration = generation
+        if (seen == null || seen == generation) return
+        estimator = null
+        lastBounds = null
+        lastLearningCfg = null
+        lastPersisted = null
+    }
+
+    /**
+     * Starts the learned state again from the profile insulin when it is not the one the learner
+     * last started from ([PkpdProfileInsulinMemory]):
+     * - same insulin: nothing to do;
+     * - nothing stored yet (first start after the update): one-shot migration. The learned values
+     *   are kept but clamped into the new bounds; with no learned value stored, the profile insulin
+     *   is the seed. Old values of the removed Initial / Anchor / Bounds keys are not read;
+     * - another insulin, or a reset asked by the user: the learned state becomes the profile insulin.
+     *
+     * The write bumps the learned state generation, like every write from outside the learner, so a
+     * reader that caches the state re-seeds. This instance takes the new generation as seen.
+     */
+    private fun adoptProfileInsulin(profile: ProfileInsulin, bounds: PkPdBounds, consoleLog: MutableList<String>?) {
+        val (diaMin, peakMin) = PkpdProfileInsulinMemory.storedMinutes(profile)
+        val storedDiaMin = preferences.get(LongNonKey.OApsAIMIPkpdProfileInsulinDiaMin)
+        val storedPeakMin = preferences.get(LongNonKey.OApsAIMIPkpdProfileInsulinPeakMin)
+        if (storedDiaMin == diaMin && storedPeakMin == peakMin) return
+        val seed = PkpdProfileInsulinBounds.seed(profile)
+        val neverSeen = storedDiaMin == PkpdProfileInsulinMemory.NEVER_SEEN &&
+            storedPeakMin == PkpdProfileInsulinMemory.NEVER_SEEN
+        val start = if (neverSeen) {
+            clampParams(
+                PkPdParams(
+                    diaHrs = preferences.getIfExists(DoubleKey.OApsAIMIPkpdStateDiaH) ?: seed.diaHrs,
+                    peakMin = preferences.getIfExists(DoubleKey.OApsAIMIPkpdStatePeakMin) ?: seed.peakMin,
+                ),
+                bounds,
+            )
+        } else {
+            seed
+        }
+        consoleLog?.add(
+            "PKPD_PROFILE_INSULIN: ${if (neverSeen) "migrate" else "reseed"} " +
+                "profile DIA=${aimiFmt2(profile.diaHours)}h peak=${aimiFmt2(profile.peakMinutes)}m " +
+                "-> learned DIA=${aimiFmt2(start.diaHrs)}h peak=${aimiFmt2(start.peakMin)}m",
+        )
+        preferences.put(DoubleKey.OApsAIMIPkpdStateDiaH, start.diaHrs)
+        preferences.put(DoubleKey.OApsAIMIPkpdStatePeakMin, start.peakMin)
+        preferences.inc(LongNonKey.OApsAIMIPkpdLearnedStateGeneration)
+        seenLearnedStateGeneration = preferences.get(LongNonKey.OApsAIMIPkpdLearnedStateGeneration)
+        PkpdProfileInsulinMemory.remember(preferences, profile)
+        estimator = null
+        lastBounds = null
+        lastLearningCfg = null
+        lastPersisted = start
+    }
+
+    private fun applyStructuralConfigChange(old: StructuralConfig, new: StructuralConfig) {
+        // Same persist as 0761e9c00a. The stale write is gone because [estimator] is now the
+        // shared learned holder, not a private seed frozen on the read-only consumer.
+        estimator?.let { persistStateIfNeeded(it.params(), new.bounds) }
+
+        val learningInputsChanged = old.bounds != new.bounds ||
+            old.anchorDiaHrs != new.anchorDiaHrs ||
+            old.anchorPeakMin != new.anchorPeakMin
+        if (learningInputsChanged) {
+            estimator = null
+            lastBounds = null
+            lastLearningCfg = null
+        }
+        if (old.isfBounds != new.isfBounds) {
+            fusion = null
+            lastFusionBounds = null
+        }
+        if (old.tailPolicy != new.tailPolicy) {
+            damping = null
+            lastTailPolicy = null
+        }
+    }
+
+    private fun clearAllCaches() {
+        learnedState.clearLearned()
+        fusion = null
+        damping = null
+        lastFusionBounds = null
+        lastTailPolicy = null
+        cachedStructuralConfig = null
+        learningWindowGate.clear()
+        // seenLearnedStateGeneration is kept on purpose: turning OApsAIMIPkpdEnabled off and on
+        // again must not look like an external reset on the next tick.
+    }
+
+    private fun aggregateActivityState(
+        estimator: AdaptivePkPdEstimator,
+        baseline: InsulinActivityState,
+        iobU: Double
+    ): InsulinActivityState {
+        val samples = recentBolusSamples
+        if (samples.isEmpty()) return baseline
+
+        val weightsByStage = linkedMapOf<InsulinActivityStage, Double>()
+        var totalWeight = 0.0
+        var weightedRelative = 0.0
+        var weightedPosition = 0.0
+        var weightedPostWindow = 0.0
+        var weightedAnticipation = 0.0
+        var weightedMinutesToOnset = 0.0
+
+        samples.forEach { sample ->
+            val bolusState = estimator.activityStateAt(sample.ageMin)
+            val residualIob = estimator.iobResidualAt(sample.ageMin)
+            val baseWeight = (sample.units * residualIob).coerceAtLeast(0.0)
+            if (baseWeight <= 1e-6) return@forEach
+
+            val stageWeight = (baseWeight * bolusState.relativeActivity.coerceAtLeast(0.05)).coerceAtLeast(1e-6)
+            totalWeight += stageWeight
+            weightsByStage[bolusState.stage] = (weightsByStage[bolusState.stage] ?: 0.0) + stageWeight
+            weightedRelative += bolusState.relativeActivity * stageWeight
+            weightedPosition += bolusState.normalizedPosition * stageWeight
+            weightedPostWindow += bolusState.postWindowFraction * stageWeight
+            weightedAnticipation += bolusState.anticipationWeight * stageWeight
+            weightedMinutesToOnset += bolusState.minutesUntilOnset * stageWeight
+        }
+
+        if (totalWeight <= 1e-6) return baseline
+
+        val dominantStage = weightsByStage.maxByOrNull { it.value }?.key ?: baseline.stage
+        val coherentStage = if (dominantStage == InsulinActivityStage.PRE_ONSET && iobU >= 3.0) {
+            InsulinActivityStage.RISING
+        } else {
+            dominantStage
+        }
+
+        return baseline.copy(
+            relativeActivity = (weightedRelative / totalWeight).coerceIn(0.0, 1.0),
+            normalizedPosition = (weightedPosition / totalWeight).coerceIn(0.0, 1.0),
+            postWindowFraction = (weightedPostWindow / totalWeight).coerceIn(0.0, 1.0),
+            anticipationWeight = (weightedAnticipation / totalWeight).coerceIn(0.0, 1.0),
+            minutesUntilOnset = (weightedMinutesToOnset / totalWeight).coerceAtLeast(0.0),
+            stage = coherentStage
+        )
+    }
+
+    private fun readStructuralConfig(profile: ProfileInsulin): StructuralConfig {
+        val bounds = PkpdProfileInsulinBounds.bounds(
+            profile = profile,
+            maxDiaChangePerDayH = PkpdLearningBounds.coerceMaxDiaChangePerDayH(
+                preferences.get(DoubleKey.OApsAIMIPkpdMaxDiaChangePerDayH),
+            ),
+            maxPeakChangePerDayMin = PkpdLearningBounds.coerceMaxPeakChangePerDayMin(
+                preferences.get(DoubleKey.OApsAIMIPkpdMaxPeakChangePerDayMin),
+            ),
+        )
+        val anchor = PkpdProfileInsulinBounds.seed(profile)
+        val isfBounds = IsfFusionBounds(
+            minFactor = preferences.get(DoubleKey.OApsAIMIIsfFusionMinFactor),
+            maxFactor = preferences.get(DoubleKey.OApsAIMIIsfFusionMaxFactor),
+            maxChangePer5Min = preferences.get(DoubleKey.OApsAIMIIsfFusionMaxChangePerTick),
+        ).normalized()
+        val effectiveTailDamping = PkpdSmbTailDamping.effectiveStoredValue(
+            preferences.get(DoubleKey.OApsAIMISmbTailDamping),
+        )
+        val tailPolicy = TailAwareSmbPolicy(
+            tailIobHigh = preferences.get(DoubleKey.OApsAIMISmbTailThreshold),
+            smbDampingAtTail = effectiveTailDamping,
+            postExerciseDamping = preferences.get(DoubleKey.OApsAIMISmbExerciseDamping),
+            lateFattyMealDamping = preferences.get(DoubleKey.OApsAIMISmbLateFatDamping)
+        )
+        return StructuralConfig(
+            bounds = bounds,
+            isfBounds = isfBounds,
+            tailPolicy = tailPolicy,
+            // The anchor is the soft target the learner is pulled back to: the profile insulin. It is
+            // inside the bounds by construction, so it never pulls the learned value onto a bound.
+            anchorDiaHrs = anchor.diaHrs,
+            anchorPeakMin = anchor.peakMin,
+        )
+    }
+
+    private fun readLearnedSeed(bounds: PkPdBounds): PkPdParams =
+        clampParams(
+            sanitizePkPdParams(
+                PkPdParams(
+                    diaHrs = preferences.get(DoubleKey.OApsAIMIPkpdStateDiaH),
+                    peakMin = preferences.get(DoubleKey.OApsAIMIPkpdStatePeakMin),
+                ),
+            ),
+            bounds,
+        )
+
+    private fun buildLearningConfig(structural: StructuralConfig): PkPdLearningConfig =
+        PkPdLearningConfig(
+            bounds = structural.bounds,
+            anchorDiaHrs = structural.anchorDiaHrs,
+            anchorPeakMin = structural.anchorPeakMin,
+        )
+
+    private fun ensureEstimator(bounds: PkPdBounds, learningCfg: PkPdLearningConfig): AdaptivePkPdEstimator {
+        if (estimator == null || lastBounds != bounds || lastLearningCfg != learningCfg) {
+            val start = estimator?.params()?.let { clampParams(it, bounds) }
+                ?: lastPersisted
+                ?: readLearnedSeed(bounds)
+            estimator = AdaptivePkPdEstimator(ExponentialKernel(), learningCfg, start)
+            lastBounds = bounds
+            lastLearningCfg = learningCfg
+        }
+        return estimator!!
+    }
+
+    private fun ensureFusion(bounds: IsfFusionBounds): IsfFusion {
+        if (fusion == null || lastFusionBounds != bounds) {
+            fusion = IsfFusion(bounds)
+            lastFusionBounds = bounds
+        }
+        return fusion!!
+    }
+
+    private fun ensureDamping(policy: TailAwareSmbPolicy): SmbDamping {
+        if (damping == null || lastTailPolicy != policy) {
+            damping = SmbDamping(policy)
+            lastTailPolicy = policy
+        }
+        return damping!!
+    }
+
+    private fun clampParams(params: PkPdParams, bounds: PkPdBounds): PkPdParams {
+        val safe = sanitizePkPdParams(params)
+        val b = bounds.normalized()
+        val dia = safe.diaHrs.coerceIn(b.diaMinH, b.diaMaxH)
+        val peak = safe.peakMin.coerceIn(b.peakMinMin, b.peakMinMax)
+        return PkPdParams(dia, peak)
+    }
+
+    private fun persistStateIfNeeded(params: PkPdParams, bounds: PkPdBounds) {
+        val clamped = clampParams(params, bounds)
+        val last = lastPersisted
+        val shouldPersist = last == null ||
+            abs(last.diaHrs - clamped.diaHrs) > DIA_PERSIST_MIN_DELTA_H ||
+            abs(last.peakMin - clamped.peakMin) > PEAK_PERSIST_MIN_DELTA_MIN
+        if (shouldPersist) {
+            preferences.put(DoubleKey.OApsAIMIPkpdStateDiaH, clamped.diaHrs)
+            preferences.put(DoubleKey.OApsAIMIPkpdStatePeakMin, clamped.peakMin)
+            lastPersisted = clamped
+        }
+    }
+
+    private fun logPkpdLearningSkipReason(
+        bg: Double,
+        iobU: Double,
+        carbsActiveG: Double,
+        deltaMgDlPer5: Double,
+        exerciseFlag: Boolean,
+        causalStatePosterior: CausalStatePosterior?,
+        learningContextClean: Boolean,
+        consoleLog: MutableList<String>?,
+    ) {
+        val reason = when {
+            bg < AdaptivePkPdEstimator.HYPO_LEARN_SKIP_BG_MGDL -> "bg<hypo"
+            bg < AdaptivePkPdEstimator.HYPO_CAUTION_BG_MGDL && deltaMgDlPer5 < -1.0 -> "bg_near_hypo_falling"
+            deltaMgDlPer5 <= AdaptivePkPdEstimator.FAST_FALL_DELTA_MGDL5 -> "fast_fall"
+            iobU < 0.3 -> "iob<0.3"
+            carbsActiveG > 15.0 -> "cob>15"
+            exerciseFlag -> "exercise"
+            deltaMgDlPer5 > 5.0 -> "delta>5"
+            !learningContextClean -> "causal_${causalStatePosterior?.dominant?.name?.lowercase() ?: "unclean"}"
+            else -> null
+        }
+        if (reason != null) {
+            consoleLog?.add("PKPD_LEARN skip: $reason (update() returns early in estimator)")
+        }
+    }
+
+    private fun computeTddIsf(tdd24h: Double, fallback: Double): Double {
+        if (tdd24h <= 0.1) return fallback
+        val anchored = 1800.0 / tdd24h
+
+        val maxDeviation = fallback * 0.5
+        val clamped = anchored.coerceIn(
+            fallback - maxDeviation,
+            fallback + maxDeviation
+        )
+
+        return clamped.coerceIn(5.0, 400.0)
+    }
+
+    private fun blendTowardNeutral(value: Double, blendFraction: Double): Double {
+        val safeBlend = blendFraction.coerceIn(0.0, 1.0)
+        return 1.0 + ((value - 1.0) * safeBlend)
+    }
+
+    private fun buildWeightKineticFactor(patientWeightKg: Double?): Double {
+        val safeWeight = patientWeightKg?.takeIf { it.isFinite() && it >= 40.0 } ?: return 1.0
+        return (75.0 / safeWeight).coerceIn(0.84, 1.08)
+    }
+
+    private fun buildPhysioAbsorptionFactor(
+        physioLatentState: PhysioLatentState?,
+        causalStatePosterior: CausalStatePosterior?,
+        mealContext: MealAggressionContext?,
+        estimatedRaMgdlPerMin: Double?,
+        patientEventMemory: PatientEventMemory?,
+    ): Double {
+        if (physioLatentState == null && causalStatePosterior == null) return 1.0
+        val mealSupportProb = max(
+            physioLatentState?.mealProb ?: 0.0,
+            causalStatePosterior?.mealConfidence ?: 0.0,
+        )
+        val mealSupport = if (mealContext?.mealModeActive == true) {
+            mealSupportProb * 0.12
+        } else {
+            0.0
+        }
+        val endogenousBrake = max(
+            physioLatentState?.endogenousGlucoseDrive ?: 0.0,
+            causalStatePosterior?.dawnEndogenousProb ?: 0.0,
+        ) * 0.10
+        val reboundBrake = max(
+            physioLatentState?.postHypoReboundProb ?: 0.0,
+            causalStatePosterior?.postHypoRecoveryProb ?: 0.0,
+        ) * 0.09
+        val protectiveBrake = (causalStatePosterior?.protectiveConfidence ?: 0.0) * 0.06
+        val fragilityBrake = (patientEventMemory?.correctionFragilityScore ?: 0.0) * 0.08
+        val exhaustionBrake = (patientEventMemory?.postHyperExhaustionScore ?: 0.0) * 0.05
+        val raSupport = estimatedRaMgdlPerMin
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?.let { (it / 12.0).coerceIn(0.0, 0.08) }
+            ?: 0.0
+        val dominantMealBoost = when (causalStatePosterior?.dominant) {
+            CausalStateId.FAST_MEAL -> 0.03
+            CausalStateId.PROLONGED_MEAL -> 0.02
+            else -> 0.0
+        }
+        return (
+            1.0 + mealSupport + raSupport + dominantMealBoost -
+                endogenousBrake - reboundBrake - protectiveBrake - fragilityBrake - exhaustionBrake
+            )
+            .coerceIn(0.82, 1.18)
+    }
+
+    private fun buildPhysioSiFactor(
+        physioLatentState: PhysioLatentState?,
+        causalStatePosterior: CausalStatePosterior?,
+        patientEventMemory: PatientEventMemory?,
+    ): Double {
+        if (physioLatentState == null && causalStatePosterior == null) return 1.0
+        val latent = physioLatentState ?: PhysioLatentState()
+        var rawFactor = latent.circadianSiFactor *
+            (1.0 - latent.transientResistanceProb * 0.14) *
+            (1.0 + latent.postHypoReboundProb * 0.08)
+        rawFactor *= when (causalStatePosterior?.dominant) {
+            CausalStateId.DAWN_ENDOGENOUS -> 0.97
+            CausalStateId.STRESS_RESISTANCE -> 0.94
+            CausalStateId.INFLAMMATORY_DRIFT -> 0.95
+            CausalStateId.POST_HYPO_RECOVERY -> 1.02
+            else -> 1.0
+        }
+        rawFactor *= 1.0 - (causalStatePosterior?.stressResistanceProb ?: 0.0) * 0.05
+        rawFactor *= 1.0 - (causalStatePosterior?.inflammatoryDriftProb ?: 0.0) * 0.04
+        rawFactor *= 1.0 + (patientEventMemory?.correctionFragilityScore ?: 0.0) * 0.06
+        rawFactor *= 1.0 + (patientEventMemory?.postHyperExhaustionScore ?: 0.0) * 0.04
+        val confidence = max(latent.sensorConfidence, causalStatePosterior?.learningQuality ?: 0.0).coerceIn(0.0, 1.0)
+        return (1.0 + ((rawFactor - 1.0) * confidence)).coerceIn(0.78, 1.08)
+    }
+}
+
+/**
+ * Read-only numbers about the DIA learning loop, for the intelligence snapshot.
+ *
+ * @property diaAtFloor learned DIA sitting on the lower bound (within 0.01 h)
+ * @property diaRegPullH last pull back toward the anchor, in hours
+ * @property diaLearnStepH last raw learning step, in hours, before the anchor pull and any clamp
+ * @property iobResidual120Min insulin left on board 2 h after a dose, 0..1
+ * @property diaAcceptedUpdates how many learning steps the estimator has accepted so far. When this
+ *   number is the same as on the tick before, [diaRegPullH] and [diaLearnStepH] were kept from an
+ *   older tick and must not be read as this tick's step.
+ * @property diaLearnBlockedBy why learning did not run on this tick, or null when it did run. Taken
+ *   in [PkPdIntegration.computeRuntime] at the line where the gate is really applied.
+ */

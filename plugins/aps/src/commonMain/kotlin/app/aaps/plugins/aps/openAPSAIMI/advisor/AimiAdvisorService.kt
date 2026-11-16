@@ -1,0 +1,1357 @@
+package app.aaps.plugins.aps.openAPSAIMI.advisor
+
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.profile.EffectiveProfile
+import app.aaps.core.keys.interfaces.TextRef
+import app.aaps.plugins.aps.openAPSAIMI.aimiFmt1
+import app.aaps.plugins.aps.openAPSAIMI.aimiFmt2
+import app.aaps.plugins.aps.openAPSAIMI.aimiFmt3
+import app.aaps.plugins.aps.openAPSAIMI.aimiWallClockMs
+import app.aaps.plugins.aps.openAPSAIMI.ports.AimiAssetReader
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiPath
+import app.aaps.plugins.aps.openAPSAIMI.utils.JsonObj
+import app.aaps.core.interfaces.concurrent.aapsIoDispatcher
+import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.math.abs
+import kotlin.math.ln
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.time.Instant
+import app.aaps.plugins.aps.ApsStrings
+import app.aaps.core.interfaces.resources.formatTemplate
+import app.aaps.plugins.aps.openAPSAIMI.advisor.data.AdvisorHistoryRepository
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefAnalysisReport
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefDataSufficiency
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefGlycemicPriority
+import app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefLocalPipeline
+import kotlin.math.max
+import kotlin.math.min
+import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.interfaces.BooleanPreferenceKey
+import app.aaps.core.keys.interfaces.DoublePreferenceKey
+import app.aaps.core.keys.interfaces.IntPreferenceKey
+import app.aaps.core.keys.interfaces.StringPreferenceKey
+import app.aaps.core.interfaces.aps.GlucoseStatusAIMI
+import app.aaps.plugins.aps.openAPSAIMI.patient.PatientStateRuntimeRepository
+import app.aaps.plugins.aps.openAPSAIMI.pkpd.PkpdSmbTailDamping
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiStorage
+
+/**
+ * =============================================================================
+ * AIMI ADVISOR SERVICE
+ * =============================================================================
+ * 
+ * Analyzes metrics and provides scored recommendations on each supported platform.
+ * Localized through [AimiAdvisorStrings] (KMP-safe); falls back to English literals.
+ * =============================================================================
+ */
+class AimiAdvisorService {
+    data class BasalHourProposal(
+        val hour: Int,
+        val current: Double,
+        val proposed: Double
+    )
+
+    data class BasalProfileProposal(
+        val generatedAt: Long,
+        val periodDays: Int,
+        /** Stable machine code for the shared export. Never localized - a parser keys on it. */
+        val strategyCode: String,
+        /** Localized label for the dialog. Never written to the export. */
+        val strategy: String,
+        val scalingFactor: Double,
+        val rationale: String,
+        val rows: List<BasalHourProposal>
+    )
+
+    private val profileFunction: app.aaps.core.interfaces.profile.ProfileFunction?
+    private val persistenceLayer: app.aaps.core.interfaces.db.PersistenceLayer?
+    private val preferences: app.aaps.core.keys.interfaces.Preferences?
+    private val unifiedReactivityLearner: app.aaps.plugins.aps.openAPSAIMI.learning.UnifiedReactivityLearner?
+    private val tddCalculator: app.aaps.core.interfaces.stats.TddCalculator?
+    private val tirCalculator: app.aaps.core.interfaces.stats.TirCalculator?
+    private val strings: AimiAdvisorStrings?
+    private val aapsLogger: app.aaps.core.interfaces.logging.AAPSLogger?
+    private val pluginManager: app.aaps.plugins.aps.openAPSAIMI.plugins.AimiPluginManager
+    private val storage: AimiStorage?
+
+    // Constructor injection for dependencies
+    constructor(
+        profileFunction: app.aaps.core.interfaces.profile.ProfileFunction? = null,
+        persistenceLayer: app.aaps.core.interfaces.db.PersistenceLayer? = null,
+        preferences: app.aaps.core.keys.interfaces.Preferences? = null,
+        strings: AimiAdvisorStrings? = null,
+        unifiedReactivityLearner: app.aaps.plugins.aps.openAPSAIMI.learning.UnifiedReactivityLearner? = null,
+        tddCalculator: app.aaps.core.interfaces.stats.TddCalculator? = null,
+        tirCalculator: app.aaps.core.interfaces.stats.TirCalculator? = null,
+        pluginManager: app.aaps.plugins.aps.openAPSAIMI.plugins.AimiPluginManager? = null,
+        aapsLogger: app.aaps.core.interfaces.logging.AAPSLogger? = null,
+        storage: AimiStorage? = null,
+    ) {
+        this.profileFunction = profileFunction
+        this.persistenceLayer = persistenceLayer
+        this.preferences = preferences
+        this.strings = strings
+        this.unifiedReactivityLearner = unifiedReactivityLearner
+        this.tddCalculator = tddCalculator
+        this.tirCalculator = tirCalculator
+        this.aapsLogger = aapsLogger
+        this.storage = storage
+        this.pluginManager = pluginManager ?: app.aaps.plugins.aps.openAPSAIMI.plugins.AimiPluginManager(aapsLogger ?: object : app.aaps.core.interfaces.logging.AAPSLogger {
+            override fun debug(message: String) {}
+            override fun debug(enable: Boolean, tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun debug(tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun debug(tag: app.aaps.core.interfaces.logging.LTag, accessor: () -> String) {}
+            override fun debug(tag: app.aaps.core.interfaces.logging.LTag, format: String, vararg arguments: Any?) {}
+            override fun warn(tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun warn(tag: app.aaps.core.interfaces.logging.LTag, format: String, vararg arguments: Any?) {}
+            override fun info(tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun info(tag: app.aaps.core.interfaces.logging.LTag, format: String, vararg arguments: Any?) {}
+            override fun error(tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun error(tag: app.aaps.core.interfaces.logging.LTag, message: String, throwable: Throwable) {}
+            override fun error(tag: app.aaps.core.interfaces.logging.LTag, format: String, vararg arguments: Any?) {}
+            override fun error(message: String) {}
+            override fun error(message: String, throwable: Throwable) {}
+            override fun error(format: String, vararg arguments: Any?) {}
+            override fun debug(className: String, methodName: String, lineNumber: Int, tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun info(className: String, methodName: String, lineNumber: Int, tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun warn(className: String, methodName: String, lineNumber: Int, tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+            override fun error(className: String, methodName: String, lineNumber: Int, tag: app.aaps.core.interfaces.logging.LTag, message: String) {}
+        })
+    }
+
+    /**
+     * Generate a full advisor report for the specified period.
+     */
+    fun generateReport(
+        periodDays: Int = 10,
+        history: List<app.aaps.plugins.aps.openAPSAIMI.advisor.data.AdvisorHistoryRepository.AdvisorActionLog> = emptyList(),
+        assetReader: AimiAssetReader? = null,
+        filesDir: AimiPath? = null,
+    ): AdvisorReport {
+        val context = collectContext(periodDays)
+        val score = computeGlobalScore(context.metrics)
+        val severity = classifySeverity(score)
+
+        // OREF first so PKPD + advisor cards + LLM payload can use the same on-device ML/heuristic block.
+        val orefWindowDays = periodDays.toLong().coerceIn(1, OrefLocalPipeline.MAX_HISTORY_DAYS_FOR_MEMORY)
+        val personalOrefMl = preferences?.get(BooleanKey.OApsAIMIAdvisorPersonalOrefMl) == true
+        val orefInsight = if (persistenceLayer != null) {
+            runBlocking(aapsIoDispatcher) {
+                try {
+                    OrefLocalPipeline(persistenceLayer, storage).run(
+                        profileSnapshot = context.profile,
+                        windowDays = orefWindowDays,
+                        assetReader = assetReader,
+                        filesDir = filesDir,
+                        personalMlEnabled = personalOrefMl,
+                    )
+                } catch (t: Throwable) {
+                    aapsLogger?.error(app.aaps.core.interfaces.logging.LTag.APS, "OrefLocalPipeline failed", t)
+                    null
+                }
+            }
+        } else null
+
+        val recommendations = generateRecommendations(context, history, orefInsight).toMutableList()
+
+        // PKPD Analysis - now returns AimiRecommendation
+        val pkpdSuggestions = PkpdAdvisor().analysePkpd(context.metrics, context.pkpdPrefs, strings!!, orefInsight)
+
+        // Filter PKPD suggestions based on history (48h cooldown)
+        pkpdSuggestions.forEach { rec ->
+            if (isRecommendationVisible(rec, history)) {
+                recommendations.add(rec)
+            }
+        }
+
+        val visibleRecommendations = recommendations.filter { isRecommendationVisible(it, history) }
+
+        return AdvisorReport(
+            generatedAt = aimiWallClockMs(),
+            metrics = context.metrics,
+            overallScore = score,
+            overallSeverity = severity,
+            overallAssessment = getAssessmentLabel(score),
+            recommendations = visibleRecommendations,
+            summary = formatSummary(context.metrics),
+            advisorContext = context,
+            orefAnalysis = orefInsight,
+            harmoniaDecision = context.harmoniaDecision,
+        )
+    }
+
+    /**
+     * Gather all necessary data for analysis.
+     */
+    fun collectContext(periodDays: Int): AdvisorContext {
+        if (persistenceLayer == null || profileFunction == null || preferences == null) {
+            return getEmptyContext()
+        }
+
+        // 1. Calculate Metrics (from Persistence Layer)
+        // We'll trust persistenceLayer to give us stats or we calculate from raw data
+        val metrics = calculateMetrics(periodDays)
+
+        // 2. Snapshot Profile
+        val profile = runBlocking(aapsIoDispatcher) { profileFunction.getProfile() }
+        val profileSnapshot = if (profile != null) {
+            // getBasal(timestamp) expects epoch millis, not seconds from midnight - h * 3600 lands
+            // every hour inside the first 83 seconds of 1 January 1970, so all 24 rows would read
+            // the same midnight block. getBasalTimeFromMidnight takes seconds from midnight directly.
+            val totalBasalCalc = (0 until 24).sumOf { h -> profile.getBasalTimeFromMidnight(h * 3600) }
+            val dia = (profile as? EffectiveProfile)?.iCfg?.dia ?: 5.0
+
+            AimiProfileSnapshot(
+                nightBasal = profile.getBasalTimeFromMidnight(0), // 00:00 basal
+                icRatio = calculateWeightedAverage(profile.getIcsValues()),
+                isf = calculateWeightedAverage(profile.getIsfsMgdlValues()),
+                targetBg = calculateWeightedAverage(profile.getSingleTargetsMgdl()),
+                dia = dia,
+                totalBasal = totalBasalCalc
+            )
+        } else {
+            AimiProfileSnapshot(0.5, 10.0, 40.0, 100.0, 5.0, 12.0) // Fallback
+        }
+
+        // 3. Snapshot Preferences
+        val prefsSnapshot = AimiPrefsSnapshot(
+            maxSmb = preferences.get(DoubleKey.OApsAIMIMaxSMB),
+            lunchFactor = preferences.get(DoubleKey.OApsAIMILunchFactor),
+            unifiedReactivityFactor = unifiedReactivityLearner?.globalFactor ?: 1.0,
+            autodriveMaxBasal = preferences.get(DoubleKey.autodriveMaxBasal),
+            autodriveEnabled = preferences.get(BooleanKey.OApsAIMIautoDriveActive),
+            mpcInsulinUPerKgPerStep = preferences.get(DoubleKey.OApsAIMIMpcInsulinUPerKgPerStep),
+        )
+        
+        // 4. Snapshot PKPD Preferences
+        val pkpdSnapshot = PkpdPrefsSnapshot(
+            pkpdEnabled = preferences.get(BooleanKey.OApsAIMIPkpdEnabled),
+            learnedDiaH = preferences.get(DoubleKey.OApsAIMIPkpdStateDiaH),
+            learnedPeakMin = preferences.get(DoubleKey.OApsAIMIPkpdStatePeakMin),
+            maxDiaChangePerDayH = preferences.get(DoubleKey.OApsAIMIPkpdMaxDiaChangePerDayH),
+            maxPeakChangePerDayMin = preferences.get(DoubleKey.OApsAIMIPkpdMaxPeakChangePerDayMin),
+            isfFusionMinFactor = preferences.get(DoubleKey.OApsAIMIIsfFusionMinFactor),
+            isfFusionMaxFactor = preferences.get(DoubleKey.OApsAIMIIsfFusionMaxFactor),
+            isfFusionMaxChangePerTick = preferences.get(DoubleKey.OApsAIMIIsfFusionMaxChangePerTick),
+            smbTailThreshold = preferences.get(DoubleKey.OApsAIMISmbTailThreshold),
+            // effectiveStoredValue() is mandatory: stored ≤ 0.55 is silently rewritten to 0.85 (neutral)
+            // at runtime. Feeding the raw value here would make the advisor reason about a setting
+            // that has no effect, perpetuating the misconfiguration.
+            smbTailDamping = PkpdSmbTailDamping.effectiveStoredValue(preferences.get(DoubleKey.OApsAIMISmbTailDamping)),
+            smbExerciseDamping = preferences.get(DoubleKey.OApsAIMISmbExerciseDamping),
+            smbLateFatDamping = preferences.get(DoubleKey.OApsAIMISmbLateFatDamping)
+        )
+
+        return AdvisorContext(
+            metrics = metrics,
+            profile = profileSnapshot,
+            prefs = prefsSnapshot,
+            pkpdPrefs = pkpdSnapshot,
+            harmoniaDecision = PatientStateRuntimeRepository.getLatest()?.harmoniaDecision,
+        )
+    }
+
+    /**
+     * PKPD-only recommendations for the guided Compose settings screen (7-day metrics when available).
+     */
+    fun pkpdRecommendationsForSettings(periodDays: Int = 7): List<AimiRecommendation> {
+        if (preferences == null || strings == null) return emptyList()
+        return try {
+            val context = collectContext(periodDays)
+            PkpdAdvisor().analysePkpd(context.metrics, context.pkpdPrefs, strings, null)
+        } catch (t: Throwable) {
+            aapsLogger?.error(app.aaps.core.interfaces.logging.LTag.APS, "pkpdRecommendationsForSettings failed", t)
+            emptyList()
+        }
+    }
+
+    private fun calculateWeightedAverage(values: Array<app.aaps.core.interfaces.profile.Profile.ProfileValue>): Double {
+        if (values.isEmpty()) return 0.0
+        
+        var totalWeightedValue = 0.0
+        var totalDuration = 0
+        
+        // Sort by time just in case
+        val sorted = values.sortedBy { it.timeAsSeconds }
+        
+        for (i in sorted.indices) {
+            val start = sorted[i].timeAsSeconds
+            val end = if (i < sorted.size - 1) sorted[i + 1].timeAsSeconds else 24 * 3600
+            val duration = end - start
+            
+            totalWeightedValue += sorted[i].value * duration
+            totalDuration += duration
+        }
+        
+        return if (totalDuration > 0) totalWeightedValue / totalDuration else 0.0
+    }
+
+    private fun calculateMetrics(days: Int): AdvisorMetrics = runBlocking(aapsIoDispatcher) {
+        // No stand-in values: null means "not measured".
+        var tir70_180: Double? = null
+        var tir70_140: Double? = null
+        var timeBelow70: Double? = null
+        var timeBelow54: Double? = null
+        var timeAbove180: Double? = null
+        var timeAbove250: Double? = null
+        var meanBg: Double? = null
+        var variabilityCv: Double? = null
+        var tdd: Double? = null
+        var basalPercent: Double? = null
+        var todayTir: Double? = null
+        var todayTdd: Double? = null
+        // How many glucose readings the block really rests on.
+        var bgReadingCount = 0
+
+        // 1. Calculate Real TIR (70-180)
+        if (tirCalculator != null) {
+            try {
+                // Main Range (70-180)
+                val tirs = tirCalculator.calculate(days.toLong(), 70.0, 180.0)
+                val avgTir = tirCalculator.averageTIR(tirs)
+                
+                if (avgTir != null) {
+                    tir70_180 = avgTir.inRangePct()?.div(100.0)
+                    timeBelow70 = avgTir.belowPct()?.div(100.0)
+                    timeAbove180 = avgTir.abovePct()?.div(100.0)
+                }
+
+                // Very Low (<54) - Calculate with low=54
+                val tirs54 = tirCalculator.calculate(days.toLong(), 54.0, 180.0)
+                val avg54 = tirCalculator.averageTIR(tirs54)
+                if (avg54 != null) {
+                    timeBelow54 = avg54.belowPct()?.div(100.0)
+                }
+                
+                // Very High (>250) - Calculate with high=250
+                val tirs250 = tirCalculator.calculate(days.toLong(), 70.0, 250.0)
+                val avg250 = tirCalculator.averageTIR(tirs250)
+                if (avg250 != null) {
+                    timeAbove250 = avg250.abovePct()?.div(100.0)
+                }
+
+                // Tight Range (70-140)
+                val tirs140 = tirCalculator.calculate(days.toLong(), 70.0, 140.0)
+                val avg140 = tirCalculator.averageTIR(tirs140)
+                if (avg140 != null) {
+                    tir70_140 = avg140.inRangePct()?.div(100.0)
+                }
+                
+                // Today's TIR
+                val dailyTirs = tirCalculator.calculateDaily(70.0, 180.0)
+                if (dailyTirs != null && dailyTirs.size() > 0) {
+                     // Get the entry with the largest timestamp (latest)
+                     // LongSparseArray doesn't ensure order by key?
+                     // Usually appended. Let's iterate or assume logic.
+                     // Finding max key
+                     var maxDate = 0L
+                     var todayStat: app.aaps.core.interfaces.stats.TIR? = null
+                     for(i in 0 until dailyTirs.size()) {
+                         val key = dailyTirs.keyAt(i)
+                         if (key > maxDate) {
+                             maxDate = key
+                             todayStat = dailyTirs.valueAt(i)
+                         }
+                     }
+                     if (todayStat != null) {
+                        todayTir = todayStat.inRangePct()?.div(100.0)
+                     }
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 2. Calculate Real TDD
+        if (tddCalculator != null) {
+            try {
+                val tdds = tddCalculator.calculate(days.toLong(), true)
+                val avgTdd = tddCalculator.averageTDD(tdds)
+                
+                if (avgTdd != null) {
+                    val total = avgTdd.data.totalAmount
+                    tdd = total
+                    if (total > 0) {
+                        basalPercent = avgTdd.data.basalAmount / total
+                    }
+                }
+                
+                val today = tddCalculator.calculateToday()
+                if (today != null) {
+                    todayTdd = today.totalAmount
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 3. Calculate Mean BG & GMI
+        if (persistenceLayer != null) {
+            try {
+                // Fetch BG readings directly for the period
+                val now = aimiWallClockMs()
+                val fromTime = now - (days * 24 * 3600 * 1000L)
+                val bgReadings = persistenceLayer.getBgReadingsDataFromTimeToTime(fromTime, now, ascending = false)
+                bgReadingCount = bgReadings.size
+                
+                aapsLogger?.debug(LTag.APS, "📊 Mean BG calculation: fetched ${bgReadings.size} BG readings")
+                
+                if (bgReadings.isEmpty()) {
+                    aapsLogger?.warn(LTag.APS, "⚠️ No BG readings found for last $days days. Mean BG stays unknown")
+                } else {
+                    // Extract valid glucose values (GV objects have .value property)
+                    val bgValues = bgReadings
+                        .map { it.value }
+                        .filter { it > 30.0 } // Filter out noise
+                    
+                    if (bgValues.isNotEmpty()) {
+                        val mean = bgValues.average()
+                        val variance = bgValues
+                            .map { value -> (value - mean) * (value - mean) }
+                            .average()
+                        val sd = kotlin.math.sqrt(variance)
+                        meanBg = mean
+                        variabilityCv = if (mean > 0.0) (sd / mean).coerceIn(0.0, 1.0) else null
+                        aapsLogger?.debug(LTag.APS, "✅ Calculated Mean BG: ${mean.toInt()} mg/dL from ${bgValues.size} readings")
+                    } else {
+                        aapsLogger?.warn(LTag.APS, "⚠️ No valid BG data after filtering. Mean BG stays unknown")
+                    }
+                }
+            } catch (e: Exception) {
+                aapsLogger?.error(LTag.APS, "❌ Failed to calculate Mean BG: ${e.message}")
+                e.printStackTrace()
+            }
+        } else {
+            aapsLogger?.warn(LTag.APS, "⚠️ PersistenceLayer is null, cannot calculate mean BG. Mean BG stays unknown")
+        }
+
+        AdvisorMetrics(
+            periodLabel = "Last $days days",
+            tir70_180 = tir70_180,
+            tir70_140 = tir70_140,
+            timeBelow70 = timeBelow70, 
+            timeBelow54 = timeBelow54,
+            timeAbove180 = timeAbove180,
+            timeAbove250 = timeAbove250,
+            meanBg = meanBg,
+            variabilityCv = variabilityCv,
+            // GMI = 3.31 + 0.02392 * MeanBG (mg/dL), only when the mean is real.
+            gmi = meanBg?.let { 3.31 + (0.02392 * it) },
+            tdd = tdd,
+            basalPercent = basalPercent,
+            hypoEvents = 0, // Need Notification/Treatment analysis
+            severeHypoEvents = 0,
+            hyperEvents = 0,
+            todayTir = todayTir,
+            todayTdd = todayTdd,
+            // Without a single glucose reading the numbers above are unknown, so nothing may
+            // propose a settings change from this block.
+            dataSufficiency = if (bgReadingCount > 0) AdvisorDataSufficiency.GOOD else AdvisorDataSufficiency.INSUFFICIENT,
+            bgReadingCount = bgReadingCount,
+            daysCovered = if (bgReadingCount > 0) days else 0
+        )
+    }
+
+    /** Score of the period, or `null` when the glucose numbers were not measured. */
+    private fun computeGlobalScore(m: AdvisorMetrics): Double? {
+        // Simple weighted score
+        // TIR (50%), Hypo Avoidance (30%), Stability (20%)
+        val tir = m.tir70_180 ?: return null
+        val below70 = m.timeBelow70 ?: return null
+        val above180 = m.timeAbove180 ?: return null
+        val tirScore = tir * 10.0
+        val hypoScore = (1.0 - (below70 * 5).coerceAtMost(1.0)) * 10.0 // penalized heavily
+        val hyperScore = (1.0 - above180) * 10.0
+
+        return (tirScore * 0.5) + (hypoScore * 0.3) + (hyperScore * 0.2)
+    }
+
+    private fun classifySeverity(score: Double?): AdvisorSeverity? {
+        if (score == null) return null
+        return when {
+            score >= 7.0 -> AdvisorSeverity.Good
+            score >= 4.0 -> AdvisorSeverity.Warning
+            else -> AdvisorSeverity.Critical
+        }
+    }
+
+    private fun getAssessmentLabel(score: Double?): String {
+        if (score == null) return notEnoughDataText()
+        return when {
+            score >= 8.5 -> strings?.scoreLabelExcellent ?: "Excellent"
+            score >= 7.0 -> strings?.scoreLabelGood ?: "Good"
+            score >= 4.0 -> strings?.scoreLabelWarning ?: "Warning"
+            score >= 2.0 -> strings?.scoreLabelAttention ?: "Attention"
+            else -> strings?.scoreLabelCritical ?: "Critical"
+        }
+    }
+
+    /** Plain sentence for "we could not measure this period". Falls back to English without [strings]. */
+    private fun notEnoughDataText(): String =
+        strings?.notEnoughData ?: "Not enough glucose data for this period."
+
+    /**
+     * Context used when the service has no data source at all. Every metric is unknown on purpose:
+     * zeros would read as a patient with no lows and no highs.
+     */
+    private fun getEmptyContext(): AdvisorContext {
+        return AdvisorContext(
+            metrics = AdvisorMetrics(
+                periodLabel = "N/A",
+                tir70_180 = null,
+                tir70_140 = null,
+                timeBelow70 = null,
+                timeBelow54 = null,
+                timeAbove180 = null,
+                timeAbove250 = null,
+                meanBg = null,
+                variabilityCv = null,
+                gmi = null,
+                tdd = null,
+                basalPercent = null,
+                hypoEvents = 0,
+                severeHypoEvents = 0,
+                hyperEvents = 0,
+                todayTir = null,
+                todayTdd = null,
+                dataSufficiency = AdvisorDataSufficiency.INSUFFICIENT,
+            ),
+            profile = AimiProfileSnapshot(0.0,0.0,0.0,0.0, 5.0, 12.0),
+            prefs = AimiPrefsSnapshot(0.0, 0.0, 0.0, 0.0, false, 0.065),
+            pkpdPrefs = PkpdPrefsSnapshot(false,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0),
+            harmoniaDecision = PatientStateRuntimeRepository.getLatest()?.harmoniaDecision,
+        )
+    }
+
+    private fun formatSummary(m: AdvisorMetrics): String {
+        val tir = m.tir70_180
+        val below70 = m.timeBelow70
+        val mean = m.meanBg
+        if (tir == null || below70 == null || mean == null) return notEnoughDataText()
+        return "TIR: ${(tir*100).toInt()}% | Hypos: ${(below70*100).toInt()}% | Mean: ${mean.toInt()}"
+    }
+
+    /**
+     * Generate recommendations based on Context using the Plugin System.
+     */
+    fun generateRecommendations(
+        ctx: AdvisorContext,
+        history: List<app.aaps.plugins.aps.openAPSAIMI.advisor.data.AdvisorHistoryRepository.AdvisorActionLog>,
+        oref: OrefAnalysisReport? = null,
+    ): List<AimiRecommendation> {
+        if (preferences == null) return emptyList()
+        // Never build advice on a missing metric: with no real numbers we say nothing.
+        if (ctx.metrics.isInsufficient) return emptyList()
+        val meanBg = ctx.metrics.meanBg ?: return emptyList()
+        val timeBelow70 = ctx.metrics.timeBelow70 ?: return emptyList()
+        val timeAbove180 = ctx.metrics.timeAbove180 ?: return emptyList()
+
+        val loopCtx = app.aaps.plugins.aps.openAPSAIMI.model.AimiPluginContext(
+            glucose = app.aaps.core.interfaces.aps.GlucoseStatusAIMI(glucose = meanBg),
+            profile = createDummyProfile(),
+            iob = emptyList(),
+            cob = 0.0,
+            preferences = preferences
+        )
+
+        // Metric driven rules (hypos, control, hypers, basal dominance). They led the list before the
+        // plugin system took over, so they are built first here too, and stay first even if a plugin
+        // is ever registered. The informational ones carry no action, which shouldShowRecommendation
+        // always lets through.
+        val recs = metricRecommendations(ctx.metrics, ctx.prefs, strings)
+            .filter { shouldShowRecommendation(it, history) }
+            .toMutableList()
+
+        // Collect actions from all plugins
+        val actions = pluginManager.collectActions(loopCtx)
+
+        // Map actions to recommendations for the UI
+        recs += actions.map { action ->
+            AimiRecommendation(
+                title = ApsStrings.aimi_advisor_recommendations_title,
+                description = TextRef.Literal(""), // Should be dynamic
+                priority = action.priority,
+                domain = action.domain,
+                action = action
+            )
+        }
+
+        // Pragmatic SMB/PKPD governance recommendations
+        if (preferences != null) {
+            val reliefEnabled = preferences.get(BooleanKey.OApsAIMIPkpdPragmaticReliefEnabled)
+            val reliefMinFactor = preferences.get(DoubleKey.OApsAIMIPkpdPragmaticReliefMinFactor)
+            val redCarpetRestore = preferences.get(DoubleKey.OApsAIMIRedCarpetRestoreThreshold)
+            val maxIobFactor = preferences.get(DoubleKey.OApsAIMIPriorityMaxIobFactor)
+            val maxIobExtra = preferences.get(DoubleKey.OApsAIMIPriorityMaxIobExtraU)
+
+            val autodriveV3Active = preferences.get(BooleanKey.OApsAIMIautoDriveActive)
+            val htrEnabled = preferences.get(BooleanKey.OApsAIMIHyperTrajectoryRelease)
+            val rbtShadowEnabled = preferences.get(BooleanKey.OApsAIMIRecursiveBeliefShadow)
+            val rbtAuthorityEnabled = preferences.get(BooleanKey.OApsAIMIRecursiveBeliefAuthority)
+            if (autodriveV3Active && !rbtShadowEnabled) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_rbt_shadow_title,
+                        description = ApsStrings.aimi_adv_rec_rbt_shadow_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                            key = BooleanKey.OApsAIMIRecursiveBeliefShadow,
+                            newValue = true,
+                            reason = "Enable RBT shadow export when Autodrive V3 is active.",
+                        ),
+                    ),
+                )
+            }
+            if (autodriveV3Active && rbtShadowEnabled && !rbtAuthorityEnabled) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_rbt_authority_title,
+                        description = ApsStrings.aimi_adv_rec_rbt_authority_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.High,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                            key = BooleanKey.OApsAIMIRecursiveBeliefAuthority,
+                            newValue = true,
+                            reason = "Enable RBT authority after shadow JSONL review when Autodrive V3 is active.",
+                        ),
+                    ),
+                )
+            }
+            if (autodriveV3Active && !htrEnabled && !rbtAuthorityEnabled && timeAbove180 > 0.22 && timeBelow70 < 0.05) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_htr_enable_title,
+                        description = ApsStrings.aimi_adv_rec_htr_enable_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.High,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                            key = BooleanKey.OApsAIMIHyperTrajectoryRelease,
+                            newValue = true,
+                            reason = "Enable HTR when Autodrive V3 is active and hyper burden is high with low hypo pressure.",
+                        ),
+                    ),
+                )
+            }
+
+            if (!reliefEnabled && timeAbove180 > 0.25 && timeBelow70 < 0.04) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_pkpd_relief_enable_title,
+                        description = ApsStrings.aimi_adv_rec_pkpd_relief_enable_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Pkpd,
+                        action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                            key = BooleanKey.OApsAIMIPkpdPragmaticReliefEnabled,
+                            newValue = true,
+                            reason = "Enable pragmatic relief to avoid excessive soft damping in explicit meal/high-rise contexts."
+                        )
+                    )
+                )
+            }
+
+            if (reliefEnabled && reliefMinFactor < 0.70 && timeAbove180 > 0.25 && timeBelow70 <= 0.045) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_pkpd_relief_factor_title,
+                        description = ApsStrings.aimi_adv_rec_pkpd_relief_factor_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Pkpd,
+                        action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                            key = DoubleKey.OApsAIMIPkpdPragmaticReliefMinFactor,
+                            newValue = 0.75,
+                            reason = "Increase minimum PKPD factor to preserve SMB intent in priority contexts."
+                        ),
+                        descriptionArgs = listOf(aimiFmt2(reliefMinFactor))
+                    )
+                )
+            }
+
+            if (reliefEnabled && redCarpetRestore < 0.65 && timeAbove180 > 0.25 && timeBelow70 <= 0.045) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_redcarpet_restore_title,
+                        description = ApsStrings.aimi_adv_rec_redcarpet_restore_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                            key = DoubleKey.OApsAIMIRedCarpetRestoreThreshold,
+                            newValue = 0.75,
+                            reason = "Raise restore threshold to avoid excessive final SMB collapse."
+                        ),
+                        descriptionArgs = listOf(aimiFmt2(redCarpetRestore))
+                    )
+                )
+            }
+
+            if (reliefEnabled && (maxIobFactor < 1.10 || maxIobExtra < 1.0) && timeAbove180 > 0.30 && timeBelow70 < 0.04) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_priority_maxiob_title,
+                        description = ApsStrings.aimi_adv_rec_priority_maxiob_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                            key = DoubleKey.OApsAIMIPriorityMaxIobFactor,
+                            newValue = 1.20,
+                            reason = "Increase priority MaxIOB headroom factor in explicit aggressive contexts."
+                        ),
+                        descriptionArgs = listOf(
+                            aimiFmt2(maxIobFactor),
+                            aimiFmt2(maxIobExtra)
+                        )
+                    )
+                )
+            }
+
+            // Bidirectional: when hypos dominate, prefer lowering aggressive SMB headroom (not only ever-increasing factors).
+            if (reliefEnabled && reliefMinFactor > 0.76 && timeBelow70 > 0.055) {
+                val proposed = (reliefMinFactor - 0.06).coerceIn(0.50, 1.0)
+                if (proposed <= reliefMinFactor - 0.02) {
+                    recs.add(
+                        AimiRecommendation(
+                            title = ApsStrings.aimi_adv_rec_pkpd_relief_reduce_title,
+                            description = ApsStrings.aimi_adv_rec_pkpd_relief_reduce_desc,
+                            priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.High,
+                            domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Pkpd,
+                            action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                                key = DoubleKey.OApsAIMIPkpdPragmaticReliefMinFactor,
+                                newValue = proposed,
+                                reason = "Lower pragmatic relief floor slightly while hypo burden is elevated (reversible when control stabilizes).",
+                            ),
+                            descriptionArgs = listOf(
+                                aimiFmt2(reliefMinFactor),
+                                aimiFmt2(proposed),
+                            ),
+                        ),
+                    )
+                }
+            }
+
+            if (reliefEnabled && redCarpetRestore > 0.72 && timeBelow70 > 0.055) {
+                val proposed = (redCarpetRestore - 0.05).coerceIn(0.50, 0.95)
+                if (proposed <= redCarpetRestore - 0.02) {
+                    recs.add(
+                        AimiRecommendation(
+                            title = ApsStrings.aimi_adv_rec_redcarpet_reduce_title,
+                            description = ApsStrings.aimi_adv_rec_redcarpet_reduce_desc,
+                            priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                            domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                            action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                                key = DoubleKey.OApsAIMIRedCarpetRestoreThreshold,
+                                newValue = proposed,
+                                reason = "Slightly lower restore threshold while lows are frequent to reduce late SMB snap-back.",
+                            ),
+                            descriptionArgs = listOf(
+                                aimiFmt2(redCarpetRestore),
+                                aimiFmt2(proposed),
+                            ),
+                        ),
+                    )
+                }
+            }
+
+            if (reliefEnabled && maxIobFactor > 1.10 && timeBelow70 > 0.05) {
+                val proposed = (maxIobFactor - 0.08).coerceIn(1.0, 1.6)
+                if (proposed <= maxIobFactor - 0.03) {
+                    recs.add(
+                        AimiRecommendation(
+                            title = ApsStrings.aimi_adv_rec_priority_maxiob_reduce_title,
+                            description = ApsStrings.aimi_adv_rec_priority_maxiob_reduce_desc,
+                            priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.High,
+                            domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                            action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                                key = DoubleKey.OApsAIMIPriorityMaxIobFactor,
+                                newValue = proposed,
+                                reason = "Reduce priority MaxIOB factor while hypo exposure is significant.",
+                            ),
+                            descriptionArgs = listOf(
+                                aimiFmt2(maxIobFactor),
+                                aimiFmt2(proposed),
+                            ),
+                        ),
+                    )
+                }
+            }
+
+            if (reliefEnabled && maxIobExtra > 1.6 && timeBelow70 > 0.055) {
+                val proposed = (maxIobExtra - 0.5).coerceIn(0.0, 5.0)
+                if (proposed <= maxIobExtra - 0.25) {
+                    recs.add(
+                        AimiRecommendation(
+                            title = ApsStrings.aimi_adv_rec_priority_maxiob_extra_reduce_title,
+                            description = ApsStrings.aimi_adv_rec_priority_maxiob_extra_reduce_desc,
+                            priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                            domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                            action = app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate(
+                                key = DoubleKey.OApsAIMIPriorityMaxIobExtraU,
+                                newValue = proposed,
+                                reason = "Trim priority MaxIOB extra U during elevated hypo burden.",
+                            ),
+                            descriptionArgs = listOf(
+                                aimiFmt2(maxIobExtra),
+                                aimiFmt2(proposed),
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
+
+        appendOrefGuidanceRecommendations(ctx, oref, recs)
+
+        // 5) If nothing alarming -> positive message
+        if (recs.isEmpty()) {
+            recs.add(AimiRecommendation(
+                title = ApsStrings.aimi_adv_rec_profile_ok_title,
+                description = ApsStrings.aimi_adv_rec_profile_ok_desc,
+                priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Low,
+                domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                action = null
+            ))
+        }
+
+        return recs
+    }
+
+    /**
+     * High-level, cautious tuning directions grounded in OREF priority + CGM metrics (no one-tap apply).
+     */
+    private fun appendOrefGuidanceRecommendations(
+        ctx: AdvisorContext,
+        oref: OrefAnalysisReport?,
+        recs: MutableList<AimiRecommendation>,
+    ) {
+        val prefs = preferences ?: return
+        if (oref == null || oref.dataSufficiency == OrefDataSufficiency.INSUFFICIENT) return
+
+        val hypoFocus = oref.priority == OrefGlycemicPriority.HYPO || oref.priority == OrefGlycemicPriority.BOTH
+        val hyperFocus = oref.priority == OrefGlycemicPriority.HYPER || oref.priority == OrefGlycemicPriority.BOTH
+        val hypoLoad = ctx.metrics.timeBelow70 ?: return
+        val hyperLoad = ctx.metrics.timeAbove180 ?: return
+        val basalPercent = ctx.metrics.basalPercent
+        val mixedOref = hypoFocus && hyperFocus
+
+        // ISF guidance: direction depends on whether lows, highs, or both dominate (avoid always “increase” framing).
+        if (mixedOref && hypoLoad >= 0.04 && hyperLoad >= 0.12) {
+            recs.add(
+                AimiRecommendation(
+                    title = ApsStrings.aimi_adv_rec_oref_isf_mixed_title,
+                    description = ApsStrings.aimi_adv_rec_oref_isf_mixed_desc,
+                    priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.High,
+                    domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                    action = null,
+                    descriptionArgs = listOf(
+                        percent(hypoLoad).toString(),
+                        percent(hyperLoad).toString(),
+                    ),
+                ),
+            )
+        } else {
+            val hyperDominatesLoad = hyperFocus && hyperLoad > hypoLoad * 1.25 && hypoLoad < 0.06
+            if (hypoFocus && hypoLoad >= 0.04 && !hyperDominatesLoad) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_oref_isf_hypo_title,
+                        description = ApsStrings.aimi_adv_rec_oref_isf_hypo_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.High,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = null,
+                        descriptionArgs = listOf(percent(hypoLoad).toString()),
+                    ),
+                )
+            }
+            if (hyperFocus && hyperLoad >= 0.10 && hypoLoad < 0.05) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_oref_isf_hyper_title,
+                        description = ApsStrings.aimi_adv_rec_oref_isf_hyper_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = null,
+                        descriptionArgs = listOf(percent(hyperLoad).toString()),
+                    ),
+                )
+            }
+        }
+
+        if (hypoFocus && hypoLoad >= 0.04 && basalPercent != null && basalPercent >= 0.48 &&
+            !(hyperFocus && hyperLoad > hypoLoad * 1.35)
+        ) {
+            recs.add(
+                AimiRecommendation(
+                    title = ApsStrings.aimi_adv_rec_oref_basal_hypo_title,
+                    description = ApsStrings.aimi_adv_rec_oref_basal_hypo_desc,
+                    priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                    domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                    action = null,
+                    descriptionArgs = listOf(percent(basalPercent).toString()),
+                ),
+            )
+        }
+
+        if (hyperFocus && hyperLoad >= 0.10) {
+            recs.add(
+                AimiRecommendation(
+                    title = ApsStrings.aimi_adv_rec_oref_ic_hyper_title,
+                    description = ApsStrings.aimi_adv_rec_oref_ic_hyper_desc,
+                    priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                    domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                    action = null,
+                    descriptionArgs = listOf(percent(hyperLoad).toString()),
+                ),
+            )
+        }
+
+        if (ctx.pkpdPrefs.pkpdEnabled && (hypoFocus || hyperFocus) &&
+            (hypoLoad >= 0.04 || hyperLoad >= 0.10)
+        ) {
+            recs.add(
+                AimiRecommendation(
+                    title = ApsStrings.aimi_adv_rec_oref_pkpd_review_title,
+                    description = ApsStrings.aimi_adv_rec_oref_pkpd_review_desc,
+                    priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                    domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Pkpd,
+                    action = null,
+                ),
+            )
+        }
+
+        if (prefs.get(BooleanKey.OApsAIMIautoDriveActive)) {
+            if (hypoFocus && hypoLoad >= 0.055) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_oref_autodrive_mpc_hypo_title,
+                        description = ApsStrings.aimi_adv_rec_oref_autodrive_mpc_hypo_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Medium,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = null,
+                        descriptionArgs = listOf(
+                            aimiFmt3(ctx.prefs.mpcInsulinUPerKgPerStep),
+                        ),
+                    ),
+                )
+            } else if (hyperFocus && hyperLoad >= 0.08 && hypoLoad < 0.052) {
+                recs.add(
+                    AimiRecommendation(
+                        title = ApsStrings.aimi_adv_rec_oref_autodrive_mpc_title,
+                        description = ApsStrings.aimi_adv_rec_oref_autodrive_mpc_desc,
+                        priority = app.aaps.plugins.aps.openAPSAIMI.model.AimiPriority.Low,
+                        domain = app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Profile,
+                        action = null,
+                        descriptionArgs = listOf(
+                            aimiFmt3(ctx.prefs.mpcInsulinUPerKgPerStep),
+                        ),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun createDummyProfile(): app.aaps.core.interfaces.aps.OapsProfileAimi {
+        return app.aaps.core.interfaces.aps.OapsProfileAimi(
+            dia = 5.0, min_5m_carbimpact = 8.0, max_iob = 0.0, max_daily_basal = 0.0, max_basal = 0.0,
+            min_bg = 70.0, max_bg = 180.0, target_bg = 100.0, carb_ratio = 10.0, sens = 50.0,
+            autosens_adjust_targets = true, max_daily_safety_multiplier = 3.0, current_basal_safety_multiplier = 4.0,
+            high_temptarget_raises_sensitivity = true, low_temptarget_lowers_sensitivity = true,
+            sensitivity_raises_target = true, resistance_lowers_target = true, adv_target_adjustments = true,
+            exercise_mode = false, half_basal_exercise_target = 160, maxCOB = 120, skip_neutral_temps = true,
+            remainingCarbsCap = 90, enableUAM = true, A52_risk_enable = true, SMBInterval = 3,
+            enableSMB_with_COB = true, enableSMB_with_temptarget = true, allowSMB_with_high_temptarget = true,
+            enableSMB_always = true, enableSMB_after_carbs = true, maxSMBBasalMinutes = 120,
+            maxUAMSMBBasalMinutes = 120, bolus_increment = 0.05, carbsReqThreshold = 1,
+            current_basal = 1.0, temptargetSet = false, autosens_max = 1.2, out_units = "mg/dL",
+            lgsThreshold = 70, variable_sens = 1.0, insulinDivisor = 30, TDD = 40.0, peakTime = 75.0,
+            futureActivity = 0.0, sensorLagActivity = 0.0, historicActivity = 0.0, currentActivity = 0.0
+        )
+    }
+
+    private fun percent(value: Double): Int = (value * 100.0).roundToInt()
+
+    /**
+     * Level 1 Analysis: Generates a deterministic text summary of the recommendations.
+     */
+    fun generatePlainTextAnalysis(
+        context: AdvisorContext,
+        report: AdvisorReport,
+        includeUserInsight: Boolean = false,
+    ): String {
+        val sb = StringBuilder()
+        
+        if (strings != null) {
+            // Introduction based on score. No score means we could not measure the period.
+            val score = report.overallScore
+            if (score == null) {
+                sb.append(notEnoughDataText() + "\n\n")
+            } else if (score >= 8.5) {
+                sb.append(strings.analysisIntroExcellent + "\n\n")
+            } else if (score >= 5.5) {
+                sb.append(strings.analysisIntroGood + "\n\n")
+            } else {
+                sb.append(strings.analysisIntroPoor + "\n\n")
+            }
+
+            // Summary of Issues
+            if (report.recommendations.isNotEmpty()) {
+                sb.append(strings.analysisIssuesHeader + "\n")
+                report.recommendations.forEach { rec ->
+                    // Just print the title of the recommendation
+                    val title = try { strings.gs(rec.title) } catch (e: Exception) { "-" }
+                    sb.append("- $title\n")
+                }
+            } else {
+                sb.append(strings.analysisAllGood)
+            }
+
+            report.orefAnalysis?.let { oref ->
+                sb.append("\n\n--- OREF local ---\n")
+                sb.append(oref.toPromptSection())
+                if (includeUserInsight) {
+                    sb.append("\n\n")
+                    sb.append(
+                        app.aaps.plugins.aps.openAPSAIMI.advisor.oref.OrefUserInsightFormatter.buildParagraph(
+                            strings,
+                            oref,
+                        ),
+                    )
+                }
+            }
+
+            sb.append("\n" + formatTemplate(strings.generatedFooter, listOf(formatTime(report.generatedAt))))
+
+        } else {
+             sb.append("Analysis available in app.")
+        }
+
+        return sb.toString()
+    }
+    
+    // internal, not private: the Profile Advisor Compose screen's footer formats the report's
+    // generatedAt timestamp the same way, and this is the one place that pattern is defined.
+    internal fun formatTime(time: Long): String {
+         // "dd MMM HH:mm" via kotlinx.datetime; SimpleDateFormat does not exist outside the JVM.
+         val local = Instant.fromEpochMilliseconds(time).toLocalDateTime(TimeZone.currentSystemDefault())
+         val months = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+         val day = local.day.toString().padStart(2, '0')
+         val hour = local.hour.toString().padStart(2, '0')
+         val minute = local.minute.toString().padStart(2, '0')
+         return "$day ${months[local.monthNumber - 1]} $hour:$minute"
+    }
+
+    /**
+     * Payload generator for future AI (LLM).
+     */
+    fun generatePayloadForAI(report: AdvisorReport, context: AdvisorContext): String {
+        return """
+            {
+              "score": ${report.overallScore},
+              "metrics": {
+                "tir": ${context.metrics.tir70_180},
+                "hypos": ${context.metrics.timeBelow70},
+                "hypers": ${context.metrics.timeAbove180},
+                "meanBg": ${context.metrics.meanBg},
+                "tdd": ${context.metrics.tdd}
+              },
+              "pkpd": {
+                "enabled": ${context.pkpdPrefs.pkpdEnabled},
+                "dia": ${context.pkpdPrefs.learnedDiaH},
+                "peak": ${context.pkpdPrefs.learnedPeakMin},
+                "isfFusionMax": ${context.pkpdPrefs.isfFusionMaxFactor},
+                "smbTailDamping": ${context.pkpdPrefs.smbTailDamping}
+              },
+              "suggestions": [
+                ${report.recommendations.filter { it.domain is app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Pkpd }.joinToString(",") { "\"${try{strings?.gs(it.title)}catch(e:Exception){strings?.gs(it.description)}}\"" }}
+              ]
+            }
+        """.trimIndent()
+    }
+
+    // The Compose screen wraps its call to this in loadOrNull, which discards the throwable by
+    // design (one bad section must not hide the rest of the report). That means the detail has to
+    // be captured here, at the source, before it is thrown away upstream - hence the log-then-rethrow
+    // below instead of a bare try/catch at the call site.
+    fun generateBasalProfileProposal(periodDays: Int = 7): BasalProfileProposal {
+        try {
+            val metrics = calculateMetrics(periodDays)
+            val profile = profileFunction?.let { runBlocking(aapsIoDispatcher) { it.getProfile() } }
+            if (profile == null) {
+                return BasalProfileProposal(
+                    generatedAt = aimiWallClockMs(),
+                    periodDays = periodDays,
+                    strategyCode = "NO_PROFILE",
+                    strategy = strings?.basalStrategyNoProfile ?: "No profile available",
+                    scalingFactor = 1.0,
+                    rationale = "Profile unavailable",
+                    rows = emptyList()
+                )
+            }
+
+            val proposalFactor = computeBasalProposalFactor(metrics)
+            val factor = proposalFactor.factor
+            val rows = (0 until 24).map { hour ->
+                // See the same fix in collectContext(): getBasalTimeFromMidnight takes seconds from
+                // midnight, getBasal(timestamp) takes epoch millis - the two are not interchangeable.
+                val current = profile.getBasalTimeFromMidnight(hour * 3600)
+                val proposed = (current * factor).coerceIn(current * 0.85, current * 1.15)
+                BasalHourProposal(
+                    hour = hour,
+                    current = current,
+                    proposed = proposed
+                )
+            }
+
+            return BasalProfileProposal(
+                generatedAt = aimiWallClockMs(),
+                periodDays = periodDays,
+                strategyCode = proposalFactor.code,
+                strategy = proposalFactor.label,
+                scalingFactor = factor,
+                rationale = proposalFactor.rationale,
+                rows = rows
+            )
+        } catch (t: Throwable) {
+            // Catching Throwable is safe only while this function and calculateMetrics stay
+            // non-suspend: each roots its own runBlocking job, so a screen leaving composition
+            // cannot deliver a CancellationException in here. Make either one a suspend fun and this
+            // catch starts logging cancellations as failures - rethrow CancellationException first.
+            aapsLogger?.error(LTag.APS, "generateBasalProfileProposal failed", t)
+            throw t
+        }
+    }
+
+    // Only the title line is natural-language prose - this text goes out through ACTION_SEND for a
+    // person to read (and plausibly forward to their doctor), so it is localized like the dialog.
+    // Every other line is a key=value or CSV row meant to stay machine-parseable, so those stay as
+    // literal English: translating "generatedAt=", "hour,current,proposed,deltaPct" or the row
+    // format would not change what a human reads, only break anything that parses this export.
+    // That is why `strategy=` writes [BasalProfileProposal.strategyCode] and not the localized
+    // [BasalProfileProposal.strategy] the dialog shows: the two must not be the same string, or the
+    // first translator to touch that label silently changes the export's value per language.
+    fun exportBasalProfileProposalText(proposal: BasalProfileProposal): String {
+        val header = buildString {
+            appendLine(strings?.basalExportHeaderTitle ?: "AIMI BASAL PROPOSAL (NOT APPLIED)")
+            appendLine("generatedAt=${proposal.generatedAt}")
+            appendLine("periodDays=${proposal.periodDays}")
+            appendLine("strategy=${proposal.strategyCode}")
+            appendLine("scalingFactor=${aimiFmt3(proposal.scalingFactor)}")
+            appendLine("rationale=${proposal.rationale}")
+            appendLine("hour,current,proposed,deltaPct")
+        }
+
+        val lines = proposal.rows.joinToString(separator = "\n") { row ->
+            val deltaPct = if (row.current > 0.0) ((row.proposed / row.current) - 1.0) * 100.0 else 0.0
+            // "%02d,%.3f,%.3f,%+.1f" without String.format (JVM-only in commonMain).
+            val hour = row.hour.toString().padStart(2, '0')
+            val signedDelta = (if (deltaPct < 0) "-" else "+") + aimiFmt1(abs(deltaPct))
+            "$hour,${aimiFmt3(row.current)},${aimiFmt3(row.proposed)},$signedDelta"
+        }
+        return header + lines + "\n"
+    }
+
+    // strategy/rationale are shown in the basal-proposal dialog (AimiProfileAdvisorScreen), so they
+    // are resolved through strings when it is available. strings is only nullable for tests that construct
+    // this service without it; the literal is the same text the resource carries.
+    private data class BasalProposalFactor(
+        val factor: Double,
+        /** Stable code for the export. */
+        val code: String,
+        /** Localized label for the dialog. */
+        val label: String,
+        val rationale: String,
+    )
+
+    /**
+     * Basal scaling factor for the proposal. With no measured period the factor is 1.0 (hold),
+     * so an unknown history can never push the proposed basal up or down.
+     */
+    private fun computeBasalProposalFactor(metrics: AdvisorMetrics): BasalProposalFactor {
+        val below54 = metrics.timeBelow54
+        val below70 = metrics.timeBelow70
+        val above180 = metrics.timeAbove180
+        val tir = metrics.tir70_180
+        if (metrics.isInsufficient || below70 == null) {
+            return BasalProposalFactor(
+                factor = 1.00,
+                code = "NO_DATA",
+                label = notEnoughDataText(),
+                rationale = "Not enough glucose data in the lookback window",
+            )
+        }
+        return when {
+            (below54 != null && below54 >= 0.01) || below70 >= 0.06 -> BasalProposalFactor(
+                factor = 0.95,
+                code = "SAFETY_REDUCTION",
+                label = strings?.basalStrategySafetyReduction ?: "Reduce basal for safety",
+                rationale = strings?.basalRationaleSafetyReduction ?: "There is hypo risk in the recent data.",
+            )
+            above180 != null && tir != null && above180 >= 0.35 && tir < 0.60 && below70 <= 0.03 -> BasalProposalFactor(
+                factor = 1.06,
+                code = "GENTLE_INCREASE",
+                label = strings?.basalStrategyGentleIncrease ?: "Increase basal a little",
+                rationale = strings?.basalRationaleGentleIncrease ?: "Blood glucose is often high and hypo risk is low.",
+            )
+            else -> BasalProposalFactor(
+                factor = 1.00,
+                code = "HOLD_BASELINE",
+                label = strings?.basalStrategyHoldBaseline ?: "Keep the current basal",
+                rationale = strings?.basalRationaleHoldBaseline ?: "There is no clear pattern to change the basal profile.",
+            )
+        }
+    }
+    
+    /**
+     * Same visibility rules as [generateReport] filtering (live prefs + 48h history).
+     * Used by the Advisor UI to drop cards after apply without regenerating the full report.
+     */
+    fun isRecommendationVisible(
+        rec: AimiRecommendation,
+        history: List<AdvisorHistoryRepository.AdvisorActionLog>,
+    ): Boolean = shouldShowRecommendation(rec, history)
+
+    /**
+     * Determines if a recommendation should be shown based on history (48h key cooldown).
+     * - Hides actionable [AimiAction.PreferenceUpdate] when that preference key was applied within the last 48h.
+     * - Hides when current preference already equals the proposed value (no Apply needed).
+     */
+    private fun shouldShowRecommendation(
+        rec: AimiRecommendation,
+        history: List<AdvisorHistoryRepository.AdvisorActionLog>
+    ): Boolean {
+        if (rec.action == null) return true // Informational recs always shown
+
+        // Fix #1b: PKPD adjustments (DIA/Peak) have no effect when T3c Brittle Mode is active.
+        // In T3c, the basal is driven by heuristics, not by the PKPD model. Suppress to avoid confusion.
+        if (rec.domain is app.aaps.plugins.aps.openAPSAIMI.model.AimiDomain.Pkpd) {
+            val isT3cActive = preferences?.get(app.aaps.core.keys.BooleanKey.OApsAIMIT3cBrittleMode) ?: false
+            if (isT3cActive) return false
+        }
+
+        if (rec.action is app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate) {
+            val update = rec.action as app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate
+            if (preferenceAlreadyMatchesProposed(update)) return false
+            if (wasPreferenceKeyAppliedInLast48h(history, update)) return false
+        }
+        return true
+    }
+
+    private fun preferenceAlreadyMatchesProposed(update: app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate): Boolean {
+        val p = preferences ?: return false
+        val key = update.key
+        val nv = update.newValue
+        return try {
+            when {
+                nv is Double && key is DoublePreferenceKey -> p.get(key) == nv
+                nv is Int && key is IntPreferenceKey -> p.get(key) == nv
+                nv is Boolean && key is BooleanPreferenceKey -> p.get(key) == nv
+                nv is String && key is StringPreferenceKey -> p.get(key) == nv
+                else -> false
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * After any apply logged for [PreferenceKey.key], suppress further actionable suggestions for that key for 48h
+     * (even if the newly proposed target value differs).
+     */
+    private fun wasPreferenceKeyAppliedInLast48h(
+        history: List<AdvisorHistoryRepository.AdvisorActionLog>,
+        update: app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate,
+    ): Boolean {
+        val threshold = aimiWallClockMs() - (48 * 3600 * 1000L)
+        val keyStr = update.key.key
+        return history.any { entry ->
+            entry.timestamp >= threshold &&
+                entry.key == keyStr &&
+                entry.type == AdvisorHistoryRepository.ActionType.PREFERENCE_CHANGE
+        }
+    }
+
+    /**
+     * Generates a detailed clinical report (JSON) for expert analysis.
+     */
+    fun generateClinicalExport(periodDays: Int = 14): String {
+        try {
+            if (persistenceLayer == null || tddCalculator == null || tirCalculator == null) {
+                return "{ \"error\": \"Dependencies missing\" }"
+            }
+
+            // 1. Fetch Raw Data
+            val now = aimiWallClockMs()
+            val fromTime = now - (periodDays * 24 * 3600 * 1000L)
+            
+            val bgReadings = try {
+                runBlocking(aapsIoDispatcher) {
+                    persistenceLayer.getBgReadingsDataFromTimeToTime(fromTime, now, false)
+                }.map { it.value }
+                    .filter { it > 30.0 }
+            } catch (e: Exception) {
+                emptyList<Double>()
+            }
+            
+            // 2. Build Context
+            val metrics = calculateMetrics(periodDays)
+            val profile = profileFunction?.let { runBlocking(aapsIoDispatcher) { it.getProfile() } }
+            val isf = profile?.getIsfMgdlTimeFromMidnight(0) ?: 40.0 // Default or specific logic needed to get specific ISF
+            
+            // AimiClinicalReportEngine is Android-only: it reads AIMIPhysioManagerMTR. The context
+            // built here was never read - the comments below say the engine was not wired up - so
+            // the stats are assembled inline instead.
+            
+            // Create Engine (We pass null for PhysioManager as we can't access it easily here - TODO: Fix DI)
+            // Wait, we need to handle the missing PhysioManager arg in constructor or make it nullable?
+            // I'll modify ClinicalReportEngine to accept nullable manager? 
+            // Better: use empty mocks.
+            
+            // Using a hack for now: We won't use the Engine class directly if we can't inject.
+            // Actually, I can just reimplement the math logic locally or create a simplified local ReportBuilder 
+            // to avoid DI hell in this existing Service.
+            
+            // Let's implement the logic inline here to ensure it works immediately without breaking DI.
+            
+            val stats = JsonObj()
+            
+            // Metabolic
+            // No readings means these numbers were not measured: they stay null in the export.
+            val mean: Double? = if (bgReadings.isNotEmpty()) bgReadings.average() else null
+            val stdDev: Double? = if (mean != null) kotlin.math.sqrt(bgReadings.map { (it-mean)*(it-mean) }.sum() / bgReadings.size) else null
+            val cv: Double? = if (mean != null && stdDev != null && mean > 0) stdDev/mean * 100 else null
+            
+            // LBGI
+            var lbgiSum = 0.0
+            bgReadings.forEach { bg ->
+                if(bg > 10) {
+                    val f = 1.509 * (ln(bg).pow(1.084) - 5.381)
+                    if(f < 0) lbgiSum += 10 * f * f
+                }
+            }
+            val lbgi: Double? = if (bgReadings.isNotEmpty()) lbgiSum/bgReadings.size else null
+
+            stats.put("meta", JsonObj().put("generated", now))
+            stats.put("metabolic", JsonObj().apply {
+                put("gmi", mean?.let { 3.31 + 0.02392 * it })
+                put("cv", cv)
+                put("lbgi", lbgi)
+                put("tir", metrics.tir70_180)
+            })
+            
+            stats.put("advisor_metrics", JsonObj().apply {
+                put("hypos", metrics.timeBelow70)
+                put("hypers", metrics.timeAbove180)
+                put("basalRatio", metrics.basalPercent)
+            })
+
+            return stats.toString(2)
+
+        } catch (e: Exception) {
+            return "{ \"error\": \"${e.message}\" }"
+        }
+    }
+}

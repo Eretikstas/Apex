@@ -1,0 +1,325 @@
+package app.aaps.plugins.aps.openAPSAIMI.hormonitor.viewer
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.compose.AapsSpacing
+import app.aaps.core.ui.compose.AapsTopAppBar
+import app.aaps.core.ui.compose.preference.ProvidePreferenceTheme
+import app.aaps.core.ui.compose.stringResource
+import app.aaps.plugins.aps.ApsStrings
+import app.aaps.plugins.aps.openAPSAIMI.aimiFmt1
+import app.aaps.plugins.aps.openAPSAIMI.aimiFmt2
+import app.aaps.plugins.aps.openAPSAIMI.ports.AimiDateFormatter
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiStorage
+import kotlin.math.roundToInt
+
+/**
+ * In-app viewer for the exported Hormonitor study data. Read-only. Day list comes from the compact
+ * daily_outcomes file; the rich per-day detail is aggregated from the event stream. The goal is to let the
+ * user see that the data is well-structured AND meaningful — how the tree/Harmonia, physio and hormonal
+ * context were actually deployed across a day. Embedded in AIMI settings via [ComposeScreenContent].
+ *
+ * [dateFormatter] is the one platform call this screen needs. The caller passes the platform
+ * implementation, so the screen itself holds no date API and the shaping rules stay shared
+ * (see `HormonitorViewerText`).
+ */
+@Composable
+fun HormonitorViewerScreen(storage: AimiStorage, dateFormatter: AimiDateFormatter, onBack: () -> Unit) {
+    // The reader reads study files through the shared storage seam now, so it no longer builds its
+    // own list of directories here. The plugin injects the same AimiStorage the engine writes with,
+    // which keeps the viewer reading exactly what was written.
+    val reader = remember(storage) { HormonitorReader(storage) }
+
+    var days by remember { mutableStateOf<List<HormonitorDaySummary>>(emptyList()) }
+    var selectedDay by remember { mutableStateOf<String?>(null) }
+    var detail by remember { mutableStateOf<HormonitorDayDetail?>(null) }
+    var loadingDays by remember { mutableStateOf(true) }
+    var loadingDetail by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        days = reader.readDays()
+        selectedDay = days.firstOrNull()?.dayLocal
+        loadingDays = false
+    }
+    LaunchedEffect(selectedDay) {
+        val day = selectedDay ?: return@LaunchedEffect
+        loadingDetail = true
+        detail = reader.readDayDetail(day)
+        loadingDetail = false
+    }
+
+    ProvidePreferenceTheme {
+        Scaffold(
+            topBar = {
+                AapsTopAppBar(
+                    title = { Text(stringResource(ApsStrings.aimi_hormonitor_viewer_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(CoreUiStrings.back),
+                            )
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Column(Modifier.padding(padding).fillMaxSize()) {
+                when {
+                    loadingDays -> CenteredProgress()
+                    days.isEmpty() -> CenteredText(stringResource(ApsStrings.aimi_hormonitor_viewer_empty))
+                    else -> {
+                        DaySelector(
+                            days = days,
+                            selected = selectedDay,
+                            dateFormatter = dateFormatter,
+                            onSelect = { selectedDay = it },
+                        )
+                        val summary = days.firstOrNull { it.dayLocal == selectedDay }
+                        Column(
+                            Modifier
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = AapsSpacing.large)
+                                .padding(bottom = AapsSpacing.xxLarge),
+                        ) {
+                            summary?.let { DaySummaryCard(it) }
+                            when {
+                                loadingDetail -> CenteredProgress()
+                                detail == null -> CenteredText(stringResource(ApsStrings.aimi_hormonitor_viewer_no_events))
+                                else -> DayDetailSections(detail!!, dateFormatter)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DaySelector(
+    days: List<HormonitorDaySummary>,
+    selected: String?,
+    dateFormatter: AimiDateFormatter,
+    onSelect: (String) -> Unit,
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(AapsSpacing.small),
+        contentPadding = PaddingValues(AapsSpacing.large),
+    ) {
+        items(days) { d ->
+            FilterChip(
+                selected = d.dayLocal == selected,
+                onClick = { onSelect(d.dayLocal) },
+                label = { Text(shortDayText(d.dayLocal, dateFormatter)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DaySummaryCard(s: HormonitorDaySummary) {
+    SectionCard(s.dayLocal) {
+        TirBar(s.tirLowPct, s.tirInRangePct, s.tirAbovePct)
+        Spacer(Modifier.height(AapsSpacing.small))
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_tir), tirText(s))
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_tdd), num1(s.tdd24hU) + " U")
+        KeyValueRow(
+            stringResource(ApsStrings.aimi_hormonitor_decisions),
+            "${s.decisionTotal}  ·  SMB ${s.decisionSmb} · TBR↑ ${s.decisionTbrUp} · TBR↓ ${s.decisionTbrDown} · " +
+                "susp ${s.decisionSuspend} · none ${s.decisionNone} · veto ${s.decisionVeto}",
+        )
+        KeyValueRow(
+            stringResource(ApsStrings.aimi_hormonitor_reliability),
+            (s.sourceReliabilityScore?.let { "${(it * 100).roundToInt()}%" } ?: "—") +
+                (s.sourceStale?.let { if (it) "  (stale)" else "" } ?: ""),
+        )
+    }
+}
+
+@Composable
+private fun DayDetailSections(d: HormonitorDayDetail, dateFormatter: AimiDateFormatter) {
+    // Integrity — proof the data is well-formed.
+    SectionCard(stringResource(ApsStrings.aimi_hormonitor_integrity)) {
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_records), "${d.eventCount}")
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_schema), d.integrity.schemaVersions.joinToString(", ").ifBlank { "—" })
+        KeyValueRow(
+            stringResource(ApsStrings.aimi_hormonitor_span),
+            timeSpanText(d.integrity.firstTimestamp, d.integrity.lastTimestamp, dateFormatter),
+        )
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_patient_story), sharePct(d.integrity.patientStoryCoverage))
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_physio_snapshot), sharePct(d.integrity.physioSnapshotCoverage))
+        if (d.integrity.malformedLineCount > 0) {
+            KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_malformed), "${d.integrity.malformedLineCount}")
+        }
+    }
+    // Tree / Harmonia — the core "does it make sense" evidence, shown first.
+    SectionCard(stringResource(ApsStrings.aimi_hormonitor_tree_harmonia)) {
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_patient_modes), d.treeHarmonia.patientModes)
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_strategy_hints), d.treeHarmonia.strategyHints)
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_reason_codes), d.treeHarmonia.reasonCodes)
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_final_decisions), d.treeHarmonia.finalDecisions)
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_mode_confidence), num2(d.treeHarmonia.meanModeConfidence))
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_vetoes), "${d.treeHarmonia.vetoCount}")
+        if (d.treeHarmonia.narrativeSamples.isNotEmpty()) {
+            Spacer(Modifier.height(AapsSpacing.small))
+            Text(stringResource(ApsStrings.aimi_hormonitor_narratives), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+            d.treeHarmonia.narrativeSamples.forEach {
+                Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+    // Physio.
+    SectionCard(stringResource(ApsStrings.aimi_hormonitor_physio)) {
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_physio_states), d.physio.physioStates)
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_activity_states), d.physio.activityStates)
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_confidence), num2(d.physio.meanConfidence))
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_data_quality), num2(d.physio.meanDataQuality))
+        StatRow("ISF ×", d.physio.isfFactor, ::num2)
+        StatRow("Basal ×", d.physio.basalFactor, ::num2)
+        StatRow("SMB ×", d.physio.smbFactor, ::num2)
+        StatRow(stringResource(ApsStrings.aimi_hormonitor_steps15), d.physio.steps15m, ::num0)
+        StatRow(stringResource(ApsStrings.aimi_hormonitor_hr), d.physio.hrNowBpm, ::num0)
+    }
+    // Hormonal.
+    SectionCard(stringResource(ApsStrings.aimi_hormonitor_hormonal)) {
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_cycle_phase), d.hormonal.cyclePhases)
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_thyroid), d.hormonal.thyroidStatuses)
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_inflammation), d.hormonal.inflammationStatuses)
+        StatRow(stringResource(ApsStrings.aimi_hormonitor_cycle_day), d.hormonal.cycleDayRange, ::num0)
+        StatRow("wCycle basal ×", d.hormonal.wcycleBasalMult, ::num2)
+        StatRow("wCycle SMB ×", d.hormonal.wcycleSmbMult, ::num2)
+        StatRow("wCycle ISF ×", d.hormonal.wcycleIsfMult, ::num2)
+    }
+    // Safety.
+    SectionCard(stringResource(ApsStrings.aimi_hormonitor_safety)) {
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_safety_gates), d.safety.safetyGates)
+        DistributionBlock(stringResource(ApsStrings.aimi_hormonitor_safety_phases), d.safety.safetyPhases)
+        KeyValueRow(stringResource(ApsStrings.aimi_hormonitor_hypo_suppressed), "${d.safety.predictiveHypoSuppressedCount}")
+        StatRow(stringResource(ApsStrings.aimi_hormonitor_composite_min), d.safety.compositeMinMgdl, ::num0)
+    }
+}
+
+// --- reusable building blocks ---
+
+@Composable
+private fun SectionCard(title: String, content: @Composable () -> Unit) {
+    Spacer(Modifier.height(AapsSpacing.medium))
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(AapsSpacing.large)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            HorizontalDivider(Modifier.padding(vertical = AapsSpacing.small))
+            content()
+        }
+    }
+}
+
+@Composable
+private fun KeyValueRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = AapsSpacing.extraSmall), verticalAlignment = Alignment.Top) {
+        Text(label, modifier = Modifier.width(150.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun StatRow(label: String, range: StatRange?, fmt: (Double?) -> String) {
+    KeyValueRow(label, range?.let { "${fmt(it.min)} – ${fmt(it.max)}  (${stringResource(ApsStrings.aimi_hormonitor_mean)} ${fmt(it.mean)})" } ?: "—")
+}
+
+@Composable
+private fun DistributionBlock(title: String, items: List<LabelCount>, max: Int = 6) {
+    if (items.isEmpty()) return
+    Spacer(Modifier.height(AapsSpacing.small))
+    Text(title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
+    items.take(max).forEach { lc ->
+        Row(Modifier.fillMaxWidth().padding(vertical = AapsSpacing.extraSmall), verticalAlignment = Alignment.CenterVertically) {
+            Text(HormonitorLabels.humanize(lc.label), modifier = Modifier.width(150.dp), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val barWeight = lc.share.toFloat().coerceIn(0.02f, 1f)
+            Box(
+                Modifier
+                    .weight(barWeight)
+                    .height(8.dp)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp)),
+            )
+            if (barWeight < 1f) Box(Modifier.weight(1f - barWeight))
+            Spacer(Modifier.width(AapsSpacing.small))
+            Text("${lc.count} (${(lc.share * 100).roundToInt()}%)", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun TirBar(low: Double?, inRange: Double?, above: Double?) {
+    val l = (low ?: 0.0).toFloat()
+    val r = (inRange ?: 0.0).toFloat()
+    val a = (above ?: 0.0).toFloat()
+    if (l + r + a <= 0f) return
+    Row(Modifier.fillMaxWidth().height(14.dp), horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+        if (l > 0f) Box(Modifier.weight(l).fillMaxHeight().background(MaterialTheme.colorScheme.error, RoundedCornerShape(3.dp)))
+        if (r > 0f) Box(Modifier.weight(r).fillMaxHeight().background(MaterialTheme.colorScheme.primary, RoundedCornerShape(3.dp)))
+        if (a > 0f) Box(Modifier.weight(a).fillMaxHeight().background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(3.dp)))
+    }
+}
+
+@Composable
+private fun CenteredProgress() {
+    Box(Modifier.fillMaxWidth().padding(AapsSpacing.xxLarge), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+}
+
+@Composable
+private fun CenteredText(text: String) {
+    Box(Modifier.fillMaxWidth().padding(AapsSpacing.xxLarge), contentAlignment = Alignment.Center) {
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+// --- formatting helpers ---
+
+private fun tirText(s: HormonitorDaySummary): String =
+    "${pct(s.tirLowPct)} / ${pct(s.tirInRangePct)} / ${pct(s.tirAbovePct)}"
+
+private fun pct(d: Double?): String = d?.let { "${it.roundToInt()}%" } ?: "—"
+private fun sharePct(d: Double): String = "${(d * 100).roundToInt()}%"
+private fun num0(d: Double?): String = d?.let { "${it.roundToInt()}" } ?: "—"
+private fun num1(d: Double?): String = d?.let { aimiFmt1(it) } ?: "—"
+private fun num2(d: Double?): String = d?.let { aimiFmt2(it) } ?: "—"

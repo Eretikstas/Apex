@@ -1,0 +1,36 @@
+package app.aaps.plugins.aps.openAPSAIMI
+
+import app.aaps.plugins.aps.openAPSAIMI.ports.AimiPlatformPreferenceSlot
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+/**
+ * Pins which slots iOS answers. Building the items needs the DI graph, so this checks the list the
+ * class itself uses. Adding a slot to the list must be a decision, not an accident.
+ */
+class IosAimiPlatformPreferenceItemsTest {
+
+    @Test
+    fun `every AIMI platform screen is answered on iOS`() {
+        assertEquals(
+            setOf(
+                AimiPlatformPreferenceSlot.CONTEXT,
+                AimiPlatformPreferenceSlot.HORMONITOR_VIEWER,
+                AimiPlatformPreferenceSlot.PKPD_SETUP,
+                AimiPlatformPreferenceSlot.MEAL_ADVISOR,
+                AimiPlatformPreferenceSlot.PROFILE_ADVISOR,
+                AimiPlatformPreferenceSlot.SUPPORT_PACKAGE,
+                AimiPlatformPreferenceSlot.MODE_SETTINGS,
+                AimiPlatformPreferenceSlot.SOS_PERMISSIONS,
+                AimiPlatformPreferenceSlot.HEALTH_CONNECT_PERMISSIONS,
+            ),
+            IosAimiPlatformPreferenceItems.ANSWERED,
+        )
+    }
+
+    @Test
+    fun `no slot is left out`() {
+        val left = AimiPlatformPreferenceSlot.entries - IosAimiPlatformPreferenceItems.ANSWERED
+        assertEquals(emptySet(), left.toSet())
+    }
+}

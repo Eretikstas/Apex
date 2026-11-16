@@ -1,0 +1,49 @@
+package app.aaps.plugins.aps.openAPSAIMI.physio
+
+import android.content.Context
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiStorage
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+
+/**
+ * Android half of [HormonitorStudyExporterProvider].
+ *
+ * The `runCatching` below is the loop's own, moved here unchanged from the field that used to build
+ * the exporter inside `DetermineBasalaimiSMB2`. It is not defensive decoration: **telemetry must
+ * never crash the loop**. If the study exporter cannot initialise (storage, permissions, context),
+ * this degrades to no telemetry rather than letting its construction abort the tick into a safe
+ * hold. `null` then makes every telemetry call in the loop a no-op, because every one of them is
+ * `?.`, and `AimiLoopTelemetry.enterPhase` already accepts a null exporter. The error log line is a
+ * support-package marker, so keep its text.
+ *
+ * `by lazy` on purpose: nothing is built while the dependency graph is being wired, only on the
+ * first tick that asks for telemetry. That is what makes the binding below safe: the graph may hold
+ * this class from the start, but the exporter behind it is still only built on the first tick that
+ * asks for telemetry.
+ *
+ * `@SingleIn(AppScope::class)` is load bearing, not tidiness. The exporter keeps day counters and a
+ * state file of its own, so a second instance would fold the same day twice. One instance per app is
+ * the same count the loop had when it held the exporter in a field of its own.
+ */
+@ContributesBinding(AppScope::class)
+@SingleIn(AppScope::class)
+class AndroidHormonitorStudyExporterProvider @Inject constructor(
+    private val context: Context,
+    private val aapsLogger: AAPSLogger,
+    private val preferences: Preferences,
+    private val storage: AimiStorage,
+) : HormonitorStudyExporterProvider {
+
+    private val exporter: HormonitorStudyExporter? by lazy {
+        runCatching { AimiHormonitorStudyExporterMTR(AndroidHormonitorStudyPlatform(context), aapsLogger, preferences, storage) }
+            .onFailure { aapsLogger.error(LTag.APS, "Hormonitor exporter init failed — telemetry disabled this session", it) }
+            .getOrNull()
+    }
+
+    override fun exporter(): HormonitorStudyExporter? = exporter
+}

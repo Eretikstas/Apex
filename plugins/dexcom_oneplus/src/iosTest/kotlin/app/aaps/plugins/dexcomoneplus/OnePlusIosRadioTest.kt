@@ -1,0 +1,375 @@
+package app.aaps.plugins.dexcomoneplus
+
+import app.aaps.core.interfaces.pump.ble.session.BleCentralEvent
+import app.aaps.core.interfaces.pump.ble.session.BleCharProperty
+import app.aaps.core.interfaces.pump.ble.session.BleGattCharacteristic
+import app.aaps.core.interfaces.pump.ble.session.BleGattService
+import app.aaps.plugins.dexcomoneplus.gatt.OnePlusBluetoothUuids
+import app.aaps.plugins.dexcomoneplus.gatt.OnePlusGattClientIos
+import app.aaps.plugins.dexcomoneplus.oem.OemDeviceProfile
+import app.aaps.plugins.dexcomoneplus.oem.OemProfileId
+import app.aaps.plugins.dexcomoneplus.scan.OnePlusBleScannerIos
+import app.aaps.plugins.dexcomoneplus.scan.OnePlusScanBudget
+import app.aaps.plugins.dexcomoneplus.scan.OnePlusScanResult
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+/**
+ * The fan-out that gives one central's events to both listeners.
+ *
+ * Wiring only one of them compiles perfectly and then shows up days later as a sensor that is
+ * never found or a connection that never becomes ready, so it is worth a test of its own.
+ */
+class OnePlusIosRadioTest {
+
+    private val deviceId = "PERIPHERAL-1"
+
+    @BeforeTest
+    fun resetBudget() = OnePlusScanBudget.reset()
+
+    @AfterTest
+    fun clearBudget() = OnePlusScanBudget.reset()
+
+    @Test
+    fun oneCentralFeedsBothTheScannerAndTheClient() {
+        val central = FakeBleCentral()
+        val radio = OnePlusIosRadio(central)
+        val scanner = OnePlusBleScannerIos(central = central, nowMs = { 0L }, sleep = { true })
+        val gatt = OnePlusGattClientIos(central = central, nowMs = { 0L }, sleep = { true })
+        radio.scanner = scanner
+        radio.gatt = gatt
+
+        // Everything the fake sensor answers goes through the fan-out, never straight to one half.
+        central.onConnect = { id -> radio.onEvent(BleCentralEvent.Link(id, connected = true, status = 0)) }
+        central.onDiscoverServices = { id ->
+            radio.onEvent(
+                BleCentralEvent.Services(
+                    id,
+                    listOf(BleGattService(OnePlusBluetoothUuids.CgmService.lowercase(), emptyList())),
+                    status = 0,
+                ),
+            )
+        }
+        central.onDiscoverCharacteristics = { id, serviceUuid ->
+            radio.onEvent(
+                BleCentralEvent.Characteristics(
+                    id,
+                    serviceUuid,
+                    listOf(
+                        BleGattCharacteristic(
+                            OnePlusBluetoothUuids.Authentication.lowercase(),
+                            setOf(BleCharProperty.Write, BleCharProperty.Indicate),
+                        ),
+                        BleGattCharacteristic(
+                            OnePlusBluetoothUuids.Control.lowercase(),
+                            setOf(BleCharProperty.Write, BleCharProperty.Indicate),
+                        ),
+                    ),
+                    status = 0,
+                ),
+            )
+        }
+        central.onEnableNotify = { subscribe ->
+            radio.onEvent(
+                BleCentralEvent.DescriptorWritten(
+                    subscribe.id,
+                    OnePlusBluetoothUuids.CharacteristicUpdateNotification,
+                    status = 0,
+                ),
+            )
+        }
+
+        val found = mutableListOf<OnePlusScanResult>()
+        scanner.startScan { found += it }
+        radio.onEvent(
+            BleCentralEvent.ScanResult(name = "DX02aS", id = deviceId, advertisementBytes = null),
+        )
+        scanner.stopScan()
+
+        gatt.connect(deviceId, autoConnect = false)
+        radio.onEvent(
+            BleCentralEvent.Value(deviceId, OnePlusBluetoothUuids.Control.lowercase(), byteArrayOf(7)),
+        )
+
+        assertEquals(1, found.size)
+        assertTrue(gatt.isConnected())
+        assertContentEquals(byteArrayOf(7), gatt.awaitControlNotify(500L))
+    }
+
+    @Test
+    fun anEventIsHarmlessBeforeEitherListenerIsSet() {
+        val radio = OnePlusIosRadio(FakeBleCentral())
+
+        radio.onEvent(BleCentralEvent.ScanResult(name = "DX02aS", id = deviceId, advertisementBytes = null))
+    }
+
+    /**
+     * The decision the whole restore path rests on: ONE+ never takes a restored link over.
+     *
+     * The peripheral is given back to the system instead, so the next attempt goes through a scan
+     * and a real advertisement. A restored peripheral that were simply ignored would stay
+     * connected at the radio with nobody owning it.
+     */
+    @Test
+    fun aRestoredPeripheralIsReleasedAndNeverAdopted() {
+        val central = FakeBleCentral()
+        val radio = OnePlusIosRadio(central)
+        val scanner = OnePlusBleScannerIos(central = central, nowMs = { 0L }, sleep = { true })
+        val gatt = OnePlusGattClientIos(central = central, nowMs = { 0L }, sleep = { true })
+        radio.scanner = scanner
+        radio.gatt = gatt
+
+        radio.onEvent(BleCentralEvent.Restored(listOf(deviceId, "PERIPHERAL-2")))
+
+        assertEquals(listOf(deviceId, "PERIPHERAL-2"), central.cancels)
+        assertFalse(gatt.isConnected())
+        assertFalse(scanner.isScanning())
+    }
+
+    /** A relaunch that kept nothing is still a relaunch. It must not crash and must take no link. */
+    @Test
+    fun anEmptyRestoreReleasesNothing() {
+        val central = FakeBleCentral()
+        val radio = OnePlusIosRadio(central)
+
+        radio.onEvent(BleCentralEvent.Restored(emptyList()))
+
+        assertTrue(central.cancels.isEmpty())
+    }
+
+    @Test
+    fun oneAdvertisementReachesBothSlotsAndStoppingOneKeepsTheScan() {
+        val central = FakeBleCentral()
+        val bus = OnePlusIosScanBus(central)
+        val radio = OnePlusIosRadio(central)
+        val production = scanner(central, bus, "prod")
+        val staging = scanner(central, bus, "staging")
+        radio.attachScanner(production)
+        radio.attachScanner(staging)
+        val productionHits = mutableListOf<OnePlusScanResult>()
+        val stagingHits = mutableListOf<OnePlusScanResult>()
+        production.startScan { productionHits += it }
+        staging.startScan { stagingHits += it }
+
+        radio.onEvent(BleCentralEvent.ScanResult(name = "DX02aS", id = deviceId, advertisementBytes = null))
+        staging.stopScan()
+
+        assertTrue(central.scanning)
+        assertEquals(1, productionHits.size)
+        assertEquals(1, stagingHits.size)
+        radio.onEvent(BleCentralEvent.ScanResult(name = "DX02bb", id = "PERIPHERAL-2", advertisementBytes = null))
+        assertEquals(2, productionHits.size)
+        assertEquals(1, stagingHits.size)
+        production.stopScan()
+        assertFalse(central.scanning)
+    }
+
+    @Test
+    fun aFilteredWaitIsNotReplacedByTheOtherSlotsScreenScan() {
+        val central = FakeBleCentral()
+        val bus = OnePlusIosScanBus(central)
+        bus.request("production", OnePlusIosScanBus.Mode.FILTERED)
+        bus.request("staging-screen", OnePlusIosScanBus.Mode.UNFILTERED)
+
+        assertTrue(central.scanning)
+        assertEquals(listOf(OnePlusBluetoothUuids.Advertisement), central.lastScanFilter)
+        bus.release("staging-screen")
+        assertTrue(central.scanning)
+        assertEquals(OnePlusIosScanBus.Mode.FILTERED, bus.appliedMode())
+        bus.release("production")
+        assertFalse(central.scanning)
+        assertEquals(OnePlusIosScanBus.Mode.OFF, bus.appliedMode())
+    }
+
+    @Test
+    fun thePreSoakConnectionDoesNotTakeTheProductionLink() {
+        val central = FakeBleCentral()
+        val radio = OnePlusIosRadio(central)
+        val production = OnePlusGattClientIos(central = central, nowMs = { 0L }, sleep = { true })
+        val staging = OnePlusGattClientIos(central = central, nowMs = { 0L }, sleep = { true })
+        radio.attachGatt(production)
+        radio.attachGatt(staging)
+        answerHandshake(central, radio)
+
+        production.connect(deviceId, autoConnect = false)
+        staging.connect("PERIPHERAL-2", autoConnect = false)
+        radio.onEvent(
+            BleCentralEvent.Value(deviceId, OnePlusBluetoothUuids.Control.lowercase(), byteArrayOf(7)),
+        )
+
+        assertTrue(production.isConnected())
+        assertTrue(staging.isConnected())
+        assertContentEquals(byteArrayOf(7), production.awaitControlNotify(500L))
+        assertEquals(null, staging.awaitControlNotify(1L))
+        val cancelsBefore = central.cancels.toList()
+        staging.disconnect()
+        assertTrue(production.isConnected())
+        assertFalse(central.cancels.drop(cancelsBefore.size).contains(deviceId))
+        assertTrue(central.cancels.contains("PERIPHERAL-2"))
+    }
+
+    @Test
+    fun aClientDroppedWhileRetiredIsBackOnTheRadioWhenItConnectsAgain() {
+        val central = FakeBleCentral()
+        val radio = OnePlusIosRadio(central)
+        answerHandshake(central, radio)
+        lateinit var production: OnePlusGattClientIos
+        production = OnePlusGattClientIos(
+            central = central,
+            profile = quickProfile(),
+            nowMs = { 0L },
+            sleep = { true },
+            onConnectAttempt = { radio.attachGatt(production) },
+        )
+        radio.attachGatt(production)
+        production.connect(deviceId, autoConnect = false)
+        production.disconnect()
+
+        val staging = OnePlusGattClientIos(
+            central = central,
+            profile = quickProfile(),
+            nowMs = { 0L },
+            sleep = { true },
+        )
+        radio.attachGatt(staging)
+
+        production.connect(deviceId, autoConnect = false)
+        radio.onEvent(
+            BleCentralEvent.Value(deviceId, OnePlusBluetoothUuids.Control.lowercase(), byteArrayOf(9)),
+        )
+
+        assertTrue(production.isConnected())
+        assertContentEquals(byteArrayOf(9), production.awaitControlNotify(500L))
+    }
+
+    @Test
+    fun aNewDriverScannerReplacesThePreviousOneOfThatSlot() {
+        val central = FakeBleCentral()
+        val bus = OnePlusIosScanBus(central)
+        val radio = OnePlusIosRadio(central)
+        val first = scanner(central, bus, "prod")
+        val second = scanner(central, bus, "prod")
+        val screen = OnePlusBleScannerIos(
+            central = central,
+            slot = "prod",
+            nowMs = { 0L },
+            sleep = { true },
+            scanBus = bus,
+            isEphemeral = true,
+        )
+        val firstHits = mutableListOf<OnePlusScanResult>()
+        val secondHits = mutableListOf<OnePlusScanResult>()
+        val screenHits = mutableListOf<OnePlusScanResult>()
+        radio.attachScanner(screen)
+        screen.startScan { screenHits += it }
+        radio.attachScanner(first)
+        first.startScan { firstHits += it }
+        radio.attachScanner(second)
+        second.startScan { secondHits += it }
+
+        radio.onEvent(BleCentralEvent.ScanResult(name = "DX02aS", id = deviceId, advertisementBytes = null))
+
+        assertEquals(0, firstHits.size)
+        assertEquals(1, secondHits.size)
+        assertEquals(1, screenHits.size)
+    }
+
+    @Test
+    fun aStopDecidedDuringStartCannotBeOverwrittenByThatStart() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        val central = FakeBleCentral()
+        central.beforeScanTakesEffect = {
+            if (!entered.isCompleted) entered.complete(Unit)
+            runBlocking { withTimeout(5_000) { gate.await() } }
+        }
+        val bus = OnePlusIosScanBus(central)
+        val starter = launch(Dispatchers.Default) {
+            bus.request("prod", OnePlusIosScanBus.Mode.UNFILTERED)
+        }
+        withTimeout(5_000) { entered.await() }
+        val stopper = launch(Dispatchers.Default) { bus.release("prod") }
+        delay(50)
+        gate.complete(Unit)
+        withTimeout(5_000) {
+            starter.join()
+            stopper.join()
+        }
+        assertFalse(central.scanning)
+        assertEquals(OnePlusIosScanBus.Mode.OFF, bus.appliedMode())
+    }
+
+    private fun quickProfile() = OemDeviceProfile(
+        id = OemProfileId.GENERIC_FALLBACK,
+        connectTimeoutMs = 500L,
+        connectRetryCount = 1,
+        connectRetryDelayMs = 0L,
+        preferredMtu = 23,
+        useForegroundService = false,
+        aggressiveReconnect = false,
+        postCloseSettleMs = 0L,
+        scanHandoffMs = 0L,
+    )
+
+    private fun scanner(central: FakeBleCentral, bus: OnePlusIosScanBus, slot: String) =
+        OnePlusBleScannerIos(
+            central = central,
+            slot = slot,
+            nowMs = { 0L },
+            sleep = { true },
+            scanBus = bus,
+        )
+
+    /** Completes connect/discover the way the single-slot test does, for whichever id asked. */
+    private fun answerHandshake(central: FakeBleCentral, radio: OnePlusIosRadio) {
+        central.onConnect = { id -> radio.onEvent(BleCentralEvent.Link(id, connected = true, status = 0)) }
+        central.onDiscoverServices = { id ->
+            radio.onEvent(
+                BleCentralEvent.Services(
+                    id,
+                    listOf(BleGattService(OnePlusBluetoothUuids.CgmService.lowercase(), emptyList())),
+                    status = 0,
+                ),
+            )
+        }
+        central.onDiscoverCharacteristics = { id, serviceUuid ->
+            radio.onEvent(
+                BleCentralEvent.Characteristics(
+                    id,
+                    serviceUuid,
+                    listOf(
+                        BleGattCharacteristic(
+                            OnePlusBluetoothUuids.Authentication.lowercase(),
+                            setOf(BleCharProperty.Write, BleCharProperty.Indicate),
+                        ),
+                        BleGattCharacteristic(
+                            OnePlusBluetoothUuids.Control.lowercase(),
+                            setOf(BleCharProperty.Write, BleCharProperty.Indicate),
+                        ),
+                    ),
+                    status = 0,
+                ),
+            )
+        }
+        central.onEnableNotify = { subscribe ->
+            radio.onEvent(
+                BleCentralEvent.DescriptorWritten(
+                    subscribe.id,
+                    OnePlusBluetoothUuids.CharacteristicUpdateNotification,
+                    status = 0,
+                ),
+            )
+        }
+    }
+}

@@ -1,0 +1,182 @@
+package app.aaps.pump.medtrum.ios
+
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.notifications.NotificationManager
+import app.aaps.core.interfaces.pump.BolusProgressData
+import app.aaps.core.interfaces.pump.DetailedBolusInfoStorage
+import app.aaps.core.interfaces.pump.PumpSync
+import app.aaps.core.interfaces.pump.TemporaryBasalStorage
+import app.aaps.core.interfaces.pump.ble.session.BleRestoreIdentifier
+import app.aaps.core.interfaces.pump.ble.session.CoreBluetoothCentral
+import app.aaps.core.interfaces.resources.TextResolver
+import app.aaps.pump.medtrum.comm.AapsMedtrumLogger
+import app.aaps.pump.medtrum.comm.MedtrumAlarmNotifier
+import app.aaps.pump.medtrum.comm.MedtrumLogger
+import app.aaps.pump.medtrum.session.MedtrumPatchSession
+import app.aaps.pump.medtrum.session.MedtrumSessionState
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+/**
+ * Builds the iOS Medtrum driver and owns the parts it needs: the radio, the clock, the stored
+ * patch state and the coroutine scope.
+ *
+ * It exists so that `IosMedtrumPlugin` can delegate the whole [app.aaps.core.interfaces.pump.Pump]
+ * interface to [driver] with one `by` clause. A Kotlin delegation target has to be ready when the
+ * constructor runs, so it cannot be a property built inside the plugin body.
+ *
+ * ## Nothing here touches the radio
+ *
+ * Building this object is cheap and silent. [CoreBluetoothCentral] only creates its
+ * `CBCentralManager` in `open()`, and `open()` is called from [openRadio] alone. So a graph that
+ * builds the plugin does not start Bluetooth and does not make iOS ask the user for the Bluetooth
+ * permission. The plugin calls [openRadio] when it starts and [shutdown] when it stops.
+ */
+@SingleIn(AppScope::class)
+@Inject
+class IosMedtrumDriverHost(
+    private val aapsLogger: AAPSLogger,
+    textResolver: TextResolver,
+    private val pumpSync: PumpSync,
+    detailedBolusInfoStorage: DetailedBolusInfoStorage,
+    temporaryBasalStorage: TemporaryBasalStorage,
+    notificationManager: NotificationManager,
+    bolusProgressData: BolusProgressData
+) {
+
+    private val logger: MedtrumLogger = AapsMedtrumLogger(aapsLogger)
+    private val clock = systemMedtrumClock()
+
+    /** Long lived patch state, read back from NSUserDefaults by the driver when it is built. */
+    val state = MedtrumSessionState(logger = logger, clock = clock)
+
+    /**
+     * The radio. It asks iOS to keep its Bluetooth state under the Medtrum name, which is what
+     * lets iOS start the app again for a pump event after the system has reclaimed it.
+     *
+     * The name has to be this driver's own. Every `CBCentralManager` in the process needs a
+     * different one, or two of them are offered the same kept peripherals and only one gets them.
+     */
+    private val central = CoreBluetoothCentral(BleRestoreIdentifier.MEDTRUM)
+
+    /** The store the driver loads from and saves to. Also the only place the serial number lives today. */
+    val store = IosMedtrumStateStore()
+
+    private val transport = IosMedtrumBleTransport(
+        central = central,
+        // Read late: the serial is only in [state] after the driver has loaded the stored state.
+        pumpSerial = { state.pumpSN },
+        logger = logger,
+        knownPeripheralId = store::loadPeripheralId,
+        rememberPeripheralId = store::savePeripheralId
+    )
+
+    /**
+     * Work the driver starts by itself: a connect attempt and a bolus stop. Its own scope, not the
+     * plugin scope, so [shutdown] ends it exactly when the plugin stops.
+     */
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    val driver = IosMedtrumPump(
+        transport = transport,
+        state = state,
+        clock = clock,
+        textResolver = textResolver,
+        pumpSync = pumpSync,
+        detailedBolusInfoStorage = detailedBolusInfoStorage,
+        temporaryBasalStorage = temporaryBasalStorage,
+        scope = scope,
+        store = store,
+        logger = logger,
+        alarmNotifier = MedtrumAlarmNotifier(notificationManager),
+        bolusProgressData = bolusProgressData
+    )
+
+    /**
+     * Finding a pump and keeping its serial number. A screen drives this; until there is one, a
+     * test does. [openRadio] has to have run first, or Bluetooth is not on and the scan refuses
+     * to start.
+     */
+    val discovery = IosMedtrumDiscoverySession(transport.scanner, store, state, onNewPump = driver::onNewPumpSerial)
+
+    /**
+     * Priming, activating and deactivating a patch. A screen drives this; until there is one, a
+     * test does. It is headless on purpose: it sends a command only when it is asked to.
+     *
+     * The basal profile is the one the loop expects the pump to run, the same source the Android
+     * `MedtrumService.startActivate` reads. When there is none, the patch session refuses to
+     * activate instead of inventing one.
+     */
+    val patch = MedtrumPatchSession(
+        session = driver.session,
+        basalProfile = {
+            pumpSync.expectedPumpState().profile?.getBasalValues()?.map { it.value to it.timeAsSeconds }
+        },
+        clock = clock,
+        logger = logger,
+        onStateChanged = driver::publishState
+    )
+
+    init {
+        // The transport reads central events; the central has to know where to send them.
+        central.events = transport::onEvent
+    }
+
+    /** The repeating expiry warning check, or null while it does not run. */
+    private var expiryWarningCheck: Job? = null
+
+    /**
+     * Starts the patch expiry warning check, every five minutes like the Android
+     * `MedtrumService.onCreate` loop. The plugin calls this when it starts, so a pump that is not
+     * used never warns. A second call does nothing; [shutdown] ends it.
+     *
+     * While iOS keeps the app suspended the check does not run, and a warning time that passes
+     * then is missed. Android misses it the same way while its service is not running.
+     */
+    fun startExpiryWarningCheck() {
+        if (expiryWarningCheck != null) return
+        expiryWarningCheck = scope.launch {
+            while (true) {
+                // One failure must not end the check for the rest of the run, as on Android.
+                try {
+                    driver.checkExpiryWarning()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    aapsLogger.error(LTag.PUMP, "checkExpiryWarning failed", e)
+                }
+                delay(MedtrumAlarmNotifier.CHECK_EXPIRY_WARNING_TIME_MS)
+            }
+        }
+    }
+
+    /** Starts CoreBluetooth. The first call is what makes iOS ask for the Bluetooth permission. */
+    fun openRadio() {
+        aapsLogger.debug(LTag.PUMP, "IosMedtrumDriverHost: opening the radio")
+        central.open()
+    }
+
+    /**
+     * Ends the session and the driver's own work. After this the host must not be used again.
+     *
+     * The `CBCentralManager` itself is not released, because `CoreBluetoothCentral` has no close.
+     * The link is dropped and the scan is stopped, so nothing is left running on the radio.
+     */
+    fun shutdown() {
+        aapsLogger.debug(LTag.PUMP, "IosMedtrumDriverHost: shutting down")
+        discovery.stop()
+        driver.disconnect("plugin stopped")
+        driver.close()
+        scope.cancel()
+    }
+}

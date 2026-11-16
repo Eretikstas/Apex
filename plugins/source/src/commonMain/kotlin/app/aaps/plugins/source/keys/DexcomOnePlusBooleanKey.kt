@@ -1,0 +1,88 @@
+package app.aaps.plugins.source.keys
+
+import app.aaps.core.keys.interfaces.BooleanPreferenceKey
+import app.aaps.core.keys.interfaces.TextRef
+import app.aaps.plugins.source.SourceStrings
+
+enum class DexcomOnePlusBooleanKey(
+    override val key: String,
+    override val defaultValue: Boolean,
+    override val title: TextRef,
+    override val summary: TextRef? = null,
+    override val defaultedBySM: Boolean = false,
+    override val calculatedDefaultValue: Boolean = false,
+    override val engineeringModeOnly: Boolean = false,
+    override val showInApsMode: Boolean = true,
+    override val showInNsClientMode: Boolean = true,
+    override val showInPumpControlMode: Boolean = true,
+    override val dependency: BooleanPreferenceKey? = null,
+    override val negativeDependency: BooleanPreferenceKey? = null,
+    override val hideParentScreenIfHidden: Boolean = true,
+    override val exportable: Boolean = false,
+) : BooleanPreferenceKey {
+
+    /**
+     * Send a fingerstick to the sensor instead of correcting its readings inside the phone.
+     *
+     * On by default (owner decision, 2026-10-26): a fingerstick is the reference, so it goes to the
+     * sensor's own algorithm, as the Dexcom app does. A sensor keeps a calibration it accepts for
+     * good — it cannot be edited or deleted — so the confirmation says so, and
+     * `OnePlusCalibrationGate` refuses a value at a bad moment (warm-up, no recent reading, glucose
+     * changing fast, blood older than one hour). Off: the value corrects readings inside the app.
+     *
+     * Provenance: ref `DexcomOnePlusBooleanKey.SendCalibrationToSensor` at `3dd0ca64772`.
+     */
+    SendCalibrationToSensor(
+        key = "dexcom_oneplus_send_calibration_to_sensor",
+        defaultValue = true,
+        title = SourceStrings.dexcom_oneplus_send_calibration_to_sensor,
+        summary = SourceStrings.dexcom_oneplus_send_calibration_to_sensor_summary,
+        exportable = false,
+    ),
+
+    /**
+     * Switches the pre-soak sensor to production by itself, [DexcomOnePlusIntKey.AutoPromoteHours]
+     * after the pre-soak start, when its readings are recent and real. The promote button still works.
+     *
+     * Off by default: the switch stops the sensor in use, and the rest of its life is lost.
+     *
+     * Provenance: ref `DexcomOnePlusBooleanKey.AutoPromote` at `a88a0e588c`.
+     */
+    AutoPromote(
+        key = "dexcom_oneplus_staging_auto_promote",
+        defaultValue = false,
+        title = SourceStrings.staging_auto_promote_title,
+        summary = SourceStrings.staging_auto_promote_summary,
+    ),
+
+    /**
+     * Direct-to-watch: a Wear OS watch also reads the sensor that feeds the loop, in the sensor's
+     * watch slot, so the watch faces keep a value when the phone is away. The watch's readings stay
+     * on the watch and never reach the loop.
+     *
+     * Off by default. Not offered on iPhone: an Apple Watch would need its own watchOS app.
+     */
+    WatchDirect(
+        key = "dexcom_oneplus_watch_direct",
+        defaultValue = false,
+        title = SourceStrings.dexcom_oneplus_watch_direct,
+        summary = SourceStrings.dexcom_oneplus_watch_direct_summary,
+    ),
+
+    /**
+     * Pre-soak (a second ONE+ / G7 warming up beside the one that feeds the loop) on iPhone.
+     *
+     * On by default: that is the behaviour the iPhone build is meant to have. Off falls back to a
+     * single sensor and does not start the second driver. Android does not show this switch and
+     * does not read it; the pre-soak slot there is always available.
+     *
+     * Key: `dexcom_oneplus_ios_presoak`.
+     */
+    IosPreSoak(
+        key = "dexcom_oneplus_ios_presoak",
+        defaultValue = true,
+        title = SourceStrings.dexcom_oneplus_ios_presoak,
+        summary = SourceStrings.dexcom_oneplus_ios_presoak_summary,
+        exportable = false,
+    ),
+}

@@ -1,0 +1,54 @@
+THIRD-PARTY NOTICE — :plugins:libkeks
+=====================================
+
+This module vendors the KEKS J-PAKE / ExtraData authentication sources from
+NightscoutFoundation/xDrip (GNU GPL v3.0), pin commit
+1e86d9a2a52577ed2c30fbf7b69d75fd56e6918f (tag 2026.07.15).
+
+Upstream paths:
+  - libkeks/src/main/java/jamorham/**
+  - ipluginda/src/main/java/com/eveningoutpost/dexdrip/plugin/IPluginDA.java
+
+Authorship per upstream comments: JamOrHam / jamorham. Upstream files carry no
+formal per-file "Copyright (C) <year> <name>" line; see the git history of the
+pin commit for authorship. No copyright holder is invented here.
+
+Each vendored source file carries an "SPDX-License-Identifier: GPL-3.0-only"
+header naming this upstream and pin.
+
+MODIFICATION NOTICE
+-------------------
+These sources are a DERIVED WORK of the pin above, not a copy of it. In October
+2026 the 24 Java files were translated into Kotlin so that the handshake can run
+on Apple platforms as well as on Android. The translation keeps the protocol,
+the state machine, the message layouts and the upstream comments; a byte for
+byte diff against the pin is therefore no longer possible, and `src/commonTest`
+exists in its place. Those tests hold values recorded from the original Java and
+BouncyCastle code, including a whole four digit pairing replayed message by
+message, and they run on the JVM, on Android and on the iOS simulator.
+
+What the translation replaced, and why:
+  - BouncyCastle (secp256r1 point arithmetic, ECDSA, ASN.1 key readers) and
+    java.math.BigInteger have no multiplatform form. They are replaced by
+    jamorham.keks.crypto: KeksUInt, KeksP256 / KeksEcPoint, KeksEcdsa, KeksDer.
+  - Project Lombok (@Getter, @val, @RequiredArgsConstructor) is not needed in
+    Kotlin and is gone, with the annotation processor.
+  - javax.crypto, java.security.SecureRandom and android.util.Log are now three
+    `expect` declarations with an actual per platform.
+  - java.nio.ByteBuffer is replaced by jamorham.keks.util.KeksBuffer, which
+    copies the three behaviours the message classes depend on.
+
+One behaviour was added after the translation (November 2026):
+  - Plugin.authSlotOverride. When it is set, the auth request asks for that
+    display slot (for example 3, the watch slot) instead of the byte upstream
+    computes. When it is null, which is the default, the request is exactly the
+    upstream one. It is used by direct-to-watch, so a Wear OS watch can read the
+    sensor next to the phone without taking the phone's slot.
+
+SHA256.java carried its own MIT notice (Copyright (c) 2017 Fabian Meyer). That
+notice is kept in full at the top of the translated SHA256.kt.
+
+The combined OpenApsAIMI APK is distributed under AGPL-3.0-or-later; GPL-3.0
+obligations are honoured for these derived parts (GPLv3 §13 AGPL compatibility).
+
+Bouncy Castle (bcpkix / bcprov) is no longer a dependency of this module.

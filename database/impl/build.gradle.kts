@@ -1,0 +1,155 @@
+plugins {
+    id("kmp-android-library")
+    alias(libs.plugins.ksp)
+    // Metro is the only DI framework here now: AppRepository comes from DatabaseBindings.
+    alias(libs.plugins.metro)
+    id("kotlinx-serialization")
+}
+
+ksp {
+    arg("room.incremental", "true")
+    // Straight into the instrumented test assets. MigrationTestHelper opens the schema JSONs from
+    // assets, and a multiplatform module has no android.sourceSets block to add a directory to - the
+    // only asset source it reads is src/<sourceSet>/assets. The other Room modules are ordinary
+    // Android libraries and keep $projectDir/schemas.
+    arg("room.schemaLocation", "$projectDir/src/androidDeviceTest/assets")
+}
+
+kotlin {
+    android {
+        namespace = "app.aaps.database.impl"
+        // Needed for the schema JSONs under src/androidDeviceTest/assets to be packaged: with resources
+        // off, the multiplatform android plugin skips the asset merge entirely.
+        androidResources { enable = true }
+        // Creates the androidHostTest compilation, which also pulls in commonTest.
+        // Restated from test-module-dependencies, which this module can no longer apply.
+        withHostTest {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+        // The instrumented Room tests. Their source set is src/androidDeviceTest and the task is
+        // connectedAndroidDeviceTest - .circleci/config.yml knows about both.
+        withDeviceTest {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
+    }
+
+    // Room only runs its processor for Android here (see kspAndroid below) - the entities and DAOs in
+    // commonMain need the annotations to resolve, not the generated implementation, and the @Database
+    // class that does need it stays in androidMain with Converters.
+
+    // Android and desktop share what is plain JVM. Applied explicitly, because the manual dependsOn
+    // below would otherwise switch the automatic hierarchy off and silently unwire iosMain.
+    applyDefaultHierarchyTemplate()
+
+    sourceSets {
+        val jvmSharedMain = create("jvmSharedMain") { dependsOn(commonMain.get()) }
+        androidMain.get().dependsOn(jvmSharedMain)
+        jvmMain.get().dependsOn(jvmSharedMain)
+
+        commonMain {
+            dependencies {
+                api(libs.kotlinx.datetime)
+                api(project.dependencies.platform(libs.kotlinx.serialization.bom))
+                api(libs.kotlinx.serialization.json)
+                api(libs.androidx.room.runtime)
+            }
+        }
+
+        // The bundled driver is what actually opens the database on a phone, so iOS needs it too.
+        iosMain {
+            dependencies {
+                implementation(libs.androidx.sqlite.bundled)
+            }
+        }
+
+        // And desktop, which opens the same file with the same engine.
+        jvmMain {
+            dependencies {
+                implementation(libs.androidx.sqlite.bundled)
+            }
+        }
+
+        androidMain {
+            dependencies {
+                api(libs.kotlin.stdlib.jdk8)
+                api(libs.kotlin.reflect)
+                api(libs.kotlinx.datetime)
+
+                api(libs.com.google.code.gson)
+
+                api(libs.androidx.room.runtime)
+                implementation(libs.androidx.sqlite.bundled)
+            }
+        }
+
+        // Shared tests run on the JVM and on the iOS simulator. runTest is needed for the suspend reads of
+        // RecentTreatmentSnapshots.
+        getByName("commonTest") {
+            dependencies {
+                implementation(kotlin("test"))
+                // The version of kotlinx-coroutines-test comes from the BOM. Without it Kotlin/Native finds none.
+                implementation(project.dependencies.platform(libs.kotlinx.coroutines.bom))
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
+        // Hand written rather than taken from test-module-dependencies, because that convention
+        // plugin applies com.android.library and so cannot be used here.
+        getByName("androidHostTest") {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.org.junit.jupiter)
+                implementation(libs.org.junit.jupiter.api)
+                implementation(libs.org.mockito.junit.jupiter)
+                implementation(libs.org.mockito.kotlin)
+                implementation(libs.com.google.truth)
+                implementation(libs.kotlinx.coroutines.test)
+                // Brings a real org.json. The android.jar stub returns null from JSONObject.put, and
+                // the APS result transactions build their JSON in the test. test-module-dependencies
+                // used to pull this in for every module; this one needs it.
+                implementation(libs.org.skyscreamer.jsonassert)
+                runtimeOnly(libs.org.junit.platform.launcher)
+            }
+        }
+
+        // Desktop tests. They open a real database file with the bundled driver, and that is the
+        // point of them: `clearAllTablesBySql` is SQL, so it only means anything when a real SQLite
+        // runs it. The Apple targets run the same common code, and this target runs on either build
+        // machine, so the check does not depend on having a Mac.
+        getByName("jvmTest") {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.org.junit.jupiter)
+                implementation(libs.org.junit.jupiter.api)
+                implementation(libs.com.google.truth)
+                implementation(libs.kotlinx.coroutines.test)
+                runtimeOnly(libs.org.junit.platform.launcher)
+            }
+        }
+
+        getByName("androidDeviceTest") {
+            dependencies {
+                implementation(libs.androidx.test.ext)
+                implementation(libs.androidx.test.rules)
+                implementation(libs.com.google.truth)
+                implementation(libs.org.mockito.kotlin)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.androidx.room.testing)
+            }
+        }
+    }
+}
+
+dependencies {
+    // Room generates the database initialiser per target, so its processor runs for every target the
+    // @Database class is compiled for.
+    add("kspAndroid", libs.androidx.room.compiler)
+    add("kspIosArm64", libs.androidx.room.compiler)
+    add("kspIosSimulatorArm64", libs.androidx.room.compiler)
+    // The JVM one was missing, and nothing said so until the desktop app ran: without it the target
+    // compiles perfectly and then throws "AppDatabase_Impl does not exist" the first time anything
+    // touches the database. A missing processor is invisible to the compiler - the generated class is
+    // only looked for at runtime.
+    add("kspJvm", libs.androidx.room.compiler)
+}

@@ -1,0 +1,822 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- General preferences -->
+    <string name="pref_title_simple_mode">Simple mode</string>
+    <string name="pref_title_low_end_stability_mode">Low-end device stability mode</string>
+    <string name="pref_title_dashboard_home_skin">Home screen</string>
+    <string name="pref_dashboard_home_overview">Overview</string>
+    <string name="pref_dashboard_home_aimi">New skin dashboard</string>
+    <string name="pref_dashboard_home_v2">Dashboard V2</string>
+    <string name="pref_dashboard_home_glass">GLASS</string>
+    <string name="pref_title_insulin_concentration">Insulin concentration support</string>
+    <string name="pref_summary_insulin_concentration">Enable support for different insulin concentrations (U50, U200, etc.)</string>
+
+    <!-- Overview preferences -->
+    <string name="pref_title_keep_screen_on">Keep screen on</string>
+    <string name="pref_summary_keep_screen_on">Prevent Android from turning the screen off. It will consume a lot of energy when not plugged in to a power outlet.</string>
+    <string name="pref_title_show_treatment_button">Show treatment button</string>
+    <string name="pref_title_show_wizard_button">Show wizard button</string>
+    <string name="pref_title_show_insulin_button">Show insulin button</string>
+    <string name="pref_title_show_carbs_button">Show carbs button</string>
+    <string name="pref_title_show_cgm_button">Show CGM button</string>
+    <string name="pref_summary_show_cgm_button">Opens xDrip+ or Dexcom App (you can use back button to return to AAPS).</string>
+    <string name="pref_title_show_calibration_button">Show calibration button</string>
+    <string name="pref_summary_show_calibration_button">Sends a calibration to xDrip+ (ensure \'Accept Calibrations\' is enabled in xDrip+ under Inter-App settings).</string>
+    <string name="pref_title_show_notes_in_dialogs">Show notes in dialogs</string>
+    <string name="pref_title_use_bolus_advisor">Use bolus advisor</string>
+    <string name="pref_summary_use_bolus_advisor">Enable bolus advisor which assists with bolus calculations during higher glycemias.</string>
+    <string name="pref_title_use_bolus_reminder">Use bolus reminder</string>
+    <string name="pref_summary_use_bolus_reminder">Enable bolus reminder notifications to help track insulin administration.</string>
+    <string name="pref_title_use_super_bolus">Use super bolus</string>
+    <string name="pref_summary_use_super_bolus">Enable super bolus feature which borrows insulin from basal for immediate delivery.</string>
+
+    <!-- Home graph look -->
+    <string name="prefs_vico_chart_appearance_title">Home graph (Vico) appearance</string>
+    <string name="pref_title_vico_bg_reading_tint">BG reading dot color</string>
+    <string name="pref_summary_vico_bg_reading_tint">Tint for discrete CGM dots on the main glucose chart. Range-colored bucketed points are unchanged.</string>
+    <string name="pref_title_vico_chart_backdrop">Chart background style</string>
+    <string name="pref_summary_vico_chart_backdrop">Background wash behind the dashboard / overview glucose chart.</string>
+    <string name="pref_vico_tint_theme">Theme default</string>
+    <string name="pref_vico_tint_mauve">Mauve</string>
+    <string name="pref_vico_tint_ocean">Ocean</string>
+    <string name="pref_vico_tint_amber">Amber</string>
+    <string name="pref_vico_tint_rose">Rose</string>
+    <string name="pref_vico_backdrop_theme">Theme default</string>
+    <string name="pref_vico_backdrop_deep">Deep</string>
+    <string name="pref_vico_backdrop_warm">Warm</string>
+    <string name="pref_vico_backdrop_cool">Cool</string>
+    <string name="pref_vico_backdrop_muted">Muted</string>
+
+    <!-- Pump preferences -->
+    <string name="pref_title_bt_watchdog">BT Watchdog</string>
+    <string name="pref_summary_bt_watchdog">Switches off the phone\'s bluetooth for one second if no connection to the pump is possible. This may help on some phones where the bluetooth stack freezes.</string>
+
+    <!-- Alert preferences -->
+    <string name="pref_title_alert_missed_bg_reading">Alert if no BG data is received</string>
+    <string name="pref_title_alert_pump_unreachable">Alert if pump is unreachable</string>
+    <string name="pref_title_alert_carbs_required">Alert on carbs required</string>
+    <string name="pref_title_alert_urgent_as_android_notification">Raise urgent alarms as Android notifications</string>
+    <string name="pref_title_alert_increase_volume">Gradually increase notification volume</string>
+    <string name="pref_title_alert_sound_low_glucose">Sound of low glucose alarms</string>
+    <string name="pref_title_alert_sound_other_alarms">Sound of other urgent alarms</string>
+    <string name="pref_summary_alert_sound">The AAPS sound, or a softer melody if loud sounds are hard for you. If a melody cannot be played, the AAPS sound is used.</string>
+    <string name="alert_sound_default">AAPS sound</string>
+    <string name="alert_sound_soft_chime" comment="Name of a soft alarm melody: four light rising bell notes">Soft chime</string>
+    <string name="alert_sound_warm_bells" comment="Name of a soft alarm melody: three low bells with a long ring">Warm bells</string>
+    <string name="alert_sound_marimba" comment="Name of a soft alarm melody: short wooden notes, like the marimba instrument">Marimba</string>
+    <string name="alert_sound_gentle_pulse" comment="Name of a soft alarm melody: one soft tone that pulses slowly">Gentle pulse</string>
+    <string name="pref_title_alert_override_dnd">Override Do Not Disturb mode</string>
+    <string name="pref_summary_alert_override_dnd">On: alarms ring even when the phone is silent or in Do Not Disturb. Off: alarms do not ring then. In Do Not Disturb they only vibrate.</string>
+    <string name="pref_title_alert_hypo">Alert on low glucose</string>
+    <string name="pref_summary_alert_hypo">Sound an alarm when glucose is at or below the low threshold.</string>
+    <string name="pref_title_alert_hypo_threshold">Low glucose alarm threshold</string>
+    <string name="pref_title_alert_hyper">Alert on high glucose</string>
+    <string name="pref_summary_alert_hyper">Notify when glucose is at or above the high threshold.</string>
+    <string name="pref_title_alert_hyper_threshold">High glucose alarm threshold</string>
+    <string name="pref_title_alert_rapid_fall">Alert on rapid fall</string>
+    <string name="pref_summary_alert_rapid_fall">Sound an alarm when glucose drops by at least the configured amount within the configured time window.</string>
+    <string name="pref_title_alert_rapid_fall_drop">Rapid fall drop threshold</string>
+    <string name="pref_summary_alert_rapid_fall_drop" comment="mg/dL and mmol/L are glucose units: keep them as they are. The value is always set in mg/dL, also for mmol/L users.">How much glucose must drop to sound the alarm. Always in mg/dL, also when AAPS shows mmol/L (18 mg/dL is about 1 mmol/L).</string>
+    <string name="pref_title_alert_rapid_fall_window">Rapid fall time window</string>
+    <string name="pref_title_alert_urgent_low">Urgent low alarm</string>
+    <string name="pref_summary_alert_urgent_low" comment="mg/dL and mmol/L are glucose units: keep them as they are">Sound an alarm when glucose is at or below 55 mg/dL (3.1 mmol/L). The mute timer never silences it.</string>
+    <string name="pref_title_alert_urgent_low_soon">Urgent low soon alarm</string>
+    <string name="pref_summary_alert_urgent_low_soon" comment="mg/dL and mmol/L are glucose units: keep them as they are">Sound an alarm when glucose is falling and will be at or below 55 mg/dL (3.1 mmol/L) within 20 minutes.</string>
+    <string name="pref_title_alert_rapid_rise">Alert on rapid rise</string>
+    <string name="pref_summary_alert_rapid_rise">Notify when glucose rises by at least the set amount within the set time window.</string>
+    <string name="pref_title_alert_rapid_rise_amount">Rapid rise threshold</string>
+    <string name="pref_summary_alert_rapid_rise_amount" comment="mg/dL and mmol/L are glucose units: keep them as they are. The value is always set in mg/dL, also for mmol/L users.">How much glucose must rise for the alarm. Always in mg/dL, also when AAPS shows mmol/L (18 mg/dL is about 1 mmol/L).</string>
+    <string name="pref_title_alert_rapid_rise_window">Rapid rise time window</string>
+    <string name="pref_title_alert_delay_first">Delay the first alarm</string>
+    <string name="pref_summary_alert_delay_first">The alarm goes off only when the condition has lasted this long. 0 = at once.</string>
+    <string name="pref_title_alert_repeat">Repeat after acknowledge</string>
+    <string name="pref_summary_alert_repeat">An alarm that is not acknowledged goes off again every 5 minutes. After you acknowledge it, it stays quiet this long, then goes off again if the cause is still there. 0 = not again until the cause has gone.</string>
+    <string name="pref_summary_alert_repeat_urgent_low">An alarm that is not acknowledged goes off again every 5 minutes. After you acknowledge it, it stays quiet this long, then goes off again if glucose is still urgent low. It always comes back, after 30 minutes at most.</string>
+    <string name="pref_title_alert_cgm_sound">Sound</string>
+    <string name="pref_summary_alert_cgm_sound">The AAPS sound follows the sound setting of low glucose or other urgent alarms. Without sound, the alarm shows a notification only.</string>
+    <string name="alert_sound_none">No sound</string>
+    <string name="alert_sound_trio_acoustic_mild" comment="Name of an alarm sound from Trio: acoustic style (real instruments), mild urgency">Trio acoustic, mild</string>
+    <string name="alert_sound_trio_acoustic_medium" comment="Name of an alarm sound from Trio: acoustic style (real instruments), medium urgency">Trio acoustic, medium</string>
+    <string name="alert_sound_trio_acoustic_harsh" comment="Name of an alarm sound from Trio: acoustic style (real instruments), highest urgency">Trio acoustic, harsh</string>
+    <string name="alert_sound_trio_electronic_mild" comment="Name of an alarm sound from Trio: electronic style (synthesizer), mild urgency">Trio electronic, mild</string>
+    <string name="alert_sound_trio_electronic_medium" comment="Name of an alarm sound from Trio: electronic style (synthesizer), medium urgency">Trio electronic, medium</string>
+    <string name="alert_sound_trio_electronic_harsh" comment="Name of an alarm sound from Trio: electronic style (synthesizer), highest urgency">Trio electronic, harsh</string>
+    <string name="alert_sound_trio_glass_bell" comment="Name of an alarm tone">Glass bell</string>
+    <string name="alert_sound_trio_harp" comment="Name of an alarm tone">Harp</string>
+    <string name="alert_sound_trio_meow" comment="Name of an alarm tone: the sound of a cat">Meow</string>
+    <string name="alert_sound_trio_saw_wave" comment="Name of an alarm tone: a saw-tooth wave from a synthesizer">Saw wave</string>
+    <string name="alert_sound_trio_hard_saw_wave" comment="Name of an alarm tone: a harder saw-tooth wave from a synthesizer">Hard saw wave</string>
+    <string name="alert_sound_trio_sine_wave" comment="Name of an alarm tone: a pure sine wave">Sine wave</string>
+    <string name="alert_sound_trio_open_can" comment="Name of an alarm tone: the sound of a can being opened">Open can</string>
+    <string name="alert_sound_trio_open_wrapper" comment="Name of an alarm tone: the sound of a wrapper being opened">Open wrapper</string>
+    <string name="pref_title_alert_cgm_sensor_failed">Alert when the CGM sensor fails</string>
+    <string name="pref_summary_alert_cgm_sensor_failed">Sound an alarm when the sensor reports an error or cannot be used. Only for BG sources that report their sensor state.</string>
+    <string name="pref_title_alert_cgm_sensor_expired">Alert when the CGM sensor has ended</string>
+    <string name="pref_summary_alert_cgm_sensor_expired">Sound an alarm when the usable time of the sensor has ended. Only for BG sources that report their sensor state.</string>
+    <string name="pref_title_alert_cgm_sensor_expiring">Warn before the CGM sensor ends</string>
+    <string name="pref_summary_alert_cgm_sensor_expiring">Notify some hours before the usable time of the sensor ends, so you can prepare a new sensor. Only for BG sources that report their sensor state.</string>
+    <string name="pref_title_alert_cgm_expiring_lead">Warn this long before the sensor ends</string>
+    <string name="pref_title_alert_cgm_signal_lost">Alert on lost CGM signal</string>
+    <string name="pref_summary_alert_cgm_signal_lost">Notify when the phone has had no link to the sensor, or no reading from it, for some time. Only for BG sources that report their sensor state.</string>
+    <string name="pref_title_alert_cgm_signal_lost_delay">Signal lost for at least</string>
+    <string name="pref_title_alert_cgm_sensor_issue">Alert on a CGM sensor issue</string>
+    <string name="pref_summary_alert_cgm_sensor_issue">Notify when the sensor is linked but sends no usable glucose value, for example because of noise. Only for BG sources that report their sensor state.</string>
+    <string name="pref_title_alert_cgm_sensor_issue_delay">Sensor issue for at least</string>
+    <string name="pref_title_alert_cgm_warmup_done">Notify when sensor warm-up is done</string>
+    <string name="pref_summary_alert_cgm_warmup_done">Notify when a new sensor sends its first usable reading. Only for BG sources that report their sensor state.</string>
+    <string name="pref_title_alert_cgm_second_sensor_ready">Notify when a second sensor is ready</string>
+    <string name="pref_summary_alert_cgm_second_sensor_ready">Notify when a pre-soaked second sensor is ready and you can switch to it. Only for BG sources that support a second sensor.</string>
+
+    <!-- BG Source preferences -->
+    <string name="pref_title_bg_source_upload_to_ns">Upload BG data to NS</string>
+    <string name="pref_title_bg_source_create_sensor_change">Log sensor change</string>
+    <string name="pref_summary_bg_source_create_sensor_change">Create sensor change therapy event when sensor is inserted.</string>
+
+    <!-- APS preferences -->
+    <string name="pref_title_aps_use_dynamic_sensitivity">Use dynamic sensitivity</string>
+    <string name="pref_summary_aps_use_dynamic_sensitivity">Use DynamicISF for sensitivity adjustment instead of Autosens.</string>
+    <string name="pref_title_aps_use_autosens">Use Autosens</string>
+    <string name="pref_title_aps_use_smb">Enable SMB</string>
+    <string name="pref_summary_aps_use_smb">Enable Super Micro Bolus. SMB delivers insulin immediately to respond to rising blood glucose.</string>
+    <string name="pref_title_aps_use_smb_with_high_tt">Enable SMB with high temp target</string>
+    <string name="pref_summary_aps_use_smb_with_high_tt">Allow SMB when high temporary target is active.</string>
+    <string name="pref_title_aps_use_smb_always">Enable SMB always</string>
+    <string name="pref_summary_aps_use_smb_always">Enable SMB in all conditions regardless of bolus or COB.</string>
+    <string name="pref_title_aps_use_smb_with_cob">Enable SMB with COB</string>
+    <string name="pref_summary_aps_use_smb_with_cob">Allow SMB when carbs on board are present.</string>
+    <string name="pref_title_aps_use_smb_with_low_tt">Enable SMB with low temp target</string>
+    <string name="pref_summary_aps_use_smb_with_low_tt">Allow SMB when low temporary target is active.</string>
+    <string name="pref_title_aps_use_smb_after_carbs">Enable SMB after carbs</string>
+    <string name="pref_summary_aps_use_smb_after_carbs">Allow SMB for a period after carbs are entered.</string>
+    <string name="pref_title_aps_use_uam">Enable UAM</string>
+    <string name="pref_summary_aps_use_uam">Enable Unannounced Meals detection and treatment.</string>
+    <string name="pref_title_aps_sensitivity_raises_target">Sensitivity raises target</string>
+    <string name="pref_summary_aps_sensitivity_raises_target">When sensitivity is detected, raise the target glucose.</string>
+    <string name="pref_title_aps_resistance_lowers_target">Resistance lowers target</string>
+    <string name="pref_summary_aps_resistance_lowers_target">When resistance is detected, lower the target glucose.</string>
+    <string name="pref_title_aps_always_use_short_deltas">Always use short average delta</string>
+    <string name="pref_summary_aps_always_use_short_deltas">Always use short average delta instead of simple delta for BG change calculations.</string>
+    <string name="pref_title_aps_dynisf_adjust_sensitivity">DynamicISF adjust sensitivity</string>
+    <string name="pref_summary_aps_dynisf_adjust_sensitivity">Adjust sensitivity calculations when using DynamicISF.</string>
+    <string name="pref_title_aps_autosens_adjust_targets">Autosens adjust targets</string>
+    <string name="pref_summary_aps_autosens_adjust_targets">Allow Autosens to adjust target glucose in addition to basal and ISF.</string>
+    <string name="pref_title_aps_high_tt_raises_sensitivity">High temp target raises sensitivity</string>
+    <string name="pref_summary_aps_high_tt_raises_sensitivity">High temporary targets will increase insulin sensitivity.</string>
+    <string name="pref_title_aps_low_tt_lowers_sensitivity">Low temp target lowers sensitivity</string>
+    <string name="pref_summary_aps_low_tt_lowers_sensitivity">Low temporary targets will decrease insulin sensitivity.</string>
+    <string name="pref_title_aps_use_autoisf_weights">Enable AutoISF</string>
+    <string name="pref_summary_aps_use_autoisf_weights">Enable AutoISF weight-based ISF adjustments.</string>
+    <string name="pref_title_aps_smb_on_even_target">Enable SMB on even target</string>
+    <string name="pref_summary_aps_smb_on_even_target">Alternative activation of SMB always based on target glucose value.</string>
+
+    <!-- Maintenance preferences -->
+    <string name="pref_title_maintenance_enable_fabric">Enable Fabric crash reporting</string>
+    <string name="pref_title_maintenance_enable_export_automation">Enable automated settings export</string>
+
+    <!-- Autotune preferences -->
+    <string name="pref_title_autotune_auto_switch_profile">Auto switch profile</string>
+    <string name="pref_summary_autotune_auto_switch_profile">Automatically switch to the Autotune-generated profile after calculation.</string>
+    <string name="pref_title_autotune_categorize_uam_as_basal">Categorize UAM as basal</string>
+    <string name="pref_summary_autotune_categorize_uam_as_basal">Treat unannounced meals as basal insulin needs for Autotune calculations.</string>
+    <string name="pref_title_autotune_tune_insulin_curve">Tune insulin curve</string>
+    <string name="pref_title_autotune_circadian_ic_isf">Use circadian IC/ISF</string>
+    <string name="pref_summary_autotune_circadian_ic_isf">Apply circadian variation to IC and ISF in Autotune calculations.</string>
+    <string name="pref_title_autotune_additional_log">Additional logging</string>
+
+    <!-- SMS preferences -->
+    <string name="pref_title_sms_allow_remote_commands">Allow remote commands via SMS</string>
+    <string name="pref_title_sms_report_pump_unreachable">Report pump unreachable via SMS</string>
+    <string name="pref_summary_sms_report_pump_unreachable">Send SMS notification when pump becomes unreachable.</string>
+
+    <!-- Virtual pump preferences -->
+    <string name="pref_title_virtual_pump_status_upload">Upload pump status to NS</string>
+
+    <!-- NS Client preferences -->
+    <string name="pref_title_ns_upload_data">Upload data to NS</string>
+    <string name="pref_summary_ns_upload_data">Upload treatments, temp basals, and other data to Nightscout.</string>
+    <string name="pref_title_ns_receive_cgm">Receive CGM data from NS</string>
+    <string name="pref_summary_ns_receive_cgm">Accept CGM readings from Nightscout.</string>
+    <string name="pref_title_ns_receive_profile_store">Receive profile store from NS</string>
+    <string name="pref_summary_ns_receive_profile_store">Accept profile store updates from Nightscout.</string>
+    <string name="pref_title_ns_receive_temp_target">Receive temp targets from NS</string>
+    <string name="pref_summary_ns_receive_temp_target">Accept temporary target changes from Nightscout.</string>
+    <string name="pref_title_ns_receive_profile_switch">Receive profile switches from NS</string>
+    <string name="pref_summary_ns_receive_profile_switch">Accept profile switch events from Nightscout.</string>
+    <string name="pref_title_ns_receive_insulin">Receive insulin from NS</string>
+    <string name="pref_summary_ns_receive_insulin">Accept insulin treatments from Nightscout.</string>
+    <string name="pref_title_ns_receive_carbs">Receive carbs from NS</string>
+    <string name="pref_summary_ns_receive_carbs">Accept carb entries from Nightscout.</string>
+    <string name="pref_title_ns_receive_therapy_event">Receive therapy events from NS</string>
+    <string name="pref_summary_ns_receive_therapy_event">Accept therapy events from Nightscout.</string>
+    <string name="pref_title_ns_receive_running_mode">Receive running mode from NS</string>
+    <string name="pref_summary_ns_receive_running_mode">Accept running mode changes from Nightscout.</string>
+    <string name="pref_title_ns_receive_tbr_eb">Receive TBR/EB from NS</string>
+    <string name="pref_summary_ns_receive_tbr_eb">Accept temp basal rates and extended boluses from Nightscout.</string>
+    <string name="pref_title_ns_notifications_from_alarms">NS alarms</string>
+    <string name="pref_title_ns_notifications_from_announcements">NS announcements</string>
+    <string name="pref_title_ns_use_cellular">Use cellular data</string>
+    <string name="pref_title_ns_use_roaming">Use roaming</string>
+    <string name="pref_title_ns_use_wifi">Use WiFi</string>
+    <string name="pref_title_ns_use_on_battery">Sync on battery</string>
+    <string name="pref_title_ns_use_on_charging">Sync while charging</string>
+    <string name="pref_title_ns_log_app_start">Log app start event</string>
+    <string name="pref_title_ns_create_announcements_from_errors">Create announcements from errors</string>
+    <string name="pref_title_ns_create_announcements_from_carbs_req">Create announcements from carbs required</string>
+    <string name="pref_title_ns_slow_sync">Use slow sync</string>
+    <string name="pref_title_ns_use_ws">Use websockets</string>
+    <string name="pref_summary_ns_use_ws">Use websockets for real-time communication with Nightscout.</string>
+    <string name="pref_title_ns_allow_client_control">Allow client control</string>
+    <string name="pref_summary_ns_allow_client_control">Let paired client devices send signed commands (e.g. start/stop scenes) over Nightscout. This also turns on hardened mode: changes made directly in Nightscout are not taken any more.</string>
+
+    <!-- OpenHumans preferences -->
+    <string name="pref_title_openhumans_wifi_only">WiFi only</string>
+    <string name="pref_title_openhumans_charging_only">Charging only</string>
+
+    <!-- xDrip preferences -->
+    <string name="pref_title_xdrip_send_status">Send status to xDrip+</string>
+    <string name="pref_title_xdrip_send_detailed_iob">Send detailed IOB</string>
+    <string name="pref_summary_xdrip_send_detailed_iob">Send detailed IOB information to xDrip+ for display on watch faces.</string>
+    <string name="pref_title_xdrip_send_bgi">Show BGI</string>
+    <string name="pref_summary_xdrip_send_bgi">Show Blood Glucose Impact in xDrip+ status line.</string>
+
+    <!-- Wear preferences -->
+    <string name="pref_title_wear_control">Wear control</string>
+    <string name="pref_summary_wear_control">Control AAPS from Android Wear watch.</string>
+    <string name="pref_title_wear_wizard_bg">Include BG in wizard</string>
+    <string name="pref_title_wear_wizard_tt">Include temp target in wizard</string>
+    <string name="pref_title_wear_wizard_trend">Include trend in wizard</string>
+    <string name="pref_title_wear_wizard_cob">Include COB in wizard</string>
+    <string name="pref_title_wear_wizard_iob">Include IOB in wizard</string>
+    <string name="pref_title_wear_custom_watchface_authorization">Authorize custom watchfaces</string>
+    <string name="pref_title_wear_pushed_watchface">Watchface installed on watch</string>
+    <string name="wear_pushed_watchface_wfs" comment="Entry of a list setting: the built-in watchface made of AAPS complications">Complications watchface</string>
+    <string name="wear_pushed_watchface_cwf" comment="Entry of a list setting: the watchface loaded from a custom watchface zip file">Custom watchface</string>
+    <string name="pref_title_wear_notify_on_smb">Notify on SMB</string>
+    <string name="pref_summary_wear_notify_on_smb">Send notifications to watch when SMB is delivered.</string>
+    <string name="pref_title_wear_broadcast_data">Broadcast data to watch</string>
+    <string name="pref_summary_wear_broadcast_data">Broadcast AAPS data to 3rd party watch apps via intent.</string>
+
+    <!-- Eversense preferences (Android only) -->
+    <string name="eversense_cloud_upload_enabled">Enable Eversense cloud upload</string>
+    <string name="eversense_cloud_upload_toast">Show a message after each upload</string>
+    <string name="eversense_cloud_upload_toast_summary">Shows a short message on the screen every time your readings are sent to the Eversense servers. This happens about every 5 minutes, so most people leave this off. Turn it on only while you are checking that the upload works.</string>
+    <string name="eversense_european_region">Eversense 365: use European servers</string>
+    <string name="eversense_european_region_summary">Turn this on if your Eversense account and 365 transmitter are European. AAPS will then sign in and sync with the European Eversense servers instead of the ones in the United States. Leave it off for a United States account. If this is set wrong, the transmitter cannot finish pairing and you will get no readings.</string>
+
+    <!-- Site rotation preferences -->
+    <string name="pref_title_site_rotation_manage_pump">Manage pump site rotation</string>
+    <string name="pref_title_site_rotation_manage_cgm">Manage CGM site rotation</string>
+
+    <!-- IntKey: Overview preferences -->
+    <string name="pref_title_carbs_button_increment_1">Carbs button increment 1</string>
+    <string name="pref_title_carbs_button_increment_2">Carbs button increment 2</string>
+    <string name="pref_title_carbs_button_increment_3">Carbs button increment 3</string>
+    <string name="carb_increment_button_message">Number of carbs to add when button is pressed</string>
+    <string name="pref_title_cage_warning">Threshold warning cannula age</string>
+    <string name="pref_title_cage_critical">Threshold critical cannula age</string>
+    <string name="pref_title_iage_warning">Threshold warning insulin age</string>
+    <string name="pref_title_iage_critical">Threshold critical insulin age</string>
+    <string name="pref_title_sage_warning">Threshold warning sensor age</string>
+    <string name="pref_title_sage_critical">Threshold critical sensor age</string>
+    <string name="pref_title_sbat_warning">Threshold warning sensor battery level</string>
+    <string name="pref_title_sbat_critical">Threshold critical sensor battery level</string>
+    <string name="pref_title_bage_warning">Threshold warning pump battery age</string>
+    <string name="pref_title_bage_critical">Threshold critical pump battery age</string>
+    <string name="pref_title_res_warning">Threshold warning reservoir level</string>
+    <string name="pref_title_res_critical">Threshold critical reservoir level</string>
+    <string name="pref_title_batt_warning">Threshold warning pump battery level</string>
+    <string name="pref_title_batt_critical">Threshold critical pump battery level</string>
+    <string name="pref_title_bolus_percentage">Bolus percentage</string>
+    <string name="deliverpartofboluswizard">Apply this value to BG and carbs correction in bolus wizard\'s result</string>
+    <string name="pref_title_reset_bolus_percentage_time">Reset bolus percentage time</string>
+    <string name="deliver_part_of_boluswizard_reset_time">Deliver full bolus (100%) if the BG reading is older than</string>
+
+    <!-- IntKey: Protection preferences -->
+    <string name="pref_title_protection_timeout">Protection timeout</string>
+    <string name="pref_title_protection_type_application">Level 0: Application protection</string>
+    <string name="pref_summary_protection_type_application">App launch and when returning to the app. Independent from other levels</string>
+    <string name="pref_title_protection_type_bolus">Level 1: Bolus protection</string>
+    <string name="pref_summary_protection_type_bolus">Treatments, profile activation. Requires Level 2</string>
+    <string name="pref_title_protection_type_settings">Level 2: Settings protection</string>
+    <string name="pref_summary_protection_type_settings">Editing profiles, preferences</string>
+    <!-- Protection type entries (canonical location - also used by core/ui) -->
+    <string name="noprotection">No protection</string>
+    <string name="biometric">Biometric</string>
+    <string name="master_password">Master password</string>
+    <string name="custom_password">Custom password</string>
+    <string name="custom_pin">Custom PIN</string>
+
+    <!-- IntKey: Safety preferences -->
+    <string name="pref_title_max_carbs">Maximum carbs allowed</string>
+
+    <!-- IntKey: Loop preferences -->
+    <string name="pref_title_open_mode_min_change">Open mode minimum change</string>
+    <string name="loop_open_mode_min_change_summary" formatted="false">Open Loop will popup new change request only if change is bigger than this value in %. Default value is 20%</string>
+
+    <!-- IntKey: APS preferences -->
+    <string name="pref_title_smb_frequency">SMB interval</string>
+    <string name="pref_title_smb_max_minutes">Max minutes of basal to limit SMB</string>
+    <string name="pref_title_uam_smb_max_minutes">UAM max minutes of basal to limit SMB</string>
+    <string name="uam_smb_max_minutes">UAM SMB max minutes</string>
+    <string name="pref_title_carbs_request_threshold">Carbs required threshold</string>
+    <string name="carbs_req_threshold_summary">Minimum grams of carbs to display a carbs suggestion alert. Carbs suggestions below this number will not trigger a notification.</string>
+    <string name="pref_title_half_basal_exercise_target">Half basal exercise target</string>
+    <string name="half_basal_exercise_target_summary">Set to a number, e.g. 160, which means when temp target is 160 mg/dL and High temptarget raises sensitivity=true, run 50%% basal at this level (120 = 75%%; 140 = 60%%).</string>
+    <string name="pref_title_iob_threshold_percent">IOB threshold percent</string>
+    <string name="openapsama_iob_threshold_percent_summary" formatted="false">Percentage of maxIOB above which SMBs are disabled.\nDefault value: 100%\nWith 100% this feature is effectively disabled.</string>
+    <string name="pref_title_dynisf_adjustment_factor">DynamicISF adjustment factor</string>
+    <string name="dyn_isf_adjust_summary" formatted="false">Adjustment factor for DynamicISF. Set more than 100% for more aggressive correction doses, and less than 100% for less aggressive corrections.</string>
+    <string name="pref_title_autosens_period">Autosens period</string>
+    <string name="openapsama_autosens_period_summary">Amount of hours in the past for sensitivity detection (carbs absorption time is excluded)</string>
+
+    <!-- IntKey: Maintenance preferences -->
+    <string name="pref_title_logs_amount">Number of logs to send</string>
+
+    <!-- IntKey: Alert preferences -->
+    <string name="pref_title_stale_data_threshold">Stale data threshold</string>
+    <string name="pref_title_pump_unreachable_threshold">Pump unreachable threshold</string>
+
+    <!-- IntKey: Insulin preferences -->
+
+    <!-- IntKey: Autotune preferences -->
+    <string name="pref_title_autotune_days">Default tune days</string>
+    <string name="autotune_default_tune_days_summary">Default number of days of data to be processed by Autotune (up to 30)</string>
+
+    <!-- IntKey: SMS preferences -->
+    <string name="pref_title_sms_remote_bolus_distance">Remote bolus min distance</string>
+
+    <!-- IntKey: BG Source preferences -->
+    <string name="pref_title_random_bg_interval">Random BG interval</string>
+    <string name="pref_title_random_bg_randomize">Randomize BG data</string>
+    <string name="pref_summary_random_bg_randomize">Add noise, jitter timestamps, randomize trend arrows, and emit occasional random carbs. Disable for a clean deterministic sine wave with the trend arrow derived from the sine slope.</string>
+
+    <!-- IntKey: NS Client preferences -->
+    <string name="pref_title_alarm_stale_data">Stale data alarm threshold</string>
+    <string name="pref_title_urgent_alarm_stale_data">Urgent stale data alarm threshold</string>
+
+    <!-- IntKey: Site rotation preferences -->
+    <string name="pref_title_site_rotation_profile">User profile for site rotation</string>
+    <!-- Body-type choices for the site-rotation user profile (man / woman / child body silhouette) -->
+    <string name="site_rotation_profile_man">Man</string>
+    <string name="site_rotation_profile_woman">Woman</string>
+    <string name="site_rotation_profile_child">Child</string>
+
+    <!-- StringKey: General preferences -->
+    <string name="pref_title_units">Units</string>
+
+    <!-- Formatted unit strings with value only -->
+
+    <!-- Formatted unit strings with value and range -->
+    <string name="lang_default">System default</string>
+    <string name="pref_title_patient_name">Instance name</string>
+    <string name="pref_summary_patient_name">Name of the person using this phone. It tells this AAPS instance apart in reports and sync.</string>
+
+    <!-- StringKey: Directory preferences -->
+    <string name="pref_title_aaps_directory">AAPS directory</string>
+
+    <!-- StringKey: Protection preferences -->
+    <string name="pref_title_master_password">Master password</string>
+    <string name="pref_title_settings_password">Settings password</string>
+    <string name="pref_title_settings_pin">Settings PIN</string>
+    <string name="pref_title_application_password">Application password</string>
+    <string name="pref_title_application_pin">Application PIN</string>
+    <string name="pref_title_bolus_password">Bolus password</string>
+    <string name="pref_title_bolus_pin">Bolus PIN</string>
+
+    <!-- Theme switcher dark and light mode-->
+    <string name="pref_summary_theme_switcher">Choose dark, light, or to follow the system theme</string>
+    <string name="pref_title_app_color_scheme">App Color Scheme</string>
+    <string name="pref_dark_theme">Dark theme</string>
+    <string name="pref_light_theme">Light theme</string>
+    <string name="pref_follow_system_theme">Use device theme</string>
+
+    <!-- StringKey: Safety preferences -->
+    <string name="pref_title_patient_age">Patient age</string>
+
+    <!-- StringKey: Maintenance preferences -->
+    <string name="maintenance_email">Email recipient</string>
+    <string name="pref_title_identification">Identification for crash reports</string>
+
+    <!-- StringKey: Automation preferences -->
+    <string name="pref_title_automation_location">Location service</string>
+    <string name="automation_location_passive">Use passive location</string>
+    <string name="automation_location_network">Use network location</string>
+    <string name="automation_location_gps">Use GPS location</string>
+
+    <!-- StringKey: SMS preferences -->
+    <string name="smscommunicator_allowednumbers">Allowed phone numbers</string>
+    <string name="smscommunicator_allowednumbers_summary">+XXXXXXXXXX;+YYYYYYYYYY</string>
+    <string name="smscommunicator_otp_pin">Additional mandatory PIN at token end</string>
+    <string name="smscommunicator_otp_pin_summary">Additional digits that should be memorised and added at the end of each generated One Time Password</string>
+
+    <!-- StringKey: Virtual pump preferences -->
+    <string name="pref_title_virtual_pump_type">Pump type</string>
+
+    <!-- StringKey: NS Client preferences -->
+    <string name="ns_client_url_title">Nightscout URL</string>
+    <string name="ns_client_url_summary">Enter your Nightscout URL (i.e. https://yoursitename.yourplatform.dom)</string>
+    <string name="ns_client_secret_title">Nightscout API secret</string>
+    <string name="ns_client_secret_summary">Enter your Nightscout API secret (min. 12 characters)</string>
+    <string name="nsclient_token_title">Nightscout access token</string>
+    <string name="nsclient_token_summary">Enter your Nightscout access token (min. 17 characters)</string>
+    <string name="ns_wifi_ssids">WiFi SSID</string>
+    <string name="ns_wifi_ssids_summary">Allowed SSIDs (semicolon separated)</string>
+
+    <!-- DoubleKey: Overview preferences -->
+    <string name="pref_title_insulin_button_increment_1">Insulin button increment 1</string>
+    <string name="pref_title_insulin_button_increment_2">Insulin button increment 2</string>
+    <string name="pref_title_insulin_button_increment_3">Insulin button increment 3</string>
+    <string name="insulin_increment_button_message">Amount of insulin to add when button is pressed</string>
+
+    <!-- DoubleKey: Actions preferences -->
+    <string name="pref_title_fill_button_1">Fill button 1</string>
+    <string name="pref_title_fill_button_2">Fill button 2</string>
+    <string name="pref_title_fill_button_3">Fill button 3</string>
+
+    <!-- DoubleKey: Safety preferences -->
+    <string name="pref_title_max_bolus">Maximum bolus</string>
+    <string name="treatmentssafety_maxbolus_summary">The selected Patient age limits this value. A higher value here has no effect.</string>
+
+    <!-- DoubleKey: APS preferences -->
+    <string name="pref_title_max_basal">Maximum basal rate</string>
+    <string name="openapsma_max_basal_summary">This value is called max basal in OpenAPS context\nThe selected Patient age limits this value. A higher value here has no effect.</string>
+    <string name="pref_title_smb_max_iob">Max IOB for SMB</string>
+    <string name="openapssmb_max_iob_summary">This value is called Max IOB in OpenAPS context\nOpenAPS will not add more insulin if current IOB is greater than this value.\nThe selected Patient age limits this value. A higher value here has no effect.</string>
+    <string name="pref_title_ama_max_iob">Max IOB for AMA</string>
+    <string name="openapsma_max_iob_summary">This value is called Max IOB in OpenAPS context\nThis is maximal insulin in [U] APS can deliver at once.\nThe selected Patient age limits this value. A higher value here has no effect.</string>
+    <string name="pref_title_max_daily_multiplier">Max daily safety multiplier</string>
+    <string name="openapsama_max_daily_safety_multiplier_summary">Default value: 3. This is a key OpenAPS safety cap. What this does is limit your basals to be 3x your biggest basal rate. You likely will not need to change this, but you should be aware that’s what is discussed about “3x max daily; 4x current” for safety caps.</string>
+    <string name="pref_title_current_basal_multiplier">Current basal safety multiplier</string>
+    <string name="openapsama_current_basal_safety_multiplier_summary">Default value: 4 This is the other half of the key OpenAPS safety caps, and the other half of “3x max daily; 4x current” of the safety caps. This means your basal, regardless of max basal set on your pump, cannot be any higher than this number times the current level of your basal. This is to prevent people from getting into dangerous territory by setting excessively high max basals before understanding how the algorithm works. Again, the default is 4x; most people will never need to adjust this and are instead more likely to need to adjust other settings if they feel like they are “running into” this safety cap.</string>
+    <string name="pref_title_bolus_snooze_divisor">Bolus snooze DIA divisor</string>
+    <string name="openapsama_bolus_snooze_dia_divisor_summary">Default value: 2\nBolus snooze is enacted after you do a meal bolus, so the loop won’t counteract with low temps when you’ve just eaten. The example here and default is 2; so a 3 hour DIA means that bolus snooze will be gradually phased out over 1.5 hours (3DIA/2).</string>
+    <string name="pref_title_ama_min_5m_carbs_impact">AMA min 5m carbs impact</string>
+    <string name="pref_title_smb_min_5m_carbs_impact">SMB min 5m carbs impact</string>
+    <string name="openapsama_min_5m_carb_impact_summary">Default value: 3.0 (AMA) or 8.0 (SMB). This is a setting for default carb absorption impact per 5 minutes. The default is an expected 3mg/dl/5min. This affects how fast COB are decayed, and how much carb absorption is assumed in calculating future predicted BG, when BG is falling more than expected, or not rising as much as expected.</string>
+    <string name="pref_title_absorption_cutoff">Absorption cutoff</string>
+    <string name="absorption_cutoff_summary">Time at which any meal is considered absorbed. Remaining carbs will be cut off.</string>
+    <string name="pref_title_absorption_maxtime">Absorption max time</string>
+    <string name="absorption_max_time_summary">Time in hours by which all carbs from a meal are expected to be absorbed</string>
+    <string name="pref_title_autosens_min">Autosens min</string>
+    <string name="openapsama_autosens_min_summary">Default value: 0.7\nThe other side of the autosens safety limits, putting a cap on how low autosens can adjust basals, and how high it can adjust ISF and BG targets.</string>
+    <string name="pref_title_autosens_max">Autosens max</string>
+    <string name="openapsama_autosens_max_summary">Default value: 1.2\nThis is a multiplier cap for autosens (and soon autotune) to set a 20%% max limit on how high the autosens ratio can be, which in turn determines how high autosens can adjust basals, how low it can adjust ISF, and how low it can set the BG target.</string>
+    <string name="pref_title_autoisf_min">AutoISF min</string>
+    <string name="openapsama_autoISF_min_summary">Similar to autosens_min this defines how weak ISF can become.\n\nThe default value 1.0 effectively shuts off this effect.</string>
+    <string name="pref_title_autoisf_max">AutoISF max</string>
+    <string name="openapsama_autoISF_max_summary">Similar to autosens_max this defines how strong ISF can become.\n\nThe default value 1.0 effectively shuts off this effect.\n\nWARNING: Be extremely careful when using values above 2.5</string>
+    <string name="pref_title_bg_accel_weight">BG acceleration ISF weight</string>
+    <string name="openapsama_bgAccel_ISF_weight_summary">This is the weight applied while glucose accelerates and which strengthens ISF thereby potentially increasing insulin delivery.\n\nThe default value 0.0 effectively shuts off this effect.</string>
+    <string name="pref_title_bg_brake_weight">BG brake ISF weight</string>
+    <string name="openapsama_bgBrake_ISF_weight_summary">This is the weight applied while glucose decelerates and which weakens ISF thereby potentially reducing insulin delivery.\n\nThe default value 0.0 effectively shuts off this effect.</string>
+    <string name="pref_title_low_bg_weight">Low BG range weight</string>
+    <string name="openapsama_lower_ISFrange_weight_summary">This is the weight applied while glucose is below target and which weakens ISF thereby potentially reducing insulin delivery.\n\nThe default value 0.0 effectively shuts off this effect.</string>
+    <string name="pref_title_high_bg_weight">High BG range weight</string>
+    <string name="openapsama_higher_ISFrange_weight_summary">This is the weight applied while glucose is above target and which strengthens ISF thereby potentially increasing insulin delivery.\n\nThe default value 0.0 effectively shuts off this effect.</string>
+    <string name="pref_title_smb_delivery_ratio_bg_range">SMB delivery ratio BG range</string>
+    <string name="openapsama_smb_delivery_ratio_bg_range_summary">Default value: 0. The linearly increasing SMB delivery ratio is mapped to the glucose range [target_bg, target_bg+bg_range].\nAt target_bg the SMB ratio is smb_delivery_ratio_min, at target_bg+bg_range it is smb_delivery_ratio_max\nWith 0 the linearly increasing SMB ratio is disabled and the fixed smb_delivery_ratio is used.</string>
+    <string name="pref_title_pp_weight">Post-prandial ISF weight</string>
+    <string name="openapsama_pp_ISF_weight_summary">This is the weight applied while glucose is rising and which strengthens ISF thereby potentially increasing insulin delivery.\n\nThe default value 0.0 effectively shuts off this effect.</string>
+    <string name="pref_title_dura_weight">Duration ISF weight</string>
+    <string name="openapsama_dura_ISF_weight_summary">This is the weight applied during longer lasting, elevated glucose plateaus and which strengthens ISF thereby potentially increasing insulin delivery.\n\nThe default value 0.0 effectively shuts off this effect.</string>
+    <string name="pref_title_smb_delivery_ratio">SMB delivery ratio</string>
+    <string name="openapsama_smb_delivery_ratio_summary">Default value: 0.5. This is another key OpenAPS safety cap, and specifies what share of the total insulin required can be delivered as SMB. This is to prevent people from getting into dangerous territory by setting SMB requests from the caregivers phone at the same time. Increase this experimental value slowly and with caution.</string>
+    <string name="pref_title_smb_delivery_ratio_min">SMB delivery ratio min</string>
+    <string name="openapsama_smb_delivery_ratio_min_summary">Default value: 0.5. This is the lower end of a linearly increasing ratio rather than the fixed value above.</string>
+    <string name="pref_title_smb_delivery_ratio_max">SMB delivery ratio max</string>
+    <string name="openapsama_smb_delivery_ratio_max_summary">Default value: 0.5. This is the upper end of a linearly increasing ratio rather than the fixed value above.</string>
+    <string name="pref_title_smb_max_range_extension">SMB max range extension</string>
+    <string name="openapsama_smb_max_range_extension_summary">Default value: 1 This is another key OpenAPS safety cap, and specifies by what factor you can exceed the regular 120 maxSMB/maxUAM minutes. Increase this experimental value slowly and with caution.</string>
+
+    <!-- UnitDoubleKey: Overview preferences -->
+    <string name="pref_title_low_mark">Low BG mark</string>
+    <string name="pref_title_high_mark">High BG mark</string>
+
+    <!-- UnitDoubleKey: APS preferences -->
+    <string name="pref_title_lgs_threshold">LGS threshold</string>
+    <string name="lgs_threshold_summary">BG value below which insulin is suspended. Default value uses standard target model. User can set value between 60mg/dl (3.3mmol/l) and 100mg/dl(5.5mmol/l). Values below 65/3.6 result in use of default model</string>
+
+    <!-- IntentKey preferences -->
+
+    <!--    Appearance preferences-->
+
+    <!-- AIMI keys ported from freeze aimi-baseline-2026-08-26 -->
+    <string name="pref_title_overview_show_hybrid_aimi_pulse">Show last AIMI run on dashboard</string>
+    <string name="pref_summary_overview_show_hybrid_aimi_pulse">When enabled, shows the summary card under the glucose ring (last loop, SMB, etc.). Off by default to leave more room for the graph.</string>
+    <string name="pref_title_overview_dashboard_extended_metrics">Dashboard: extended metrics</string>
+    <string name="pref_summary_overview_dashboard_extended_metrics">Time in range bar, AIMI trajectory strip and adaptation card. Off = compact row (steps, IOB, heart rate, TBR).</string>
+    <string name="pref_title_aimi_autodrive_aggressive_smb_floor">Aggressive-rise SMB floor</string>
+    <string name="pref_summary_aimi_autodrive_aggressive_smb_floor">On a confirmed aggressive rise, guarantee at least the user-defined Autodrive prebolus amount, delivered as a floor on top of the model SMB. Always re-bounded by Autodrive V3 safety (post-hypo, max SMB, IOB headroom, correction aggression).</string>
+    <string name="pref_title_aimi_anticip_basal_floor">Help a meal you have declared</string>
+    <string name="pref_summary_aimi_anticip_basal_floor">When you know you are about to eat, you can tell the loop instead of waiting for it to work the meal out from your glucose going up. Write a note holding the word "anticip" and give it a duration. While that note is open, the loop holds your basal high enough to deliver the amount set below, spread evenly over 30 minutes, and then goes back to normal. No bolus is given and your target is not changed. This is the only setting in AIMI that makes a dose bigger, so it is bounded three ways: the amount you set, the 30 minutes, and the highest rate your pump allows. It stops on its own if your glucose is under 80 mg/dL or is falling by 3 mg/dL or more every 5 minutes, and deleting the note stops it at once. Off by default.</string>
+    <string name="pref_title_aimi_anticip_meal_evidence">Treat a declared meal as meal evidence</string>
+    <string name="pref_summary_aimi_anticip_meal_evidence">Also let the note above count as proof of a meal inside the loop, so the loop stops waiting for your glucose to confirm one. This is wider than the basal help: meal evidence is one of the things that opens the early release of the dose floor, so it can make the loop dose more in ways the basal help does not. It is a separate switch so the two can be judged apart. Off by default.</string>
+    <string name="pref_title_aimi_anticip_budget_u">Insulin for a declared meal (U)</string>
+    <string name="pref_title_aimi_stress_isf_floor">Stress ISF floor</string>
+    <string name="pref_summary_aimi_stress_isf_floor">When you are under stress, keep the insulin sensitivity used by the loop at or above your profile value, instead of letting it drift below. Stress is detected only from the watch: heart rate at least 20 bpm above your resting rate, fewer than 250 steps in the last 15 minutes, and both held without a break for at least 10 minutes. Once it is on, it stays on until the signs have been gone for 5 minutes, so a few steps do not turn it off and on again. It works at any hour of the day or night. When it is on, it can only make doses smaller, never larger, because a higher sensitivity means the loop expects more from the insulin already active. When it is off, the same check still runs and is written to the log, but nothing in your therapy changes. If the heart rate or the resting heart rate is missing, the floor stays off.</string>
+    <string name="pref_title_aimi_rise_ceiling_guard">Stop repeating the biggest bolus while glucose climbs</string>
+    <string name="pref_summary_aimi_rise_ceiling_guard">When glucose climbs fast, the loop can send its biggest allowed bolus again and again, once a minute. Insulin takes 20 to 40 minutes to show, so it can send ten of them before the first one can be seen, and everything sent is still to come once the rise stops. This setting refuses those repeats: after the bolus has come out at its maximum 3 times in a row while glucose is rising by at least 8 mg/dL every 5 minutes, the next ones are held back. The first doses of a rise are never touched, and the temporary basal rate is not changed. Off by default. This switch changes your doses: when it is on, boluses are really held back during a fast rise, and you may run higher after a meal. When it is off, nothing is held back; the verdict is only written to the exported data, so you can measure what it would have done before you turn it on.</string>
+    <string name="pref_title_aimi_effort_activity_protection">Effort/activity SMB protection</string>
+    <string name="pref_summary_aimi_effort_activity_protection">Lower SMB when steps and heart rate show current or recent physical effort, even if no activity was declared in AIMI Context. Protection persists for a while after you stop (post-exercise sensitivity) and is skipped when the signals look like stress rather than exercise. Reduction-only.</string>
+    <string name="pref_title_aimi_autodrive_v3_authoritative">Autodrive V3 authoritative SMB</string>
+    <string name="pref_summary_aimi_autodrive_v3_authoritative">When Autodrive V3 is active and issues a safe SMB/TBR, do not recompute SMB with the legacy MPC/PI blender (prevents post-hypo overshoot). Disable only for debugging.</string>
+    <string name="pref_title_aimi_peak_governor_enabled">TAP-G peak governor</string>
+    <string name="pref_summary_aimi_peak_governor_enabled">When adaptive PK/PD is on, blend the insulin profile peak with the learned PKPD peak for loop peakTime (see research doc TAP_G_PEAK_GOVERNOR_RFC). When off, the peak also gets no shift from the current context (stress, meal, after a hypo).</string>
+    <string name="pref_title_aimi_tree_meal_rise_frontload">Meal-rise front-loader (early SMB)</string>
+    <string name="pref_summary_aimi_tree_meal_rise_frontload">On a corroborated meal rise (tree = NEED_MORE_INSULIN, BG above target, rising), let Harmonia apply the early SMB lift even when sensor confidence is low — instead of waiting for established hyper. Only ever softens the authority (never a hard bolus); real hypo, free-fall and safety blocks are never overridden. Off by default: it overrides the sensor-confidence gate. Fix the sensor source first if you can.</string>
+    <string name="pref_title_aimi_sensor_confidence_cgm_first">Sensor confidence: CGM-first</string>
+    <string name="pref_summary_aimi_sensor_confidence_cgm_first">Base sensor confidence on the CGM source and signal, not on wearable/health data availability. The old formula let a missing watch collapse sensor confidence and block Harmonia/RBT all day even with a good CGM. When on, a native/filtered CGM is trusted and an unknown source stays cautious rather than fully blocking. This raises dosing authority, so it is off by default.</string>
+    <string name="pref_title_aimi_meal_confirmed_early_release">Meal-confirmed early release</string>
+    <string name="pref_summary_aimi_meal_confirmed_early_release">For undeclared meals: once a meal is confirmed and rising, let the loop reach your configured maximum SMB and basal early, instead of holding back until the high is already established. It only lifts the internal safety floor toward the meal path while blood glucose is climbing, stays within your max SMB, max basal and max IOB, and automatically hands back to the cautious floor once the peak is passed, insulin has stacked, or the rise stops. Real lows and post-hypo protection are never overridden. This raises early dosing, so it is off by default.</string>
+    <string name="pref_title_aimi_hyper_trajectory_release">Hyper trajectory SMB release (HTR)</string>
+    <string name="pref_summary_aimi_hyper_trajectory_release">When Autodrive V3 is on, lift V3 micro-bolus using scenario projection and trajectory on credible hyper rise. Trigger is not a fixed 200 mg/dL threshold.</string>
+    <string name="pref_title_aimi_hyper_trajectory_release_aggressive">HTR aggressive floors</string>
+    <string name="pref_summary_aimi_hyper_trajectory_release_aggressive">Raises HTR SMB floors ~15%% when scenario confirms hyper rise. Use only if default release feels too weak.</string>
+    <string name="pref_title_aimi_recursive_belief_shadow">Recursive belief tree (shadow export)</string>
+    <string name="pref_summary_aimi_recursive_belief_shadow">Build multi-scale belief tree each loop and export recursive_belief (and physiological_patterns when the physio assistant is on) to AIMI_Decisions.jsonl. Required before RBT authority.</string>
+    <string name="pref_title_aimi_recursive_belief_authority">Recursive belief tree authority</string>
+    <string name="pref_summary_aimi_recursive_belief_authority">When on, RBT resolves SMB demand and Traj-Bridge suppression from cross-scale tensions (replaces parallel HTR when release authority is active). Enable only after shadow JSONL review.</string>
+    <string name="pref_title_aimi_recursive_belief_wavelet">RBT wavelet belief (experimental)</string>
+    <string name="pref_summary_aimi_recursive_belief_wavelet">Haar 3-band BG decomposition for micro/meso/macro leaves. Off by default.</string>
+    <string name="pref_title_aimi_dyn_isf_trajectory_tuning">DynISF: trajectory tuning (CGM geometry)</string>
+    <string name="pref_summary_aimi_dyn_isf_trajectory_tuning">Uses the same short-horizon CGM features as AutoISF (deltas, parabolic projection, acceleration) only when quality gates pass. Bounded change per tick; skips when physio already tightens ISF strongly. Requires dynamic sensitivity. Off by default.</string>
+    <string name="pref_title_aimi_dyn_isf_trajectory_shadow">DynISF trajectory: shadow only</string>
+    <string name="pref_summary_aimi_dyn_isf_trajectory_shadow">When on, logs the would-be ISF multiplier but does not change displayed DynISF. Turn off after you trust the signal in logs.</string>
+    <string name="pref_title_aimi_straight_line_tube">Straight-line tube advisor (SMB caps)</string>
+    <string name="pref_summary_aimi_straight_line_tube">Discrete short-horizon control on max SMB: keeps predicted minimum BG above a floor using the PKPD min curve, favors larger caps when eventual BG is high, penalizes zig-zag SMB sizing. Does not replace PKPD or safety nets. Off by default.</string>
+    <string name="pref_title_aimi_basal_slew_limit">Basal anti-whiplash (slew limit)</string>
+    <string name="pref_summary_aimi_basal_slew_limit">Limit how fast the basal rate can rise each cycle to smooth out over-corrections. Basal cuts stay instant for hypo safety; meal and forced-boost paths are exempt.</string>
+    <string name="pref_title_aimi_pkpd_endo_reversion">Prediction: endogenous reversion</string>
+    <string name="pref_summary_aimi_pkpd_endo_reversion">Stop the pkpd eventual prediction from sticking at the 39 mg/dL floor once insulin is spent, letting counter-regulation drift it back toward a low-normal. Affects the eventual only; the hypo-protection floor is unchanged.</string>
+    <string name="pref_title_aimi_basal_channel_safety_guards">Basal channel: honour SMB safety holds</string>
+    <string name="pref_summary_aimi_basal_channel_safety_guards">When a safety rule zeroes the SMB, also block the automatic T3C/Harmonia basal channels instead of letting them take over, and keep the adaptive learner reduction on the rate they propose. Can only lower the automatic temp basal, never raise it. Manual meal modes keep their configured rate.</string>
+    <string name="pref_title_aimi_basal_projected_error">Basal channel: project glucose before correcting</string>
+    <string name="pref_summary_aimi_basal_projected_error">Size the temp basal on where glucose is heading over the insulin action window, as a single distance from target, instead of adding a separate trend term that outweighed the distance term 36 to 1. Unchanged when glucose is steady; a rise no longer alone drives several times profile basal.</string>
+    <string name="pref_title_aimi_dynamic_basal_stack_cap">Basal channel: do not raise the basal on a large insulin stack</string>
+    <string name="pref_summary_aimi_dynamic_basal_stack_cap">The dynamic basal can multiply the basal up to 10 times from glucose and trend only. With this on, it does not raise the basal when the insulin on board could bring glucose under 70 mg/dL by itself. It never lowers the basal for that reason, and it never acts while a meal is declared (a meal mode, or a meal note in the last 3 hours). ON by default; every case is recorded.</string>
+    <string name="pref_title_aimi_basal_stack_terminal_cap">Basal channel: bring a high basal back to profile on a large insulin stack</string>
+    <string name="pref_summary_aimi_basal_stack_terminal_cap">Uses the same rule on the final basal rate: when the insulin on board could bring glucose under 70 mg/dL by itself, a basal above the profile is brought back to the profile basal. It never goes under the profile basal, and it never acts while a meal is declared. OFF by default: every case is recorded, but the rate is not changed.</string>
+    <string name="pref_title_aimi_engine_hyper_rate_bound">Basal engine: bound the rising-glucose rules</string>
+    <string name="pref_summary_aimi_engine_hyper_rate_bound">Two rules of the basal engine (slow rise, eventual glucose above 110) have no upper limit and can ask for more than 100 U/h before the max basal cuts them. With this on, they are bound to the profile basal times one glucose factor (0.5 to 5). OFF by default: the bound is recorded, but the rate is not changed.</string>
+    <string name="pref_title_aimi_forced_tbr_real_pred_delta">Early-meal basal: confirm the rise with a prediction</string>
+    <string name="pref_summary_aimi_forced_tbr_real_pred_delta">The early-meal basal for an undeclared meal starts when a rise is detected. With this on, the detector uses the predicted rise instead of the last 5-minute step counted twice, so one noisy reading cannot start it alone. Declared meals are not affected. ON by default.</string>
+    <string name="pref_title_aimi_basal_terminal_invariants">Basal channel: final safety limits</string>
+    <string name="pref_summary_aimi_basal_terminal_invariants">Re-check three limits on the temp basal after every multiplier has been applied, instead of before them: hold at profile basal when both glucose and the prediction are below target, while post-hypo recovery is active, or when insulin on board is negative without a rise. Can only lower the rate, never raise it. Manual meal modes are exempt.</string>
+    <string name="pref_title_aimi_traj_bridge_basal_survives">Basal channel: keep the trajectory bridge cut</string>
+    <string name="pref_summary_aimi_traj_bridge_basal_survives">When the trajectory safety bridge asks for a lower temp basal, apply that request again after the basal schedule has run, so the schedule can no longer write over it. Can only lower the rate, never raise it, and does nothing on a loop run where the bridge did not ask for anything. Off by default; the request is recorded either way.</string>
+    <string name="pref_title_aimi_tube_veto_ignore_floor_artefact">Bolus channel: ignore a veto built on a floored prediction</string>
+    <string name="pref_summary_aimi_tube_veto_ignore_floor_artefact">The dose feasibility check refuses every bolus when the predicted lowest glucose sits under the hypo floor. That prediction cannot go below 39 mg/dL, so a curve that reached its own limit looks like a coming low. With this on, the bolus limit is released only while glucose is high and flat, never during exercise, never after a low and never while glucose is falling. This is the only setting here that can raise a dose. Off by default; the case is recorded either way, so you can count how often it happens first.</string>
+    <string name="pref_title_aimi_tube_hyper_clamp_physical_bound">Bolus channel: judge high glucose with insulin on board</string>
+    <string name="pref_summary_aimi_tube_hyper_clamp_physical_bound">Above 160 mg/dL the prediction is held at 80 mg/dL, whatever insulin is on board. With this on, the dose check uses instead the glucose that the insulin on board would reach by itself. With little insulin on board, a rising glucose can get more SMB. With a lot of insulin on board, the SMB is blocked. ON by default; every case is recorded so it can be reviewed.</string>
+    <string name="pref_title_aimi_t3c_autodrive_basal_authority">T3C: Autodrive basal authority</string>
+    <string name="pref_summary_aimi_t3c_autodrive_basal_authority">Under T3C brittle mode, fuse Autodrive’s temporary basal demand with the T3C PI controller. SMB from Autodrive is never delivered (basal-only). The physiological tree can unlock a higher basal ceiling and faster ramp on a confirmed rise. Off disables fusion (PI-only + shadow Autodrive).</string>
+    <string name="pref_title_aimi_t3c_hyper_basal_floor">T3C: Hyper basal floor</string>
+    <string name="pref_summary_aimi_t3c_hyper_basal_floor">Under T3C brittle mode, when glucose has stayed at or above 160 mg/dL for at least 20 minutes, hold the basal at your configured Max basal rate so sensor noise cannot collapse the correction to zero. Basal only (no SMB). Releases automatically once glucose falls back below 160 mg/dL. On by default. This is not medical advice — review your settings with your care team.</string>
+    <string name="pref_title_aimi_t3c_cfrd_mode">T3C: CFRD mode</string>
+    <string name="pref_summary_aimi_t3c_cfrd_mode">Cystic fibrosis–related diabetes adaptations under T3C: higher LGS safety floor, delayed COB absorption for malabsorption, and inflammation-aware basal aggressiveness. Basal-only (no SMB). On by default when T3C brittle mode is used. This is not medical advice — review with your CF/diabetes care team.</string>
+    <string name="pref_title_aimi_t3c_cfrd_exacerbation">T3C CFRD: pulmonary exacerbation</string>
+    <string name="pref_summary_aimi_t3c_cfrd_exacerbation">Manual flag for active pulmonary exacerbation or corticosteroid treatment. Raises the T3C basal aggressiveness ceiling while CFRD mode is on. Turn off when the exacerbation ends. Off by default.</string>
+    <string name="pref_title_aimi_undeclared_cob">Undeclared-meal COB estimation</string>
+    <string name="pref_summary_aimi_undeclared_cob">Estimates virtual carbs from the glucose appearance rate (Ra), BG dynamics, patient weight/TDD and rest/activity context, then feeds them into the prediction curves so basal (TBR) anticipates an undeclared meal. Never delivers autonomous SMB. Automatically muted during exercise, hypo/post-hypo, pulmonary exacerbation and any stress/dawn false-meal suppression. Off by default.</string>
+    <string name="pref_title_aimi_sos_enable">Enable Emergency SOS</string>
+    <string name="pref_summary_aimi_sos_enable">Send SMS with BG, trend, IOB and location when a severe hypo or missing CGM data is detected. SMS only (no automatic calls).</string>
+    <string name="pref_title_aimi_advisor_personal_oref_ml">AIMI Advisor: personal on-device risk model</string>
+    <string name="pref_summary_aimi_advisor_personal_oref_ml">When you open Advisor, trains small models from recent loop+CGM features. Informational only; does not change insulin delivery.</string>
+    <string name="pref_title_aimi_advisor_llm_rich_oref">AI Coach: include structured OREF insights</string>
+    <string name="pref_summary_aimi_advisor_llm_rich_oref">Adds a plain-language facts block for the coach LLM. Turn off for a shorter cloud prompt.</string>
+    <string name="pref_title_aimi_tpo_enabled">Transient preference overlay (TPO)</string>
+    <string name="pref_summary_aimi_tpo_enabled">Temporarily lowers correction aggression for 45 min after post-hypo, poor sleep, or hyper→hypo exhaustion. Only works while Autodrive is on together with the hyper trajectory release, the authoritative switch or recursive belief authority. Reverts automatically.</string>
+    <string name="pref_title_aimi_tpo_llm_confirm_enabled">TPO: require LLM confirmation</string>
+    <string name="pref_summary_aimi_tpo_llm_confirm_enabled">When on, AIMI applies a TPO session only if the advisor LLM confirms the clinical context (uses the same API keys as AI Coach). When off, algorithm triggers apply directly.</string>
+    <string name="pref_title_aimi_tpo_notify_on_apply">TPO: notify on session start</string>
+    <string name="pref_summary_aimi_tpo_notify_on_apply">Shows a system notification when a 45 min protection session starts or ends. Tap to open OpenAPS AIMI preferences.</string>
+    <string name="pref_title_aimi_dyn_isf_trajectory_max_fraction">DynISF trajectory: max ISF change per tick</string>
+    <string name="pref_summary_aimi_dyn_isf_trajectory_max_fraction">Cap on relative ISF adjustment from trajectory (e.g. 0.06 = at most about 6% tighter ISF on a strong rise, or 6% looser on a strong fall). Lower = safer, smaller benefit.</string>
+    <string name="pref_title_aimi_hyper_established_dev">HTR established deviation (mg/dL above target)</string>
+    <string name="pref_summary_aimi_hyper_established_dev">0 = TDD-scaled default (~80). Deviation above target for ESTABLISHED tier.</string>
+    <string name="pref_title_aimi_hyper_deep_dev">HTR deep deviation (mg/dL above target)</string>
+    <string name="pref_summary_aimi_hyper_deep_dev">0 = TDD-scaled default (~120). Deviation above target for DEEP plateau tier.</string>
+    <string name="aimi_tube_advanced_title">Straight-line tube (tuning)</string>
+    <string name="aimi_tube_hypo_floor_title">Tube: minimum predicted BG floor (mg/dL)</string>
+    <string name="aimi_tube_hypo_floor_summary">Robust hypo constraint: SMB cap scale is only allowed if min predicted BG minus estimated SMB effect stays at or above this value.</string>
+    <string name="aimi_tube_hyper_band_title">Tube: hyper band above target (mg/dL)</string>
+    <string name="aimi_tube_hyper_band_summary">Eventual BG above target + this band triggers stronger pull toward larger SMB caps (within the hypo tube).</string>
+    <string name="aimi_tube_aggressiveness_title">Tube: aggressiveness</string>
+    <string name="aimi_tube_aggressiveness_summary">1.0 = default. Higher = more correction appetite (stronger hyper pull, less command smoothing). Lower = gentler caps.</string>
+    <string name="aimi_tube_basal_trim_title">Tube: max basal trim (fraction)</string>
+    <string name="aimi_tube_basal_trim_summary">When SMB caps are reduced, also scale profile basal and max daily basal by up to this fraction (0 = off). Floor 0.88 applied internally.</string>
+    <string name="aimi_tube_kappa_margin_title">Tube: kappa safety margin</string>
+    <string name="aimi_tube_kappa_margin_summary">Inflates estimated BG drop per unit SMB (0 = nominal). Use 0.05–0.15 if you want a more conservative tube.</string>
+    <string name="pref_title_aimi_t3c_cfrd_lgs_floor">T3C CFRD: LGS safety floor</string>
+    <string name="pref_summary_aimi_t3c_cfrd_lgs_floor">Minimum LGS threshold (mg/dL) used by T3C anticipation when CFRD mode is on. Impaired counter-regulation needs a higher floor than typical T1D. Range 70–95.</string>
+    <string name="pref_title_aimi_t3c_cfrd_cob_delay">T3C CFRD: COB absorption delay</string>
+    <string name="pref_summary_aimi_t3c_cfrd_cob_delay">Minutes to shift the COB prediction curve forward for delayed/irregular carbohydrate absorption. Feeds basal anticipation only (no SMB). Range 0–90 min.</string>
+    <string name="pref_title_aimi_undeclared_cob_max_g" comment="%1$s is not used; plain title. Max grams the estimator may inject.">Undeclared COB: maximum grams</string>
+    <string name="pref_summary_aimi_undeclared_cob_max_g">Upper bound (grams) for the virtual carbs the estimator may inject into the prediction path. Lower = safer and smaller effect. Only used when undeclared-meal COB estimation is on.</string>
+    <string name="aimi_gov_hypo_rate_enter_title">Governance: hypo rate to enter HOLD</string>
+    <string name="aimi_gov_hypo_rate_enter_summary">Fraction of recent samples with BG below the hypo threshold required to enter conservative HOLD (0–1). Lower = harder to trigger.</string>
+    <string name="aimi_gov_hypo_rate_exit_title">Governance: hypo rate to exit HOLD</string>
+    <string name="aimi_gov_hypo_rate_exit_summary">Must stay below this (and no severe sample) to leave HOLD after hysteresis. Should be lower than enter rate.</string>
+    <string name="aimi_gov_hypo_bg_mgdl_title">Governance: hypo BG threshold (mg/dL)</string>
+    <string name="aimi_gov_hypo_bg_mgdl_summary">Post-sample BG below this counts toward hypo rate in the rolling governance window.</string>
+    <string name="aimi_gov_severe_hypo_bg_mgdl_title">Governance: severe hypo BG (mg/dL)</string>
+    <string name="aimi_gov_severe_hypo_bg_mgdl_summary">Any sample at or below this uses the stricter severe tier floors/decays. Kept strictly below the hypo threshold.</string>
+    <string name="aimi_gov_hold_basal_floor_rate_title">HOLD: basal scaling floor (rate tier)</string>
+    <string name="aimi_gov_hold_basal_floor_rate_summary">Minimum universal basal scaling factor while HOLD applies without a severe sample in the window.</string>
+    <string name="aimi_gov_hold_basal_decay_rate_title">HOLD: basal decay per update (rate tier)</string>
+    <string name="aimi_gov_hold_basal_decay_rate_summary">Each learning update multiplies basal scaling by this value during HOLD (rate tier). Must be &lt; 1.</string>
+    <string name="aimi_gov_hold_agg_floor_rate_title">HOLD: T3C aggressiveness floor (rate tier)</string>
+    <string name="aimi_gov_hold_agg_floor_rate_summary">Minimum T3C aggressiveness factor during HOLD (rate tier).</string>
+    <string name="aimi_gov_hold_agg_decay_rate_title">HOLD: T3C aggressiveness decay (rate tier)</string>
+    <string name="aimi_gov_hold_agg_decay_rate_summary">Multiplicative decay per update for aggressiveness during HOLD (rate tier).</string>
+    <string name="aimi_gov_hold_basal_floor_severe_title">HOLD: basal scaling floor (severe tier)</string>
+    <string name="aimi_gov_hold_basal_floor_severe_summary">Used when at least one sample in the window is at or below the severe hypo BG.</string>
+    <string name="aimi_gov_hold_basal_decay_severe_title">HOLD: basal decay (severe tier)</string>
+    <string name="aimi_gov_hold_basal_decay_severe_summary">Basal scaling multiplicative decay per update during HOLD when severe tier applies.</string>
+    <string name="aimi_gov_hold_agg_floor_severe_title">HOLD: T3C aggressiveness floor (severe tier)</string>
+    <string name="aimi_gov_hold_agg_floor_severe_summary">Minimum aggressiveness when severe hypo tier applies.</string>
+    <string name="aimi_gov_hold_agg_decay_severe_title">HOLD: T3C aggressiveness decay (severe tier)</string>
+    <string name="aimi_gov_hold_agg_decay_severe_summary">Aggressiveness decay per update when severe tier applies.</string>
+    <string name="aimi_gov_anticipation_lookback_samples_title">Governance: anticipation lookback (samples)</string>
+    <string name="aimi_gov_anticipation_lookback_samples_summary">How many recent learning samples (typically 5 min apart) are used to score short-horizon prediction relief. Rounded to a whole number.</string>
+    <string name="aimi_gov_anticipation_margin_mgdl_title">Governance: anticipation margin above hypo (mg/dL)</string>
+    <string name="aimi_gov_anticipation_margin_mgdl_summary">Minimum predicted BG must be at least hypo threshold plus this margin to count as recovery-oriented for relief.</string>
+    <string name="aimi_gov_anticipation_hypo_damp_title">Governance: anticipation hypo dampening</string>
+    <string name="aimi_gov_anticipation_hypo_damp_summary">When relief is high, weighted hypo rate for HOLD enter/exit is multiplied by (1 minus this fraction times relief). 0 disables hypo dampening from predictions.</string>
+    <string name="aimi_gov_anticipation_decay_blend_max_title">Governance: anticipation HOLD decay softening</string>
+    <string name="aimi_gov_anticipation_decay_blend_max_summary">Caps how much HOLD basal/aggressiveness decay is eased toward neutral when prediction relief is high. 0 leaves decay unchanged by anticipation.</string>
+    <string name="pref_title_aimi_sos_threshold">Monitoring threshold (30 min)</string>
+    <string name="pref_summary_aimi_sos_threshold">BG (mg/dL) below which the 30-minute observation window starts. Recovery requires returning above this value + 10.</string>
+    <string name="pref_title_aimi_sos_immediate_threshold">Immediate emergency threshold</string>
+    <string name="pref_summary_aimi_sos_immediate_threshold">BG (mg/dL) that triggers an immediate SOS SMS (also triggered when delta ≤ −10 mg/dL).</string>
+    <string name="pref_title_aimi_sos_stale_threshold">Missing sensor alert (minutes)</string>
+    <string name="pref_summary_aimi_sos_stale_threshold">If no valid CGM reading is seen for this many minutes, send a missing-data SOS SMS.</string>
+    <string name="pref_title_aimi_sos_phone">Emergency contact #1</string>
+    <string name="pref_summary_aimi_sos_phone">Primary phone number for SOS SMS (include country code, e.g. +33…).</string>
+    <string name="pref_title_aimi_sos_phone2">Emergency contact #2</string>
+    <string name="pref_summary_aimi_sos_phone2">Optional second contact. Identical numbers are deduplicated so only one SMS is sent.</string>
+    <!-- Titles for freeze AIMI keys that had no titleResId -->
+    <string name="pref_title_oaps_aimi_m_ltraining">AIMI ML training</string>
+    <string name="pref_title_oaps_aimi_enable_steps_from_watch">AIMI enable steps from watch</string>
+    <string name="pref_title_oaps_aimi_pregnancy">AIMI pregnancy</string>
+    <string name="pref_title_oaps_aimi_night">AIMI night</string>
+    <string name="pref_title_oaps_aimi_honeymoon">AIMI honeymoon</string>
+    <string name="pref_title_oaps_aimi_t3c_adaptive_basal_enabled">AIMI T3C adaptive basal enabled</string>
+    <string name="pref_title_oaps_aimi_t3c_physio_informed_enabled">AIMI T3C physio informed enabled</string>
+    <string name="pref_title_oaps_aimi_auto_drive_active">AIMI Autodrive active</string>
+    <string name="pref_title_oaps_aimi_wcycle">AIMI cycle</string>
+    <string name="pref_title_oaps_aimi_w_cycle_shadow">AIMI cycle shadow</string>
+    <string name="pref_title_oaps_aimi_w_cycle_require_confirm">AIMI cycle require confirm</string>
+    <string name="pref_title_oaps_aimi_night_growth_enabled">AIMI night growth enabled</string>
+    <string name="pref_title_oaps_aimi_pkpd_enabled">AIMI PKPD enabled</string>
+    <string name="pref_title_oaps_aimi_intelligence_snapshot_export">AIMI intelligence snapshot export</string>
+    <string name="pref_title_oaps_aimi_dia_governor_enabled">AIMI DIA governor enabled</string>
+    <string name="pref_summary_oaps_aimi_dia_governor_enabled">When adaptive PK/PD is on, blend the insulin profile DIA with the learned PK/PD DIA. When off, the DIA is the profile DIA: no learned DIA and no shift from the current context (stress, meal, after a hypo).</string>
+    <string name="pref_title_oaps_aimi_prediction_authority_shadow">AIMI prediction authority shadow</string>
+    <string name="pref_summary_oaps_aimi_prediction_authority_shadow">Used only when AIMI prediction authority is off: AIMI computes the prediction and writes it in the log, but does not use it for dosing.</string>
+    <string name="pref_title_oaps_aimi_prediction_authority_enabled">AIMI prediction authority enabled</string>
+    <string name="pref_title_oaps_aimi_meal_hyper_bypass_enabled">AIMI meal hyper bypass enabled</string>
+    <string name="pref_title_oaps_aimi_hyper_dropping_exempt_enabled">AIMI hyper dropping exempt enabled</string>
+    <string name="pref_title_oaps_aimi_pkpd_pragmatic_relief_enabled">AIMI PKPD pragmatic relief enabled</string>
+    <string name="pref_title_oaps_aimi_loop_blackbox_file_enabled">AIMI loop blackbox file enabled</string>
+    <string name="pref_title_oaps_aimi_loop_exclusive_invocation_enabled">AIMI loop exclusive invocation enabled</string>
+    <string name="pref_title_oaps_aimi_aimi_smb_comparator_enabled">AIMI SMB comparator enabled</string>
+    <string name="pref_title_oaps_aimi_iob_surveillance_guard">AIMI IOB surveillance guard</string>
+    <string name="pref_title_oaps_aimi_effective_iob_release_enabled">AIMI effective IOB release enabled</string>
+    <string name="pref_title_oaps_aimi_unified_reactivity_enabled">AIMI unified reactivity enabled</string>
+    <string name="pref_title_aimi_auditor_enabled">AIMI auditor enabled</string>
+    <string name="pref_title_aimi_auditor_profile_factors">Auditor may adjust ISF and target</string>
+    <string name="pref_summary_aimi_auditor_profile_factors">Lets the AI auditor change the insulin sensitivity (ISF) and the glucose target used by the loop by at most 15 %, up or down, for 15 to 30 minutes. The loop checks every proposal against the last 30 minutes of data and refuses it if one number is wrong. More insulin is never allowed when glucose is under 120 mg/dL, falling, predicted low, after a low, during exercise or with a noisy sensor. The ISF never goes below its usual floor, and all your limits (max SMB, max IOB, max basal, low glucose suspend) still apply. When this is off, the auditor still makes its proposals and writes them to the log, but nothing in your therapy changes.</string>
+    <string name="pref_title_oaps_aimi_trajectory_guard_enabled">AIMI trajectory guard enabled</string>
+    <string name="pref_title_oaps_aimi_context_enabled">AIMI context enabled</string>
+    <string name="pref_title_oaps_aimi_pkpd_hyper_reversion">Prediction: hyper reversion</string>
+    <string name="pref_summary_oaps_aimi_pkpd_hyper_reversion">ON by default. When glucose is clearly high (160 mg/dL or more), lets the pkpd prediction come off its 39 mg/dL floor even while insulin is still active, so a high glucose is not read as a coming low. Without it, a large insulin stack can predict a false low near 200 mg/dL and give less insulin. The guards for low and falling glucose stay on. Turn OFF only to go back to the old behaviour.</string>
+    <string name="pref_title_oaps_aimi_pkpd_stack_aware_guard_b">Stack-aware hyper floor release</string>
+    <string name="pref_summary_oaps_aimi_pkpd_stack_aware_guard_b">OFF by default. During a descent from a high glucose, releases the prediction floor as soon as the insulin on board can physiologically bring glucose down and glucose is no longer rising, so the basal cuts and holds instead of bouncing on sensor noise. May leave highs a little longer — turn ON only if you see the basal whipsawing with a large insulin stack.</string>
+    <string name="pref_title_oaps_aimi_context_llm_enabled">AIMI context LLM enabled</string>
+    <string name="pref_title_oaps_aimi_t3c_brittle_mode">AIMI T3C brittle mode</string>
+    <string name="pref_title_oaps_aimi_thyroid_enabled">AIMI thyroid enabled</string>
+    <string name="pref_title_oaps_aimi_thyroid_log_verbosity">AIMI thyroid log verbosity</string>
+    <string name="pref_title_aimi_physio_assistant_enable">AIMI physio assistant enable</string>
+    <string name="pref_title_aimi_physio_sleep_data_enable">Use sleep data</string>
+    <string name="pref_summary_aimi_physio_sleep_data_enable">On: AIMI uses the sleep from your watch (sleep debt, poor night) and can give a little less insulin after a bad night. Off: sleep data is ignored.</string>
+    <string name="pref_title_aimi_physio_hrv_data_enable">Use heart rate variability (HRV)</string>
+    <string name="pref_summary_aimi_physio_hrv_data_enable">On: AIMI uses the HRV from your watch to detect stress or fatigue, which can change the insulin dose a little. Off: HRV is ignored.</string>
+    <string name="pref_title_aimi_physio_llm_analysis_enable">AIMI physio LLM analysis enable</string>
+    <string name="pref_title_aimi_hrv_baseline_per_night">AIMI HRV baseline per night</string>
+    <string name="pref_title_aimi_parity_capture_enable">AIMI record loop ticks to files (expert, for comparing runs)</string>
+    <string name="pref_title_aimi_phone_steps_sync_enable">AIMI phone step sync</string>
+    <string name="pref_title_aimi_health_connect_steps_enable">AIMI Health Connect step sync</string>
+    <string name="pref_title_aimi_endometriosis_enable">AIMI endometriosis enable</string>
+    <string name="pref_title_aimi_endometriosis_pain_flare">AIMI endometriosis pain flare</string>
+    <string name="pref_summary_aimi_endometriosis_pain_flare">Switch on during a pain flare: AIMI gives more basal and smaller SMBs while your glucose is above 110 mg/dL (6.1 mmol/L). The flare ends by itself after the flare duration.</string>
+    <string name="pref_title_oaps_aimi_meal_advisor_trigger">AIMI meal advisor trigger</string>
+    <string name="pref_title_aimi_cosine_gate_enabled">AIMI cosine gate enabled</string>
+    <string name="pref_title_oaps_aimi_max_smb">AIMI max SMB</string>
+    <string name="pref_title_oaps_aimi_high_bg_max_smb">AIMI high BG max SMB</string>
+    <string name="pref_title_oaps_aimi_weight">AIMI weight</string>
+    <string name="pref_title_oaps_aimi_mpc_insulin_u_per_kg_per_step">AIMI MPC insulin u per kg per step</string>
+    <string name="pref_title_oaps_aimi_cho">AIMI CHO</string>
+    <string name="pref_title_oaps_aimi_tdd7">AIMI TDD 7</string>
+    <string name="pref_title_oaps_aimi_pkpd_max_dia_change_per_day_h">AIMI PKPD max DIA change per day h</string>
+    <string name="pref_title_oaps_aimi_pkpd_max_peak_change_per_day_min">AIMI PKPD max peak change per day min</string>
+    <string name="pref_title_oaps_aimi_pkpd_state_dia_h">AIMI PKPD state DIA h</string>
+    <string name="pref_title_oaps_aimi_pkpd_state_peak_min">AIMI PKPD state peak min</string>
+    <string name="pref_title_oaps_aimi_isf_fusion_min_factor">AIMI ISF fusion min factor</string>
+    <string name="pref_title_oaps_aimi_isf_fusion_max_factor">AIMI ISF fusion max factor</string>
+    <string name="pref_title_oaps_aimi_isf_fusion_max_change_per_tick">AIMI ISF fusion max change per tick</string>
+    <string name="pref_title_oaps_aimi_smb_tail_threshold">AIMI SMB tail threshold</string>
+    <string name="pref_title_oaps_aimi_smb_tail_damping">AIMI SMB tail damping</string>
+    <string name="pref_title_oaps_aimi_smb_exercise_damping">AIMI SMB exercise damping</string>
+    <string name="pref_title_oaps_aimi_smb_late_fat_damping">AIMI SMB late fat damping</string>
+    <string name="pref_title_oaps_aimi_pkpd_pragmatic_relief_min_factor">AIMI PKPD pragmatic relief min factor</string>
+    <string name="pref_title_oaps_aimi_red_carpet_restore_threshold">AIMI red carpet restore threshold</string>
+    <string name="pref_title_oaps_aimi_priority_max_iob_factor">AIMI priority max IOB factor</string>
+    <string name="pref_title_oaps_aimi_priority_max_iob_extra_u">AIMI priority max IOB extra u</string>
+    <string name="pref_title_aimi_smb_training_min_quality">SMB training: row quality limit</string>
+    <string name="pref_summary_aimi_smb_training_min_quality">Rows with a quality value below this limit are not used to train the SMB model. A lower limit gives more rows, but rougher data. A higher limit gives cleaner data, but fewer rows. Standard: 0.40. Changing it starts a new training at the next loop run.</string>
+    <string name="pref_title_aimi_smb_training_relaxed_filter">SMB training: relaxed row filter</string>
+    <string name="pref_summary_aimi_smb_training_relaxed_filter">On: rows that only have the harmless dual delivery flag (SMB and temp basal in the same loop run) are kept, and check rows are taken from every period. Off: the old filter, any flag removes the row, so the model may get almost no SMB rows.</string>
+    <string name="pref_title_oaps_aimi_meal_factor">Meal mode: SMB size (percent)</string>
+    <string name="pref_title_oaps_aimi_bf_factor">Breakfast mode: SMB size (percent)</string>
+    <string name="pref_title_oaps_aimi_bf_prebolus">AIMI BF prebolus</string>
+    <string name="pref_title_oaps_aimi_bf_prebolus2">AIMI BF prebolus2</string>
+    <string name="pref_title_oaps_aimi_lunch_factor">Lunch mode: SMB size (percent)</string>
+    <string name="pref_title_oaps_aimi_dinner_factor">Dinner mode: SMB size (percent)</string>
+    <string name="pref_title_oaps_aimi_hc_factor">High carb mode: SMB size (percent)</string>
+    <string name="pref_title_oaps_aimi_snack_factor">Snack mode: SMB size (percent)</string>
+    <string name="pref_title_oaps_aimi_sleep_factor">Sleep mode: SMB size (percent)</string>
+    <string name="pref_summary_oaps_aimi_meal_factor_percent">Percent of the SMB that AIMI calculates while this mode is on. 100 = the full SMB, 50 (the default) = half. What AIMI learned about your reactivity is applied on top, and the max SMB limits still apply.</string>
+    <string name="pref_summary_oaps_aimi_sleep_factor_percent">Percent of the SMB that AIMI calculates while sleep mode is on. 100 = the full SMB, 60 (the default) = a little more than half, 50 = half. What AIMI learned about your reactivity is applied on top, and the max SMB limits still apply.</string>
+    <string name="pref_title_oaps_aimi_meal_prebolus">AIMI meal prebolus</string>
+    <string name="pref_title_oaps_aimi_autodrive_prebolus">AIMI autodrive prebolus</string>
+    <string name="pref_title_oaps_aimi_autodrivesmall_prebolus">AIMI autodrive small prebolus</string>
+    <string name="pref_title_oaps_aimi_combined_delta">AIMI combined delta</string>
+    <string name="pref_title_oaps_aimi_autodrive_acceleration">AIMI autodrive acceleration</string>
+    <string name="pref_title_oaps_aimi_lunch_prebolus">AIMI lunch prebolus</string>
+    <string name="pref_title_oaps_aimi_lunch_prebolus2">AIMI lunch prebolus2</string>
+    <string name="pref_title_oaps_aimi_dinner_prebolus">AIMI dinner prebolus</string>
+    <string name="pref_title_oaps_aimi_dinner_prebolus2">AIMI dinner prebolus2</string>
+    <string name="pref_title_oaps_aimi_snack_prebolus">AIMI snack prebolus</string>
+    <string name="pref_title_oaps_aimi_high_carb_prebolus">AIMI high carb prebolus</string>
+    <string name="pref_title_oaps_aimi_high_carb_prebolus2">AIMI high carb prebolus2</string>
+    <string name="pref_title_oaps_aimi_wcycledateday">AIMI cycle date day</string>
+    <string name="pref_title_oaps_aimi_w_cycle_clamp_min">AIMI cycle clamp min</string>
+    <string name="pref_title_oaps_aimi_w_cycle_clamp_max">AIMI cycle clamp max</string>
+    <string name="pref_title_oaps_aimi_night_growth_max_iob_extra">AIMI night growth max IOB extra</string>
+    <string name="pref_title_oaps_aimi_activity_basal_cap_factor">AIMI activity basal cap factor</string>
+    <string name="pref_title_oaps_aimi_high_bg">AIMI high BG</string>
+    <string name="pref_title_oaps_aimi_max_multiplier">AIMI max multiplier</string>
+    <string name="pref_title_aimi_uam_confidence">AIMI UAM confidence</string>
+    <string name="pref_title_oaps_aimi_last_estimated_carbs">AIMI last estimated carbs</string>
+    <string name="pref_title_oaps_aimi_last_estimated_carb_time">AIMI last estimated carb time</string>
+    <string name="pref_title_aimi_endometriosis_basal_mult">AIMI endometriosis basal mult</string>
+    <string name="pref_title_aimi_endometriosis_smb_dampen">AIMI endometriosis SMB dampen</string>
+    <string name="pref_title_aimi_cosine_gate_alpha">AIMI cosine gate alpha</string>
+    <string name="pref_title_aimi_cosine_gate_min_data_quality">AIMI cosine gate min data quality</string>
+    <string name="pref_title_aimi_cosine_gate_min_sensitivity">AIMI cosine gate min sensitivity</string>
+    <string name="pref_title_aimi_cosine_gate_max_sensitivity">AIMI cosine gate max sensitivity</string>
+    <string name="pref_title_oaps_aimi_t3c_activation_threshold">AIMI T3C activation threshold</string>
+    <string name="pref_title_oaps_aimi_t3c_anticipation_strength">AIMI T3C anticipation strength</string>
+    <string name="pref_title_oaps_aimi_t3c_aggressiveness">AIMI T3C aggressiveness</string>
+    <string name="pref_title_oaps_aimi_adaptive_basal_max_scaling">AIMI adaptive basal max scaling</string>
+    <string name="pref_title_oaps_aimi_high_b_ginterval">AIMI high BG interval</string>
+    <string name="pref_title_oaps_aimi_mealinterval">AIMI meal interval</string>
+    <string name="pref_title_oaps_aimi_lunchinterval">AIMI lunch interval</string>
+    <string name="pref_title_oaps_aimi_dinnerinterval">AIMI dinner interval</string>
+    <string name="pref_title_oaps_aimi_h_cinterval">AIMI HC interval</string>
+    <string name="pref_title_oaps_aimi_snackinterval">AIMI snack interval</string>
+    <string name="pref_title_oaps_aimi_b_finterval">AIMI BF interval</string>
+    <string name="pref_title_oaps_aimi_sleepinterval">AIMI sleep interval</string>
+    <string name="pref_title_oaps_aimi_w_cycle_avg_length">AIMI cycle average length</string>
+    <string name="pref_title_oaps_aimi_night_growth_age_years">AIMI night growth age years</string>
+    <string name="pref_title_oaps_aimi_intratick_stall_seconds">AIMI intratick stall seconds</string>
+    <string name="pref_title_aimi_auditor_max_per_hour">AIMI auditor max per hour</string>
+    <string name="pref_title_aimi_auditor_timeout_seconds">AIMI auditor timeout seconds</string>
+    <string name="pref_title_aimi_auditor_min_confidence">AIMI auditor min confidence</string>
+    <string name="pref_title_aimi_endometriosis_flare_duration">Pain flare duration</string>
+    <string name="pref_summary_aimi_endometriosis_flare_duration">Hours after which a pain flare you switched on stops changing insulin. Switch the flare off and on again for a new flare.</string>
+    <string name="pref_title_aimi_cosine_gate_max_peak_shift">AIMI cosine gate max peak shift</string>
+    <string name="pref_title_oaps_aimi_w_cycle_tracking_mode">AIMI cycle tracking mode</string>
+    <string name="pref_title_oaps_aimi_w_cycle_contraceptive">AIMI cycle contraceptive</string>
+    <string name="pref_title_oaps_aimi_w_cycle_thyroid">AIMI cycle thyroid</string>
+    <string name="pref_title_oaps_aimi_w_cycle_verneuil">AIMI cycle Verneuil</string>
+    <string name="pref_title_oaps_aimi_night_growth_start">AIMI night growth start</string>
+    <string name="pref_title_oaps_aimi_night_growth_end">AIMI night growth end</string>
+    <string name="pref_title_aimi_advisor_open_ai_key">AIMI advisor OpenAI key</string>
+    <string name="pref_title_aimi_advisor_gemini_key">AIMI advisor gemini key</string>
+    <string name="pref_title_aimi_advisor_deep_seek_key">AIMI advisor DeepSeek key</string>
+    <string name="pref_title_aimi_advisor_claude_key">AIMI advisor claude key</string>
+    <string name="pref_title_aimi_advisor_provider">AIMI advisor provider</string>
+    <string name="pref_title_aimi_tuning_context_selection">AIMI tuning context selection</string>
+    <string name="pref_title_aimi_auditor_mode">AIMI auditor mode</string>
+    <string name="pref_title_context_mode">Context mode</string>
+    <string name="pref_title_oaps_aimi_context_storage">AIMI context storage</string>
+    <string name="pref_title_oaps_aimi_thyroid_mode">AIMI thyroid mode</string>
+    <string name="pref_title_oaps_aimi_thyroid_manual_status">AIMI thyroid manual status</string>
+    <string name="pref_title_oaps_aimi_thyroid_treatment_phase">AIMI thyroid treatment phase</string>
+    <string name="pref_title_oaps_aimi_thyroid_guard_level">AIMI thyroid guard level</string>
+    <string name="pref_title_autodrive_max_basal">Fixed basal 30 min if meal detected (U/h)</string>
+    <string name="pref_title_meal_modes_max_basal">Fixed basal 30 min at meal start (U/h)</string>
+
+</resources>

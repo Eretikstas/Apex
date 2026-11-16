@@ -1,0 +1,117 @@
+package app.aaps.core.ui.compose.navigation
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
+
+/**
+ * Where a request to open a screen waits until the app navigator takes it: a tapped notification, or
+ * an in-app link from shared code that cannot reach the navigator itself.
+ *
+ * Two kinds of writers use it:
+ * - a tapped notification (Android intent, iOS notification delegate), which can come before the UI
+ *   exists;
+ * - an in-app tap in shared code: the AIMI Essentials page parks
+ *   `NavigationRequest.Element(ElementType.PROFILE_MANAGEMENT)` here when the person taps the profile
+ *   targets (`requestProfileScreen` in the AIMI plugin). The UI is open then, so the request is taken
+ *   at once.
+ *
+ * Either way the navigator handles the request, so its protection check runs first, as for the
+ * drawer entry.
+ *
+ * A notification is tapped while the app may not be running. The nav graph does not exist yet at
+ * that moment, so the tap cannot navigate - it can only say where it wanted to go. This object
+ * holds that one request until the host has a navigator, and the host then takes it.
+ *
+ * It is deliberately a plain object and not a Metro binding. The writer is a platform entry point
+ * that runs before any graph is built: on Android the activity reading its own intent, on iOS the
+ * notification delegate. Making it an injected dependency would mean building a graph inside those
+ * entry points just to park a string.
+ *
+ * The shared app root (`AapsAppRoot`, used by the Android activity and by the iOS `AapsAppHost`)
+ * collects it while the app is open. So do not clear it at start up, and do not accept only some
+ * request types, or the in-app link breaks.
+ *
+ * Only one request is kept. A second tap before the host has taken the first replaces it, which is
+ * what a user means by tapping twice: they want the last thing they tapped.
+ */
+object PendingNavigation {
+
+    private val _pending = MutableStateFlow<NavigationRequest?>(null)
+
+    /**
+     * The parked request, or `null` when there is none.
+     *
+     * A flow rather than a plain field because the second tap matters. A notification tapped while
+     * the app is already open does not rebuild the UI, so a host that only looked once at start up
+     * would never see it. Hosts collect this instead.
+     */
+    val pending: StateFlow<NavigationRequest?> = _pending.asStateFlow()
+
+    /** Parks [request]. Any request not yet taken is replaced. */
+    fun request(request: NavigationRequest) {
+        _pending.value = request
+    }
+
+    /**
+     * Takes the parked request and clears it, or answers `null` when there is none.
+     *
+     * Clearing on read is the point: a request must be acted on once. Without it, every later
+     * recomposition would navigate again and the user could not leave the screen.
+     */
+    fun consume(): NavigationRequest? = _pending.getAndUpdate { null }
+
+    /**
+     * Reads a route string as a request: `plugin_preferences/<pluginKey>`, the same with
+     * `?composeScreenKey=<screenKey>` after it, or [AUDITOR_REPORT_ROUTE].
+     *
+     * Android carries the wanted screen through an intent extra, which is a string, so the string
+     * has to become a request again on this side. `AppRoute.PluginPreferences.createRoute` builds
+     * the same shape, and this is its inverse. Anything else answers `null`, because a route this
+     * code does not know is not something to guess at.
+     */
+    fun parseRoute(route: String?): NavigationRequest? {
+        val value = route ?: return null
+        if (value == AUDITOR_REPORT_ROUTE) return NavigationRequest.AuditorReport
+        if (!value.startsWith(PLUGIN_PREFERENCES_PREFIX)) return null
+        val rest = value.removePrefix(PLUGIN_PREFERENCES_PREFIX)
+        val key = rest.substringBefore(COMPOSE_SCREEN_KEY_PARAM)
+        if (key.isEmpty()) return null
+        val screenKey = rest.substringAfter(COMPOSE_SCREEN_KEY_PARAM, missingDelimiterValue = "")
+        return NavigationRequest.PluginPreferences(key, composeScreenKey = screenKey.ifEmpty { null })
+    }
+
+    /**
+     * Builds the route a notification carries so a tap opens [pluginKey]'s settings, or one of its
+     * sub screens when [composeScreenKey] is given.
+     *
+     * The inverse of [parseRoute], and kept beside it so the two cannot drift. Every poster calls
+     * this instead of writing the string: Android puts it in an intent extra, iOS puts it in
+     * `userInfo`, and one of them changing the spelling would break the other silently.
+     *
+     * [pluginKey] is the plugin's class simple name, because that is what the
+     * `plugin_preferences/{pluginKey}` destination matches on. [composeScreenKey] is the key of a
+     * sub screen with its own Compose content in that plugin's settings tree.
+     */
+    fun pluginPreferencesRoute(pluginKey: String, composeScreenKey: String? = null): String =
+        if (composeScreenKey == null) PLUGIN_PREFERENCES_PREFIX + pluginKey
+        else PLUGIN_PREFERENCES_PREFIX + pluginKey + COMPOSE_SCREEN_KEY_PARAM + composeScreenKey
+
+    /**
+     * The route a notification carries so a tap opens the AIMI auditor report.
+     *
+     * The report is a dialog and has no screen of its own, so this is not a nav graph route. It only
+     * travels from the notification to [parseRoute], which turns it into [NavigationRequest.AuditorReport];
+     * the navigator then opens the report.
+     */
+    const val AUDITOR_REPORT_ROUTE: String = "aimi_auditor_report"
+
+    /** The intent extra Android carries the route in. */
+    const val EXTRA_NAVIGATE_ROUTE: String = "extra_navigate_route"
+
+    private const val PLUGIN_PREFERENCES_PREFIX = "plugin_preferences/"
+
+    /** Same spelling as `AppRoute.PluginPreferences`, so the route also works as a nav graph route. */
+    private const val COMPOSE_SCREEN_KEY_PARAM = "?composeScreenKey="
+}

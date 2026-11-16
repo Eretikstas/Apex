@@ -1,0 +1,342 @@
+package app.aaps.ios.shell.di
+
+import app.aaps.core.interfaces.alerts.EatReminder
+import app.aaps.core.interfaces.aps.AimiAuditorReport
+import app.aaps.core.interfaces.alerts.LocalAlertUtils
+import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
+import app.aaps.core.interfaces.clientcontrol.ClientControlActionDispatcher
+import app.aaps.core.interfaces.configuration.Config
+import app.aaps.core.interfaces.configuration.ConfigBuilder
+import app.aaps.core.interfaces.constraints.ConstraintsChecker
+import app.aaps.core.interfaces.constraints.Objectives
+import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.dst.DstHelper
+import app.aaps.core.interfaces.iob.IobCobCalculator
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.maintenance.PrefsFileInfo
+import app.aaps.core.interfaces.notifications.NotificationManager
+import app.aaps.core.interfaces.overview.graph.OverviewDataCache
+import app.aaps.core.interfaces.plugin.ActivePlugin
+import app.aaps.core.interfaces.plugin.PluginBase
+import app.aaps.core.interfaces.plugin.PluginPermissions
+import app.aaps.core.interfaces.profile.ProfileUtil
+import app.aaps.core.interfaces.protection.ExportPasswordDataStore
+import app.aaps.core.interfaces.protection.PasswordCheck
+import app.aaps.core.interfaces.protection.PasswordHasher
+import app.aaps.core.interfaces.protection.ProtectionCheck
+import app.aaps.core.interfaces.pump.BolusProgressData
+import app.aaps.core.interfaces.queue.CommandQueue
+import app.aaps.core.interfaces.resources.TextResolver
+import app.aaps.core.interfaces.rx.bus.RxBus
+import app.aaps.core.interfaces.sharedPreferences.KeyValueStore
+import app.aaps.core.interfaces.source.DexcomBoyda
+import app.aaps.core.interfaces.sync.NsClient
+import app.aaps.core.interfaces.profile.ProfileFunction
+import app.aaps.core.interfaces.stats.TddCalculator
+import app.aaps.core.interfaces.stats.TirCalculator
+import app.aaps.core.interfaces.ui.SnackbarHostPresence
+import app.aaps.core.interfaces.ui.UiInteraction
+import app.aaps.core.interfaces.ui.UiRestart
+import app.aaps.core.interfaces.ui.UrlOpener
+import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.interfaces.utils.DecimalFormatter
+import app.aaps.core.interfaces.utils.fabric.CrashReporter
+import app.aaps.core.interfaces.utils.fabric.FabricPrivacy
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.core.keys.interfaces.VisibilityContext
+import app.aaps.core.objects.di.CoreObjectsGraph
+import app.aaps.core.ui.compose.pump.PumpCommunicationStatus
+import app.aaps.database.AppRepository
+import app.aaps.database.di.IosAppDatabaseBuilder
+import app.aaps.implementation.maintenance.PeriodicMaintenance
+import app.aaps.implementation.maintenance.cloud.AuthBrowser
+import app.aaps.implementation.notifications.SnackbarNotificationFallback
+import app.aaps.implementation.plugin.IosPluginPermissions
+import app.aaps.implementation.plugin.PluginStore
+import app.aaps.implementation.receivers.IosReceiverStatusStore
+import app.aaps.plugins.aps.openAPSAIMI.OpenAPSAIMIPlugin
+import app.aaps.plugins.aps.openAPSAIMI.learning.BasalMlTrainingCoordinator
+import app.aaps.plugins.automation.AutomationRuntime
+import app.aaps.plugins.configuration.setupwizard.SWDefinition
+import app.aaps.plugins.sync.nsclientV3.IosNsRoleChange
+import app.aaps.plugins.sync.nsclientV3.ws.IosNsAppLifecycle
+import app.aaps.plugins.sync.nsclientV3.ws.NsSocketFactory
+import app.aaps.shared.clientbindings.ClientGraphBindings
+import app.aaps.shared.clientbindings.ClientHistoryWindowGraph
+import app.aaps.ui.compose.overview.chips.ChipsViewModel
+import app.aaps.ui.compose.overview.graphs.GraphViewModel
+import app.aaps.ui.search.BuiltInSearchables
+import app.aaps.core.interfaces.di.APS
+import app.aaps.implementation.maintenance.KeepAliveChecks
+import app.aaps.implementation.profile.ProfileSwitchScheduler
+import app.aaps.plugins.aps.loop.runningMode.IosRunningModeExpiryScheduler
+import app.aaps.plugins.aps.loop.runningMode.RunningModeReconciler
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.DependencyGraph
+import dev.zacsweers.metro.Includes
+import dev.zacsweers.metro.Provides
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metrox.viewmodel.MetroViewModelMultibindings
+import kotlinx.coroutines.CoroutineScope
+
+/**
+ * The real app's object graph on iOS - the counterpart of `AppRootGraph` in `:app`.
+ *
+ * [IosProbeGraph] answers "can Metro build this class at all". This one answers the question after
+ * it: can the app itself be assembled and shown. They share every leaf through
+ * [IosPlatformBindings] and differ only in what they expose and which database file they open.
+ *
+ * ## What is real and what is not
+ *
+ * Almost everything below is production AAPS code. The exceptions live in
+ * `app.aaps.ios.shell.missing` and are there so this graph can be built at all: each one satisfies
+ * a binding iOS has no implementation for yet, logs loudly when touched, and refuses to invent an
+ * answer that a screen would act on. They are listed in `_docs/ios_blockers.md` and are meant to be
+ * deleted one at a time.
+ */
+/*
+ * `OpenAPSAIMIPlugin` is IN this graph since 2026-10-18. It was held out while iOS could not
+ * honour its ports, because a plugin that is wired up and half fed would dose an iPhone
+ * differently from an Android phone.
+ *
+ * Every platform port of the plugin has a real iOS side, contributed to `AppScope` by its own
+ * `Ios*` class: `AimiStepsLifecycle` (HealthKit), `AimiPhysioLifecycle`, `AimiTrainingScheduler`,
+ * `AimiStorageStatusSource`, `AimiAuditorNotifier`, `AimiPlatformPreferenceItems`,
+ * `AimiPlatformActions` (since step S4: the profile screen link of the Essentials page, through
+ * `PendingNavigation`, which `AapsAppHost` collects) and `AimiTickCaptureHook`. The same eight are the
+ * `PLATFORM_PORT_FIELDS` of the Android `AimiPlatformPortsWiredTest`; add a new port to both.
+ * `AimiStorage` and `HormonitorStudyExporterProvider` are in `IosAimiPlatformBindings`; the HealthKit
+ * physio sources in `IosAimiPhysioBindings`; `AimiKeyValueCache` is `IosAimiKeyValueCache`.
+ *
+ * The phone is a master (`IosConfig`), so these plugins really reach a pump and a sensor: the iOS
+ * Medtrum driver (`IosMedtrumPlugin`), the Omnipod Dash driver (`IosOmnipodDashPlugin`, from
+ * `:pump:omnipod:dashctl`) and the Dexcom ONE+ / G7 driver (`DexcomOnePlusPlugin`) are contributed to
+ * the plugin map below, beside `VirtualPumpPlugin` and `NSClientSourcePlugin`.
+ */
+@DependencyGraph(AppScope::class)
+interface IosAppGraph : MetroViewModelMultibindings {
+
+    // Everything AapsAppRoot needs.
+    val config: Config
+    val preferences: Preferences
+
+    /**
+     * Exposed so startup can read the reporting opt-out through [FabricPrivacy.fabricEnabled] and
+     * push it into Crashlytics, rather than through [preferences], which answers the shared default
+     * for this Simple-Mode-defaulted key. The AIMI engine graph uses it too.
+     */
+    val fabricPrivacy: FabricPrivacy
+
+    /** Collected by the composition root, which rebuilds when it moves. */
+    val uiRestart: UiRestart
+    val dateUtil: DateUtil
+    val decimalFormatter: DecimalFormatter
+
+    /**
+     * The shell's own checker, `ConstraintsCheckerImpl` from `:plugins:constraints`.
+     *
+     * Exposed because the AIMI engine graph needs the same instance: a checker that knows no
+     * plugins would apply no limits, and "no limit" is the unsafe direction for every constraint.
+     */
+    val constraintsChecker: ConstraintsChecker
+
+    /** The encrypted settings store opened by `IosStorage`, exposed for graphs that take it as a factory parameter. */
+    val keyValueStore: KeyValueStore
+    val profileUtil: ProfileUtil
+    val profileFunction: ProfileFunction
+    val passwordHasher: PasswordHasher
+    val passwordCheck: PasswordCheck
+
+    /**
+     * Real protection now, not the placeholder that granted everything.
+     * `ProtectionCheckImpl` moved to commonMain, and `AapsAppRoot` places `ProtectionHost`, so the
+     * request published here is rendered rather than left waiting.
+     */
+    val protectionCheck: ProtectionCheck
+    val exportPasswordDataStore: ExportPasswordDataStore
+    val visibilityContext: VisibilityContext
+    val nsClient: NsClient
+    val rxBus: RxBus
+    val snackbarHostPresence: SnackbarHostPresence
+    val clientControlActionDispatcher: ClientControlActionDispatcher
+
+    // Shared pieces the navigation graph reads.
+    val activePlugin: ActivePlugin
+    val pluginPermissions: PluginPermissions
+    val textResolver: TextResolver
+    val configBuilder: ConfigBuilder
+    val prefsFileInfo: PrefsFileInfo
+    val persistenceLayer: PersistenceLayer
+    val logger: AAPSLogger
+
+    /**
+     * The factory for a history browsing window.
+     *
+     * Declared here rather than discovered: a `@GraphExtension` is only reachable through an
+     * accessor its parent graph states, the same way `AppRootGraph` states this one. Without it the
+     * factory looks like an ordinary missing binding, which is exactly how it first failed.
+     *
+     * Each window it creates is a separate scope with its own calculation objects - see
+     * [ClientHistoryWindowGraph] for why that matters. Shared with desktop.
+     */
+    val historyWindowFactory: ClientHistoryWindowGraph.Factory
+
+    /** The loop's own calculator and cache, exposed so a test can prove a window does not share them. */
+    val iobCobCalculator: IobCobCalculator
+
+    /**
+     * Insulin statistics calculators, resolved from the commonMain implementations
+     * (`TddCalculatorImpl`, `TirCalculatorImpl`). Exposed for the AIMI engine graph,
+     * which needs them to build its input snapshot.
+     */
+    val tddCalculator: TddCalculator
+    val tirCalculator: TirCalculator
+
+    /**
+     * The plugin registry itself, not just the [ActivePlugin] view of it.
+     *
+     * `PluginStore.plugins` is a `lateinit` that something has to fill at start up - `MainApp` does
+     * it on Android, `IosAppStartup` here. Until it is filled, the first call that asks for the
+     * active pump throws, which is what the app did before this existed.
+     */
+    val pluginStore: PluginStore
+
+    /**
+     * Plugins that register themselves with `@ContributesIntoMap`, keyed by their order.
+     *
+     * `IosAppStartup` merges [contributedApsPlugins] into this list when `config.APS`, the same rule
+     * as `MetroGraphs.allPlugins` on Android. The `@PumpDriver` and `@NotNSClient` qualifiers are
+     * Android-only annotations, so no plugin compiled for iOS can carry them; the iOS pump drivers
+     * register in this unqualified bucket instead.
+     */
+    val contributedPlugins: Map<Int, PluginBase>
+
+    /** Plugins that belong only in a build that runs the loop - `ObjectivesPlugin` among them. */
+    @APS
+    val contributedApsPlugins: Map<Int, PluginBase>
+
+    /** Started by `IosAppStartup`, as `MainApp` starts them on Android. */
+    val runningModeReconciler: RunningModeReconciler
+    val runningModeExpiryScheduler: IosRunningModeExpiryScheduler
+    val profileSwitchScheduler: ProfileSwitchScheduler
+    val keepAliveChecks: KeepAliveChecks
+
+    /** The coordinator the loop's `DetermineBasalaimiSMB2` holds; it reloads the learner the loop doses with. */
+    val basalMlTrainingCoordinator: BasalMlTrainingCoordinator
+
+    /** Run by the keep-alive loop before the checks, as `KeepAliveWorker` does on Android. */
+    val dstHelper: DstHelper
+
+    /** Moves the Nightscout upload marks once when a former client becomes the master. */
+    val nsRoleChange: IosNsRoleChange
+
+    /** Checks the Nightscout connection when the app comes back from the background. */
+    val nsAppLifecycle: IosNsAppLifecycle
+
+    /**
+     * The concrete permissions class, not only [pluginPermissions]: the shell asks it to read the
+     * states again on resume and to ask for a permission, which the shared interface has no words for.
+     */
+    val iosPluginPermissions: IosPluginPermissions
+    val automationRuntime: AutomationRuntime
+    // The periodic housekeeping shared with Android, and the scope the shell drives it on.
+    val periodicMaintenance: PeriodicMaintenance
+
+    /**
+     * The local alarms, for one call Android makes and this shell has to make too:
+     * `preSnoozeAlarms` holds the stale-data alarm back for five minutes so the first Nightscout
+     * round can land before the database is judged out of date.
+     */
+    val localAlertUtils: LocalAlertUtils
+
+    // Turns a snackbar into a notification when no screen is up to show it. Shared with Android.
+    val snackbarNotificationFallback: SnackbarNotificationFallback
+    val eatReminder: EatReminder
+    val appScope: CoroutineScope
+    val swDefinition: SWDefinition
+    val builtInSearchables: BuiltInSearchables
+
+    /**
+     * These two view models are assisted, not contributed: they are built with the overview data
+     * cache rather than from the map, so `metroViewModel()` cannot find them. Android reaches them
+     * the same way, through their own factories.
+     */
+    val graphViewModelFactory: GraphViewModel.Factory
+    val chipsViewModelFactory: ChipsViewModel.Factory
+    val overviewDataCache: OverviewDataCache
+
+    // What the overview needs beyond the above. `Objectives` and `PumpCommunicationStatus` became
+    // available when ObjectivesPlugin and the pump status moved to commonMain.
+    val objectives: Objectives
+    val bgQualityCheck: BgQualityCheck
+    val uiInteraction: UiInteraction
+    val bolusProgressData: BolusProgressData
+    val commandQueue: CommandQueue
+    val pumpCommunicationStatus: PumpCommunicationStatus
+    val dexcomBoyda: DexcomBoyda
+    /** Opens the AIMI auditor report dialog. The Glass Tools tile reaches it through the navigator. */
+    val aimiAuditorReport: AimiAuditorReport
+    /** Concrete, not the interface: the app has to start the battery watch, which is iOS-only. */
+    val receiverStatusStore: IosReceiverStatusStore
+
+    val urlOpener: UrlOpener
+
+    /** Where a Google sign in is shown. Not [urlOpener] - see `AuthBrowser` for why they differ. */
+    val authBrowser: AuthBrowser
+    val notificationManager: NotificationManager
+
+    /**
+     * The view model maps come from [MetroViewModelMultibindings], the same interface `AppRootGraph`
+     * implements. `ClientViewModelFactory` turns them into the factory `metroViewModel()` asks for:
+     * Android reaches that through the `Application` object, and iOS has no ambient equivalent, so
+     * the host provides it as `LocalMetroViewModelFactory` around the shared UI.
+     */
+
+    /**
+     * The app's own database, under the name the app uses rather than the probe's.
+     *
+     * The logger is passed in so that a database that could not be moved out of Documents says so in
+     * `aaps.log`, where it will actually be read. `:database:impl` cannot see `AAPSLogger` itself.
+     */
+    @Provides
+    @SingleIn(AppScope::class)
+    fun repository(aapsLogger: AAPSLogger): AppRepository =
+        IosAppDatabaseBuilder(
+            log = { failed, message ->
+                if (failed) aapsLogger.error(LTag.DATABASE, message) else aapsLogger.debug(LTag.DATABASE, message)
+            }
+        ).provideAppRepository("aaps-ios.db")
+
+    @DependencyGraph.Factory
+    fun interface Factory {
+
+        /**
+         * [CoreObjectsGraph] is a `@BindingContainer`, so its `@Provides` are only visible to a
+         * graph that includes it - the same way `AppRootGraph` takes it on Android.
+         */
+        fun create(
+            @Includes coreObjects: CoreObjectsGraph,
+            @Includes clientBindings: ClientGraphBindings,
+            /**
+             * The Nightscout socket, handed in by the app because it is written in Swift.
+             *
+             * Every other platform contributes its own: `SocketIoNsSocketFactory` in `jvmSharedMain`
+             * carries `@ContributesBinding` and Android and desktop pick it up for free. iOS cannot,
+             * because the implementation is `SwiftNsSocketFactory` on `socket.io-client-swift` - the
+             * same project's client as the Java one, which is what keeps both platforms speaking to
+             * Nightscout identically - and a Swift class cannot carry a Kotlin annotation.
+             *
+             * So it arrives here instead. Until it did, iOS had a placeholder that returned null and
+             * the client simply never connected, while desktop worked.
+             */
+            @Provides nsSocketFactory: NsSocketFactory,
+            /**
+             * Firebase Crashlytics, handed in for the same reason as the socket: the implementation
+             * is a Swift class on the Firebase Apple SDK, and a Swift class cannot carry a Kotlin
+             * annotation. `FabricPrivacyImpl` takes it and reports through it.
+             */
+            @Provides crashReporter: CrashReporter
+        ): IosAppGraph
+    }
+}

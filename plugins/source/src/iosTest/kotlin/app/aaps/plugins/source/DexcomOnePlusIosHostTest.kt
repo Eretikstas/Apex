@@ -1,0 +1,162 @@
+package app.aaps.plugins.source
+
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.ui.compose.navigation.NavigationRequest
+import app.aaps.plugins.dexcomoneplus.OnePlusCgmDriverStub
+import app.aaps.plugins.dexcomoneplus.OnePlusCgmDrivers
+import app.aaps.plugins.source.keys.DexcomOnePlusIntentKey
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+/**
+ * The iPhone host may be switched on now, and must still say what is different here.
+ *
+ * Nothing locks the plugin any more, so the contract moved: the switch is free, the limits are in
+ * the note that replaces the description, and what the host hands out by itself is still the stub
+ * until the engineering switch is turned on.
+ *
+ * The real driver is shared code and the host can reach it, so the tests below say which of the
+ * two comes back and when. Nothing here builds `OnePlusIosPlatform`: that opens a
+ * `CBCentralManager`, which a unit test on the simulator has no business doing. The config
+ * builder and the other providers are never reached either - only the screens, the notifications
+ * and the missed-reading alarm ask for them, and those are tested on their own parts:
+ * `DexcomOnePlusIosNoticesTest` and `DexcomOnePlusMissedReadingAlarmTest`.
+ */
+class DexcomOnePlusIosHostTest {
+
+    private var preSoak = true
+
+    private val host = DexcomOnePlusIosHost(
+        aapsLogger = SilentLogger,
+        configBuilder = { error("the config builder is not used here") },
+        notificationManager = { error("the notification manager is not used here") },
+        rh = { error("the text resolver is not used here") },
+        dateUtil = { error("the date util is not used here") },
+        preferences = { error("the preferences are not used here") },
+    ).apply {
+        iosPreSoakEnabled = { preSoak }
+    }
+
+    @AfterTest
+    fun releaseDrivers() {
+        OnePlusCgmDrivers.shutdownAll()
+        preSoak = true
+    }
+
+    @Test
+    fun `nothing locks the plugin on iPhone any more`() {
+        assertNull(host.notUsableReason)
+    }
+
+    @Test
+    fun `on iPhone this is the default BG source`() {
+        // Without a default BG source the app stopped at start-up with "Default plugin not found":
+        // the Dexcom (BYODA) default exists only on Android.
+        assertTrue(host.isDefaultBgSource)
+    }
+
+    @Test
+    fun `the host still says what is different on iPhone`() {
+        assertNotNull(host.platformNote)
+    }
+
+    @Test
+    fun `the production slot is the real driver`() {
+        assertSame(OnePlusCgmDrivers.realProduction(), host.productionDriver())
+    }
+
+    @Test
+    fun thePreSoakSlotIsTheRealDriverWhileTheSwitchIsOn() {
+        assertTrue(host.supportsStaging)
+        assertTrue(host.offersIosPreSoakSwitch)
+        assertSame(OnePlusCgmDrivers.staging(), host.stagingDriver())
+    }
+
+    @Test
+    fun thePreSoakSlotIsTheStubWhenTheSwitchIsOff() {
+        preSoak = false
+        assertTrue(!host.supportsStaging)
+        assertSame(OnePlusCgmDriverStub.instance, host.stagingDriver())
+        assertNull(host.promoteStagingInstance())
+    }
+
+    @Test
+    fun `the stub never claims a session`() {
+        assertTrue(!host.productionDriver().isSessionUp())
+    }
+
+    @Test
+    fun promoteHandsThePreSoakDriverTheProductionRole() {
+        val staging = host.stagingDriver()
+        host.promoteStagingInstance()
+        assertSame(staging, host.productionDriver())
+        assertNull(host.existingStagingDriver())
+    }
+
+    @Test
+    fun theStatusScreenShowsThePreSoakCardWhileTheSwitchIsOn() {
+        assertTrue(host.supportsStaging)
+        assertNull(host.logSharer)
+    }
+
+    @Test
+    fun `the start screen opens inside the plugin settings`() {
+        val asked = mutableListOf<NavigationRequest>()
+        host.openScreen(DexcomOnePlusHost.Screen.START) { asked += it }
+        host.openScreen(DexcomOnePlusHost.Screen.WARMUP) { asked += it }
+        assertEquals(
+            listOf<NavigationRequest>(
+                NavigationRequest.PluginPreferences("DexcomOnePlusPlugin", DexcomOnePlusIntentKey.Start.key),
+                NavigationRequest.PluginPreferences("DexcomOnePlusPlugin", DexcomOnePlusIntentKey.Warmup.key),
+            ),
+            asked,
+        )
+    }
+
+    // The screen entry itself is not asserted here. `screenItems` wires the shared start screen to
+    // the plugin, and a unit test on the simulator cannot build a plugin. What that screen does is
+    // covered where it can be run: `DexcomOnePlusStartRulesTest` and `DexcomOnePlusStartStringsTest`
+    // run its rules and its strings on this simulator, and `DexcomOnePlusStartScreenTest` renders it
+    // under Robolectric with a one slot host, which is the iPhone shape.
+
+    @Test
+    fun `each slot gets its own store`() {
+        val production = host.slotStore(null)
+        val staging = host.slotStore(host.stagingNamespace)
+        assertTrue(production !== staging)
+    }
+
+    /**
+     * Swallows the lines the host writes; this test is about what it answers, not what it logs.
+     *
+     * Written out by hand because an iOS test has no Mockito.
+     */
+    private object SilentLogger : AAPSLogger {
+
+        override fun debug(message: String) = Unit
+        override fun debug(enable: Boolean, tag: LTag, message: String) = Unit
+        override fun debug(tag: LTag, message: String) = Unit
+        override fun debug(tag: LTag, accessor: () -> String) = Unit
+        override fun debug(tag: LTag, format: String, vararg arguments: Any?) = Unit
+        override fun warn(tag: LTag, message: String) = Unit
+        override fun warn(tag: LTag, format: String, vararg arguments: Any?) = Unit
+        override fun info(tag: LTag, message: String) = Unit
+        override fun info(tag: LTag, format: String, vararg arguments: Any?) = Unit
+        override fun error(tag: LTag, message: String) = Unit
+        override fun error(tag: LTag, message: String, throwable: Throwable) = Unit
+        override fun error(tag: LTag, format: String, vararg arguments: Any?) = Unit
+        override fun error(message: String) = Unit
+        override fun error(message: String, throwable: Throwable) = Unit
+        override fun error(format: String, vararg arguments: Any?) = Unit
+        override fun debug(className: String, methodName: String, lineNumber: Int, tag: LTag, message: String) = Unit
+        override fun info(className: String, methodName: String, lineNumber: Int, tag: LTag, message: String) = Unit
+        override fun warn(className: String, methodName: String, lineNumber: Int, tag: LTag, message: String) = Unit
+        override fun error(className: String, methodName: String, lineNumber: Int, tag: LTag, message: String) = Unit
+    }
+}

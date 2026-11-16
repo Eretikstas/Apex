@@ -1,0 +1,51 @@
+package app.aaps.pump.eopatch.ble.task
+
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.pump.eopatch.alarm.AlarmCode
+import app.aaps.pump.eopatch.alarm.IAlarmRegistry
+import app.aaps.pump.eopatch.ble.PatchStateManager
+import app.aaps.pump.eopatch.core.api.BasalResume
+import app.aaps.pump.eopatch.core.response.BaseResponse
+import app.aaps.pump.eopatch.core.response.PatchBooleanResponse
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import io.reactivex.rxjava3.core.Single
+import io.reactivex.rxjava3.functions.Consumer
+import io.reactivex.rxjava3.functions.Function
+
+@SingleIn(AppScope::class)
+@Inject
+class ResumeBasalTask(
+    val alarmRegistry: IAlarmRegistry,
+    val startNormalBasalTask: StartNormalBasalTask,
+    val patchStateManager: PatchStateManager
+) : TaskBase(TaskFunc.RESUME_BASAL) {
+
+    @Inject lateinit var basalResume: BasalResume
+
+    @Synchronized fun resume(): Single<out BaseResponse> {
+        if (patchConfig.needSetBasalSchedule) {
+            return startNormalBasalTask.start(normalBasalManager.normalBasal)
+        }
+
+        return isReady().concatMapSingle<PatchBooleanResponse>(Function { basalResume.resume() })
+            .doOnNext(Consumer { response: PatchBooleanResponse -> this.checkResponse(response) })
+            .firstOrError()
+            .doOnSuccess(Consumer { v: PatchBooleanResponse -> this.onResumeResponse(v) })
+            .doOnError(Consumer { e: Throwable -> aapsLogger.error(LTag.PUMPCOMM, e.message ?: "ResumeBasalTask error") })
+    }
+
+    private fun onResumeResponse(v: PatchBooleanResponse) {
+        if (v.isSuccess) {
+            patchStateManager.onBasalResumed(v.timestamp + 1000)
+            alarmRegistry.remove(AlarmCode.B001).subscribe()
+        }
+        enqueue(TaskFunc.UPDATE_CONNECTION)
+    }
+
+    @Throws(Exception::class) override fun preCondition() {
+        checkPatchActivated()
+        checkPatchConnected()
+    }
+}

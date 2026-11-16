@@ -1,0 +1,442 @@
+package app.aaps.plugins.aps.openAPSAIMI.advisor.auditor
+
+import app.aaps.core.interfaces.concurrent.aapsIoDispatcher
+import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.keys.StringKey
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.plugins.aps.openAPSAIMI.aimiWaitMs
+import app.aaps.plugins.aps.openAPSAIMI.llm.claude.ClaudeModelResolver
+import app.aaps.plugins.aps.openAPSAIMI.llm.LlmHttpRetry
+import app.aaps.plugins.aps.openAPSAIMI.llm.gemini.GeminiModelResolver
+import app.aaps.plugins.aps.openAPSAIMI.model.VerdictType
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiHttp
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiHttpFailure
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiHttpRequest
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiHttpTimeoutException
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.AppScope
+
+/**
+ * ============================================================================
+ * AIMI AI Decision Auditor - AI Service
+ * ============================================================================
+ * 
+ * Handles communication with AI providers (OpenAI, Gemini, DeepSeek, Claude)
+ * to get audit verdicts. Reuses existing infrastructure from AiCoachingService.
+ */
+@SingleIn(AppScope::class)
+class AuditorAIService @Inject constructor(
+    private val preferences: Preferences,
+    private val aapsLogger: AAPSLogger,
+    private val geminiResolver: GeminiModelResolver,
+    private val auditorStatusNotifier: AuditorStatusNotifier,
+    private val aimiHttp: AimiHttp
+) {
+    
+    companion object {
+        private const val OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+
+        private const val DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+        private const val CLAUDE_URL = "https://api.anthropic.com/v1/messages"
+        
+        // Timeout for API calls (45s max per security audit to avoid blocking loop)
+        private const val DEFAULT_TIMEOUT_MS = 45_000L
+
+        /** Same value as `java.net.HttpURLConnection.HTTP_OK`, named here so this file needs no JVM import. */
+        private const val HTTP_OK = 200
+    }
+    
+    enum class Provider(val id: String, val displayName: String) {
+        OPENAI("openai", "ChatGPT (GPT-5.2)"),
+        GEMINI("gemini", "Gemini (3.0 Flash)"),
+        DEEPSEEK("deepseek", "DeepSeek (Chat)"),
+        CLAUDE("claude", "Claude (model chosen in settings)")
+    }
+    
+    /**
+     * Get audit verdict from AI provider
+     * 
+     * @param input Complete auditor input
+     * @param provider AI provider to use
+     * @param timeoutMs Timeout in milliseconds
+     * @param profileFactorsArmed True when the user opted in to the profile factors. It only swaps
+     *   one rule line of the prompt; with false the prompt is exactly the one of before.
+     * @return Auditor verdict or null if failed/timeout
+     */
+    suspend fun getVerdict(
+        input: AuditorInput,
+        provider: Provider,
+        timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+        useHighPerf: Boolean = false,
+        profileFactorsArmed: Boolean = false
+    ): AuditorVerdict? = withContext(aapsIoDispatcher) {
+        
+        // Get API key
+        val apiKey = getApiKey(provider)
+        if (apiKey.isBlank()) {
+            AuditorStatusTracker.updateStatus(AuditorStatusTracker.Status.OFFLINE_NO_APIKEY)
+            auditorStatusNotifier.notifyUpdate()
+            return@withContext null
+        }
+        
+        // Build prompt
+        val prompt = AuditorPromptBuilder.buildPrompt(input, profileFactorsArmed)
+        
+        // --- ROCKET SAUVAGE: RETRY LOGIC (3 attempts) ---
+        // What the last failure was, in the seam's own words. It starts at OTHER so that a loop that
+        // somehow ended without a failure still reports the plain-exception status it reported before.
+        var lastFailure = AimiHttpFailure.OTHER
+        val maxRetries = 3
+
+        for (attempt in 1..maxRetries) {
+            try {
+                // Call AI with timeout
+                val responseJson = withTimeoutOrNull(timeoutMs) {
+                    when (provider) {
+                        Provider.OPENAI -> callOpenAI(apiKey, prompt, useHighPerf)
+                        Provider.GEMINI -> callGemini(apiKey, prompt, useHighPerf)
+                        Provider.DEEPSEEK -> callDeepSeek(apiKey, prompt) // DeepSeek is always cheap/fast
+                        Provider.CLAUDE -> callClaude(apiKey, prompt, useHighPerf)
+                    }
+                }
+                
+                if (responseJson != null) {
+                    // Success!
+                    try {
+                        return@withContext parseVerdict(responseJson, provider)
+                    } catch (e: Exception) {
+                        // JSON parsing failed - unlikely to succeed on retry unless response was partial
+                        AuditorStatusTracker.updateStatus(AuditorStatusTracker.Status.ERROR_PARSE)
+                        auditorStatusNotifier.notifyUpdate()
+                        return@withContext null
+                    }
+                } else {
+                    // Time out in coroutine
+                    throw AimiHttpTimeoutException("Coroutine timeout after ${timeoutMs}ms")
+                }
+
+            } catch (e: Exception) {
+                // The seam names the platform failure, because the JVM types that used to be tested
+                // here cannot be named in shared code. The one failure AIMI raises itself is the one
+                // the seam does not have to know about.
+                lastFailure = if (e is AimiHttpTimeoutException) AimiHttpFailure.TIMEOUT else aimiHttp.classify(e)
+                // Only retry on network/timeout/server errors
+                val isRetryable = lastFailure != AimiHttpFailure.OTHER
+
+                if (attempt < maxRetries && isRetryable) {
+                    val backoff = attempt * 2000L // 2s, 4s
+                    // Log retry
+                    println("⚠️ Auditor ${provider} attempt $attempt failed: ${e.message}. Retrying in ${backoff}ms...")
+                    // Blocking inside IO dispatcher is acceptable here. A wait cut short by a thread
+                    // interrupt stops the retries and hands the error on, the same way `LlmHttpRetry` does.
+                    if (!aimiWaitMs(backoff)) throw e
+                } else {
+                    // Final failure or non-retryable
+                    break
+                }
+            }
+        }
+
+        // Identify final error
+        AuditorStatusTracker.updateStatus(AuditorStatusTracker.statusForTransportFailure(lastFailure))
+        auditorStatusNotifier.notifyUpdate()
+        return@withContext null
+    }
+    
+    /**
+     * Get API key for provider from preferences
+     */
+    private fun getApiKey(provider: Provider): String {
+        return when (provider) {
+            Provider.OPENAI -> preferences.get(StringKey.AimiAdvisorOpenAIKey)
+            Provider.GEMINI -> preferences.get(StringKey.AimiAdvisorGeminiKey)
+            Provider.DEEPSEEK -> preferences.get(StringKey.AimiAdvisorDeepSeekKey)
+            Provider.CLAUDE -> preferences.get(StringKey.AimiAdvisorClaudeKey)
+        }
+    }
+    
+    /**
+     * Call OpenAI API
+     */
+    private fun callOpenAI(apiKey: String, prompt: String, useHighPerf: Boolean): String {
+        val model = if (useHighPerf) "gpt-4o" else "gpt-4o-mini"
+
+        val requestBody = buildJsonObject {
+            put("model", model)
+            put("messages", buildJsonArray {
+                add(buildJsonObject {
+                    put("role", "user")
+                    put("content", prompt)
+                })
+            })
+            put("max_tokens", 2048)
+            put("response_format", buildJsonObject { put("type", "json_object") })
+        }
+
+        val response = aimiHttp.execute(
+            AimiHttpRequest(
+                url = OPENAI_URL,
+                method = "POST",
+                connectTimeoutMs = 15_000, // Reduced per audit
+                readTimeoutMs = DEFAULT_TIMEOUT_MS.toInt(), // Reduced per audit
+                headers = mapOf(
+                    "Content-Type" to "application/json",
+                    "Authorization" to "Bearer $apiKey"
+                ),
+                body = requestBody.toString()
+            )
+        )
+
+        if (response.code != HTTP_OK) {
+            throw Exception("HTTP ${response.code}")
+        }
+
+        return response.body.orEmpty()
+    }
+    
+    /**
+     * Call Gemini API
+     */
+    private fun callGemini(apiKey: String, prompt: String, useHighPerf: Boolean): String {
+        // 1. Select Model based on complexity (durable *-latest aliases track current GA)
+        // HighPerf -> pro tier | Standard -> flash tier
+        val modelName = if (useHighPerf) "gemini-pro-latest" else "gemini-flash-latest"
+        
+        val primaryModel = geminiResolver.resolveGenerateContentModel(apiKey, modelName)
+        
+        try {
+            return LlmHttpRetry.withTransientRetry(aapsLogger) { executeGeminiRequest(apiKey, prompt, primaryModel) }
+        } catch (e: Exception) {
+            // 2. Quota (429) OR still-overloaded (503) after retries → flash fallback (also retried).
+            if (LlmHttpRetry.isQuota(e) || LlmHttpRetry.isTransient(e)) {
+                val fallbackModel = "gemini-flash-latest"
+                aapsLogger.warn(LTag.AIMI, "[AIMI_GEMINI] Auditor: $primaryModel failed (${e.message?.take(80)}). Fallback to $fallbackModel")
+                return LlmHttpRetry.withTransientRetry(aapsLogger) { executeGeminiRequest(apiKey, prompt, fallbackModel) }
+            }
+            throw e
+        }
+    }
+
+    private fun executeGeminiRequest(apiKey: String, prompt: String, modelId: String): String {
+        val urlStr = geminiResolver.getGenerateContentUrl(modelId, apiKey)
+
+        val requestBody = buildJsonObject {
+            put("contents", buildJsonArray {
+                add(buildJsonObject {
+                    put("role", "user")
+                    put("parts", buildJsonArray {
+                        add(buildJsonObject {
+                            put("text", prompt)
+                        })
+                    })
+                })
+            })
+            put("generationConfig", buildJsonObject {
+                put("temperature", 0.3)
+                put("maxOutputTokens", 8192)
+                put("responseMimeType", "application/json")
+            })
+        }
+
+        val response = aimiHttp.execute(
+            AimiHttpRequest(
+                url = urlStr,
+                method = "POST",
+                connectTimeoutMs = 15_000,
+                readTimeoutMs = 45_000,
+                headers = mapOf("Content-Type" to "application/json"),
+                body = requestBody.toString()
+            )
+        )
+
+        if (response.code == HTTP_OK) {
+             return response.body.orEmpty()
+        } else {
+             val errorResponse = response.body ?: "Unknown error"
+             throw Exception("HTTP ${response.code}: $errorResponse")
+        }
+    }
+    
+    /**
+     * Call DeepSeek API
+     */
+    private fun callDeepSeek(apiKey: String, prompt: String): String {
+        val requestBody = buildJsonObject {
+            put("model", "deepseek-chat")
+            put("messages", buildJsonArray {
+                add(buildJsonObject {
+                    put("role", "user")
+                    put("content", prompt)
+                })
+            })
+            put("max_tokens", 2048)  // FIX: Was missing - same as other providers
+            put("temperature", 0.3)
+            put("response_format", buildJsonObject { put("type", "json_object") })
+        }
+        
+        val response = aimiHttp.execute(
+            AimiHttpRequest(
+                url = DEEPSEEK_URL,
+                method = "POST",
+                connectTimeoutMs = 15_000, // Reduced per audit
+                readTimeoutMs = DEFAULT_TIMEOUT_MS.toInt(), // Reduced per audit
+                headers = mapOf(
+                    "Content-Type" to "application/json",
+                    "Authorization" to "Bearer $apiKey"
+                ),
+                body = requestBody.toString()
+            )
+        )
+
+        if (response.code != HTTP_OK) {
+            throw Exception("HTTP ${response.code}")
+        }
+
+        return response.body.orEmpty()
+    }
+    
+    /**
+     * Call Claude API
+     */
+    private fun callClaude(apiKey: String, prompt: String, useHighPerf: Boolean): String {
+        // One user-selected model for every audit (useHighPerf no longer switches tiers for Claude).
+        val model = ClaudeModelResolver.current()
+        val requestBody = buildJsonObject {
+            put("model", model)
+            put("max_tokens", 8192) // thinking tokens count in this limit on newer Claude models
+            put("messages", buildJsonArray {
+                add(buildJsonObject {
+                    put("role", "user")
+                    put("content", prompt)
+                })
+            })
+        }
+        
+        val response = aimiHttp.execute(
+            AimiHttpRequest(
+                url = CLAUDE_URL,
+                method = "POST",
+                connectTimeoutMs = 15_000, // Reduced per audit
+                readTimeoutMs = 90_000, // larger Claude models (Sonnet 5 / Fable 5.1) need more time; the verdict is async anyway
+                headers = mapOf(
+                    "Content-Type" to "application/json",
+                    "x-api-key" to apiKey,
+                    "anthropic-version" to "2023-06-01"
+                ),
+                body = requestBody.toString()
+            )
+        )
+
+        if (response.code != HTTP_OK) {
+            throw Exception("HTTP ${response.code}")
+        }
+
+        return response.body.orEmpty()
+    }
+    
+    /**
+     * Asks the profile checker for its two factors. One attempt, never null, never throws.
+     *
+     * It is a separate request on purpose, sent after the main verdict has already been handled, so
+     * it cannot delay or change the verdict path in any way. It deliberately does NOT touch
+     * [AuditorStatusTracker]: the status the user sees stays the status of the main verdict.
+     *
+     * Every failure — no key, timeout, network, bad JSON — comes back as a neutral answer that
+     * carries its reason, so the log always has one line per request.
+     */
+    suspend fun getProfileFactorProposal(
+        prompt: String,
+        provider: Provider,
+        timeoutMs: Long = DEFAULT_TIMEOUT_MS
+    ): AuditorProfileFactorLlmOutput = withContext(aapsIoDispatcher) {
+        val apiKey = getApiKey(provider)
+        if (apiKey.isBlank()) return@withContext AuditorProfileFactorLlmOutput.failed("no_api_key")
+        try {
+            val responseJson = withTimeoutOrNull(timeoutMs) {
+                when (provider) {
+                    Provider.OPENAI   -> callOpenAI(apiKey, prompt, useHighPerf = false)
+                    Provider.GEMINI   -> callGemini(apiKey, prompt, useHighPerf = false)
+                    Provider.DEEPSEEK -> callDeepSeek(apiKey, prompt)
+                    Provider.CLAUDE   -> callClaude(apiKey, prompt, useHighPerf = false)
+                }
+            } ?: return@withContext AuditorProfileFactorLlmOutput.failed("timeout")
+            val text = extractContentText(responseJson, provider)
+            return@withContext AuditorProfileFactorParser.parse(text)
+        } catch (e: Exception) {
+            return@withContext AuditorProfileFactorLlmOutput.failed("exception:${e::class.simpleName}")
+        }
+    }
+
+    /**
+     * Pulls the model's own text out of the provider envelope and strips a code fence.
+     *
+     * Shared by the verdict and by the profile check, so both read the same four provider shapes.
+     *
+     * Every step raises when what it asked for is not there, exactly as the `org.json` getters it
+     * replaces did. That is the whole point: a reply that does not have the shape this expects has to
+     * reach the caller's `catch`, which turns it into the parse status the user sees.
+     */
+    private fun extractContentText(responseJson: String, provider: Provider): String {
+        val root = Json.parseToJsonElement(responseJson).jsonObject
+
+        val contentJson = when (provider) {
+            Provider.OPENAI, Provider.DEEPSEEK -> {
+                root.getValue("choices").jsonArray[0].jsonObject
+                    .getValue("message").jsonObject
+                    .getValue("content").jsonPrimitive.content
+            }
+            Provider.GEMINI                    -> {
+                root.getValue("candidates").jsonArray[0].jsonObject
+                    .getValue("content").jsonObject
+                    .getValue("parts").jsonArray[0].jsonObject
+                    .getValue("text").jsonPrimitive.content
+            }
+            Provider.CLAUDE                    -> {
+                ClaudeModelResolver.extractText(root)
+            }
+        }
+
+        return if (contentJson.contains("```json")) {
+            contentJson.substringAfter("```json")
+                .substringBefore("```")
+                .trim()
+        } else if (contentJson.contains("```")) {
+            contentJson.substringAfter("```")
+                .substringBefore("```")
+                .trim()
+        } else {
+            contentJson.trim()
+        }
+    }
+
+    /**
+     * Parse verdict from API response
+     */
+    private fun parseVerdict(responseJson: String, provider: Provider): AuditorVerdict {
+        val jsonStr = extractContentText(responseJson, provider)
+
+        // Parse verdict JSON
+        val verdictJson = Json.parseToJsonElement(jsonStr).jsonObject
+        val verdict = AuditorVerdict.fromJSON(verdictJson)
+        AuditorStatusTracker.updateStatus(verdict.toTrackerStatus())
+        return verdict
+    }
+
+    private fun AuditorVerdict.toTrackerStatus(): AuditorStatusTracker.Status =
+        when (verdict) {
+            VerdictType.Confirm -> AuditorStatusTracker.Status.OK_CONFIRM
+            VerdictType.Soften -> AuditorStatusTracker.Status.OK_SOFTEN
+            VerdictType.ShiftToTbr -> AuditorStatusTracker.Status.OK_PREFER_TBR
+        }
+}
