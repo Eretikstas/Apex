@@ -28,7 +28,7 @@ class Atc3PairingTest : TestBaseWithProfile() {
     fun setup() {
         pairing = Atc3Pairing(
             aapsLogger, preferences, commandQueue, pumpSync, atc3HistorySync, Atc3PumpState(),
-            { atc3Connection }, atc3Queue
+            lazy { atc3Connection }, atc3Queue
         )
     }
 
