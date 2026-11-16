@@ -107,7 +107,7 @@ import kotlinx.coroutines.runBlocking
 @Inject
 class Atc3PumpPlugin(
     aapsLogger: AAPSLogger,
-    rh: ResourceHelper,
+    override val rh: ResourceHelper,
     preferences: Preferences,
     commandQueue: CommandQueue,
     private val pumpState: Atc3PumpState,
