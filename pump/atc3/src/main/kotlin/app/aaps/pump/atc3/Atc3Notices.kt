@@ -1,8 +1,8 @@
 package app.aaps.pump.atc3
 
-import androidx.annotation.RawRes
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.notifications.AlarmSound
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.notifications.NotificationLevel
@@ -43,8 +43,8 @@ class Atc3Notices(
 
     /** [level] is taken as it comes: a notice asked a sound for was an alarm in 3.4, and only an alarm sounds in 4.0. */
     @Suppress("UNUSED_PARAMETER")
-    fun addNotificationWithSound(id: Int, text: String, level: Int, @RawRes soundId: Int?) {
-        notificationManager.post(noticeIdOf(id), text, level = NotificationLevel.URGENT, soundRes = soundId)
+    fun addNotificationWithSound(id: Int, text: String, level: Int, sound: AlarmSound?) {
+        notificationManager.post(noticeIdOf(id), text, level = NotificationLevel.URGENT, sound = sound)
     }
 
     fun dismiss(id: Int) {

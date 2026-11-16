@@ -19,9 +19,8 @@ import app.aaps.core.interfaces.rx.bus.RxBus
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.ui.R as CoreUiR
+import app.aaps.core.ui.compose.ScreenAction
 import app.aaps.core.ui.compose.StatusLevel
-import app.aaps.core.ui.compose.pump.ActionCategory
-import app.aaps.core.ui.compose.pump.PumpAction
 import app.aaps.core.ui.compose.pump.PumpCommunicationStatus
 import app.aaps.core.ui.compose.pump.PumpInfoRow
 import app.aaps.core.ui.compose.pump.PumpOverviewUiState
@@ -200,13 +199,13 @@ class Atc3OverviewViewModel(
 
         val stopped = card?.suspended == true
         val primary = listOf(
-            PumpAction(
+            ScreenAction(
                 label = rh.gs(CoreUiR.string.refresh),
                 icon = Icons.Filled.Refresh,
                 enabled = paired,
                 onClick = ::onClickRefresh
             ),
-            PumpAction(
+            ScreenAction(
                 label = rh.gs(if (stopped) R.string.atc3_resume_pump else R.string.atc3_stop_pump),
                 icon = if (stopped) Icons.Filled.PlayArrow else Icons.Filled.Pause,
                 // Only once the pump's state is known: the button says what it will do.
@@ -215,16 +214,14 @@ class Atc3OverviewViewModel(
             )
         )
         val management = listOf(
-            PumpAction(
+            ScreenAction(
                 label = rh.gs(if (paired) R.string.atc3_change_pump else R.string.atc3_select_pump),
                 icon = Icons.Filled.Bluetooth,
-                category = ActionCategory.MANAGEMENT,
                 onClick = { _events.tryEmit(Atc3OverviewEvent.OpenPairing) }
             ),
-            PumpAction(
+            ScreenAction(
                 label = rh.gs(R.string.atc3_change_password),
                 icon = Icons.Filled.Key,
-                category = ActionCategory.MANAGEMENT,
                 enabled = paired,
                 onClick = { _events.tryEmit(Atc3OverviewEvent.AskPassword(preferences.get(Atc3StringKey.Atc3BtPassword))) }
             )

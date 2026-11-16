@@ -2,11 +2,11 @@ package app.aaps.pump.atc3.link
 
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.core.interfaces.notifications.AlarmSound
 import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.interfaces.Preferences
-import app.aaps.core.ui.R as CoreUiR
 import app.aaps.pump.atc3.Atc3Notices
 import app.aaps.pump.atc3.R
 import app.aaps.pump.atc3.clock.Atc3DayClock
@@ -128,7 +128,7 @@ class Atc3LinkKeeper(
                 if (!atc3Connection.isPasswordEntered) rh.gs(R.string.atc3_password_missing)
                 else rh.gs(if (stop != null) R.string.atc3_link_stopped else R.string.atc3_link_silent, minutes),
                 Notification.URGENT,
-                CoreUiR.raw.alarm
+                AlarmSound.ALARM
             )
             // No basal from the last answer on, drawn as far as the next telling.
             stop?.let { atc3HistorySync.recordLinkStop(it.fromReadMs, now - it.fromReadMs + Atc3LinkWatch.ALARM_AFTER_MS) }
