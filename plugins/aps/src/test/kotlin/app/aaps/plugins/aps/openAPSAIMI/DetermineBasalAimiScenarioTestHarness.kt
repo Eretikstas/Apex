@@ -20,6 +20,7 @@ import app.aaps.plugins.aps.openAPSAIMI.trajectory.TrajectoryGuard
 import app.aaps.plugins.aps.openAPSAIMI.wcycle.WCycleFacade
 import app.aaps.plugins.aps.openAPSAIMI.wcycle.WCycleLearner
 import app.aaps.plugins.aps.openAPSAIMI.wcycle.WCyclePreferences
+import app.aaps.plugins.aps.openAPSAIMI.validation.PumpCapabilityValidator
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -38,6 +39,10 @@ internal class DetermineBasalAimiScenarioTestHarness(
     val autodriveEngine: AutodriveEngine,
     val physioAdapter: AIMIInsulinDecisionAdapterMTR,
     val basalNeuralLearner: BasalNeuralLearner,
+    // Optional real parts for a history replay; the scenario tests keep the relaxed mocks.
+    val pumpCapabilityValidator: PumpCapabilityValidator = mockk(relaxed = true),
+    val dynamicBasalController: DynamicBasalController = mockk(relaxed = true),
+    val wCycleFacade: WCycleFacade = mockk(relaxed = true),
 ) {
     val persistenceLayer = mockk<PersistenceLayer>(relaxed = true)
     val engine: DetermineBasalaimiSMB2
@@ -87,11 +92,11 @@ internal class DetermineBasalAimiScenarioTestHarness(
             auditorOrchestrator = mockk(relaxed = true),
             uiInteraction = mockk(relaxed = true),
             notificationManager = mockk<NotificationManager>(relaxed = true),
-            wCycleFacade = mockk<WCycleFacade>(relaxed = true),
+            wCycleFacade = this.wCycleFacade,
             wCyclePreferences = mockk<WCyclePreferences>(relaxed = true),
             wCycleLearner = mockk<WCycleLearner>(relaxed = true),
-            pumpCapabilityValidator = mockk(relaxed = true),
-            dynamicBasalController = mockk<DynamicBasalController>(relaxed = true),
+            pumpCapabilityValidator = this.pumpCapabilityValidator,
+            dynamicBasalController = this.dynamicBasalController,
             autodriveEngine = autodriveEngine,
             context = mockk(relaxed = true) {
                 every { getExternalFilesDir(any()) } returns realTmpDir

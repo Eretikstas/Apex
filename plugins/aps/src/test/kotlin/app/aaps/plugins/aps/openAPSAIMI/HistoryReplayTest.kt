@@ -16,6 +16,7 @@ import app.aaps.core.interfaces.aps.OapsProfileAimi
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.UnitDoubleKey
@@ -26,7 +27,14 @@ import app.aaps.core.keys.interfaces.LongPreferenceKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.keys.interfaces.StringPreferenceKey
 import app.aaps.core.keys.interfaces.UnitDoublePreferenceKey
+import app.aaps.plugins.aps.openAPSAIMI.basal.BasalDecisionEngine
+import app.aaps.plugins.aps.openAPSAIMI.basal.BasalPlanner
+import app.aaps.plugins.aps.openAPSAIMI.basal.DynamicBasalController
+import app.aaps.plugins.aps.openAPSAIMI.context.ContextInfluenceEngine
 import app.aaps.plugins.aps.openAPSAIMI.learning.BasalNeuralLearner
+import app.aaps.plugins.aps.openAPSAIMI.physio.PhysioMultipliersMTR
+import app.aaps.plugins.aps.openAPSAIMI.validation.PumpCapabilityValidator
+import app.aaps.plugins.aps.openAPSAIMI.wcycle.WCycleFacade
 import app.aaps.plugins.aps.openAPSAIMI.safety.HypoExposureMonitor
 import io.mockk.clearAllMocks
 import io.mockk.coEvery
@@ -76,8 +84,24 @@ class HistoryReplayTest {
             autodriveGater = mockk(relaxed = true),
             autodriveEngine = mockk(relaxed = true),
             physioAdapter = mockk(relaxed = true),
-            basalNeuralLearner = mockk<BasalNeuralLearner>(relaxed = true),
+            basalNeuralLearner = mockk<BasalNeuralLearner>(relaxed = true) {
+                // Neutral answer: no learned basal change (the learners are off in this replay).
+                every { getUniversalBasalDecision(any(), any(), any(), any(), any(), any(), any()) } returns
+                    BasalNeuralLearner.UniversalBasalDecision(1.0, 1.0, BasalNeuralLearner.BasalMultiplierSource.DISABLED, 0.7, 1.3)
+            },
+            pumpCapabilityValidator = PumpCapabilityValidator(),
+            dynamicBasalController = DynamicBasalController(mockk(relaxed = true)),
+            wCycleFacade = mockk<WCycleFacade>(relaxed = true) { every { getIcMultiplier() } returns 1.0 },
         )
+        // Real basal decision parts; learners and context give their neutral value (a relaxed mock would say 0).
+        val adaptiveBasal = AIMIAdaptiveBasal(mockk(relaxed = true), mockk(relaxed = true))
+        harness.engine.basalDecisionEngine = BasalDecisionEngine(mockk(relaxed = true), adaptiveBasal, BasalPlanner(adaptiveBasal, mockk(relaxed = true)))
+        harness.engine.basalLearner = mockk(relaxed = true) { every { getMultiplier() } returns 1.0 }
+        harness.engine.unifiedReactivityLearner = mockk(relaxed = true) { every { getCombinedFactor(any()) } returns 1.0 }
+        harness.engine.contextInfluenceEngine = mockk(relaxed = true) {
+            every { computeInfluence(any(), any(), any(), any(), any()) } returns ContextInfluenceEngine.ContextInfluence.neutral()
+        }
+        every { harness.physioAdapter.getMultipliers(any(), any(), any(), any(), any()) } returns PhysioMultipliersMTR()
         val clock = mockk<DateUtil>(relaxed = true) { every { now() } answers { now } }
         harness.engine.dateUtil = clock
         stubDatabase(harness, history) { now }
@@ -138,7 +162,7 @@ class HistoryReplayTest {
                 }
                 row.put("iob", chained.iobArray[0].iob)
                     .put("errors", (rt.consoleError ?: emptyList<String>()).joinToString(" | ").take(400))
-                    .put("pkpd", (rt.consoleLog ?: emptyList<String>()).filter { it.contains("PKPD") || it.contains("DIA (learned)") || it.contains("ISF") }.joinToString(" | ").take(500))
+                    .put("pkpd", (rt.consoleLog ?: emptyList<String>()).filter { it.contains("PKPD") || it.contains("DIA (learned)") || it.contains("ISF") || it.contains("asal") }.joinToString(" | ").take(900))
                 row.put("rate", rt.rate ?: JSONObject.NULL)
                     .put("dur", rt.duration ?: JSONObject.NULL)
                     .put("units", rt.units ?: 0.0)
@@ -278,6 +302,7 @@ class HistoryReplayTest {
         every { get(any<LongPreferenceKey>()) } answers { firstArg<LongPreferenceKey>().defaultValue }
         every { get(any<StringPreferenceKey>()) } answers { firstArg<StringPreferenceKey>().defaultValue }
         every { get(any<UnitDoublePreferenceKey>()) } answers { firstArg<UnitDoublePreferenceKey>().defaultValue }
+        every { get(BooleanKey.OApsAIMIPkpdEnabled) } returns true
         every { get(DoubleKey.OApsAIMIweight) } returns meta.getDouble("weightKg")
         every { get(DoubleKey.OApsAIMITDD7) } returns meta.getDouble("tdd")
         every { get(DoubleKey.ApsSmbMaxIob) } returns meta.getDouble("maxIob")
