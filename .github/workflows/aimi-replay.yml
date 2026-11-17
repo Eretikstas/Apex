@@ -92,6 +92,7 @@ jobs:
           AIMI_REPLAY_SIM_ISF: ${{ inputs.isf }}
           AIMI_REPLAY_REACT_FLOOR: ${{ inputs.react_floor }}
           AIMI_REPLAY_PRED: ${{ inputs.oref_prediction && 'oref' || '' }}
+          AIMI_REPLAY_TRACE: '1'
           AIMI_REPLAY_PASSES: ${{ inputs.pretrained && '2' || '1' }}
         run: |
           set +e

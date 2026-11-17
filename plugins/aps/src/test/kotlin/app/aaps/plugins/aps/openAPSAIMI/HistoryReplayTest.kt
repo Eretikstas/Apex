@@ -245,6 +245,7 @@ class HistoryReplayTest {
         var bgIdx = bgT.indexOfFirst { it > startMs }.let { if (it < 0) bgT.size else it }
         var smbState = ticks.getJSONObject(0).optBoolean("smbOk", true)
         var prevNow = startMs
+        var traceLeft = if (System.getenv("AIMI_REPLAY_TRACE") == "1") 25 else 0
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
 
         val out = JSONArray()
@@ -332,6 +333,12 @@ class HistoryReplayTest {
                 row.put("iob", chained.iobArray[0].iob)
                     .put("errors", (rt.consoleError ?: emptyList<String>()).joinToString(" | ").take(400))
                     .put("pkpd", (rt.consoleLog ?: emptyList<String>()).filter { it.contains("PKPD") || it.contains("DIA (learned)") || it.contains("ISF") || it.contains("asal") }.joinToString(" | ").take(900))
+                // Full AIMI log for some ticks with a high temp at a normal glucose: to see which part set it.
+                val basalNow = tick.getJSONObject("prof").getDouble("basal")
+                if (traceLeft > 0 && algo == "aimi" && (rt.rate ?: 0.0) > basalNow * 1.5 && (gsSim?.glucose ?: 999.0) < 125.0 && i % 7 == 0) {
+                    traceLeft--
+                    row.put("trace", (rt.consoleLog ?: emptyList<String>()).joinToString("\n").take(20_000))
+                }
                 row.put("rate", rt.rate ?: JSONObject.NULL)
                     .put("dur", rt.duration ?: JSONObject.NULL)
                     .put("units", rt.units ?: 0.0)
