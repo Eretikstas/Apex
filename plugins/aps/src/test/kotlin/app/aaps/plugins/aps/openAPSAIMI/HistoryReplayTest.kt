@@ -87,8 +87,37 @@ class HistoryReplayTest {
         val inPath = System.getenv("AIMI_REPLAY_IN")
         val outPath = System.getenv("AIMI_REPLAY_OUT")
         assumeTrue(!inPath.isNullOrBlank() && !outPath.isNullOrBlank(), "no replay input given")
+        val learn = System.getenv("AIMI_REPLAY_LEARN") == "1"
+        // Two passes: the first one only teaches the learners, the second one (16 days later, same
+        // time of day) starts with what they learned and is the one written out.
+        val passes = System.getenv("AIMI_REPLAY_PASSES")?.toIntOrNull()?.coerceIn(1, 2) ?: 1
+        // Learner files live in a fresh folder of this run, kept between the passes.
+        val storageDir = Files.createTempDirectory("aimi-replay").toFile()
+        for (pass in 0 until passes) {
+            val data = JSONObject(GZIPInputStream(File(inPath!!).inputStream()).bufferedReader().readText())
+            if (pass > 0) shiftTimes(data, pass * 16 * 86_400_000L)
+            replayOnce(data, storageDir, outPath!!, learn)
+            println("AIMI replay: pass ${pass + 1} of $passes done")
+        }
+    }
 
-        val data = JSONObject(GZIPInputStream(File(inPath!!).inputStream()).bufferedReader().readText())
+    /** Moves every time in the input by [by] ms. */
+    private fun shiftTimes(data: JSONObject, by: Long) {
+        for (name in listOf("bg", "boluses", "carbs", "temps")) {
+            val a = data.getJSONArray(name)
+            for (k in 0 until a.length()) a.getJSONArray(k).let { it.put(0, it.getLong(0) + by) }
+        }
+        val ticks = data.getJSONArray("ticks")
+        for (k in 0 until ticks.length()) {
+            val t = ticks.getJSONObject(k)
+            t.put("t", t.getLong("t") + by)
+            t.getJSONObject("gs").let { it.put("t", it.getLong("t") + by) }
+            if (t.getLong("lastBolus") > 0) t.put("lastBolus", t.getLong("lastBolus") + by)
+            if (t.getLong("lastCarb") > 0) t.put("lastCarb", t.getLong("lastCarb") + by)
+        }
+    }
+
+    private fun replayOnce(data: JSONObject, storageDir: File, outPath: String, learn: Boolean) {
         val meta = data.getJSONObject("meta")
         val history = readHistory(data)
         val ticks = data.getJSONArray("ticks")
@@ -96,10 +125,7 @@ class HistoryReplayTest {
         var now = ticks.getJSONObject(0).getLong("t")
         // Every AIMI timer and learner window follows the replayed time.
         AimiReplayClock.override = { now }
-        val learn = System.getenv("AIMI_REPLAY_LEARN") == "1"
         val prefs = preferences(meta)
-        // Learner files live in a fresh folder of this run.
-        val storageDir = Files.createTempDirectory("aimi-replay").toFile()
         mockkStatic(Environment::class)
         every { Environment.getExternalStorageDirectory() } returns storageDir
         val appContext = mockk<Context>(relaxed = true) { every { getExternalFilesDir(any()) } returns storageDir }
@@ -321,10 +347,10 @@ class HistoryReplayTest {
                 // mockk keeps every call it saw; over thousands of ticks that fills the heap. The answers stay.
                 clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
                 // What is done so far is kept even if a later tick stops the run.
-                write(outPath!!, out)
+                write(outPath, out)
             }
         }
-        write(outPath!!, out)
+        write(outPath, out)
         AimiReplayClock.override = null
         // Counts only: no values of the input reach the test log.
         if (sim) println("AIMI replay: body model, algorithm $algo, ${body.treats.size} model hypo treatments")

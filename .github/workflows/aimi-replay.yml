@@ -16,6 +16,10 @@ on:
         description: 'AIMI settings to try, like OApsAIMIMaxSMB=0.3,OApsAIMIPkpdEnabled=true'
         type: string
         default: ''
+      pretrained:
+        description: 'Two passes: learn on the whole history first, then replay it again with what was learned'
+        type: boolean
+        default: false
       sim:
         description: 'Closed loop on the body model (glucose answers the insulin)'
         type: boolean
@@ -78,6 +82,7 @@ jobs:
           AIMI_REPLAY_SIM: ${{ inputs.sim && '1' || '0' }}
           AIMI_REPLAY_ALGO: ${{ inputs.algo }}
           AIMI_REPLAY_SIM_ISF: ${{ inputs.isf }}
+          AIMI_REPLAY_PASSES: ${{ inputs.pretrained && '2' || '1' }}
         run: |
           set +e
           W="$RUNNER_TEMP/replay"
@@ -91,7 +96,7 @@ jobs:
           # lines reach this log.
           ./gradlew :plugins:aps:testFullDebugUnitTest --tests '*HistoryReplayTest*' --console=plain > "$W/gradle.log" 2>&1
           code=$?
-          grep -E "BUILD (SUCCESSFUL|FAILED)|AIMI replay: [0-9]+ ticks, [0-9]+ failed|tests completed" "$W/gradle.log" || true
+          grep -E "BUILD (SUCCESSFUL|FAILED)|AIMI replay: [0-9]+ ticks, [0-9]+ failed|AIMI replay: pass|tests completed" "$W/gradle.log" || true
           # Compile errors name files and lines of the code, never data: show them so they can be fixed.
           grep -E "^e: " "$W/gradle.log" | head -40 || true
           tar -C "$W" -czf "$W/result.tgz" gradle.log $( [ -f "$W/out.json.gz" ] && echo out.json.gz )
