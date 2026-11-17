@@ -17,5 +17,8 @@ object AimiReplayClock {
     /** Replay trial: AIMI prediction with the oref rules (full insulin, deviation gone in 60 min). AIMI_REPLAY_PRED=oref. */
     val orefPrediction: Boolean = System.getenv("AIMI_REPLAY_PRED") == "oref"
 
+    /** Replay trial: the dynamic basal booster may lower the rate but never raise it. AIMI_REPLAY_NO_BOOSTER=1. */
+    val noBasalBooster: Boolean = System.getenv("AIMI_REPLAY_NO_BOOSTER") == "1"
+
     fun now(): Long = override?.invoke() ?: System.currentTimeMillis()
 }

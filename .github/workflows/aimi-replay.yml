@@ -28,6 +28,10 @@ on:
         description: 'AIMI prediction with the oref rules (full insulin, deviation gone in 60 min)'
         type: boolean
         default: false
+      no_booster:
+        description: 'The AIMI dynamic basal booster may not raise the temp basal'
+        type: boolean
+        default: false
       sim:
         description: 'Closed loop on the body model (glucose answers the insulin)'
         type: boolean
@@ -93,6 +97,7 @@ jobs:
           AIMI_REPLAY_REACT_FLOOR: ${{ inputs.react_floor }}
           AIMI_REPLAY_PRED: ${{ inputs.oref_prediction && 'oref' || '' }}
           AIMI_REPLAY_TRACE: '1'
+          AIMI_REPLAY_NO_BOOSTER: ${{ inputs.no_booster && '1' || '0' }}
           AIMI_REPLAY_PASSES: ${{ inputs.pretrained && '2' || '1' }}
         run: |
           set +e

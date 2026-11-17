@@ -1,5 +1,6 @@
 package app.aaps.plugins.aps.openAPSAIMI.basal
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import dagger.Reusable
@@ -144,7 +145,8 @@ class DynamicBasalController @Inject constructor(
             multiplier.coerceIn(MIN_TBR_MULTIPLIER, MAX_TBR_MULTIPLIER)
         }
 
-        val finalRate = currentRate * safeMultiplier
+        // Replay trial "no basal booster": never above the requested rate, as AAPS (oref) has no such step.
+        val finalRate = currentRate * (if (AimiReplayClock.noBasalBooster) safeMultiplier.coerceAtMost(1.0) else safeMultiplier)
 
         return ControllerState(
             errorP = proportionalError,
