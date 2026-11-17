@@ -1,5 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.learning
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
+
 /**
  * Four dayparts for segment-aware [UnifiedReactivityLearner] reactivity.
  * Pure math lives here so unit tests can validate combine/shrinkage/caps without DI.
@@ -22,7 +24,7 @@ enum class ReactivityDaypart(
         const val SEGMENT_WEIGHT = 0.30
         const val SHRINKAGE_K = 50.0
         const val EXERCISE_HYPO_AMPLIFIER = 1.5
-        const val FACTOR_MIN = 0.5
+        val FACTOR_MIN: Double get() = AimiReplayClock.reactFloor
         const val FACTOR_MAX = 1.5
 
         fun fromHour(hourOfDay: Int): ReactivityDaypart {

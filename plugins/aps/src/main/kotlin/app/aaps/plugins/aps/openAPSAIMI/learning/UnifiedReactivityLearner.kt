@@ -384,7 +384,7 @@ class UnifiedReactivityLearner @Inject constructor(
             log.debug(LTag.APS, "UnifiedReactivityLearner: Adaptive α=$alpha (hypo=${perf.hypo_count}, CV=${perf.cv_percent.toInt()}%, hyper=${perf.tir_above_180.toInt()}%)")
             
             // Apply EMA: New = (Target * alpha) + (Old * (1-alpha))
-            globalFactor = (targetFactor * alpha + globalFactor * (1 - alpha)).coerceIn(0.5, 1.5)
+            globalFactor = (targetFactor * alpha + globalFactor * (1 - alpha)).coerceIn(AimiReplayClock.reactFloor, 1.5)
 
             // F4 — "good enough" recovery (fixes the frozen zone A4). Without this, a good-but-not-optimal
             // day (CV 36–44, hypo-free, mild/no hyper) has `adjustment == 1.0` → target == globalFactor →
@@ -398,7 +398,7 @@ class UnifiedReactivityLearner @Inject constructor(
                 perf.cv_percent < 45
             if (goodEnough && globalFactor < 1.0) {
                 val nudgeAlpha = 0.03
-                globalFactor = (1.0 * nudgeAlpha + globalFactor * (1 - nudgeAlpha)).coerceIn(0.5, 1.5)
+                globalFactor = (1.0 * nudgeAlpha + globalFactor * (1 - nudgeAlpha)).coerceIn(AimiReplayClock.reactFloor, 1.5)
                 reasons.add("Bonne journée (récupération douce) → nudge vers 1.0")
             }
         }
@@ -702,7 +702,7 @@ class UnifiedReactivityLearner @Inject constructor(
         // ~1h half-life at the 10-min short-term cadence.
         if (adjustment == 1.0) {
             val neutralAlpha = 0.08
-            shortTermFactor = (1.0 * neutralAlpha + shortTermFactor * (1 - neutralAlpha)).coerceIn(0.5, 1.5)
+            shortTermFactor = (1.0 * neutralAlpha + shortTermFactor * (1 - neutralAlpha)).coerceIn(AimiReplayClock.reactFloor, 1.5)
             return
         }
 
@@ -716,7 +716,7 @@ class UnifiedReactivityLearner @Inject constructor(
             else -> 0.40                         // Standard short-term rate
         }
 
-        shortTermFactor = (target * alpha + shortTermFactor * (1 - alpha)).coerceIn(0.5, 1.5)
+        shortTermFactor = (target * alpha + shortTermFactor * (1 - alpha)).coerceIn(AimiReplayClock.reactFloor, 1.5)
     }
     
     /**
@@ -760,8 +760,8 @@ class UnifiedReactivityLearner @Inject constructor(
         storageHelper.loadFileSafe(file, 
             onSuccess = { content ->
                 val json = JSONObject(content)
-                globalFactor = json.optDouble("globalFactor", 1.0).coerceIn(0.5, 1.5)
-                shortTermFactor = json.optDouble("shortTermFactor", 1.0).coerceIn(0.5, 1.5)
+                globalFactor = json.optDouble("globalFactor", 1.0).coerceIn(AimiReplayClock.reactFloor, 1.5)
+                shortTermFactor = json.optDouble("shortTermFactor", 1.0).coerceIn(AimiReplayClock.reactFloor, 1.5)
                 lastAnalysisTime = json.optLong("lastAnalysisTime", 0L)
                 lastShortAnalysisTime = json.optLong("lastShortAnalysisTime", 0L)
                 lastSeenHypoBurdenPct = json.optDouble("lastSeenHypoBurdenPct", 0.0)

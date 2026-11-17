@@ -8,5 +8,11 @@ object AimiReplayClock {
 
     @Volatile var override: (() -> Long)? = null
 
+    /**
+     * Lowest value of the learned reactivity (AIMI: 0.5). Only a replay changes it, to try a lower floor;
+     * read once from AIMI_REPLAY_REACT_FLOOR.
+     */
+    val reactFloor: Double = System.getenv("AIMI_REPLAY_REACT_FLOOR")?.toDoubleOrNull()?.coerceIn(0.1, 0.5) ?: 0.5
+
     fun now(): Long = override?.invoke() ?: System.currentTimeMillis()
 }

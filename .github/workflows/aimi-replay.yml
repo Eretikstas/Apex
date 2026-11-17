@@ -20,6 +20,10 @@ on:
         description: 'Two passes: learn on the whole history first, then replay it again with what was learned'
         type: boolean
         default: false
+      react_floor:
+        description: 'Lowest learned reactivity of AIMI (empty = 0.5, the AIMI value)'
+        type: string
+        default: ''
       sim:
         description: 'Closed loop on the body model (glucose answers the insulin)'
         type: boolean
@@ -82,6 +86,7 @@ jobs:
           AIMI_REPLAY_SIM: ${{ inputs.sim && '1' || '0' }}
           AIMI_REPLAY_ALGO: ${{ inputs.algo }}
           AIMI_REPLAY_SIM_ISF: ${{ inputs.isf }}
+          AIMI_REPLAY_REACT_FLOOR: ${{ inputs.react_floor }}
           AIMI_REPLAY_PASSES: ${{ inputs.pretrained && '2' || '1' }}
         run: |
           set +e
