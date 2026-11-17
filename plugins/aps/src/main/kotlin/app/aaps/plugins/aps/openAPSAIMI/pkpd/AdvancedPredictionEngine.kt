@@ -132,7 +132,10 @@ object AdvancedPredictionEngine {
         val deviation = delta - expectedDelta
         var hybridMomentum = deviation * modulation.hybridMomentumFactor
 
+        // Replay trial "oref prediction": every unit of insulin counts in full, as in AAPS (oref).
+        val orefPrediction = AimiReplayClock.orefPrediction
         val iobDampingFactor = when {
+            orefPrediction -> 1.0
             delta > 10.0 -> 0.40
             delta > 5.0 -> 0.60
             delta > 2.0 -> 0.80
@@ -147,6 +150,8 @@ object AdvancedPredictionEngine {
         var lastZt = currentBG
         var lastHybrid = currentBG
         var uamMomentum = deviation * modulation.uamMomentumFactor
+        val uamMomentumStart = uamMomentum
+        val hybridMomentumStart = hybridMomentum
         var rawInsulinPathMin = Double.POSITIVE_INFINITY
         var softInsulinPathMin = Double.POSITIVE_INFINITY
         var endoAppliedOnInsulin = false
@@ -178,6 +183,12 @@ object AdvancedPredictionEngine {
 
         repeat(steps) { stepIndex ->
             val minutesInFuture = (stepIndex + 1) * STEP_MINUTES
+            if (orefPrediction) {
+                // oref: the deviation falls in a straight line to zero over 60 minutes.
+                val left = (1.0 - stepIndex * STEP_MINUTES / 60.0).coerceAtLeast(0.0)
+                uamMomentum = uamMomentumStart * left
+                hybridMomentum = hybridMomentumStart * left
+            }
             val targetTime = now + (minutesInFuture * 60_000L)
             val entry = iobArray.minByOrNull { abs(it.time - targetTime) }
             val activityRate = entry?.activity ?: 0.0

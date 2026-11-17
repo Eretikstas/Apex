@@ -24,6 +24,10 @@ on:
         description: 'Lowest learned reactivity of AIMI (empty = 0.5, the AIMI value)'
         type: string
         default: ''
+      oref_prediction:
+        description: 'AIMI prediction with the oref rules (full insulin, deviation gone in 60 min)'
+        type: boolean
+        default: false
       sim:
         description: 'Closed loop on the body model (glucose answers the insulin)'
         type: boolean
@@ -87,6 +91,7 @@ jobs:
           AIMI_REPLAY_ALGO: ${{ inputs.algo }}
           AIMI_REPLAY_SIM_ISF: ${{ inputs.isf }}
           AIMI_REPLAY_REACT_FLOOR: ${{ inputs.react_floor }}
+          AIMI_REPLAY_PRED: ${{ inputs.oref_prediction && 'oref' || '' }}
           AIMI_REPLAY_PASSES: ${{ inputs.pretrained && '2' || '1' }}
         run: |
           set +e

@@ -14,5 +14,8 @@ object AimiReplayClock {
      */
     val reactFloor: Double = System.getenv("AIMI_REPLAY_REACT_FLOOR")?.toDoubleOrNull()?.coerceIn(0.1, 0.5) ?: 0.5
 
+    /** Replay trial: AIMI prediction with the oref rules (full insulin, deviation gone in 60 min). AIMI_REPLAY_PRED=oref. */
+    val orefPrediction: Boolean = System.getenv("AIMI_REPLAY_PRED") == "oref"
+
     fun now(): Long = override?.invoke() ?: System.currentTimeMillis()
 }
