@@ -88,6 +88,26 @@ class HistoryReplayTest {
             aapsLogger = mockk<AAPSLogger>(relaxed = true),
         )
 
+        val startMs = ticks.getJSONObject(0).getLong("t")
+        val basalTimes = (0 until ticks.length()).map { ticks.getJSONObject(it).getLong("t") }
+        val basals = (0 until ticks.length()).map { ticks.getJSONObject(it).getJSONObject("prof").getDouble("basal") }
+        val basalAt: (Long) -> Double = { t ->
+            val k = basalTimes.binarySearch(t).let { if (it >= 0) it else (-it - 2).coerceAtLeast(0) }
+            basals[k]
+        }
+        val bolusRows = data.getJSONArray("boluses").rows()
+        val chain = Chain(
+            startMs = startMs,
+            manual = bolusRows.filter { !it.getBoolean(2) }.map { Pair(it.getLong(0), it.getDouble(1)) },
+            realBefore = bolusRows.filter { it.getBoolean(2) && it.getLong(0) < startMs }.map { Pair(it.getLong(0), it.getDouble(1)) },
+            realTempsBefore = data.getJSONArray("temps").rows().filter { it.getLong(0) < startMs }
+                .map { OwnTemp(it.getLong(0), it.getDouble(1), minOf(it.getLong(0) + it.getLong(2), startMs)) },
+            basalAt = basalAt,
+        )
+        // The database AIMI reads holds the same: human boluses, AutoISF's doses before the start, AIMI's after.
+        history.boluses.removeAll { it.type == BS.Type.SMB && it.timestamp >= startMs }
+        history.temps.removeAll { it.timestamp >= startMs }
+
         val out = JSONArray()
         var failed = 0
         var lastGuardRefresh = 0L
@@ -100,7 +120,25 @@ class HistoryReplayTest {
             }
             val row = JSONObject().put("t", now)
             try {
-                val rt = runTick(harness, tick, meta, now)
+                val chained = chainedInputs(chain, tick, now)
+                val rt = runTick(harness, tick, meta, now, chained)
+                val smb = rt.units ?: 0.0
+                if (smb > 0.0) {
+                    chain.ownSmb.add(Pair(now, smb))
+                    history.boluses.add(BS(timestamp = now, amount = smb, type = BS.Type.SMB, iCfg = ICfg(insulinLabel = "replay", peak = 45, dia = 5.0, concentration = 1.0)))
+                }
+                val rate = rt.rate
+                val dur = rt.duration
+                if (rate != null && dur != null) {
+                    chain.activeTemp(now)?.let { it.end = now }
+                    if (dur > 0) {
+                        chain.ownTemps.add(OwnTemp(now, rate, now + dur * minute))
+                        history.temps.add(TB(timestamp = now, type = TB.Type.NORMAL, isAbsolute = true, rate = rate, duration = dur * minute))
+                    }
+                }
+                row.put("iob", chained.iobArray[0].iob)
+                    .put("errors", (rt.consoleError ?: emptyList<String>()).joinToString(" | ").take(400))
+                    .put("pkpd", (rt.consoleLog ?: emptyList<String>()).filter { it.contains("PKPD") || it.contains("DIA (learned)") || it.contains("ISF") }.joinToString(" | ").take(500))
                 row.put("rate", rt.rate ?: JSONObject.NULL)
                     .put("dur", rt.duration ?: JSONObject.NULL)
                     .put("units", rt.units ?: 0.0)
@@ -127,18 +165,77 @@ class HistoryReplayTest {
     private fun write(path: String, out: JSONArray) =
         GZIPOutputStream(File(path).outputStream()).bufferedWriter().use { it.write(out.toString()) }
 
-    private class History(val bg: List<GV>, val boluses: List<BS>, val carbs: List<CA>, val temps: List<TB>)
+    private class History(val bg: List<GV>, val boluses: MutableList<BS>, val carbs: List<CA>, val temps: MutableList<TB>)
+
+    /** A temp basal AIMI set in the replay; [end] moves earlier when the next one replaces it. */
+    private class OwnTemp(val start: Long, val rate: Double, var end: Long)
+
+    /**
+     * The insulin of the replay: the human boluses as they were, and from [startMs] on AIMI's own SMBs
+     * and temp basals instead of AutoISF's. Before [startMs] everything is as it really was, so the
+     * first ticks start from the real insulin on board.
+     */
+    private inner class Chain(
+        val startMs: Long,
+        val manual: List<Pair<Long, Double>>,
+        val realBefore: List<Pair<Long, Double>>,
+        val realTempsBefore: List<OwnTemp>,
+        val basalAt: (Long) -> Double,
+    ) {
+        val ownSmb = mutableListOf<Pair<Long, Double>>()
+        val ownTemps = mutableListOf<OwnTemp>()
+
+        fun activeTemp(now: Long): OwnTemp? = ownTemps.lastOrNull { it.start <= now && now < it.end }
+
+        /** Every dose that can act at [now], temp basals as net insulin in 5-minute pieces up to [until]. */
+        fun doses(now: Long, diaMs: Long, until: Long): List<Pair<Long, Double>> {
+            val from = now - diaMs
+            val out = ArrayList<Pair<Long, Double>>()
+            manual.filterTo(out) { it.first in from..now }
+            realBefore.filterTo(out) { it.first in from..now }
+            ownSmb.filterTo(out) { it.first in from..now }
+            for (tb in realTempsBefore + ownTemps) {
+                val end = minOf(tb.end, until)
+                var p = maxOf(tb.start, from)
+                while (p < end) {
+                    val q = minOf(p + 5 * minute, end)
+                    val net = (tb.rate - basalAt(p)) * (q - p) / 3_600_000.0
+                    if (net != 0.0) out.add(Pair((p + q) / 2, net))
+                    p = q
+                }
+            }
+            return out
+        }
+    }
+
+    /** oref exponential insulin curve: (insulin on board, activity per minute) for one unit after [m] minutes. */
+    private fun curve(peak: Double, diaHours: Double): (Double) -> Pair<Double, Double> {
+        val td = diaHours * 60.0
+        val tau = peak * (1 - peak / td) / (1 - 2 * peak / td)
+        val a = 2 * tau / td
+        val sFactor = 1 / (1 - a + (1 + a) * Math.exp(-td / tau))
+        return { m ->
+            when {
+                m < 0 -> Pair(0.0, 0.0)
+                m >= td -> Pair(0.0, 0.0)
+                else -> Pair(
+                    1 - sFactor * (1 - a) * ((m * m / (tau * td * (1 - a)) - m / tau - 1) * Math.exp(-m / tau) + 1),
+                    (sFactor / (tau * tau)) * m * (1 - m / td) * Math.exp(-m / tau)
+                )
+            }
+        }
+    }
 
     private fun readHistory(data: JSONObject): History {
         val icfg = ICfg(insulinLabel = "replay", peak = 45, dia = 5.0, concentration = 1.0)
         val bg = data.getJSONArray("bg").rows().map {
             GV(timestamp = it.getLong(0), raw = null, value = it.getDouble(1), trendArrow = TrendArrow.NONE, noise = null, sourceSensor = SourceSensor.UNKNOWN)
         }
-        val boluses = data.getJSONArray("boluses").rows().map {
+        val boluses = data.getJSONArray("boluses").rows().mapTo(mutableListOf()) {
             BS(timestamp = it.getLong(0), amount = it.getDouble(1), type = if (it.getBoolean(2)) BS.Type.SMB else BS.Type.NORMAL, iCfg = icfg)
         }
         val carbs = data.getJSONArray("carbs").rows().map { CA(timestamp = it.getLong(0), duration = 0L, amount = it.getDouble(1)) }
-        val temps = data.getJSONArray("temps").rows().map {
+        val temps = data.getJSONArray("temps").rows().mapTo(mutableListOf()) {
             TB(timestamp = it.getLong(0), type = TB.Type.NORMAL, isAbsolute = true, rate = it.getDouble(1), duration = it.getLong(2))
         }
         return History(bg, boluses, carbs, temps)
@@ -192,18 +289,51 @@ class HistoryReplayTest {
         every { get(UnitDoubleKey.ApsLgsThreshold) } returns meta.getDouble("lgs")
     }
 
-    private fun runTick(harness: DetermineBasalAimiScenarioTestHarness, tick: JSONObject, meta: JSONObject, now: Long) =
+    private class Chained(val iobArray: Array<IobTotal>, val cur: Double, val fut: Double, val lag: Double, val hist: Double, val temp: CurrentTemp)
+
+    private fun chainedInputs(chain: Chain, tick: JSONObject, now: Long): Chained {
+        val prof = tick.getJSONObject("prof")
+        val peak = prof.getDouble("peak")
+        val diaH = prof.getDouble("dia")
+        val f = curve(peak, diaH)
+        val diaMs = (diaH * 3_600_000).toLong()
+        val active = chain.activeTemp(now)
+        val doses = chain.doses(now, diaMs, until = maxOf(now, active?.end ?: now))
+        val lastBolus = (chain.manual + chain.realBefore + chain.ownSmb).filter { it.first <= now }.maxOfOrNull { it.first } ?: 0L
+        fun at(whenMs: Long): Triple<Double, Double, Double> {
+            var iob = 0.0; var act = 0.0
+            for ((t, u) in doses) {
+                if (t > whenMs) continue
+                val (i, a) = f((whenMs - t) / 60_000.0)
+                iob += i * u; act += a * u
+            }
+            return Triple(iob, act, 0.0)
+        }
+        val iobArray = Array(48) { k ->
+            val (i, a, _) = at(now + k * 5 * minute)
+            IobTotal(time = now + k * 5 * minute, iob = i, activity = a, lastBolusTime = lastBolus)
+        }
+        fun sum(offsets: List<Int>) = offsets.sumOf { at(now + it * minute).second }
+        val pk = maxOf(peak.toInt(), 35)
+        val temp = if (active != null)
+            CurrentTemp(duration = ((active.end - now) / minute).toInt(), rate = active.rate, minutesrunning = ((now - active.start) / minute).toInt())
+        else CurrentTemp(duration = 0, rate = prof.getDouble("basal"), minutesrunning = 0)
+        return Chained(
+            iobArray = iobArray,
+            cur = sum((4 downTo 0).toList()),
+            fut = sum((-4..0).map { pk - it }),
+            lag = sum((-4..0).map { -10 - it }),
+            hist = sum((-2..2).map { -20 - it }),
+            temp = temp,
+        )
+    }
+
+    private fun runTick(harness: DetermineBasalAimiScenarioTestHarness, tick: JSONObject, meta: JSONObject, now: Long, chained: Chained) =
         run {
             val gs = tick.getJSONObject("gs")
             val prof = tick.getJSONObject("prof")
-            val act = tick.getJSONObject("act")
-            val temp = tick.getJSONObject("temp")
-            val iob = tick.getJSONArray("iob")
-            val lastBolus = tick.getLong("lastBolus")
-            val iobArray = Array(iob.length()) { k ->
-                val r = iob.getJSONArray(k)
-                IobTotal(time = now + k * 5 * minute, iob = r.getDouble(0), activity = r.getDouble(1), basaliob = r.getDouble(2), lastBolusTime = lastBolus)
-            }
+            val iobArray = chained.iobArray
+            val lastBolus = iobArray[0].lastBolusTime
             val tt = if (tick.isNull("tt")) null else tick.getDouble("tt")
             val target = tt ?: prof.getDouble("target")
             val profile = OapsProfileAimi(
@@ -251,18 +381,21 @@ class HistoryReplayTest {
                 insulinDivisor = 75,
                 TDD = meta.getDouble("tdd"),
                 peakTime = prof.getDouble("peak"),
-                futureActivity = act.getDouble("fut"),
-                sensorLagActivity = act.getDouble("lag"),
-                historicActivity = act.getDouble("hist"),
-                currentActivity = act.getDouble("cur"),
+                futureActivity = chained.fut,
+                sensorLagActivity = chained.lag,
+                historicActivity = chained.hist,
+                currentActivity = chained.cur,
             )
             harness.engine.determine_basal(
                 glucose_status = GlucoseStatusAIMI(
                     glucose = gs.getDouble("g"), noise = 0.0, delta = gs.getDouble("d"),
                     shortAvgDelta = gs.getDouble("sad"), longAvgDelta = gs.getDouble("lad"), date = gs.getLong("t")
                 ),
-                currenttemp = CurrentTemp(duration = temp.getInt("dur"), rate = temp.getDouble("rate"), minutesrunning = temp.getInt("running")),
+                currenttemp = chained.temp,
                 iob_data_array = iobArray,
+                pkpd_iob_data_array = iobArray,
+                effective_dia_hours = prof.getDouble("dia"),
+                effective_peak_minutes = prof.getDouble("peak"),
                 profile = profile,
                 autosens_data = AutosensResult(ratio = 1.0),
                 mealData = MealData(
