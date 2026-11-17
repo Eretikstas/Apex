@@ -562,7 +562,7 @@ class HistoryReplayTest {
 
     /** What AAPS really did at the tick: the model check (the model must give back the real glucose then). */
     private fun realTick(realSmb: List<Pair<Long, Double>>, prev: Long, now: Long, rate: Double?, basal: Double) = RT(
-        algorithm = APSResult.Algorithm.AUTO_ISF, timestamp = now,
+        algorithm = APSResult.Algorithm.AUTO_ISF, runningDynamicIsf = false, timestamp = now,
         units = realSmb.filter { it.first in prev until now }.sumOf { it.second },
         rate = rate ?: basal, duration = 30,
     ).also { it.reason.append("real") }
