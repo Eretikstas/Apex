@@ -1,0 +1,81 @@
+name: AIMI history replay
+
+# Runs recorded loop cycles through the AIMI decision engine (HistoryReplayTest) and stores what AIMI
+# would have decided. The input (replay/input.enc) and the result are health data of a real person,
+# so both are only kept encrypted: the key is the repository secret AIMI_REPLAY_KEY, the log shows
+# counts only, and the artifact holds the encrypted result and nothing else.
+
+on:
+  workflow_dispatch:
+  # A push only makes the workflow known to GitHub (so it can be started by hand); it runs nothing.
+  push:
+    branches:
+      - aimi-replay
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
+        -Dkotlin.daemon.jvm.options="-Xmx2g"
+        -Dkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.workers.max=2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check the key is there
+        env:
+          AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}
+        run: |
+          if [ -z "$AIMI_REPLAY_KEY" ]; then
+            echo "The repository secret AIMI_REPLAY_KEY is missing."
+            exit 1
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Replay
+        env:
+          AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}
+        run: |
+          set +e
+          W="$RUNNER_TEMP/replay"
+          mkdir -p "$W"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in replay/input.enc -out "$W/in.json.gz" -pass env:AIMI_REPLAY_KEY || { echo "decryption failed"; exit 1; }
+          export AIMI_REPLAY_IN="$W/in.json.gz"
+          export AIMI_REPLAY_OUT="$W/out.json.gz"
+          # The whole Gradle output goes to a file that is encrypted with the result; only the outcome
+          # lines reach this log.
+          ./gradlew :plugins:aps:testFullDebugUnitTest --tests '*HistoryReplayTest*' --console=plain > "$W/gradle.log" 2>&1
+          code=$?
+          grep -E "BUILD (SUCCESSFUL|FAILED)|AIMI replay: [0-9]+ ticks, [0-9]+ failed|tests completed" "$W/gradle.log" || true
+          # Compile errors name files and lines of the code, never data: show them so they can be fixed.
+          grep -E "^e: " "$W/gradle.log" | head -40 || true
+          tar -C "$W" -czf "$W/result.tgz" gradle.log $( [ -f "$W/out.json.gz" ] && echo out.json.gz )
+          mkdir -p out
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$W/result.tgz" -out out/result.enc -pass env:AIMI_REPLAY_KEY
+          rm -rf "$W"
+          exit $code
+
+      - name: Upload the encrypted result
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: aimi-replay-result
+          path: out/result.enc
+          if-no-files-found: ignore
+          retention-days: 7
