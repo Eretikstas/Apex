@@ -28,6 +28,7 @@ import app.aaps.core.keys.interfaces.StringPreferenceKey
 import app.aaps.core.keys.interfaces.UnitDoublePreferenceKey
 import app.aaps.plugins.aps.openAPSAIMI.learning.BasalNeuralLearner
 import app.aaps.plugins.aps.openAPSAIMI.safety.HypoExposureMonitor
+import io.mockk.clearAllMocks
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -111,11 +112,20 @@ class HistoryReplayTest {
                 row.put("error", e.javaClass.simpleName)
             }
             out.put(row)
+            if (i % 200 == 199) {
+                // mockk keeps every call it saw; over thousands of ticks that fills the heap. The answers stay.
+                clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
+                // What is done so far is kept even if a later tick stops the run.
+                write(outPath!!, out)
+            }
         }
-        GZIPOutputStream(File(outPath!!).outputStream()).bufferedWriter().use { it.write(out.toString()) }
+        write(outPath!!, out)
         // Counts only: no values of the input reach the test log.
         println("AIMI replay: ${ticks.length()} ticks, $failed failed")
     }
+
+    private fun write(path: String, out: JSONArray) =
+        GZIPOutputStream(File(path).outputStream()).bufferedWriter().use { it.write(out.toString()) }
 
     private class History(val bg: List<GV>, val boluses: List<BS>, val carbs: List<CA>, val temps: List<TB>)
 

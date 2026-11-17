@@ -58,6 +58,7 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in replay/input.enc -out "$W/in.json.gz" -pass env:AIMI_REPLAY_KEY || { echo "decryption failed"; exit 1; }
           export AIMI_REPLAY_IN="$W/in.json.gz"
           export AIMI_REPLAY_OUT="$W/out.json.gz"
+          export AIMI_REPLAY_HEAP=5g
           # The whole Gradle output goes to a file that is encrypted with the result; only the outcome
           # lines reach this log.
           ./gradlew :plugins:aps:testFullDebugUnitTest --tests '*HistoryReplayTest*' --console=plain > "$W/gradle.log" 2>&1

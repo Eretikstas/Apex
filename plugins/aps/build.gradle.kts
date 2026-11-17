@@ -64,3 +64,8 @@ dependencies {
     // OREF Advisor: optional on-device LightGBM via ONNX (place models under assets/oref/).
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
 }
+// The history replay (HistoryReplayTest) runs thousands of decision ticks in one test; its workflow
+// asks for a bigger test heap. Other runs are not changed.
+tasks.withType<Test>().configureEach {
+    System.getenv("AIMI_REPLAY_HEAP")?.let { maxHeapSize = it }
+}
