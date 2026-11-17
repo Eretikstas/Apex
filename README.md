@@ -133,7 +133,7 @@ smoothed) are only in the dev version.*
   20 minutes ahead
 - holding a point of the BG graph shows the smoothed value and the raw value in brackets
 - coloured BG dots every minute with a 1 minute CGM and UKF smoothing (display only)
-- graphs for the AutoISF factors and iobTH (also in the IOB graph); duISF is cyan, so it is not mixed
+- graphs for the AutoISF factors and iobTH (also in the IOB graph); duISF is blue, so it is not mixed
   up with the green acISF
 - German texts for everything this fork added
 
@@ -173,6 +173,11 @@ This program comes with ABSOLUTELY NO WARRANTY, to the extent permitted by appli
 ## Changelog (German)
 
 The newest changes. ⚠ = this change can affect insulin dosing.
+
+### 2026-11-17 (42) – duISF-Linie in Blau
+
+- **AutoISF-Graph:** die **duISF-Linie** ist jetzt **blau** statt cyan. Cyan war im hellen Design auf Weiß zu blass.
+  Blau ist gut zu sehen, auf dunklem und hellem Hintergrund, und keine andere Linie dieses Graphen ist blau.
 
 ### 2026-11-17 (40) – BZ-Alter: Sekunden nur unter 2 Minuten
 
@@ -220,22 +225,6 @@ Aus dev übernommen (dort getestet):
   **Automatic** (Standard: Uhr, wenn sie in den letzten 10 Minuten Schritte geschickt hat, sonst Handy). Es zählt
   immer nur die neueste Uhr-Zeile, nichts doppelt. Die Monitor-Logik bleibt wie im Original AutoISF.
   Garmin nur mit einem Watchface, das die Schritte mitschickt. Ohne Uhr bleibt alles wie bisher.
-
-### 2026-11-12 (32) – Gemeldete Fehler: AutoISF-Tab, BZ-Anzeige, iobTH-Legende, Classifier aus, Logdateien
-
-- **AutoISF-Tab** wie in AutoISF 3.4.2.6: zuerst das Ergebnis (Script Debug, Result, Request – offen), dann die
-  Eingaben (zugeklappt, außer Glucose Status). Der **Glucose Status zeigt alle AutoISF-Werte** (duraISF, Parabel
-  a0–a2, corrSqu, deltaPl/deltaPn, bgAcceleration …), das **Profil die Schritte** (recent_steps 5–60, phone_moved …).
-- **Log:** nur noch `FitUsesRaw=…` statt `rawFit=…; smoothedFit=…`.
-- **Einheitlicher BZ-Wert:** Benachrichtigung/Statusleiste, Wear-Uhr, SMS und Tizen zeigen denselben, neuesten Wert
-  wie Hauptbildschirm und Loop (vorher bei 1-Minuten-Sensoren bis zu 4 Minuten alt). Nur Anzeige.
-- **IOB-Graph:** Legende für IOB und iobTH, wenn iobTH eingeschaltet ist – iobTH gestrichelt wie seine Linie und
-  hellviolett. iobTH ist nur noch im IOB-Graph wählbar, nicht mehr in den Graphen 2–5.
-- ⚠ **Activity Classifier ist jetzt standardmäßig aus.** Er gehört nicht zu AutoISF 3.4 (kam mit der AAPS-4-Basis)
-  und ändert Ziel und SMB-Größe – das soll niemand ungefragt haben. Wer ihn will, schaltet ihn in den
-  Activity-Monitor-Einstellungen ein; wer ihn schon selbst eingeschaltet hatte, behält ihn.
-- **Logdateien** liegen jetzt auch in der normalen Version in `Documents/aapsLogs` (stündliches Zip, 30 Tage),
-  wie bei AutoISF 3.4 – damit die AutoISF-Emulator-Werkzeuge sie lesen können.
 
 All changes: [CHANGELOG-autoISF.md](CHANGELOG-autoISF.md)
 <!-- changelog:end -->
