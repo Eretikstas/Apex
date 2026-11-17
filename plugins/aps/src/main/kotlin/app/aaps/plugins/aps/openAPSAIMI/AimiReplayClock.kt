@@ -20,5 +20,8 @@ object AimiReplayClock {
     /** Replay trial: the dynamic basal booster may lower the rate but never raise it. AIMI_REPLAY_NO_BOOSTER=1. */
     val noBasalBooster: Boolean = System.getenv("AIMI_REPLAY_NO_BOOSTER") == "1"
 
+    /** Replay trial: the basal booster takes off what the insulin on board will do in its 60 min. AIMI_REPLAY_BOOSTER_IOB=1. */
+    val boosterSeesInsulin: Boolean = System.getenv("AIMI_REPLAY_BOOSTER_IOB") == "1"
+
     fun now(): Long = override?.invoke() ?: System.currentTimeMillis()
 }

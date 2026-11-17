@@ -14465,6 +14465,9 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             shortAvgDelta = shortAvgDelta.toDouble(),
             projectionHorizonMin = DynamicBasalController.PROJECTION_HORIZON_MIN
                 .takeIf { preferences.get(BooleanKey.OApsAIMIBasalProjectedError) },
+            // Replay trial: about half of the insulin on board acts in the next 60 minutes.
+            insulinDropMgdl = if (AimiReplayClock.boosterSeesInsulin)
+                maxOf(0.0, iob.toDouble()) * (stackCapIsf() ?: profile.sens) * 0.5 else 0.0,
         )
         var rateAdjustment = dynamicState.finalRate.coerceAtLeast(0.0)
         // Same rule as the engine's PI fallback: no up-multiplier while the stack can reach 70 on its own,

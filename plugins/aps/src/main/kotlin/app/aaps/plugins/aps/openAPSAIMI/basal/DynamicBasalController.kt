@@ -56,6 +56,7 @@ class DynamicBasalController @Inject constructor(
         delta: Double,
         shortAvgDelta: Double,
         projectionHorizonMin: Double? = null,
+        insulinDropMgdl: Double = 0.0,
     ): ControllerState {
         
         // 1. Proportional Error (Distance from target)
@@ -96,7 +97,8 @@ class DynamicBasalController @Inject constructor(
         val legacySignal = (proportionalError * P_WEIGHT) + (derivativeError * D_WEIGHT)
         val totalErrorSignal = if (projectionHorizonMin != null && projectionHorizonMin > 0.0) {
             val steps = projectionHorizonMin / 5.0
-            val projectedBg = bg + velocity * steps
+            // insulinDropMgdl: what the insulin already given will take off in the horizon (replay trial).
+            val projectedBg = bg + velocity * steps - insulinDropMgdl
             min((projectedBg - targetBg) * P_WEIGHT, legacySignal)
         } else {
             legacySignal
