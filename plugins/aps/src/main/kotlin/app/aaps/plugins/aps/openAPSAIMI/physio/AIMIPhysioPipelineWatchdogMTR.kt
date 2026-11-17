@@ -8,6 +8,7 @@ import app.aaps.plugins.aps.openAPSAIMI.steps.AIMIHealthConnectSyncServiceMTR
 import app.aaps.plugins.aps.openAPSAIMI.steps.UnifiedActivityProviderMTR
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Periodic integrity check for the physio + activity data chain.
@@ -40,7 +41,7 @@ class AIMIPhysioPipelineWatchdogMTR @Inject constructor(
      * Runs diagnostics and best-effort recovery (HC sync + physio refresh). Safe on any thread.
      */
     suspend fun runCheckAndRecover() {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val start = now - DB_LOOKBACK_MS
 
         val hrCount = try {

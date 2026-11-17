@@ -3,6 +3,7 @@ package app.aaps.plugins.aps.openAPSAIMI.physio.thermal
 import app.aaps.plugins.aps.openAPSAIMI.wcycle.CyclePhase
 import java.util.Locale
 import kotlin.math.abs
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 internal object ThermalBeliefEngine {
 
@@ -34,7 +35,7 @@ internal object ThermalBeliefEngine {
         val latestDelta = latest?.deltaCelsius ?: 0.0
         val rawDeltaVsBaseline = latestDelta - baseline
         val deltaVsBaseline = deadbandDelta(rawDeltaVsBaseline)
-        val nowMs = window.fetchedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis()
+        val nowMs = window.fetchedAtMs.takeIf { it > 0L } ?: AimiReplayClock.now()
         val slope6h = deadbandSlope(slope(samples, nowMs, hours = 6))
         val slope24h = deadbandSlope(slope(samples, nowMs, hours = 24))
         val circadianDisruption = circadianDisruptionScore(samples, baseline)

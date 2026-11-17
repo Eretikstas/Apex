@@ -16,6 +16,7 @@ import app.aaps.plugins.aps.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * User-visible notification when a TPO protection session starts or ends.
@@ -48,7 +49,7 @@ class TpoNotificationManager @Inject constructor(
         if (!preferences.get(BooleanKey.OApsAIMITpoNotifyOnApply)) return
         if (session.status != TpoSessionStatus.ACTIVE) return
 
-        val ui = TpoUiSupport.buildActiveSessionUi(session, System.currentTimeMillis()) ?: return
+        val ui = TpoUiSupport.buildActiveSessionUi(session, AimiReplayClock.now()) ?: return
         val packLabel = context.getString(ui.packTitleResId)
         val title = context.getString(R.string.aimi_tpo_notification_started_title)
         val text = context.getString(

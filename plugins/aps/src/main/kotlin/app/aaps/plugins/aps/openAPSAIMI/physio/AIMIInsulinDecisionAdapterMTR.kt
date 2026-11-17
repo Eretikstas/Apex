@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 💉 AIMI Insulin Decision Adapter - MTR Implementation
@@ -305,7 +306,7 @@ class AIMIInsulinDecisionAdapterMTR @Inject constructor(
         vetoReason: String?
     ) {
         lastDecisionTrace = PhysioDecisionTraceMTR(
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             physioState = state,
             physioConfidence = confidence,
             physioDataQuality = dataQuality,
@@ -480,7 +481,7 @@ class AIMIInsulinDecisionAdapterMTR @Inject constructor(
      * @return true if hypo occurred in last 2 hours
      */
     private fun hasRecentHypoglycemia(explicitTimestamp: Long?): Boolean {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         
         // Check explicit timestamp first
         if (explicitTimestamp != null && (now - explicitTimestamp) < RECENT_HYPO_WINDOW_MS) {
@@ -596,7 +597,7 @@ class AIMIInsulinDecisionAdapterMTR @Inject constructor(
         return mapOf(
             "source" to snapshot.source,
             "confidence" to "${(snapshot.confidence * 100).toInt()}%",
-            "age" to "${(System.currentTimeMillis() - snapshot.timestamp) / 1000}s",
+            "age" to "${(AimiReplayClock.now() - snapshot.timestamp) / 1000}s",
             "isValid" to snapshot.isValid.toString()
         )
     }
@@ -615,7 +616,7 @@ class AIMIInsulinDecisionAdapterMTR @Inject constructor(
             return "🏥 Physio: NO DATA / WAITING | Check Health Connect permissions & Sync"
         }
         
-        val ageMin = (System.currentTimeMillis() - snapshot.timestamp) / 60000
+        val ageMin = (AimiReplayClock.now() - snapshot.timestamp) / 60000
         val sb = StringBuilder()
         
         // Header

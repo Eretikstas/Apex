@@ -3,6 +3,7 @@ package app.aaps.plugins.aps.openAPSAIMI.advisor.auditor
 import java.util.concurrent.ConcurrentLinkedQueue
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🔄 AimiStateTransitionManager
@@ -23,7 +24,7 @@ class AimiStateTransitionManager(
     data class TransitionRecord(
         val from: AuditorUIState,
         val to: AuditorUIState,
-        val timestampMs: Long = System.currentTimeMillis(),
+        val timestampMs: Long = AimiReplayClock.now(),
         val reason: String? = null
     )
 

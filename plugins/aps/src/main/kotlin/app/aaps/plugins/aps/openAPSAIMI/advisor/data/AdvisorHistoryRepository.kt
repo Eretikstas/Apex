@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.util.Collections
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Tracks the history of actions applied via the AIMI Advisor.
@@ -42,7 +43,7 @@ class AdvisorHistoryRepository(context: Context) {
     fun logAction(type: ActionType, key: String, desc: String, oldVal: Any, newVal: Any) {
         val currentList = loadHistory().toMutableList()
         val entry = AdvisorActionLog(
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             type = type,
             description = desc,
             key = key,
@@ -61,7 +62,7 @@ class AdvisorHistoryRepository(context: Context) {
      * Get actions from the last N days.
      */
     fun getRecentActions(days: Int): List<AdvisorActionLog> {
-        val cutoff = System.currentTimeMillis() - (days * 24 * 60 * 60 * 1000L)
+        val cutoff = AimiReplayClock.now() - (days * 24 * 60 * 60 * 1000L)
         return loadHistory().filter { it.timestamp >= cutoff }
     }
 

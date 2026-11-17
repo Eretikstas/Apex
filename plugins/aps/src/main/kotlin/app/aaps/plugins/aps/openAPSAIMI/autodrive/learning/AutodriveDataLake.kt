@@ -13,6 +13,7 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🗂️ Autodrive Data Lake (Data Logger CSV)
@@ -68,7 +69,7 @@ class AutodriveDataLake @Inject constructor(
         rawCommand: AutoDriveCommand?,
         safeCommand: AutoDriveCommand?,
         engaged: Boolean,
-        currentTimestamp: Long = System.currentTimeMillis()
+        currentTimestamp: Long = AimiReplayClock.now()
     ) {
         try {
             val line = formatRow(state, rawCommand, safeCommand, engaged, currentTimestamp)

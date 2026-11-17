@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.advisor.auditor.model
 
 import app.aaps.plugins.aps.openAPSAIMI.model.AdvisorSeverity
 import java.util.concurrent.ConcurrentLinkedQueue
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Robust manager for Auditor UI state transitions.
@@ -16,7 +17,7 @@ object StateTransitionManager {
         val from: AuditorUIState.StateType,
         val to: AuditorUIState.StateType,
         val severity: AdvisorSeverity,
-        val timestampMs: Long = System.currentTimeMillis(),
+        val timestampMs: Long = AimiReplayClock.now(),
         val context: String
     )
 

@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.basal
 
 import app.aaps.core.data.model.TB
 import kotlin.math.max
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Utilitaires robustes d'historique Basal (TBR).
@@ -38,7 +39,7 @@ object BasalHistoryUtils {
      */
     class FetcherProvider(
         private val fetcher: (fromMillis: Long) -> List<TB>,
-        private val nowProvider: () -> Long = { System.currentTimeMillis() }
+        private val nowProvider: () -> Long = { AimiReplayClock.now() }
     ) : BasalHistoryProvider {
 
         override fun zeroBasalDurationMinutes(lookBackHours: Int): Int {

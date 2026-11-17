@@ -6,6 +6,7 @@ import app.aaps.core.interfaces.aps.OapsProfileAimi
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Provides a unified prediction model that mirrors the same parameters used during SMB/basal decisions.
@@ -112,7 +113,7 @@ object AdvancedPredictionEngine {
         }
 
         val steps = maxOf(1, effectiveHorizonMinutes / STEP_MINUTES)
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val carbRatio = profile.carb_ratio.takeIf { it > 0 } ?: 10.0
         val effectiveSensitivity = modulation.effectiveSensitivityMgdlPerU
             .takeIf { it.isFinite() && it > 0.0 }

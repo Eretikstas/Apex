@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🏥 Health Context Repository
@@ -92,7 +93,7 @@ class HealthContextRepository @Inject constructor(
      * Throttled snapshot for Autodrive V3 gater — avoids four DB reads every 5 min when unchanged.
      */
     fun fetchSnapshotForAutodriveGater(): HealthContextSnapshot {
-        val ageMs = System.currentTimeMillis() - lastSnapshot.timestamp
+        val ageMs = AimiReplayClock.now() - lastSnapshot.timestamp
         if (lastSnapshot.isValid && ageMs in 0..AUTODRIVE_GATER_SNAPSHOT_MAX_AGE_MS) {
             return lastSnapshot
         }
@@ -115,9 +116,9 @@ class HealthContextRepository @Inject constructor(
             sleepData == null && hrvList.isEmpty() && rhrList.isEmpty() && lastSnapshot.isValid
 
         // 2. Fetch Real-Time Data (Unified Provider: Watch > Phone > HC)
-        val steps5Result = unifiedProvider.getStepsTotalSince(System.currentTimeMillis() - 5 * 60 * 1000)
-        val steps15Result = unifiedProvider.getStepsTotalSince(System.currentTimeMillis() - 15 * 60 * 1000)
-        val steps60Result = unifiedProvider.getStepsTotalSince(System.currentTimeMillis() - 60 * 60 * 1000)
+        val steps5Result = unifiedProvider.getStepsTotalSince(AimiReplayClock.now() - 5 * 60 * 1000)
+        val steps15Result = unifiedProvider.getStepsTotalSince(AimiReplayClock.now() - 15 * 60 * 1000)
+        val steps60Result = unifiedProvider.getStepsTotalSince(AimiReplayClock.now() - 60 * 60 * 1000)
         val hrResult = unifiedProvider.getLatestHeartRate(15 * 60 * 1000)
 
         // Extract values or defaults
@@ -186,8 +187,8 @@ class HealthContextRepository @Inject constructor(
             confidence = (confidence + 0.15).coerceAtMost(1.0)
         }
 
-        val hcSleepActive = sleepData?.isOngoingAt(System.currentTimeMillis()) == true
-        val clockIsNight = clockIsNightHour(System.currentTimeMillis())
+        val hcSleepActive = sleepData?.isOngoingAt(AimiReplayClock.now()) == true
+        val clockIsNight = clockIsNightHour(AimiReplayClock.now())
         val sleepLive = SleepLiveDetector.evaluate(
             SleepLiveDetector.Input(
                 stepsLast15m = steps15,
@@ -214,7 +215,7 @@ class HealthContextRepository @Inject constructor(
             activityState = activityState,
             hrNow = currentHR,
             hrAvg15m = currentHR, // Approximation if simple point
-            hrMeasuredAtMs = if (currentHR > 0) System.currentTimeMillis() else 0L,
+            hrMeasuredAtMs = if (currentHR > 0) AimiReplayClock.now() else 0L,
             hrvRmssd = hrv,
             hrvDepression = hrvDepression,
             hrvBaselineMean = hrvBaseline.mean,
@@ -227,7 +228,7 @@ class HealthContextRepository @Inject constructor(
             asleepLiveConfidence = sleepLive.confidence,
             asleepLiveSource = sleepLive.source.name,
             thermalBelief = thermalBelief,
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             confidence = confidence.coerceIn(0.0, 1.0),
             source = "Merged(Unified+HC)",
             isValid = confidence > 0.3
@@ -286,7 +287,7 @@ class HealthContextRepository @Inject constructor(
         }
         PatientStateRuntimeRefresher.refreshFromHealthSnapshot(
             healthSnapshot = snapshot,
-            nowMs = System.currentTimeMillis(),
+            nowMs = AimiReplayClock.now(),
         )
     }
 
@@ -324,7 +325,7 @@ class HealthContextRepository @Inject constructor(
     }
 
     private fun refreshAwakeRestingHeartRateAsync() {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val measuredAt = awakeRestingMeasuredAtMs.get()
         if (measuredAt != 0L && now - measuredAt in 0..AWAKE_RESTING_REFRESH_MS) return
         if (!awakeRestingInFlight.compareAndSet(false, true)) return
@@ -336,7 +337,7 @@ class HealthContextRepository @Inject constructor(
                 val samples = buildAwakeSamples(heartRates, steps)
                 val estimate = AwakeRestingHeartRate.estimate(samples, ZoneId.systemDefault())
                 awakeRestingRef.set(estimate)
-                awakeRestingMeasuredAtMs.set(System.currentTimeMillis())
+                awakeRestingMeasuredAtMs.set(AimiReplayClock.now())
                 aapsLogger.debug(
                     LTag.APS,
                     "[$TAG] awake resting HR: ${estimate ?: "stand down"} from ${samples.size} samples",
@@ -347,7 +348,7 @@ class HealthContextRepository @Inject constructor(
                 // gesture down — so a database hiccup would end a protection. One hour of a baseline
                 // that moves by about one beat a day is a far smaller error than that.
                 aapsLogger.warn(LTag.APS, "[$TAG] awake resting HR measurement failed, keeping the last value", e)
-                awakeRestingMeasuredAtMs.set(System.currentTimeMillis())
+                awakeRestingMeasuredAtMs.set(AimiReplayClock.now())
             } finally {
                 awakeRestingInFlight.set(false)
             }

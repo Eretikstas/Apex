@@ -24,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * ============================================================================
@@ -172,7 +173,7 @@ class AuditorOrchestrator @Inject constructor(
         onSyncDisposition: (AuditorJsonlExport.TickDisposition) -> Unit = {},
         callback: ((AuditorVerdict?, DecisionResult) -> Unit)? = null
     ) {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         // Reset each tick; set again below only if the Sentinel actually runs, so early-exit dispositions
         // (DISABLED / SKIPPED_*) don't carry a stale agreement/factor into the JSONL telemetry.
         lastSentinelAdvice = null
@@ -499,7 +500,7 @@ class AuditorOrchestrator @Inject constructor(
         onProfileProposal: (AuditorProfileProposal) -> Unit,
     ) {
         if (request == null) return
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (!AuditorProfileFactorRateLimit.allow(now, lastProfileFactorRequestMs)) {
             aapsLogger.info(LTag.APS, "🧪 Profile factors: skipped, one request per 15 minutes")
             return
@@ -515,13 +516,13 @@ class AuditorOrchestrator @Inject constructor(
                 cgmNoise = request.cgmNoise,
             )
             val contextJson = context.toPromptJson().toString()
-            val sentAtMs = System.currentTimeMillis()
+            val sentAtMs = AimiReplayClock.now()
             val output = aiService.getProfileFactorProposal(
                 prompt = AuditorProfileFactorPromptBuilder.buildPrompt(context, verdict),
                 provider = provider,
                 timeoutMs = timeoutMs,
             )
-            val receivedAtMs = System.currentTimeMillis()
+            val receivedAtMs = AimiReplayClock.now()
             val proposal = AuditorProfileFactorValidator.validate(
                 output = output,
                 context = context,
@@ -705,7 +706,7 @@ class AuditorOrchestrator @Inject constructor(
      * Performance: Cached bucket calculation 
      */
     private fun getCurrentTimeBucket(): Long {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (cachedTimeBucket == -1L || now - cachedTimeBucket > 300_000) {
             cachedTimeBucket = now / (5 * 60 * 1000) * (5 * 60 * 1000)
         }

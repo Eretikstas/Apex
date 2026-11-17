@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.minutes
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Context Activity - UI for Context Module.
@@ -234,7 +235,7 @@ class ContextActivity : TranslatedDaggerAppCompatActivity() {
         val presentation = runtimeSnapshot?.let {
             PatientStatePresentationBuilder.build(
                 snapshot = it,
-                nowMs = System.currentTimeMillis(),
+                nowMs = AimiReplayClock.now(),
             )
         }
         if (presentation == null) {
@@ -293,7 +294,7 @@ class ContextActivity : TranslatedDaggerAppCompatActivity() {
     }
     
     private fun getTimeRemaining(intent: app.aaps.plugins.aps.openAPSAIMI.context.ContextIntent): String {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val remaining = (intent.endTimeMs - now) / 1000 / 60 // minutes
         
         return when {

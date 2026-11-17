@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Unified Reactivity Learner - Remplace le système de buckets temporels
@@ -724,7 +725,7 @@ class UnifiedReactivityLearner @Inject constructor(
     private fun exportToCSV(perf: GlycemicPerformance, reasonsStr: String) {
         try {
             val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-            val timestamp = System.currentTimeMillis()
+            val timestamp = AimiReplayClock.now()
             val date = sdf.format(Date(timestamp))
             
             val line = listOf(

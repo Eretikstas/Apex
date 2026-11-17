@@ -3,6 +3,7 @@ package app.aaps.plugins.aps.openAPSAIMI.physio
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.LinkedList
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🧮 Physio Aggregator
@@ -28,7 +29,7 @@ class PhysioAggregator @Inject constructor() {
      */
     fun addStepDelta(steps: Int) {
         if (steps <= 0) return
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         synchronized(stepBuffer) {
             stepBuffer.add(TimestampedValue(now, steps.toDouble()))
             cleanup(stepBuffer, WINDOW_60M)
@@ -40,7 +41,7 @@ class PhysioAggregator @Inject constructor() {
      */
     fun addHeartRate(bpm: Int) {
         if (bpm <= 0) return
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         synchronized(hrBuffer) {
             hrBuffer.add(TimestampedValue(now, bpm.toDouble()))
             cleanup(hrBuffer, WINDOW_60M) // Keep 60m for context if needed
@@ -52,7 +53,7 @@ class PhysioAggregator @Inject constructor() {
      */
     fun getStepsLast(minutes: Int): Int {
         val windowMs = minutes * 60 * 1000L
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val threshold = now - windowMs
         
         synchronized(stepBuffer) {
@@ -65,7 +66,7 @@ class PhysioAggregator @Inject constructor() {
      */
     fun getHrAverage(minutes: Int): Int {
         val windowMs = minutes * 60 * 1000L
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val threshold = now - windowMs
         
         synchronized(hrBuffer) {
@@ -76,7 +77,7 @@ class PhysioAggregator @Inject constructor() {
     }
 
     private fun cleanup(buffer: LinkedList<TimestampedValue>, maxRetentionMs: Long) {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val threshold = now - maxRetentionMs
         while (buffer.isNotEmpty() && buffer.first.ts < threshold) {
             buffer.removeFirst()

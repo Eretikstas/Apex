@@ -27,6 +27,7 @@ import app.aaps.core.interfaces.aps.GlucoseStatusAIMI
 import app.aaps.plugins.aps.openAPSAIMI.patient.PatientStateRuntimeRepository
 import app.aaps.plugins.aps.openAPSAIMI.pkpd.PkpdSmbTailDamping
 import org.json.JSONObject
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * =============================================================================
@@ -152,7 +153,7 @@ class AimiAdvisorService {
         val visibleRecommendations = recommendations.filter { isRecommendationVisible(it, history) }
 
         return AdvisorReport(
-            generatedAt = System.currentTimeMillis(),
+            generatedAt = AimiReplayClock.now(),
             metrics = context.metrics,
             overallScore = score,
             overallSeverity = severity,
@@ -375,7 +376,7 @@ class AimiAdvisorService {
         if (persistenceLayer != null) {
             try {
                 // Fetch BG readings directly for the period
-                val now = System.currentTimeMillis()
+                val now = AimiReplayClock.now()
                 val fromTime = now - (days * 24 * 3600 * 1000L)
                 val bgReadings = persistenceLayer.getBgReadingsDataFromTimeToTime(fromTime, now, ascending = false)
 
@@ -1037,7 +1038,7 @@ class AimiAdvisorService {
         val profile = profileFunction?.let { runBlocking(Dispatchers.IO) { it.getProfile() } }
         if (profile == null) {
             return BasalProfileProposal(
-                generatedAt = System.currentTimeMillis(),
+                generatedAt = AimiReplayClock.now(),
                 periodDays = periodDays,
                 strategy = "NO_PROFILE",
                 scalingFactor = 1.0,
@@ -1058,7 +1059,7 @@ class AimiAdvisorService {
         }
 
         return BasalProfileProposal(
-            generatedAt = System.currentTimeMillis(),
+            generatedAt = AimiReplayClock.now(),
             periodDays = periodDays,
             strategy = strategy,
             scalingFactor = factor,
@@ -1177,7 +1178,7 @@ class AimiAdvisorService {
         history: List<AdvisorHistoryRepository.AdvisorActionLog>,
         update: app.aaps.plugins.aps.openAPSAIMI.model.AimiAction.PreferenceUpdate,
     ): Boolean {
-        val threshold = System.currentTimeMillis() - (48 * 3600 * 1000L)
+        val threshold = AimiReplayClock.now() - (48 * 3600 * 1000L)
         val keyStr = update.key.key
         return history.any { entry ->
             entry.timestamp >= threshold &&
@@ -1196,7 +1197,7 @@ class AimiAdvisorService {
             }
 
             // 1. Fetch Raw Data
-            val now = System.currentTimeMillis()
+            val now = AimiReplayClock.now()
             val fromTime = now - (periodDays * 24 * 3600 * 1000L)
             
             val bgReadings = try {

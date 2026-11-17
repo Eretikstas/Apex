@@ -1,5 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.physio
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
+
 /**
  * 📊 Health Connect Fetch Outcome
  * 
@@ -37,7 +39,7 @@ data class ProbeResult(
     val stepsCount: Int,
     val dataOrigins: Set<String>,
     val windowDays: Int,
-    val probeTimestamp: Long = System.currentTimeMillis()
+    val probeTimestamp: Long = AimiReplayClock.now()
 ) {
     fun hasAnyData(): Boolean = sleepCount > 0 || hrvCount > 0 || heartRateCount > 0 || stepsCount > 0
     

@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * reliable resolver for Gemini Model IDs.
@@ -101,7 +102,7 @@ class GeminiModelResolver @Inject constructor(
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val diskTs = prefs.getLong(KEY_CACHE_TIMESTAMP, 0)
         
-        if (System.currentTimeMillis() - diskTs < CACHE_TTL_MS) {
+        if (AimiReplayClock.now() - diskTs < CACHE_TTL_MS) {
             val jsonStr = prefs.getString(KEY_AVAILABLE_MODELS, null)
             if (jsonStr != null) {
                 val set = parseModelsSet(jsonStr)
@@ -119,7 +120,7 @@ class GeminiModelResolver @Inject constructor(
             
             // Save to Disk
             prefs.edit()
-                .putLong(KEY_CACHE_TIMESTAMP, System.currentTimeMillis())
+                .putLong(KEY_CACHE_TIMESTAMP, AimiReplayClock.now())
                 .putString(KEY_AVAILABLE_MODELS, freshModels.joinToString(","))
                 .apply()
             
@@ -148,11 +149,11 @@ class GeminiModelResolver @Inject constructor(
     private fun updateMemoryCache(models: Set<String>) {
         memoryCache.clear()
         models.forEach { memoryCache[it] = true }
-        lastCacheUpdate = System.currentTimeMillis()
+        lastCacheUpdate = AimiReplayClock.now()
     }
 
     private fun isCacheExpired(): Boolean {
-        return (System.currentTimeMillis() - lastCacheUpdate) > CACHE_TTL_MS
+        return (AimiReplayClock.now() - lastCacheUpdate) > CACHE_TTL_MS
     }
 
     private fun parseModelsSet(csv: String): Set<String> {
@@ -160,7 +161,7 @@ class GeminiModelResolver @Inject constructor(
     }
 
     private fun fetchModelsFromApi(apiKey: String): Set<String> {
-        val start = System.currentTimeMillis()
+        val start = AimiReplayClock.now()
         var connection: HttpURLConnection? = null
         try {
             val url = URL("$BASE_URL?key=$apiKey")
@@ -178,7 +179,7 @@ class GeminiModelResolver @Inject constructor(
             }
 
             val response = connection.inputStream.bufferedReader().use { it.readText() }
-            val latency = System.currentTimeMillis() - start
+            val latency = AimiReplayClock.now() - start
             Log.d(TAG, "ListModels success ($latency ms). Response size: ${response.length}")
             
             val json = JSONObject(response)

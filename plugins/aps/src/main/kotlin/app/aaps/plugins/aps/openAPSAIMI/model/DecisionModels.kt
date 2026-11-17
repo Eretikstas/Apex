@@ -1,6 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.model
 
 import app.aaps.core.keys.interfaces.PreferenceKey
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🛰️ AIMI Core Decision Models
@@ -25,7 +26,7 @@ sealed class AimiAction {
         override val reason: String,
         override val domain: AimiDomain = AimiDomain.Basal,
         override val priority: AimiPriority = AimiPriority.Medium,
-        override val timestamp: Long = System.currentTimeMillis()
+        override val timestamp: Long = AimiReplayClock.now()
     ) : AimiAction()
 
     data class SMB(
@@ -33,7 +34,7 @@ sealed class AimiAction {
         override val reason: String,
         override val domain: AimiDomain = AimiDomain.Smb,
         override val priority: AimiPriority = AimiPriority.Medium,
-        override val timestamp: Long = System.currentTimeMillis()
+        override val timestamp: Long = AimiReplayClock.now()
     ) : AimiAction()
 
     data class Bolus(
@@ -41,7 +42,7 @@ sealed class AimiAction {
         override val reason: String,
         override val domain: AimiDomain = AimiDomain.Bolus,
         override val priority: AimiPriority = AimiPriority.High,
-        override val timestamp: Long = System.currentTimeMillis()
+        override val timestamp: Long = AimiReplayClock.now()
     ) : AimiAction()
 
     data class PreferenceUpdate(
@@ -50,7 +51,7 @@ sealed class AimiAction {
         override val reason: String,
         override val domain: AimiDomain = AimiDomain.Profile,
         override val priority: AimiPriority = AimiPriority.Medium,
-        override val timestamp: Long = System.currentTimeMillis()
+        override val timestamp: Long = AimiReplayClock.now()
     ) : AimiAction()
 
     data class Notification(
@@ -59,7 +60,7 @@ sealed class AimiAction {
         override val domain: AimiDomain = AimiDomain.Safety,
         override val priority: AimiPriority = AimiPriority.Low,
         override val reason: String,
-        override val timestamp: Long = System.currentTimeMillis()
+        override val timestamp: Long = AimiReplayClock.now()
     ) : AimiAction()
 }
 
@@ -169,5 +170,5 @@ data class AimiPluginContext(
     val iob: List<app.aaps.core.interfaces.aps.IobTotal>,
     val cob: Double,
     val preferences: app.aaps.core.keys.interfaces.Preferences,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = AimiReplayClock.now()
 )

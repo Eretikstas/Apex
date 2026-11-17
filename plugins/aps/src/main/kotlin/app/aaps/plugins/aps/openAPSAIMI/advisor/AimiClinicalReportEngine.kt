@@ -10,6 +10,7 @@ import org.json.JSONObject
 import javax.inject.Inject
 import kotlin.math.pow
 import kotlin.math.sqrt
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🏥 AIMI Clinical Report Engine
@@ -40,7 +41,7 @@ class AimiClinicalReportEngine @Inject constructor(
         // 1. Metadata
         root.put("meta", JSONObject().apply {
             put("version", "2.1-ENDO")
-            put("generatedAt", System.currentTimeMillis())
+            put("generatedAt", AimiReplayClock.now())
             put("generator", "AIMI Clinical Engine")
         })
 

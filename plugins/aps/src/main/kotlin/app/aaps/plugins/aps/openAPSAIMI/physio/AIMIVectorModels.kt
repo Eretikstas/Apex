@@ -1,5 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.physio
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
+
 /**
  * 🌀 AIMI Adaptive Trajectory - Vector Models
  *
@@ -87,5 +89,5 @@ data class GateInput(
     val sleepState: Boolean, // True if sleep detected
     val physioState: PhysioStateMTR, // From PhysioEngine
     val dataQuality: Double, // 0.0 - 1.0
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = AimiReplayClock.now()
 )

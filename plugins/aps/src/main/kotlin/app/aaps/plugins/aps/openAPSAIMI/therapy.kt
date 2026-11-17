@@ -79,7 +79,7 @@ class Therapy(private val persistenceLayer: PersistenceLayer) {
     }
 
     private fun refreshIfNeededAsync() {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val current = snapshotRef.get()
         if (current != null && now - current.generatedAtMs < SNAPSHOT_TTL_MS) return
         if (!refreshInFlight.compareAndSet(false, true)) return
@@ -96,7 +96,7 @@ class Therapy(private val persistenceLayer: PersistenceLayer) {
     }
 
     private suspend fun buildSnapshot(): TherapySnapshot {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val fromTime = now - TimeUnit.DAYS.toMillis(1)
         // Context intents are stored as notes too ("AIMI_CONTEXT:<id>:{json}"). Their JSON holds words
         // like "Meal" or "SPORT_INTENSE", so every keyword below would read them as a mode the person
@@ -323,7 +323,7 @@ class Therapy(private val persistenceLayer: PersistenceLayer) {
             }
 
     fun getTimeElapsedSinceLastEvent(keyword: String): Long {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val fromTime = now - TimeUnit.MINUTES.toMillis(60)
         val lastEvent = latestNoteEvents
             .asSequence()

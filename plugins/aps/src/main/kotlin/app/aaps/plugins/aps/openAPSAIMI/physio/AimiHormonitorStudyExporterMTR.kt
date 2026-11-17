@@ -31,6 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 data class HormonitorDecisionEventMTR(
     val eventId: String,
@@ -446,7 +447,7 @@ class AimiHormonitorStudyExporterMTR(
         }
         persistDailyState()
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (now - lastDailyEmitMs < DAILY_EMIT_INTERVAL_MS) return
         lastDailyEmitMs = now
 
@@ -543,7 +544,7 @@ class AimiHormonitorStudyExporterMTR(
     }
 
     private fun persistDailyState() {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (now - lastStatePersistMs < STATE_PERSIST_INTERVAL_MS) return
         lastStatePersistMs = now
 
@@ -603,7 +604,7 @@ class AimiHormonitorStudyExporterMTR(
         writeScope.launch {
             while (isActive) {
                 delay(WATCHDOG_INTERVAL_MS)
-                val now = System.currentTimeMillis()
+                val now = AimiReplayClock.now()
                 val pendingId = pendingTickEndId
                 val pendingPulseAt = pendingTickPulseWallMs
                 if (pendingId > 0L && pendingPulseAt > 0L) {
@@ -784,7 +785,7 @@ class AimiHormonitorStudyExporterMTR(
         ) {
             qa.criticalFieldMissingCount += 1
         }
-        if (event.eventTimestamp <= 0L || event.eventTimestamp > System.currentTimeMillis() + 5 * 60_000L) {
+        if (event.eventTimestamp <= 0L || event.eventTimestamp > AimiReplayClock.now() + 5 * 60_000L) {
             qa.invalidTimestampCount += 1
         }
         if (
@@ -804,7 +805,7 @@ class AimiHormonitorStudyExporterMTR(
         if (snapshotAgeSeconds != null && snapshotAgeSeconds > SNAPSHOT_STALE_THRESHOLD_SECONDS) {
             qa.staleSnapshotCount += 1
         }
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (now - lastQaEmitMs < DAILY_EMIT_INTERVAL_MS) return
         lastQaEmitMs = now
 

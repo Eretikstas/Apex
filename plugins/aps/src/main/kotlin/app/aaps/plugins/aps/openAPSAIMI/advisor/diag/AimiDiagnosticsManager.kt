@@ -17,6 +17,7 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Moteur de diagnostic sécurisé pour AIMI.
@@ -238,7 +239,7 @@ class AimiDiagnosticsManager(
         sb.append("Started: ").append(formatMs(session.startedAtMs)).append('\n')
         sb.append("Expires: ").append(formatMs(session.expiresAtMs))
         val live = session.status == TpoSessionStatus.ACTIVE || session.status == TpoSessionStatus.PENDING_LLM
-        if (live && System.currentTimeMillis() > session.expiresAtMs) {
+        if (live && AimiReplayClock.now() > session.expiresAtMs) {
             sb.append("  PAST ITS EXPIRY AND STILL WRITTEN - the loop has not reverted it")
         }
         sb.append('\n')

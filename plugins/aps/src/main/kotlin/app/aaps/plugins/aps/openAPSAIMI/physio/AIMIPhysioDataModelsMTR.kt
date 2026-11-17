@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.physio
 
 import org.json.JSONObject
 import java.time.Instant
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🏥 AIMI Physiological Assistant - Data Models MTR
@@ -85,7 +86,7 @@ data class RawPhysioDataMTR(
     val hrv: List<HRVDataMTR> = emptyList(),
     val rhr: List<RHRDataMTR> = emptyList(),
     val steps: Int = 0,
-    val fetchTimestamp: Long = System.currentTimeMillis(),
+    val fetchTimestamp: Long = AimiReplayClock.now(),
     /** Vitals from PersistenceLayer via UnifiedActivityProvider (Wear / HealthConnect sync / phone) when HC-native fetch is empty. */
     val ambientHeartRateBpm: Int = 0,
     /** Approximate step signal from unified DB window (e.g. last 24h sum of 5m buckets). */
@@ -134,7 +135,7 @@ data class PhysioFeaturesMTR(
     val stepsTrend: Double = 0.0, // -1 to +1
     
     // Metadata
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = AimiReplayClock.now(),
     val dataQuality: Double = 0.0, // 0-1, based on completeness
     val hasValidData: Boolean = false
 ) {
@@ -338,14 +339,14 @@ data class PhysioContextMTR(
     val recommendIncreaseISF: Boolean = false,
     
     // Metadata
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = AimiReplayClock.now(),
     val validUntil: Long = timestamp + (20 * 60 * 60 * 1000), // 20h
     val narrative: String = "", // LLM-generated, optional
     val features: PhysioFeaturesMTR? = null
 ) {
-    fun isValid(): Boolean = System.currentTimeMillis() < validUntil && confidence > 0.3
+    fun isValid(): Boolean = AimiReplayClock.now() < validUntil && confidence > 0.3
     
-    fun ageSeconds(): Long = (System.currentTimeMillis() - timestamp) / 1000
+    fun ageSeconds(): Long = (AimiReplayClock.now() - timestamp) / 1000
     
     fun toJSON(): JSONObject = JSONObject().apply {
         put("state", state.name)
@@ -491,7 +492,7 @@ data class AimiPhysioInputs(
  * Captures a single physio decision event from adapter runtime.
  */
 data class PhysioDecisionTraceMTR(
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = AimiReplayClock.now(),
     val physioState: String = PhysioStateMTR.UNKNOWN.name,
     val physioConfidence: Double = 0.0,
     val physioDataQuality: Double = 0.0,

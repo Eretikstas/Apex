@@ -1,5 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.advisor.auditor
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
+
 /**
  * AI Auditor Status Tracking
  * 
@@ -63,7 +65,7 @@ object AuditorStatusTracker {
      */
     fun updateStatus(status: Status) {
         currentStatus = status
-        lastUpdateMs = System.currentTimeMillis()
+        lastUpdateMs = AimiReplayClock.now()
     }
     
     /**
@@ -74,7 +76,7 @@ object AuditorStatusTracker {
             return Pair(Status.OFF, null)
         }
         
-        val ageMs = System.currentTimeMillis() - lastUpdateMs
+        val ageMs = AimiReplayClock.now() - lastUpdateMs
         if (ageMs > maxAgeMs) {
             return Pair(Status.STALE, ageMs)
         }

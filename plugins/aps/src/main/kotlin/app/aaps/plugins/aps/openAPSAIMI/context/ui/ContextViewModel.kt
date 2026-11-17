@@ -17,6 +17,7 @@ import app.aaps.plugins.aps.openAPSAIMI.trajectory.TrajectoryGuard
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlin.time.Duration.Companion.minutes
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * ViewModel for Context Activity.
@@ -169,7 +170,7 @@ class ContextViewModel(
      * Get formatted time remaining for intent.
      */
     fun getTimeRemaining(intent: ContextIntent): String {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val remaining = (intent.endTimeMs - now) / 1000 / 60 // minutes
         
         return when {

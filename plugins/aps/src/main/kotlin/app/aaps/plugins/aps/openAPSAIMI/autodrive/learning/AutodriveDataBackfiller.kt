@@ -17,6 +17,7 @@ import app.aaps.plugins.aps.openAPSAIMI.autodrive.learning.AutodriveDatasetSchem
 import app.aaps.plugins.aps.openAPSAIMI.utils.AimiStorageHelper
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🧹 Autodrive Data Backfiller
@@ -196,7 +197,7 @@ class AutodriveDataBackfiller @Inject constructor(
         // cette passe toutes les 6 h, par la porte de volume et par l'entraîneur. Enregistrer chaque
         // tick au lieu des seuls ticks engagés multiplie sa croissance par ~3,5, donc le plafond doit
         // exister avant. La purge se fait ici parce que cette passe réécrit le fichier de toute façon.
-        val retentionCutoff = System.currentTimeMillis() - RETENTION_MILLIS
+        val retentionCutoff = AimiReplayClock.now() - RETENTION_MILLIS
         val retained = parsedLines.filter { it.timestamp <= 0L || it.timestamp >= retentionCutoff }
         val prunedCount = parsedLines.size - retained.size
         if (prunedCount > 0) {

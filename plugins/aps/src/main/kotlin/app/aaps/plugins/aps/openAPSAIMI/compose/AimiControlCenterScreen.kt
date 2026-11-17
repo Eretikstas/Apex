@@ -53,6 +53,7 @@ import app.aaps.plugins.aps.openAPSAIMI.tpo.TpoSessionStatus
 import app.aaps.plugins.aps.openAPSAIMI.tpo.TpoUiSupport
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 @Composable
 fun AimiControlCenterScreen(
@@ -128,7 +129,7 @@ fun AimiControlCenterScreen(
     val tpoActiveSessionUi = remember(tpoUiRevision) {
         TpoUiSupport.buildActiveSessionUi(
             session = tpoOrchestrator.currentSession(),
-            nowMs = System.currentTimeMillis(),
+            nowMs = AimiReplayClock.now(),
         )
     }
 

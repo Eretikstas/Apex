@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Singleton
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.minutes
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Context Manager - Storage & lifecycle gestion des intents utilisateur.
@@ -41,7 +42,7 @@ import kotlin.time.Duration.Companion.minutes
  * contextManager.addIntent("heavy cardio 1h")
  * 
  * // Get snapshot for current tick
- * val snapshot = contextManager.getSnapshot(System.currentTimeMillis())
+ * val snapshot = contextManager.getSnapshot(AimiReplayClock.now())
  * 
  * // Remove intent
  * contextManager.removeIntent(intentId)
@@ -129,7 +130,7 @@ class ContextManager @Inject constructor(
         }
         
         // Cleanup expired and SAVE
-        cleanupExpired(System.currentTimeMillis())
+        cleanupExpired(AimiReplayClock.now())
         saveToStorage()
         notifyPatientStateChanged()
         
@@ -192,7 +193,7 @@ class ContextManager @Inject constructor(
         aapsLogger.debug(LTag.APS, "[ContextManager] Stored preset $id: $intent")
         
         // Cleanup expired and SAVE
-        cleanupExpired(System.currentTimeMillis())
+        cleanupExpired(AimiReplayClock.now())
         saveToStorage()
         notifyPatientStateChanged()
         
@@ -387,7 +388,7 @@ class ContextManager @Inject constructor(
     }
     
     private fun generateId(): String {
-        return "CTX_${System.currentTimeMillis()}_${nextId++}"
+        return "CTX_${AimiReplayClock.now()}_${nextId++}"
     }
 
     // --- PERSISTENCE ---
@@ -455,69 +456,69 @@ class ContextManager @Inject constructor(
                     
                     val intent = when(type) {
                         "Activity" -> Activity(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             activityType = Activity.ActivityType.valueOf(obj.getString("activityType"))
                         )
                         "Illness" -> Illness(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             symptomType = Illness.SymptomType.valueOf(obj.getString("symptomType"))
                         )
                         "Stress" -> Stress(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             stressType = Stress.StressType.valueOf(obj.getString("stressType"))
                         )
                         "Alcohol" -> Alcohol(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             units = obj.getDouble("units").toFloat()
                         )
                         "UnannouncedMealRisk" -> UnannouncedMealRisk(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             riskWindow = obj.getLong("riskWindow").minutes
                         )
                         "Travel" -> Travel(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             timezoneShiftHours = obj.getInt("tz")
                         )
                         "MenstrualCycle" -> MenstrualCycle(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             phase = MenstrualCycle.CyclePhase.valueOf(obj.getString("phase"))
                         )
                         "SlowCarbMeal" -> SlowCarbMeal(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,
                             absorptionDelay = obj.optLong("absorptionDelay", 90L).minutes
                         )
                         "HypoRecovery" -> HypoRecovery(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence
                         )
                         "Custom" -> Custom(
-                            startTimeMs = if (startTimeMs > 0) startTimeMs else System.currentTimeMillis(),
+                            startTimeMs = if (startTimeMs > 0) startTimeMs else AimiReplayClock.now(),
                             durationMs = durationMs,
                             intensity = intensity,
                             confidence = confidence,

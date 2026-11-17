@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 📱 AIMI Phone Steps Sync Service - MTR Implementation
@@ -89,7 +90,7 @@ class AIMIPhoneStepsSyncServiceMTR @Inject constructor(
      */
     private fun syncStepsToDatabase() {
         try {
-            val now = System.currentTimeMillis()
+            val now = AimiReplayClock.now()
             
             // Read all windows from StepService. Unknown (null) becomes 0 and is not written: only steps5 > 0 is stored.
             val steps5 = StepService.getRecentStepCount5Min() ?: 0

@@ -8,6 +8,7 @@ import org.json.JSONObject
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.exp
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🚪 Mechanism Attention Gate (Cerveau IA V3)
@@ -100,7 +101,7 @@ class MechanismAttentionGate @Inject constructor(
     }
 
     private fun getWeights(): AttentionWeights? {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         // On recharge les poids du JSON au maximum une fois par heure
         if (weightsCache == null || (now - lastLoadTime > 60 * 60 * 1000L)) {
             loadWeights()
@@ -126,7 +127,7 @@ class MechanismAttentionGate @Inject constructor(
                 // 0.0 keeps those files behaving exactly as they did.
                 wEngaged = json.optDouble("weight_engaged", 0.0)
             )
-            lastLoadTime = System.currentTimeMillis()
+            lastLoadTime = AimiReplayClock.now()
             aapsLogger.info(LTag.APS, "IA Attention Gate: Nouveaux Poids d'Apprentissage chargés en mémoire.")
             
         } catch (e: Exception) {

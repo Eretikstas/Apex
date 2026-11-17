@@ -12,6 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * LLM Client pour parsing intelligent du contexte utilisateur.
@@ -383,7 +384,7 @@ Output:
             val jsonArray = JSONArray(cleanJson)
             
             val intents = mutableListOf<ContextIntent>()
-            val now = System.currentTimeMillis()
+            val now = AimiReplayClock.now()
             
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)

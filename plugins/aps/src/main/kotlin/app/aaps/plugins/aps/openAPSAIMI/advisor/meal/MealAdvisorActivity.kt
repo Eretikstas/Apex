@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import app.aaps.core.keys.DoubleKey
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Meal Advisor UI: "Snap & Go"
@@ -376,7 +377,7 @@ class MealAdvisorActivity : TranslatedDaggerAppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             val ca = app.aaps.core.data.model.CA(
-                timestamp = System.currentTimeMillis(),
+                timestamp = AimiReplayClock.now(),
                 isValid = true,
                 duration = 0,
                 amount = valCarbs,
@@ -392,7 +393,7 @@ class MealAdvisorActivity : TranslatedDaggerAppCompatActivity() {
             
             preferences.put(app.aaps.core.keys.BooleanKey.OApsAIMIMealAdvisorTrigger, true)
             preferences.put(DoubleKey.OApsAIMILastEstimatedCarbs, valCarbs)
-            val nowMs = System.currentTimeMillis()
+            val nowMs = AimiReplayClock.now()
             preferences.put(DoubleKey.OApsAIMILastEstimatedCarbTime, nowMs.toDouble())
             aapsLogger.debug(
                 LTag.APS,

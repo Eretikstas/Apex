@@ -4,6 +4,7 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.plugins.aps.openAPSAIMI.context.ContextIntent.*
 import org.json.JSONObject
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Deserializer for ContextIntent from Nightscout JSON.
@@ -20,7 +21,7 @@ object ContextIntentDeserializer {
                 "Activity" -> {
                     val start = obj.optLong("start", 0L)
                     Activity(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.valueOf(obj.getString("int")),
                         confidence = obj.getDouble("conf").toFloat(),
@@ -31,7 +32,7 @@ object ContextIntentDeserializer {
                 "Stress" -> {
                     val start = obj.optLong("start", 0L)
                     Stress(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.valueOf(obj.getString("int")),
                         confidence = obj.getDouble("conf").toFloat(),
@@ -42,7 +43,7 @@ object ContextIntentDeserializer {
                 "Illness" -> {
                     val start = obj.optLong("start", 0L)
                     Illness(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.valueOf(obj.getString("int")),
                         confidence = obj.getDouble("conf").toFloat(),
@@ -53,7 +54,7 @@ object ContextIntentDeserializer {
                 "UnannouncedMeal", "UnannouncedMealRisk" -> {
                     val start = obj.optLong("start", 0L)
                     UnannouncedMealRisk(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.MEDIUM,
                         confidence = obj.getDouble("conf").toFloat()
@@ -63,7 +64,7 @@ object ContextIntentDeserializer {
                 "SlowCarbMeal", "SlowMeal", "FatMeal" -> {
                     val start = obj.optLong("start", 0L)
                     SlowCarbMeal(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = runCatching { Intensity.valueOf(obj.optString("int", "MEDIUM")) }.getOrDefault(Intensity.MEDIUM),
                         confidence = obj.getDouble("conf").toFloat()
@@ -73,7 +74,7 @@ object ContextIntentDeserializer {
                 "HypoRecovery", "Hypo", "Hypoglycemia" -> {
                     val start = obj.optLong("start", 0L)
                     HypoRecovery(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = runCatching { Intensity.valueOf(obj.optString("int", "MEDIUM")) }.getOrDefault(Intensity.MEDIUM),
                         confidence = obj.getDouble("conf").toFloat()
@@ -83,7 +84,7 @@ object ContextIntentDeserializer {
                 "Alcohol" -> {
                     val start = obj.optLong("start", 0L)
                     Alcohol(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.MEDIUM,
                         confidence = obj.getDouble("conf").toFloat(),
@@ -94,7 +95,7 @@ object ContextIntentDeserializer {
                 "Travel" -> {
                     val start = obj.optLong("start", 0L)
                     Travel(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.MEDIUM,
                         confidence = obj.getDouble("conf").toFloat(),
@@ -105,7 +106,7 @@ object ContextIntentDeserializer {
                 "MenstrualCycle" -> {
                     val start = obj.optLong("start", 0L)
                     MenstrualCycle(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.valueOf(obj.getString("int")),
                         confidence = obj.getDouble("conf").toFloat(),
@@ -116,7 +117,7 @@ object ContextIntentDeserializer {
                 "Custom" -> {
                     val start = obj.optLong("start", 0L)
                     Custom(
-                        startTimeMs = if (start > 0) start else System.currentTimeMillis(),
+                        startTimeMs = if (start > 0) start else AimiReplayClock.now(),
                         durationMs = obj.getLong("dur"),
                         intensity = Intensity.valueOf(obj.getString("int")),
                         confidence = obj.getDouble("conf").toFloat(),

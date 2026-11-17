@@ -1,5 +1,14 @@
 package app.aaps.plugins.aps.openAPSAIMI
 
+import android.content.Context
+import android.os.Environment
+import app.aaps.plugins.aps.openAPSAIMI.learning.BasalLearner
+import app.aaps.plugins.aps.openAPSAIMI.learning.UnifiedReactivityLearner
+import app.aaps.plugins.aps.openAPSAIMI.utils.AimiStorageHelper
+import io.mockk.mockkStatic
+import java.nio.file.Files
+import java.time.Instant
+import java.time.ZoneOffset
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.GV
@@ -76,7 +85,16 @@ class HistoryReplayTest {
         val ticks = data.getJSONArray("ticks")
 
         var now = ticks.getJSONObject(0).getLong("t")
+        // Every AIMI timer and learner window follows the replayed time.
+        AimiReplayClock.override = { now }
+        val learn = System.getenv("AIMI_REPLAY_LEARN") == "1"
         val prefs = preferences(meta)
+        // Learner files live in a fresh folder of this run.
+        val storageDir = Files.createTempDirectory("aimi-replay").toFile()
+        mockkStatic(Environment::class)
+        every { Environment.getExternalStorageDirectory() } returns storageDir
+        val appContext = mockk<Context>(relaxed = true) { every { getExternalFilesDir(any()) } returns storageDir }
+        val storage = AimiStorageHelper(appContext, mockk(relaxed = true))
         val harness = DetermineBasalAimiScenarioTestHarness(
             now = now,
             preferences = prefs,
@@ -84,7 +102,8 @@ class HistoryReplayTest {
             autodriveGater = mockk(relaxed = true),
             autodriveEngine = mockk(relaxed = true),
             physioAdapter = mockk(relaxed = true),
-            basalNeuralLearner = mockk<BasalNeuralLearner>(relaxed = true) {
+            basalNeuralLearner = if (learn) BasalNeuralLearner(appContext, prefs, storage, mockk(relaxed = true))
+            else mockk<BasalNeuralLearner>(relaxed = true) {
                 // Neutral answer: no learned basal change (the learners are off in this replay).
                 every { getUniversalBasalDecision(any(), any(), any(), any(), any(), any(), any()) } returns
                     BasalNeuralLearner.UniversalBasalDecision(1.0, 1.0, BasalNeuralLearner.BasalMultiplierSource.DISABLED, 0.7, 1.3)
@@ -96,8 +115,15 @@ class HistoryReplayTest {
         // Real basal decision parts; learners and context give their neutral value (a relaxed mock would say 0).
         val adaptiveBasal = AIMIAdaptiveBasal(mockk(relaxed = true), mockk(relaxed = true))
         harness.engine.basalDecisionEngine = BasalDecisionEngine(mockk(relaxed = true), adaptiveBasal, BasalPlanner(adaptiveBasal, mockk(relaxed = true)))
-        harness.engine.basalLearner = mockk(relaxed = true) { every { getMultiplier() } returns 1.0 }
-        harness.engine.unifiedReactivityLearner = mockk(relaxed = true) { every { getCombinedFactor(any()) } returns 1.0 }
+        // The harness mocks the storage root again: point it back at this run's folder.
+        every { Environment.getExternalStorageDirectory() } returns storageDir
+        harness.engine.storageHelper = storage
+        if (learn) {
+            harness.engine.basalLearner = BasalLearner(appContext, mockk(relaxed = true), storage)
+        } else {
+            harness.engine.basalLearner = mockk(relaxed = true) { every { getMultiplier() } returns 1.0 }
+            harness.engine.unifiedReactivityLearner = mockk(relaxed = true) { every { getCombinedFactor(any()) } returns 1.0 }
+        }
         harness.engine.contextInfluenceEngine = mockk(relaxed = true) {
             every { computeInfluence(any(), any(), any(), any(), any()) } returns ContextInfluenceEngine.ContextInfluence.neutral()
         }
@@ -105,6 +131,7 @@ class HistoryReplayTest {
         val clock = mockk<DateUtil>(relaxed = true) { every { now() } answers { now } }
         harness.engine.dateUtil = clock
         stubDatabase(harness, history) { now }
+        if (learn) harness.engine.unifiedReactivityLearner = UnifiedReactivityLearner(appContext, harness.persistenceLayer, clock, prefs, mockk(relaxed = true), storage)
         harness.engine.hypoExposureMonitor = HypoExposureMonitor(
             persistenceLayer = harness.persistenceLayer,
             dateUtil = clock,
@@ -160,6 +187,11 @@ class HistoryReplayTest {
                         history.temps.add(TB(timestamp = now, type = TB.Type.NORMAL, isAbsolute = true, rate = rate, duration = dur * minute))
                     }
                 }
+                if (learn && i % 12 == 0) {
+                    row.put("learn", JSONObject()
+                        .put("basal", harness.engine.basalLearner.getMultiplier())
+                        .put("react", harness.engine.unifiedReactivityLearner.getCombinedFactor(Instant.ofEpochMilli(now).atZone(ZoneOffset.ofHours(3)).hour)))
+                }
                 row.put("iob", chained.iobArray[0].iob)
                     .put("errors", (rt.consoleError ?: emptyList<String>()).joinToString(" | ").take(400))
                     .put("pkpd", (rt.consoleLog ?: emptyList<String>()).filter { it.contains("PKPD") || it.contains("DIA (learned)") || it.contains("ISF") || it.contains("asal") }.joinToString(" | ").take(900))
@@ -182,6 +214,7 @@ class HistoryReplayTest {
             }
         }
         write(outPath!!, out)
+        AimiReplayClock.override = null
         // Counts only: no values of the input reach the test log.
         println("AIMI replay: ${ticks.length()} ticks, $failed failed")
     }

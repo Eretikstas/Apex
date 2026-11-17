@@ -10,6 +10,7 @@ import app.aaps.core.interfaces.sharedPreferences.SP
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.runBlocking
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 /**
  * 🎛️ Unified Activity Provider - MTR Implementation
  *
@@ -182,7 +183,7 @@ class UnifiedActivityProviderMTR @Inject constructor(
         val mode = getMode()
         if (mode == MODE_DISABLED) return null
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val start = now - windowMs
 
         return try {
@@ -222,7 +223,7 @@ class UnifiedActivityProviderMTR @Inject constructor(
         val mode = getMode()
         if (mode == MODE_DISABLED) return null
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
 
         return try {
             val records = loadStepsRecords(startMs, now).sortedBy { it.timestamp }
@@ -237,7 +238,7 @@ class UnifiedActivityProviderMTR @Inject constructor(
         val mode = getMode()
         if (mode == MODE_DISABLED) return null
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val start = now - windowMs
 
         return try {

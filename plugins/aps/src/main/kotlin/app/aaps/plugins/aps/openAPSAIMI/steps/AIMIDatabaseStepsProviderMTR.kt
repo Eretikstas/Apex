@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🗄️ AIMI Database Steps Provider - MTR Implementation
@@ -92,7 +93,7 @@ class AIMIDatabaseStepsProviderMTR @Inject constructor(
     
     override fun getLastUpdateMillis(): Long {
         return try {
-            val now = System.currentTimeMillis()
+            val now = AimiReplayClock.now()
             val searchStart = now - 210 * 60 * 1000L // Last 3.5 hours
             val allSteps = stepsCached(searchStart, now)
             

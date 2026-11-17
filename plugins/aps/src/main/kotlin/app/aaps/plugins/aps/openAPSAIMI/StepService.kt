@@ -39,7 +39,7 @@ object StepService : SensorEventListener {
     }
 
     private fun currentTimeIn5Min(): Long {
-        return (System.currentTimeMillis() / fiveMinutesInMs.toDouble()).roundToLong()
+        return (AimiReplayClock.now() / fiveMinutesInMs.toDouble()).roundToLong()
     }
 
     override fun onSensorChanged(sensorEvent: SensorEvent?) {

@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.advisor.auditor
 
 import java.util.concurrent.ConcurrentHashMap
 import app.aaps.plugins.aps.openAPSAIMI.model.DecisionResult
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Thread-safe cache for AI Auditor verdicts
@@ -31,7 +32,7 @@ object AuditorVerdictCache {
         cache[key] = CachedVerdict(
             verdict = verdict,
             result = result,
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             bgTimestampMs = currentBgTimestampMs,
         )
     }
@@ -49,7 +50,7 @@ object AuditorVerdictCache {
         cache[key] = CachedVerdict(
             verdict = verdict,
             result = result,
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             bgTimestampMs = bgTimestampMs,
         )
     }
@@ -63,7 +64,7 @@ object AuditorVerdictCache {
     @JvmStatic
     fun get(key: String, maxAgeMs: Long): CachedVerdict? {
         val cached = cache[key] ?: return null
-        val age = System.currentTimeMillis() - cached.timestamp
+        val age = AimiReplayClock.now() - cached.timestamp
         if (age > maxAgeMs) {
             cache.remove(key) // Proactive TTL cleanup
             return null
@@ -116,7 +117,7 @@ object AuditorVerdictCache {
     @JvmStatic
     fun getAgeMs(key: String): Long? {
         val cached = cache[key] ?: return null
-        return System.currentTimeMillis() - cached.timestamp
+        return AimiReplayClock.now() - cached.timestamp
     }
     
     @JvmStatic

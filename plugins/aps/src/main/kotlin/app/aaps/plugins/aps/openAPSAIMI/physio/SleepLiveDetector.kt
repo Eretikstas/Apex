@@ -1,5 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.physio
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
+
 /**
  * Evidence-based "patient is asleep now" signal — complements clock [isNight].
  *
@@ -28,7 +30,7 @@ object SleepLiveDetector {
     }
 
     data class Input(
-        val nowMs: Long = System.currentTimeMillis(),
+        val nowMs: Long = AimiReplayClock.now(),
         val therapySleepTime: Boolean = false,
         val stepsLast15m: Int = 0,
         val stepsLast5m: Int = 0,

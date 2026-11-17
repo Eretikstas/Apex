@@ -7,6 +7,11 @@ name: AIMI history replay
 
 on:
   workflow_dispatch:
+    inputs:
+      learn:
+        description: 'Let the AIMI learners learn during the replay'
+        type: boolean
+        default: true
   # A push only makes the workflow known to GitHub (so it can be started by hand); it runs nothing.
   push:
     branches:
@@ -59,6 +64,7 @@ jobs:
           export AIMI_REPLAY_IN="$W/in.json.gz"
           export AIMI_REPLAY_OUT="$W/out.json.gz"
           export AIMI_REPLAY_HEAP=5g
+          export AIMI_REPLAY_LEARN=${{ inputs.learn && '1' || '0' }}
           # The whole Gradle output goes to a file that is encrypted with the result; only the outcome
           # lines reach this log.
           ./gradlew :plugins:aps:testFullDebugUnitTest --tests '*HistoryReplayTest*' --console=plain > "$W/gradle.log" 2>&1

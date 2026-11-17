@@ -1,6 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.ISF
 
 import kotlin.math.min
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Mélange un ISF "lent" (fusedIsf: PK/PD+TDD) avec un ISF "rapide" (kalmanIsf),
@@ -24,7 +25,7 @@ class IsfBlender(
      * @param fusedIsf    socle lent (PkPdIntegration.fusedIsf)
      * @param kalmanIsf   candidat rapide (KalmanISFCalculator)
      * @param trustFast   0..1 (poids du rapide) - ex: 1/(1+varianceKalman)
-     * @param nowMs       System.currentTimeMillis()
+     * @param nowMs       AimiReplayClock.now()
      */
     fun blend(
         fusedIsf: Double,

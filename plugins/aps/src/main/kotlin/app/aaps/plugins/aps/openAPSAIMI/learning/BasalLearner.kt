@@ -13,6 +13,7 @@ import javax.inject.Singleton
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Multi-Scale Basal Learner
@@ -159,7 +160,7 @@ class BasalLearner @Inject constructor(
         tdd30Days: Double,
         isFastingTime: Boolean
     ) {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val observation = TimestampedBg(now, currentBg, currentDelta)
 
         // 🧪 Lot 4 — fenêtre d'exclusion post-hypo.
@@ -226,10 +227,10 @@ class BasalLearner @Inject constructor(
     fun onHypoDetected() {
         log.info(LTag.APS, "BasalLearner: Hypo detected, reducing short-term multiplier")
         // Lot 4 — ouvre la fenêtre d'exclusion : le rebond qui suit ne doit pas entraîner à la hausse.
-        lastHypoDetectedAt = System.currentTimeMillis()
+        lastHypoDetectedAt = AimiReplayClock.now()
         shortTermMultiplier = (shortTermMultiplier * 0.90).coerceIn(CLAMP_MIN, CLAMP_MAX)
         save()
-        publishStatus(System.currentTimeMillis())
+        publishStatus(AimiReplayClock.now())
     }
 
     /**
@@ -241,7 +242,7 @@ class BasalLearner @Inject constructor(
         // franchir le seuil d'hyper persistante alors qu'il est précisément l'artefact que la fenêtre
         // d'exclusion écarte de l'apprentissage. Le laisser passer ici rouvrirait par la porte
         // événementielle ce que [process] vient de fermer côté buffers.
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (now - lastHypoDetectedAt < POST_HYPO_EXCLUSION_MS) {
             log.info(LTag.APS, "BasalLearner: Persistent hyper ignored (post-hypo rebound window)")
             return

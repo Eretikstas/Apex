@@ -67,6 +67,7 @@ import app.aaps.plugins.aps.openAPSAIMI.compose.AimiBehaviorFamilyId
 import app.aaps.plugins.aps.openAPSAIMI.compose.AimiControlCenterPendingChanges
 import app.aaps.plugins.aps.openAPSAIMI.compose.AimiFamilyWritebackPlan
 import java.util.Locale
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 
 /**
@@ -564,7 +565,7 @@ class AimiProfileAdvisorActivity : TranslatedDaggerAppCompatActivity() {
                 val authority = "${packageName}.fileprovider"
                 
                 // Create a temporary ZIP file in cache
-                val zipFileName = "AIMI_Support_Package_${System.currentTimeMillis()}.zip"
+                val zipFileName = "AIMI_Support_Package_${AimiReplayClock.now()}.zip"
                 val zipFile = java.io.File(cacheDir, zipFileName)
                 
                 java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(java.io.FileOutputStream(zipFile))).use { out ->
@@ -583,7 +584,7 @@ class AimiProfileAdvisorActivity : TranslatedDaggerAppCompatActivity() {
                         val entry = java.util.zip.ZipEntry("AIMI_Decisions_Last24h.jsonl")
                         out.putNextEntry(entry)
                         
-                        val cutoffTime = System.currentTimeMillis() - (24 * 60 * 60 * 1000L) // 24 hours ago
+                        val cutoffTime = AimiReplayClock.now() - (24 * 60 * 60 * 1000L) // 24 hours ago
                         
                         // Buffer for reading/writing
                         val reader = java.io.BufferedReader(java.io.FileReader(jsonFile))

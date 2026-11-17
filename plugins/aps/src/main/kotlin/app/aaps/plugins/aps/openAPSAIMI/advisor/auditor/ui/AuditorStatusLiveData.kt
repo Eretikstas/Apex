@@ -8,6 +8,7 @@ import app.aaps.plugins.aps.openAPSAIMI.model.VerdictType
 import app.aaps.plugins.aps.openAPSAIMI.advisor.auditor.model.AuditorUIState
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Reactive layer transforming [AuditorStatusTracker.Status] → [AuditorUIState].
@@ -63,7 +64,7 @@ class AuditorStatusLiveData @Inject constructor() {
 
   fun markAsRead() {
     val verdictTimestamp = AuditorVerdictCache.resolveForDisplay()?.cached?.timestamp
-    lastReadTimestampMs = verdictTimestamp ?: System.currentTimeMillis()
+    lastReadTimestampMs = verdictTimestamp ?: AimiReplayClock.now()
     notifyUpdate()
   }
 

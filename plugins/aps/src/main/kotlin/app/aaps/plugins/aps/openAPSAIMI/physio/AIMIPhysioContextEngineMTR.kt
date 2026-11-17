@@ -5,6 +5,7 @@ import app.aaps.core.interfaces.logging.LTag
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🧠 AIMI Physiological Context Engine - MTR Implementation
@@ -110,7 +111,7 @@ class AIMIPhysioContextEngineMTR @Inject constructor(
             recommendReduceBasal = recommendations.reduceBasal,
             recommendReduceSMB = recommendations.reduceSMB,
             recommendIncreaseISF = recommendations.increaseISF,
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             features = features
         )
         

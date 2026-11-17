@@ -14,6 +14,7 @@ import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 @Reusable
 class BasalDecisionEngine @Inject constructor(
@@ -161,7 +162,7 @@ class BasalDecisionEngine @Inject constructor(
                 r2 = gs?.corrSqu,
                 parabolaMinutes = gs?.parabolaMinutes,
                 combinedDelta = input.featuresCombinedDelta ?: input.combinedDelta,
-                epochMillis = System.currentTimeMillis()
+                epochMillis = AimiReplayClock.now()
             )
 
             // Capacités pompe passées via Input (dynamique)
@@ -199,7 +200,7 @@ class BasalDecisionEngine @Inject constructor(
                 ),
                 tdd24hU = input.tdd7Days,   // ou tdd 24h réel si dispo
                 eventualBg = input.eventualBg,
-                nowEpochMillis = System.currentTimeMillis()
+                nowEpochMillis = AimiReplayClock.now()
             )
 
             basalPlanner.plan(ctx)?.let { plan ->

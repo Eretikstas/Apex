@@ -20,6 +20,7 @@ import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.min
 import kotlin.math.sqrt
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * AimiSmbTrainer — Singleton managing the ML model lifecycle for SMB refinement.
@@ -299,7 +300,7 @@ object AimiSmbTrainer {
         minLearningQuality: Float = SmbRefinementFeatureSchema.MIN_TRAINING_LEARNING_QUALITY,
         relaxedFilter: Boolean = true,
     ) {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
 
         // The user changed the quality limit or the filter mode: forget the last attempt time,
         // so the next attempt runs now and does not wait for the 6 hour limit.
@@ -324,7 +325,7 @@ object AimiSmbTrainer {
                     trainNow(dir, csvFile, minLearningQuality, relaxedFilter)
                 } catch (e: Exception) {
                     recordFailure()
-                    recordResult(dir, TrainingResult(atMs = System.currentTimeMillis(), outcome = TrainingOutcome.ERROR, gateDetail = e.message ?: e.toString()))
+                    recordResult(dir, TrainingResult(atMs = AimiReplayClock.now(), outcome = TrainingOutcome.ERROR, gateDetail = e.message ?: e.toString()))
                     Log.e(TAG, "Training failed: ${e.message}")
                 }
             }
@@ -369,7 +370,7 @@ object AimiSmbTrainer {
     ): Float {
         if (features.size != INPUT_SIZE) return predictedSmb
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (isCircuitOpen(now)) return predictedSmb
 
         val model = modelRef.get() ?: return predictedSmb
@@ -413,7 +414,7 @@ object AimiSmbTrainer {
         // single-threaded and does not need the lock either.
         ensureStateLoadedLocked(dir)
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
 
         // CIRCUIT_OPEN and (below) SKIPPED_NOT_DUE are "nothing changed, still waiting" states that can
         // repeat on every loop tick for hours. They update `currentWaitingStatusRef` only — in memory,
@@ -547,7 +548,7 @@ object AimiSmbTrainer {
         )
         if (net != null) {
             modelRef.set(net)
-            lastTrainMs.set(System.currentTimeMillis())
+            lastTrainMs.set(AimiReplayClock.now())
             rowsAtLastTrain.set(totalRows)
             persistState(dir)
             circuitBreaker.reset()   // reset circuit breaker on success
@@ -811,7 +812,7 @@ object AimiSmbTrainer {
         val file = stateFile(dir)
         if (!file.exists()) return
         try {
-            val now = System.currentTimeMillis()
+            val now = AimiReplayClock.now()
             val json = JSONObject(file.readText())
             val loadedAttemptMs = sanitizeTimestamp(json.optLong("lastAttemptMs", 0L), now)
             val loadedTrainMs = sanitizeTimestamp(json.optLong("lastTrainMs", 0L), now)

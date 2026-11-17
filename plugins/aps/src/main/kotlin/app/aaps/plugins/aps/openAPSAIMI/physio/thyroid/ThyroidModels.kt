@@ -1,5 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.physio.thyroid
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
+
 /**
  * Models for the Basedow (Hyperthyroidism) integration physiological module.
  * Clinically models states of increased insulin clearance, increased EGP,
@@ -34,7 +36,7 @@ enum class NormalizingGuardLevel {
 }
 
 data class ThyroidInputs(
-    val timestampMs: Long = System.currentTimeMillis(),
+    val timestampMs: Long = AimiReplayClock.now(),
     val isEnabled: Boolean = false,
     val userMode: ThyroidEstimationMode = ThyroidEstimationMode.MANUAL,
     val manualStatus: ThyroidStatus = ThyroidStatus.EUTHYROID,

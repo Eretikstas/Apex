@@ -27,6 +27,7 @@ import java.util.Timer
 import java.util.TimerTask
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🔄 AIMI Health Connect Sync Service - MTR Implementation
@@ -157,7 +158,7 @@ class AIMIHealthConnectSyncServiceMTR @Inject constructor(
             return
         }
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val syncStart = now - SYNC_INTERVAL_MS // Last 5 minutes (steps)
 
         // Audit existing data (for logging only, NOT for skipping)
@@ -378,7 +379,7 @@ class AIMIHealthConnectSyncServiceMTR @Inject constructor(
         val enabled = isEnabled()
         val clientAvailable = healthConnectClient != null
         val lastSync = if (lastSyncTimestamp > 0) {
-            val ageSeconds = (System.currentTimeMillis() - lastSyncTimestamp) / 1000
+            val ageSeconds = (AimiReplayClock.now() - lastSyncTimestamp) / 1000
             "${ageSeconds}s ago"
         } else {
             "Never"

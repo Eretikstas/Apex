@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.pkpd
 
 import app.aaps.core.interfaces.aps.IobTotal
 import app.aaps.core.interfaces.aps.OapsProfileAimi
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 // 1. Définir la structure de données pour notre nouvelle métrique
 data class IobActionProfile(
@@ -26,7 +27,7 @@ object InsulinActionProfiler {
         var weightedActivityNow = 0.0
         var weightedActivityIn30Min = 0.0
 
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
 
         // Normalisation pour que le pic d'activité soit égal à 1
         val maxActivity = InsulinWeibullCurve.activityRaw(insulinPeakTime, insulinPeakTime)

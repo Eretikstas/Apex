@@ -6,6 +6,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 import kotlin.math.sqrt
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🧮 AIMI Physiological Feature Extractor - MTR Implementation
@@ -92,7 +93,7 @@ class AIMIPhysioFeatureExtractorMTR @Inject constructor(
             stepsTrend = activityFeatures.trend,
             
             // Metadata
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             dataQuality = dataQuality,
             hasValidData = dataQuality > 0.3
         )
@@ -168,7 +169,7 @@ class AIMIPhysioFeatureExtractorMTR @Inject constructor(
         
         // 1. Filter for RECENT data (Last 24h)
         // We only want the "Current State", not the 7-day history average
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val oneDayAgo = now - (24 * 60 * 60 * 1000)
         val recentSamples = hrvList.filter { it.timestamp >= oneDayAgo && it.hasValidData() }
         

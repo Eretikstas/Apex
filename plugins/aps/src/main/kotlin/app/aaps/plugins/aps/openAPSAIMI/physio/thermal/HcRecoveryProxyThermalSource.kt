@@ -4,6 +4,7 @@ import app.aaps.plugins.aps.openAPSAIMI.physio.HRVDataMTR
 import app.aaps.plugins.aps.openAPSAIMI.physio.RHRDataMTR
 import java.time.Instant
 import java.time.ZoneId
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Infers a thermal-style delta timeline from Health Connect recovery vitals
@@ -18,7 +19,7 @@ internal object HcRecoveryProxyThermalSource {
         rhrPoints: List<RHRDataMTR>,
         hrvPoints: List<HRVDataMTR>,
         daysBack: Int,
-        nowMs: Long = System.currentTimeMillis(),
+        nowMs: Long = AimiReplayClock.now(),
     ): List<ThermalSampleMTR> {
         val validRhr = rhrPoints.filter { it.hasValidData() }
         if (validRhr.size < 2) return emptyList()

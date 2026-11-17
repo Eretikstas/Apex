@@ -21,6 +21,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import java.io.File
 import java.util.Locale
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * BasalNeuralLearner identifies user-specific glycemic response patterns
@@ -110,7 +111,7 @@ class BasalNeuralLearner @Inject constructor(
         highRate = 0.0,
         meanAbsTargetError = 0.0,
         reason = "Warmup",
-        timestamp = System.currentTimeMillis(),
+        timestamp = AimiReplayClock.now(),
         hypoHoldLatched = false,
         activeBasalFloor = null,
         activeAggressivenessFloor = null,
@@ -562,7 +563,7 @@ class BasalNeuralLearner @Inject constructor(
         ensureCsvSchema(file)
 
         val physio = if (physioFeatures.size == neutralPhysioFeatures.size) physioFeatures else neutralPhysioFeatures
-        val row = "${System.currentTimeMillis()},$bg,$eventualBg,$basal,$target,$accel,$duraMin,$duraAvg,$iob," +
+        val row = "${AimiReplayClock.now()},$bg,$eventualBg,$basal,$target,$accel,$duraMin,$duraAvg,$iob," +
             "$internalAggressivenessFactor,$internalBasalScalingFactor,${physio.joinToString(",")}," +
             "$bolusInsulinU,$cobGrams\n"
         file.appendText(row)
@@ -582,10 +583,10 @@ class BasalNeuralLearner @Inject constructor(
         val iob = if (iobUnits.isFinite()) iobUnits else 0.0
         val d = if (deltaMgDl.isFinite()) deltaMgDl else (bgAfter - bgBefore)
         val predMin = shortMinPredBg?.takeIf { it.isFinite() }
-        fillRealisedOutcomes(nowMs = System.currentTimeMillis(), observedBg = bgBefore)
+        fillRealisedOutcomes(nowMs = AimiReplayClock.now(), observedBg = bgBefore)
         governanceWindow.addFirst(
             LearningSample(
-                timestamp = System.currentTimeMillis(),
+                timestamp = AimiReplayClock.now(),
                 bgBefore = bgBefore,
                 bgAfter = bgAfter,
                 targetBg = targetBg,
@@ -759,7 +760,7 @@ class BasalNeuralLearner @Inject constructor(
     }
 
     internal fun evaluateGovernance() {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         if (governanceWindow.isEmpty()) return
 
         val p = effectiveGovernanceParams()
@@ -906,7 +907,7 @@ class BasalNeuralLearner @Inject constructor(
     }
 
     private fun maybeLogGovernance(snapshot: GovernanceSnapshot) {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         val hasActionChanged = snapshot.action != lastLoggedAction
         if (!hasActionChanged && (now - lastGovernanceLogAt) < GOVERNANCE_LOG_MIN_MS) return
 
@@ -995,7 +996,7 @@ class BasalNeuralLearner @Inject constructor(
             highRate = 0.0,
             meanAbsTargetError = 0.0,
             reason = "Warmup",
-            timestamp = System.currentTimeMillis(),
+            timestamp = AimiReplayClock.now(),
             hypoHoldLatched = false,
             activeBasalFloor = null,
             activeAggressivenessFloor = null,

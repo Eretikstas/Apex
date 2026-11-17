@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🏥 AIMI Health Connect Steps Provider - MTR Implementation
@@ -85,7 +86,7 @@ class AIMIHealthConnectStepsProviderMTR @Inject constructor(
     }
     
     override fun isAvailable(): Boolean {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         
         // Cache availability check for 30 seconds
         if (now - lastAvailabilityCheck < 30_000 && lastAvailabilityCheck > 0) {
@@ -144,7 +145,7 @@ class AIMIHealthConnectStepsProviderMTR @Inject constructor(
                 )
                 val response = client.readRecords(request)
                 val totalSteps = response.records.sumOf { it.count.toInt() }
-                cache[windowMinutes] = CachedStepsData(totalSteps, System.currentTimeMillis())
+                cache[windowMinutes] = CachedStepsData(totalSteps, AimiReplayClock.now())
             } catch (e: Exception) {
                 aapsLogger.error(LTag.APS, "[$SOURCE_NAME] Error fetching steps for {$windowMinutes}min window", e)
             } finally {
@@ -169,7 +170,7 @@ class AIMIHealthConnectStepsProviderMTR @Inject constructor(
         val steps: Int,
         val timestamp: Long
     ) {
-        fun isExpired(): Boolean = System.currentTimeMillis() - timestamp > CACHE_TTL_MS
-        fun ageSeconds(): Long = (System.currentTimeMillis() - timestamp) / 1000
+        fun isExpired(): Boolean = AimiReplayClock.now() - timestamp > CACHE_TTL_MS
+        fun ageSeconds(): Long = (AimiReplayClock.now() - timestamp) / 1000
     }
 }

@@ -3,6 +3,7 @@ package app.aaps.plugins.aps.openAPSAIMI.advisor.data
 import android.os.Environment
 import java.io.File
 import org.json.JSONObject
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 internal enum class T3cRuntimeTickStatus {
     NATIVE_APPLIED,
@@ -140,7 +141,7 @@ internal object T3cRuntimeHistoryReader {
 
     fun summarizeLast24Hours(
         file: File = aimiDecisionsJsonlFile(),
-        nowMs: Long = System.currentTimeMillis(),
+        nowMs: Long = AimiReplayClock.now(),
     ): T3cRuntimeHistorySummary? {
         if (!file.exists() || !file.canRead()) return null
         val cutoffMs = nowMs - WINDOW_24H_MS

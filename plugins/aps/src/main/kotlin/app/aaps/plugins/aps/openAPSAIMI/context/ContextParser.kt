@@ -7,6 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Offline parser pour contexte utilisateur (fallback sans LLM).
@@ -132,7 +133,7 @@ class ContextParser @Inject constructor(
         aapsLogger.debug(LTag.APS, "[ContextParser] Parsing offline: '$text'")
         
         val intents = mutableListOf<ContextIntent>()
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         
         // Try to match each category
         matchActivity(text, now)?.let { intents.add(it) }
@@ -161,7 +162,7 @@ class ContextParser @Inject constructor(
      * @return Single intent
      */
     fun parsePreset(preset: ContextPreset): ContextIntent {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         
         return when (preset.type) {
             PresetType.CARDIO -> Activity(

@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.sqrt
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🏥 AIMI Physiological Data Repository - MTR Implementation
@@ -85,7 +86,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
         val timestamp: Long,
         val expiresAt: Long = timestamp + CACHE_TTL_MS
     ) {
-        fun isValid(): Boolean = System.currentTimeMillis() < expiresAt
+        fun isValid(): Boolean = AimiReplayClock.now() < expiresAt
     }
     
     private val cache = ConcurrentHashMap<String, CachedData<*>>()
@@ -291,7 +292,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                                 ongoingEndMs = ongoingRecord?.endTime?.toEpochMilli(),
                             )
                             
-                            cache[cacheKey] = CachedData(sleepData, System.currentTimeMillis())
+                            cache[cacheKey] = CachedData(sleepData, AimiReplayClock.now())
                             
                             aapsLogger.info(
                                 LTag.APS,
@@ -351,7 +352,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                             )
                         }
                         
-                        cache[cacheKey] = CachedData(hrvList, System.currentTimeMillis())
+                        cache[cacheKey] = CachedData(hrvList, AimiReplayClock.now())
                         
                         if (hrvList.isNotEmpty()) {
                             val avgRMSSD = hrvList.map { it.rmssd }.average()
@@ -500,7 +501,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                             sortedRHR = readRestingHeartRateRecordsAsRhr(client, daysBack, now)
                         }
 
-                        cache[cacheKey] = CachedData(sortedRHR, System.currentTimeMillis())
+                        cache[cacheKey] = CachedData(sortedRHR, AimiReplayClock.now())
                         
                         if (sortedRHR.isNotEmpty()) {
                             val avgRHR = sortedRHR.map { it.bpm }.average()
@@ -565,7 +566,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                         // Average daily steps
                         val avgSteps = if (daysBack > 0) (totalSteps / daysBack).toInt() else 0
                         
-                        cache[cacheKey] = CachedData(avgSteps, System.currentTimeMillis())
+                        cache[cacheKey] = CachedData(avgSteps, AimiReplayClock.now())
                         
                         aapsLogger.info(LTag.APS, "[$TAG] ✅ Steps (HC Aggregated): total=$totalSteps, avg=$avgSteps/day")
                         avgSteps
@@ -605,7 +606,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
         }
         if (dayStartMs >= nowMs) return null
 
-        val nowWall = System.currentTimeMillis()
+        val nowWall = AimiReplayClock.now()
         val cached = todayStepsAggCache.get()
         if (cached != null &&
             cached.dayStartMs == dayStartMs &&
@@ -629,7 +630,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                         )
                     )
                     val total = response[StepsRecord.COUNT_TOTAL] ?: 0L
-                    todayStepsAggCache.set(TodayStepsAggCache(dayStartMs, total, System.currentTimeMillis()))
+                    todayStepsAggCache.set(TodayStepsAggCache(dayStartMs, total, AimiReplayClock.now()))
                     total
                 }
             }
@@ -669,7 +670,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
      * @return RawPhysioDataMTR with available data (never null)
      */
     suspend fun fetchAllData(daysBack: Int = 7): RawPhysioDataMTR {
-        val startTime = System.currentTimeMillis()
+        val startTime = AimiReplayClock.now()
         
         aapsLogger.info(LTag.APS, "[$TAG] 🔄 Fetching physiological data (${daysBack}d window)...")
         
@@ -687,7 +688,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
             val steps = fetchStepsData(daysBack, ignoreUnifiedSourceMode = true)
             aapsLogger.info(LTag.APS, "[$TAG] 📊 FETCH RESULT - Steps: $steps avg/day ${if (steps == 0) "(no steps data)" else ""}")
             
-            val elapsed = System.currentTimeMillis() - startTime
+            val elapsed = AimiReplayClock.now() - startTime
             
             // 📊 SUMMARY
             val hasAnyData = sleep != null || hrv.isNotEmpty() || rhr.isNotEmpty() || steps > 0
@@ -703,7 +704,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                 hrv = hrv,
                 rhr = rhr,
                 steps = steps,
-                fetchTimestamp = System.currentTimeMillis()
+                fetchTimestamp = AimiReplayClock.now()
             )
         } catch (e: SecurityException) {
             aapsLogger.error(LTag.APS, "[$TAG] ❌ SECURITY ERROR: Health Connect permissions denied! Check Settings > Apps > AAPS > Health Connect", e)
@@ -807,7 +808,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
         }
 
         val client = healthConnectClient
-        val fetchedAtMs = System.currentTimeMillis()
+        val fetchedAtMs = AimiReplayClock.now()
 
         return try {
             withTimeout(API_TIMEOUT_MS) {
@@ -871,7 +872,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
                     }
 
                     ThermalDataWindowMTR(fetchedAtMs = fetchedAtMs).also {
-                        cache[cacheKey] = CachedData(it, System.currentTimeMillis())
+                        cache[cacheKey] = CachedData(it, AimiReplayClock.now())
                         ThermalDataCache.update(it)
                     }
                 }
@@ -887,7 +888,7 @@ class AIMIPhysioDataRepositoryMTR @Inject constructor(
         window: ThermalDataWindowMTR,
         logLabel: String,
     ): ThermalDataWindowMTR {
-        cache[cacheKey] = CachedData(window, System.currentTimeMillis())
+        cache[cacheKey] = CachedData(window, AimiReplayClock.now())
         ThermalDataCache.update(window)
         aapsLogger.info(LTag.APS, "[$TAG] ✅ Thermal: $logLabel")
         return window

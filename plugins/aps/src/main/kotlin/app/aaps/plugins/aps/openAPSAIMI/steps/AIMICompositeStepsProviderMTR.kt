@@ -5,6 +5,7 @@ import app.aaps.core.interfaces.logging.LTag
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🔗 AIMI Composite Steps Provider - MTR Chain of Responsibility
@@ -154,14 +155,14 @@ class AIMICompositeStepsProviderMTR @Inject constructor(
             aapsLogger.info(LTag.APS, "[$TAG] Steps source changed: $lastUsedSource -> $source")
             lastUsedSource = source
         }
-        lastSourceSelectionTime = System.currentTimeMillis()
+        lastSourceSelectionTime = AimiReplayClock.now()
     }
     
     private fun getTimeSinceLastSelection(): Long {
         return if (lastSourceSelectionTime == 0L) {
             0
         } else {
-            (System.currentTimeMillis() - lastSourceSelectionTime) / 1000
+            (AimiReplayClock.now() - lastSourceSelectionTime) / 1000
         }
     }
 }

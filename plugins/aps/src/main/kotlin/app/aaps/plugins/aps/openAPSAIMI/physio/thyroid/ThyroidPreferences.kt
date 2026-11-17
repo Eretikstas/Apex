@@ -6,6 +6,7 @@ import app.aaps.core.keys.interfaces.Preferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Provides access to AIMI Hyperthyroidism (Basedow) preferences and emits updates via StateFlow.
@@ -33,7 +34,7 @@ class ThyroidPreferences(private val prefs: Preferences) {
 
     private fun getCurrentInputs(): ThyroidInputs {
         return ThyroidInputs(
-            timestampMs = System.currentTimeMillis(),
+            timestampMs = AimiReplayClock.now(),
             isEnabled = isEnabled(),
             userMode = getMode(),
             manualStatus = getManualStatus(),

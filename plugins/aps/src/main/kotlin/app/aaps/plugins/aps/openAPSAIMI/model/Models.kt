@@ -1,5 +1,7 @@
 package app.aaps.plugins.aps.openAPSAIMI.model
 
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
+
 data class BgSnapshot(
     val mgdl: Double,
     val delta5: Double,
@@ -84,7 +86,7 @@ sealed class DecisionResult {
         override val reason: String,
         val originalBasalRate: Double? = null,
         val originalBasalDuration: Int? = null,
-        val timestampMs: Long = System.currentTimeMillis()
+        val timestampMs: Long = AimiReplayClock.now()
     ) : DecisionResult() {
         fun undo(undoReason: String = "Undo Applied Action"): Applied = copy(
             tbrUph = originalBasalRate,
@@ -98,14 +100,14 @@ sealed class DecisionResult {
         val source: String,
         override val reason: String,
         val severity: AdvisorSeverity,
-        val timestampMs: Long = System.currentTimeMillis()
+        val timestampMs: Long = AimiReplayClock.now()
     ) : DecisionResult()
 
     /** Decision skipped as unnecessary or redundant (e.g., small correction below threshold). */
     data class Skipped(
         val source: String,
         override val reason: String,
-        val timestampMs: Long = System.currentTimeMillis()
+        val timestampMs: Long = AimiReplayClock.now()
     ) : DecisionResult()
 
     /** Legacy or internal signal to continue without AIMI intervention. */

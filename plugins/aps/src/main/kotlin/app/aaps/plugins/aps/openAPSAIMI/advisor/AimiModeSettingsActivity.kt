@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.widget.Switch
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 
 class AimiModeSettingsActivity : TranslatedDaggerAppCompatActivity() {
@@ -397,7 +398,7 @@ class AimiModeSettingsActivity : TranslatedDaggerAppCompatActivity() {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val te = app.aaps.core.data.model.TE(
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = AimiReplayClock.now(),
                     type = app.aaps.core.data.model.TE.Type.NOTE,
                     note = modeNote,
                     duration = durationMs,

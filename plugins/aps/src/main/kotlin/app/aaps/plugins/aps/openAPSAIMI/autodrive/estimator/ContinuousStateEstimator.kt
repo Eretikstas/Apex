@@ -8,6 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.exp
 import kotlin.math.max
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🧠 Continuous State Estimator (PSE)
@@ -47,7 +48,7 @@ class ContinuousStateEstimator @Inject constructor(
      *
      * N'est **pas** incrémenté quand [updateAndPredict] rejoue un tick déjà pris en compte, donc il
      * compte les avances, pas les appels. Ne pas réutiliser [lastUpdateMs] à sa place : il est
-     * alimenté par `System.currentTimeMillis()` alors que le tick raisonne en `dateUtil.now()`, et
+     * alimenté par `AimiReplayClock.now()` alors que le tick raisonne en `dateUtil.now()`, et
      * mélanger deux horloges dans une garde est la façon la plus sûre de laisser passer un double
      * appel.
      */
@@ -105,7 +106,7 @@ class ContinuousStateEstimator @Inject constructor(
      */
     fun updateAndPredict(
         actualState: AutoDriveState,
-        nowMs: Long = System.currentTimeMillis(),
+        nowMs: Long = AimiReplayClock.now(),
         tickId: Long = 0L,
     ): AutoDriveState {
         // ⏱️ Une seule avance par tick, quel que soit le nombre de chemins qui appellent.

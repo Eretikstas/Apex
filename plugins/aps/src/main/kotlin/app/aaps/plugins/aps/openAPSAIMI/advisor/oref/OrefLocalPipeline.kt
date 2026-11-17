@@ -8,6 +8,7 @@ import app.aaps.plugins.aps.openAPSAIMI.advisor.AimiProfileSnapshot
 import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Builds OREF-aligned feature rows from **local** AAPS data: [GV] + [APSResult] history.
@@ -25,7 +26,7 @@ class OrefLocalPipeline(
     ): OrefAnalysisReport = withContext(Dispatchers.Default) {
         // APS rows carry large JSON per loop; loading 30d on a 256MB heap can OOM (see APSResultDao cursor).
         val effectiveWindowDays = min(windowDays, MAX_HISTORY_DAYS_FOR_MEMORY)
-        val end = System.currentTimeMillis()
+        val end = AimiReplayClock.now()
         val start = end - T.days(effectiveWindowDays).msecs()
 
         val gvList = persistenceLayer.getBgReadingsDataFromTimeToTime(start, end, ascending = true)

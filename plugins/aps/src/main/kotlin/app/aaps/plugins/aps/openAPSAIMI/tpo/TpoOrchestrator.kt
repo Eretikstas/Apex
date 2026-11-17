@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 @Singleton
 class TpoOrchestrator @Inject constructor(
@@ -53,7 +54,7 @@ class TpoOrchestrator @Inject constructor(
     fun currentSession(): TpoSessionDocument? = sessionManager.currentSession()
 
     fun revertNow(): Boolean {
-        val changed = sessionManager.revertNow(preferences, historyRepo, System.currentTimeMillis())
+        val changed = sessionManager.revertNow(preferences, historyRepo, AimiReplayClock.now())
         if (changed) {
             prefsChangedThisTick = true
             tpoNotificationManager.showSessionEnded(TpoEndReason.MANUAL_REVERT)

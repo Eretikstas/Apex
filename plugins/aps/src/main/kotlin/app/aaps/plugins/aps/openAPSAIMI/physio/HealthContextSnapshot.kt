@@ -2,6 +2,7 @@ package app.aaps.plugins.aps.openAPSAIMI.physio
 
 import app.aaps.plugins.aps.openAPSAIMI.physio.thermal.ThermalBeliefDigest
 import org.json.JSONObject
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🏥 AIMI Health Context Snapshot
@@ -74,7 +75,7 @@ data class HealthContextSnapshot(
     val thermalBelief: ThermalBeliefDigest = ThermalBeliefDigest.EMPTY,
     
     // ℹ️ Metadata
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = AimiReplayClock.now(),
     val confidence: Double = 0.0, // 0.0-1.0 (Data quality/freshness)
     val source: String = "Unknown", // "HealthConnect", "Watch", "Merged"
     val isValid: Boolean = false

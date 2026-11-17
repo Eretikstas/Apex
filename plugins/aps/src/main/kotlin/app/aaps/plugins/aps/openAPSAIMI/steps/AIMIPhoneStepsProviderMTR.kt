@@ -6,6 +6,7 @@ import app.aaps.plugins.aps.openAPSAIMI.StepService
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 📱 AIMI Phone Steps Provider - MTR Implementation
@@ -63,7 +64,7 @@ class AIMIPhoneStepsProviderMTR @Inject constructor(
         // StepService doesn't track update time, use current time if data exists
         return try {
             val has5MinData = (StepService.getRecentStepCount5Min() ?: 0) > 0
-            if (has5MinData) System.currentTimeMillis() else 0L
+            if (has5MinData) AimiReplayClock.now() else 0L
         } catch (e: Exception) {
             0L
         }

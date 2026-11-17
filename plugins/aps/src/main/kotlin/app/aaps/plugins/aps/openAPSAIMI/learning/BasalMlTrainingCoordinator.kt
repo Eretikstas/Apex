@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Coordinated basal / T3C neural training with SMB-style safety:
@@ -163,7 +164,7 @@ class BasalMlTrainingCoordinator @Inject constructor(
     }
 
     suspend fun runScheduledTraining(): TrainingOutcome = trainMutex.withLock {
-        val now = System.currentTimeMillis()
+        val now = AimiReplayClock.now()
         // First-ever model creation bypasses the rate limit: if no basal weights exist yet, train now (bootstrap) so
         // the model is created ASAP from the already-accumulated CSV, instead of waiting for the next 1h window.
         val bootstrapNeeded = !storageHelper.getAimiFile(BASAL_WEIGHTS).exists()

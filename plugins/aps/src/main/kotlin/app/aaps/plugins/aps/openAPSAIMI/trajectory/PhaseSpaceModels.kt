@@ -4,6 +4,7 @@ import app.aaps.plugins.aps.openAPSAIMI.pkpd.ActivityStage
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * Phase-Space Trajectory Models for PKPD Control
@@ -251,7 +252,7 @@ data class TrajectoryWarning(
     val type: String,
     val message: String,
     val suggestedAction: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = AimiReplayClock.now()
 )
 
 /**
@@ -281,7 +282,7 @@ data class TrajectoryAnalysis(
     val warnings: List<TrajectoryWarning>,
     val stableOrbitDistance: Double,       // Distance to target stable orbit
     val predictedConvergenceTime: Int?,    // Minutes until expected convergence (null if diverging)
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = AimiReplayClock.now()
 ) {
     /**
      * Format for console logging (compact, info-rich)

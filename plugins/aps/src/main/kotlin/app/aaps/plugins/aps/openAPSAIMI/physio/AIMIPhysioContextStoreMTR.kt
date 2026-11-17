@@ -10,6 +10,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.concurrent.read
 import kotlin.concurrent.write
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 💾 AIMI Physiological Context Store - MTR Implementation
@@ -109,9 +110,9 @@ class AIMIPhysioContextStoreMTR @Inject constructor(
             if (baseline != null) {
                 currentBaseline = baseline
             }
-            lastUpdate = System.currentTimeMillis()
+            lastUpdate = AimiReplayClock.now()
             lastRunOutcome = outcome
-            lastRunTimestamp = System.currentTimeMillis()
+            lastRunTimestamp = AimiReplayClock.now()
             if (probeResult != null) {
                 lastProbeResult = probeResult
             }
@@ -159,7 +160,7 @@ class AIMIPhysioContextStoreMTR @Inject constructor(
         }
         
         // Check age
-        val age = (System.currentTimeMillis() - lastUpdate) / 1000
+        val age = (AimiReplayClock.now() - lastUpdate) / 1000
         if (age > VALIDITY_MS / 1000) {
             aapsLogger.debug(LTag.APS, "[$TAG] Context too old (${age / 3600}h)")
             return@read null
@@ -337,7 +338,7 @@ class AIMIPhysioContextStoreMTR @Inject constructor(
                 }
             }
             
-            val age = (System.currentTimeMillis() - lastUpdate) / (60 * 60 * 1000)
+            val age = (AimiReplayClock.now() - lastUpdate) / (60 * 60 * 1000)
             
             if (lastContextUnsafe != null) {
                 aapsLogger.info(
@@ -373,7 +374,7 @@ class AIMIPhysioContextStoreMTR @Inject constructor(
             "hasBaseline" to (currentBaseline != null).toString(),
             "lastRunOutcome" to lastRunOutcome.name,
             "contextState" to (lastContextUnsafe?.state?.name ?: "NONE"),
-            "contextAge" to "${(System.currentTimeMillis() - lastUpdate) / (60 * 60 * 1000)}h",
+            "contextAge" to "${(AimiReplayClock.now() - lastUpdate) / (60 * 60 * 1000)}h",
             "confidence" to "${((lastContextUnsafe?.confidence ?: 0.0) * 100).toInt()}%",
             "baselineDays" to (currentBaseline?.validDaysCount ?: 0).toString(),
             "isValid" to isValid().toString(),

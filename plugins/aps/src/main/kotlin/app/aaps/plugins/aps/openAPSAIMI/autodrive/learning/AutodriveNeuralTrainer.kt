@@ -16,6 +16,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.exp
 import kotlin.math.ln
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🧠 Autodrive Neural Trainer (on-device learning)
@@ -340,7 +341,7 @@ class AutodriveNeuralTrainer @Inject constructor(
             json.put("weight_inflammation", model.weights[1])
             json.put("weight_hormonal", model.weights[2])
             json.put("weight_engaged", model.weights[3])
-            json.put("timestamp", System.currentTimeMillis())
+            json.put("timestamp", AimiReplayClock.now())
             // Liveness: "the model says safe" and "there is no model" must not look the same.
             json.put("rows", report.rows)
             json.put("positives", report.positives)

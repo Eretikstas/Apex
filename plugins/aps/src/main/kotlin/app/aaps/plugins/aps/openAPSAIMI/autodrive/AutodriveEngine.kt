@@ -18,6 +18,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
+import app.aaps.plugins.aps.openAPSAIMI.AimiReplayClock
 
 /**
  * 🧠 Autodrive Engine (iLet-like Architecture)
@@ -237,7 +238,7 @@ class AutodriveEngine @Inject constructor(
         steps: Int,
         hr: Int,
         rhr: Int,
-        currentEpochMs: Long = System.currentTimeMillis(),
+        currentEpochMs: Long = AimiReplayClock.now(),
         tickId: Long = 0L,
         observationId: Long = 0L,
         /** Relayed to `tick`; without it this path silently took the 0.0 default. */
@@ -292,7 +293,7 @@ class AutodriveEngine @Inject constructor(
         steps: Int,
         hr: Int,
         rhr: Int,
-        currentEpochMs: Long = System.currentTimeMillis(),
+        currentEpochMs: Long = AimiReplayClock.now(),
         /**
          * Hyper-trajectory Ra floor, in mg/dL/min, or 0.0 for none.
          *
