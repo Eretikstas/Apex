@@ -9,11 +9,14 @@ import io.mockk.mockkStatic
 import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneOffset
+import androidx.collection.LongSparseArray
+import app.aaps.core.data.aps.AverageTDD
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.CA
 import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.ICfg
 import app.aaps.core.data.model.SourceSensor
+import app.aaps.core.data.model.TDD
 import app.aaps.core.data.model.TB
 import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.interfaces.aps.AutosensResult
@@ -23,6 +26,7 @@ import app.aaps.core.interfaces.aps.IobTotal
 import app.aaps.core.interfaces.aps.MealData
 import app.aaps.core.interfaces.aps.OapsProfileAimi
 import app.aaps.core.interfaces.logging.AAPSLogger
+import app.aaps.core.interfaces.stats.TIR
 import app.aaps.core.interfaces.ui.UiInteraction
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.BooleanKey
@@ -131,6 +135,36 @@ class HistoryReplayTest {
         val clock = mockk<DateUtil>(relaxed = true) { every { now() } answers { now } }
         harness.engine.dateUtil = clock
         stubDatabase(harness, history) { now }
+        // Eva's own totals, read at each tick: the harness default is an adult 48 U/day.
+        var tdd24 = 0.0
+        var tdd7 = 0.0
+        var below24 = 0.0
+        harness.engine.tddCalculator = mockk(relaxed = true) {
+            coEvery { calculate(any<Long>(), any<Boolean>()) } answers {
+                LongSparseArray<TDD>().apply { put(now, TDD(timestamp = now, totalAmount = if (firstArg<Long>() <= 1L) tdd24 else tdd7)) }
+            }
+            coEvery { calculate(any<Long>(), any<Long>(), any<Boolean>()) } answers {
+                LongSparseArray<TDD>().apply { put(now, TDD(timestamp = now, totalAmount = if (secondArg<Long>() <= 1L) tdd24 else tdd7)) }
+            }
+            coEvery { calculateDaily(any(), any()) } answers { TDD(timestamp = now, totalAmount = tdd24) }
+            every { averageTDD(any()) } answers {
+                val v = firstArg<LongSparseArray<TDD>?>()?.let { if (it.size() > 0) it.valueAt(0).totalAmount else null } ?: tdd24
+                AverageTDD(TDD(timestamp = now, totalAmount = v), true)
+            }
+        }
+        harness.engine.tirCalculator = mockk(relaxed = true) {
+            every { averageTIR(any()) } answers { mockk<TIR>(relaxed = true) { every { belowPct() } returns below24 } }
+        }
+        // The recent glucose the safety checks read, newest first as the AAPS bucketed table is.
+        harness.engine.glucoseStatusCalculatorAimi = mockk(relaxed = true) {
+            every { getRecentGlucose() } answers {
+                history.bg.filter { it.timestamp in (now - 3 * 3_600_000L)..now }.sortedByDescending { it.timestamp }.map { it.value.toFloat() }
+            }
+            every { getBucketedGlucoseSinceMinutes(any()) } answers {
+                val back = firstArg<Int>() * 60_000L
+                history.bg.filter { it.timestamp in (now - back)..now }.sortedByDescending { it.timestamp }.map { TimestampedBgSample(it.timestamp, it.value) }
+            }
+        }
         if (learn) harness.engine.unifiedReactivityLearner = UnifiedReactivityLearner(appContext, harness.persistenceLayer, clock, prefs, mockk(relaxed = true), storage)
         harness.engine.hypoExposureMonitor = HypoExposureMonitor(
             persistenceLayer = harness.persistenceLayer,
@@ -165,6 +199,9 @@ class HistoryReplayTest {
         for (i in 0 until ticks.length()) {
             val tick = ticks.getJSONObject(i)
             now = tick.getLong("t")
+            tdd24 = tick.optDouble("tdd24", meta.getDouble("tdd"))
+            tdd7 = tick.optDouble("tdd7", meta.getDouble("tdd"))
+            below24 = tick.optDouble("below24", 0.0)
             if (now - lastGuardRefresh > 60 * minute) {
                 runBlocking { harness.engine.refreshHypoExposure() }
                 lastGuardRefresh = now
@@ -468,7 +505,8 @@ class HistoryReplayTest {
                     carbs = tick.getDouble("carbs3h"), mealCOB = tick.getDouble("cob"),
                     lastBolusTime = lastBolus, lastCarbTime = tick.getLong("lastCarb")
                 ),
-                microBolusAllowed = true,
+                // As AAPS had it: the automations switched SMBs off on a quarter of the cycles.
+                microBolusAllowed = tick.optBoolean("smbOk", true),
                 currentTime = now,
                 flatBGsDetected = false,
                 dynIsfMode = false,
