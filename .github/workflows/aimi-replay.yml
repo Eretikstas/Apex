@@ -12,6 +12,10 @@ on:
         description: 'Let the AIMI learners learn during the replay'
         type: boolean
         default: true
+      prefs:
+        description: 'AIMI settings to try, like OApsAIMIMaxSMB=0.3,OApsAIMIPkpdEnabled=true'
+        type: string
+        default: ''
   # A push only makes the workflow known to GitHub (so it can be started by hand); it runs nothing.
   push:
     branches:
@@ -56,6 +60,8 @@ jobs:
       - name: Replay
         env:
           AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}
+          # Passed as an environment value, never pasted into the script text.
+          AIMI_REPLAY_PREFS: ${{ inputs.prefs }}
         run: |
           set +e
           W="$RUNNER_TEMP/replay"

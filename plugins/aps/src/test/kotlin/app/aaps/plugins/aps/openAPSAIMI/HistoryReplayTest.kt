@@ -335,7 +335,6 @@ class HistoryReplayTest {
         every { get(any<LongPreferenceKey>()) } answers { firstArg<LongPreferenceKey>().defaultValue }
         every { get(any<StringPreferenceKey>()) } answers { firstArg<StringPreferenceKey>().defaultValue }
         every { get(any<UnitDoublePreferenceKey>()) } answers { firstArg<UnitDoublePreferenceKey>().defaultValue }
-        every { get(BooleanKey.OApsAIMIPkpdEnabled) } returns true
         every { get(DoubleKey.OApsAIMIweight) } returns meta.getDouble("weightKg")
         every { get(DoubleKey.OApsAIMITDD7) } returns meta.getDouble("tdd")
         every { get(DoubleKey.ApsSmbMaxIob) } returns meta.getDouble("maxIob")
@@ -345,6 +344,15 @@ class HistoryReplayTest {
         every { get(IntKey.ApsMaxMinutesOfBasalToLimitSmb) } returns meta.getInt("maxSmbMin")
         every { get(IntKey.ApsUamMaxMinutesOfBasalToLimitSmb) } returns meta.getInt("maxUamSmbMin")
         every { get(UnitDoubleKey.ApsLgsThreshold) } returns meta.getDouble("lgs")
+        // Settings to try, from the workflow: "Name=value,Name=value" with enum names of BooleanKey,
+        // DoubleKey or IntKey.
+        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') }.forEach { pair ->
+            val (name, value) = pair.split('=', limit = 2).map { it.trim() }
+            BooleanKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toBoolean(); return@forEach }
+            DoubleKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toDouble(); return@forEach }
+            IntKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toInt(); return@forEach }
+            error("unknown setting $name")
+        }
     }
 
     private class Chained(val iobArray: Array<IobTotal>, val cur: Double, val fut: Double, val lag: Double, val hist: Double, val temp: CurrentTemp)
