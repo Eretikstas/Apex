@@ -212,9 +212,20 @@ class HistoryReplayTest {
             basals[k]
         }
         val bolusRows = data.getJSONArray("boluses").rows()
+        // Scenario "food first": a meal bolus given at glucose below 4.5 mmol/L is given LATE_BOLUS_<min> later.
+        val lateBolusMin = Regex("LATE_BOLUS_([0-9]+)").find(System.getenv("AIMI_REPLAY_PREFS").orEmpty())?.groupValues?.get(1)?.toLong() ?: 0L
+        val bgTimes = history.bg.map { it.timestamp }.toLongArray()
+        fun bgBefore(t: Long): Double = history.bg[(bgTimes.binarySearch(t).let { if (it >= 0) it else -it - 2 }).coerceIn(0, bgTimes.size - 1)].value
+        val movedBoluses = if (System.getenv("AIMI_REPLAY_SIM") == "1" && lateBolusMin > 0)
+            bolusRows.filter { !it.getBoolean(2) && it.getLong(0) >= startMs && bgBefore(it.getLong(0)) < 81.0 }
+                .map { Triple(it.getLong(0), it.getLong(0) + lateBolusMin * minute, it.getDouble(1)) }
+        else emptyList()
+        fun movedTime(t: Long): Long = movedBoluses.firstOrNull { it.first == t }?.second ?: t
+        history.boluses.replaceAll { b -> if (b.type != BS.Type.SMB && movedBoluses.any { it.first == b.timestamp }) b.copy(timestamp = movedTime(b.timestamp)) else b }
+        history.boluses.sortBy { it.timestamp }
         val chain = Chain(
             startMs = startMs,
-            manual = bolusRows.filter { !it.getBoolean(2) }.map { Pair(it.getLong(0), it.getDouble(1)) },
+            manual = bolusRows.filter { !it.getBoolean(2) }.map { Pair(movedTime(it.getLong(0)), it.getDouble(1)) },
             realBefore = bolusRows.filter { it.getBoolean(2) && it.getLong(0) < startMs }.map { Pair(it.getLong(0), it.getDouble(1)) },
             realTempsBefore = data.getJSONArray("temps").rows().filter { it.getLong(0) < startMs }
                 .map { OwnTemp(it.getLong(0), it.getDouble(1), minOf(it.getLong(0) + it.getLong(2), startMs)) },
@@ -238,6 +249,8 @@ class HistoryReplayTest {
         val realTreats = history.carbs.filter { it.timestamp >= startMs && it.amount <= 12.0 && realBgAt(it.timestamp) < 90.0 }
             .map { Pair(it.timestamp, it.amount) }
         val body = Body(bodyIsf, bodyIsf / prof0.getDouble("ic"), realTreats)
+        movedBoluses.forEach { (from, to, u) -> body.addInsulin(from, -u); body.addInsulin(to, u) }
+        if (movedBoluses.isNotEmpty()) println("AIMI replay: ${movedBoluses.size} meal boluses moved later")
         if (sim) history.carbs.removeAll { c -> realTreats.any { it.first == c.timestamp } }
         val realSmbAfter = bolusRows.filter { it.getBoolean(2) && it.getLong(0) >= startMs }.map { Pair(it.getLong(0), it.getDouble(1)) }
         val realTemps = data.getJSONArray("temps").rows().map { Triple(it.getLong(0), it.getDouble(1), it.getLong(2)) }.sortedBy { it.first }
@@ -491,7 +504,7 @@ class HistoryReplayTest {
         every { get(UnitDoubleKey.ApsLgsThreshold) } returns meta.getDouble("lgs")
         // Settings to try, from the workflow: "Name=value,Name=value" with enum names of BooleanKey,
         // DoubleKey or IntKey.
-        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("SMB_INTERVAL") }.forEach { pair ->
+        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("SMB_INTERVAL") && !it.startsWith("LATE_BOLUS") }.forEach { pair ->
             val (name, value) = pair.split('=', limit = 2).map { it.trim() }
             BooleanKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toBoolean(); return@forEach }
             DoubleKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toDouble(); return@forEach }
