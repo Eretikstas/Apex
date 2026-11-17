@@ -16,6 +16,19 @@ on:
         description: 'AIMI settings to try, like OApsAIMIMaxSMB=0.3,OApsAIMIPkpdEnabled=true'
         type: string
         default: ''
+      sim:
+        description: 'Closed loop on the body model (glucose answers the insulin)'
+        type: boolean
+        default: false
+      algo:
+        description: 'Algorithm on the body model: aimi, autoisf, or real (the real doses, a check of the model)'
+        type: choice
+        options: [aimi, autoisf, real]
+        default: aimi
+      isf:
+        description: 'ISF of the body model in mg/dL per unit (empty = profile ISF)'
+        type: string
+        default: ''
   # A push only makes the workflow known to GitHub (so it can be started by hand); it runs nothing.
   push:
     branches:
@@ -62,6 +75,9 @@ jobs:
           AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}
           # Passed as an environment value, never pasted into the script text.
           AIMI_REPLAY_PREFS: ${{ inputs.prefs }}
+          AIMI_REPLAY_SIM: ${{ inputs.sim && '1' || '0' }}
+          AIMI_REPLAY_ALGO: ${{ inputs.algo }}
+          AIMI_REPLAY_SIM_ISF: ${{ inputs.isf }}
         run: |
           set +e
           W="$RUNNER_TEMP/replay"
