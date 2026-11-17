@@ -250,6 +250,27 @@ class HistoryReplayTest {
             .map { Pair(it.timestamp, it.amount) }
         val body = Body(bodyIsf, bodyIsf / prof0.getDouble("ic"), realTreats)
         movedBoluses.forEach { (from, to, u) -> body.addInsulin(from, -u); body.addInsulin(to, u) }
+        // Scenario NEED_<pct>: the body needs pct % more basal insulin (lower sensitivity). It acts like
+        // insulin that is used up by the body, so glucose drifts up unless the algorithm gives more.
+        val prefsText = System.getenv("AIMI_REPLAY_PREFS").orEmpty()
+        val needPct = Regex("NEED_([0-9]+)").find(prefsText)?.groupValues?.get(1)?.toDouble() ?: 0.0
+        // Scenario CARBS_<pct>: every meal (> 12 g) is pct % bigger; the parent enters it and gives the
+        // meal bolus for it with the profile carb ratio, as with the real meals.
+        val carbsPct = Regex("CARBS_([0-9]+)").find(prefsText)?.groupValues?.get(1)?.toDouble() ?: 0.0
+        if (sim && carbsPct > 0) {
+            val ic = prof0.getDouble("ic")
+            history.carbs.filter { it.timestamp >= startMs && it.amount > 12.0 }.forEach { c ->
+                val extra = c.amount * carbsPct / 100.0
+                body.extraMeals.add(Pair(c.timestamp, extra))
+                body.addInsulin(c.timestamp, extra / ic)
+                chain.extraManual.add(Pair(c.timestamp, extra / ic))
+                history.boluses.add(BS(timestamp = c.timestamp, amount = extra / ic, type = BS.Type.NORMAL, iCfg = ICfg(insulinLabel = "replay", peak = 45, dia = 5.0, concentration = 1.0)))
+            }
+            history.boluses.sortBy { it.timestamp }
+            history.carbs.replaceAll { c -> if (c.timestamp >= startMs && c.amount > 12.0) c.copy(amount = c.amount * (1 + carbsPct / 100.0)) else c }
+            println("AIMI replay: ${body.extraMeals.size} meals made bigger")
+        }
+        val cobScale = 1.0 + carbsPct / 100.0
         if (movedBoluses.isNotEmpty()) println("AIMI replay: ${movedBoluses.size} meal boluses moved later")
         if (sim) history.carbs.removeAll { c -> realTreats.any { it.first == c.timestamp } }
         val realSmbAfter = bolusRows.filter { it.getBoolean(2) && it.getLong(0) >= startMs }.map { Pair(it.getLong(0), it.getDouble(1)) }
@@ -267,6 +288,10 @@ class HistoryReplayTest {
         for (i in 0 until ticks.length()) {
             val tick = ticks.getJSONObject(i)
             now = tick.getLong("t")
+            if (cobScale != 1.0) {
+                tick.put("cob", tick.getDouble("cob") * cobScale)
+                tick.put("carbs3h", tick.getDouble("carbs3h") * cobScale)
+            }
             tdd24 = tick.optDouble("tdd24", meta.getDouble("tdd"))
             tdd7 = tick.optDouble("tdd7", meta.getDouble("tdd"))
             below24 = tick.optDouble("below24", 0.0)
@@ -281,6 +306,7 @@ class HistoryReplayTest {
                     val mine = if (algo == "real") real else chain.activeTemp(p)?.rate ?: b
                     val net = (mine - real) * (q - p) / 3_600_000.0
                     if (net != 0.0) body.addInsulin((p + q) / 2, net)
+                    if (needPct > 0) body.addNeed((p + q) / 2, b * needPct / 100.0 * (q - p) / 3_600_000.0)
                     p = q
                 }
                 if (algo != "real") realSmbAfter.filter { it.first in prevNow until now }.forEach { body.addInsulin(it.first, -it.second) }
@@ -398,6 +424,8 @@ class HistoryReplayTest {
         val basalAt: (Long) -> Double,
     ) {
         val ownSmb = mutableListOf<Pair<Long, Double>>()
+        /** Extra meal boluses of the CARBS scenario. */
+        val extraManual = mutableListOf<Pair<Long, Double>>()
         val ownTemps = mutableListOf<OwnTemp>()
 
         fun activeTemp(now: Long): OwnTemp? = ownTemps.lastOrNull { it.start <= now && now < it.end }
@@ -407,6 +435,7 @@ class HistoryReplayTest {
             val from = now - diaMs
             val out = ArrayList<Pair<Long, Double>>()
             manual.filterTo(out) { it.first in from..now }
+            extraManual.filterTo(out) { it.first in from..now }
             realBefore.filterTo(out) { it.first in from..now }
             ownSmb.filterTo(out) { it.first in from..now }
             for (tb in realTempsBefore + ownTemps) {
@@ -504,7 +533,7 @@ class HistoryReplayTest {
         every { get(UnitDoubleKey.ApsLgsThreshold) } returns meta.getDouble("lgs")
         // Settings to try, from the workflow: "Name=value,Name=value" with enum names of BooleanKey,
         // DoubleKey or IntKey.
-        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("SMB_INTERVAL") && !it.startsWith("LATE_BOLUS") }.forEach { pair ->
+        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("SMB_INTERVAL") && !it.startsWith("LATE_BOLUS") && !it.startsWith("NEED_") && !it.startsWith("CARBS_") }.forEach { pair ->
             val (name, value) = pair.split('=', limit = 2).map { it.trim() }
             BooleanKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toBoolean(); return@forEach }
             DoubleKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toDouble(); return@forEach }
@@ -527,6 +556,19 @@ class HistoryReplayTest {
         private var donePointer = 0
         private var doneUnits = 0.0
         val treats = ArrayList<Pair<Long, Double>>()
+        /** Extra meal carbs of the CARBS scenario: slow absorption like Eva's meals (peak about 2.5 h, done in 4.5 h). */
+        val extraMeals = ArrayList<Pair<Long, Double>>()
+
+        private fun slowAbsorbed(m: Double): Double {
+            // Triangle rate: 0 at 0 min, peak at 150 min, 0 at 270 min. Returns the absorbed fraction.
+            val a = 150.0; val b = 270.0
+            return when {
+                m <= 0 -> 0.0
+                m <= a -> m * m / (a * b)
+                m < b -> 1.0 - (b - m) * (b - m) / ((b - a) * b)
+                else -> 1.0
+            }
+        }
 
         private var sorted = true
 
@@ -535,7 +577,17 @@ class HistoryReplayTest {
             insulin.add(Pair(t, u))
         }
 
-        fun insulinBetween(from: Long, to: Long) = insulin.filter { it.first in from until to }.sumOf { it.second }
+        private val need = ArrayList<Pair<Long, Double>>()
+
+        /** Extra need of the NEED scenario: counts like insulin used up by the body, not like a dose. */
+        fun addNeed(t: Long, u: Double) {
+            addInsulin(t, -u)
+            need.add(Pair(t, u))
+        }
+
+        /** Insulin the algorithm gave beyond (or below) the real doses; the NEED part is not a dose. */
+        fun insulinBetween(from: Long, to: Long) =
+            insulin.filter { it.first in from until to }.sumOf { it.second } + need.filter { it.first in from until to }.sumOf { it.second }
 
         private fun carbsIn(list: List<Pair<Long, Double>>, ts: Long) =
             list.sumOf { (t, g) -> if (t > ts) 0.0 else g * ((ts - t - 5 * minute) / (30.0 * minute)).coerceIn(0.0, 1.0) }
@@ -552,7 +604,8 @@ class HistoryReplayTest {
                 if (t > ts) break
                 acted += u * (1 - curve((ts - t) / 60_000.0).first)
             }
-            val v = real - isf * acted + csf * (carbsIn(treats, ts) - carbsIn(removed, ts))
+            val meals = extraMeals.sumOf { (t, g) -> if (t > ts) 0.0 else g * slowAbsorbed((ts - t) / 60_000.0) }
+            val v = real - isf * acted + csf * (carbsIn(treats, ts) - carbsIn(removed, ts) + meals)
             return v.coerceIn(39.0, 400.0)
         }
     }
