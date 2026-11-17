@@ -491,7 +491,7 @@ class HistoryReplayTest {
         every { get(UnitDoubleKey.ApsLgsThreshold) } returns meta.getDouble("lgs")
         // Settings to try, from the workflow: "Name=value,Name=value" with enum names of BooleanKey,
         // DoubleKey or IntKey.
-        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') }.forEach { pair ->
+        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("SMB_INTERVAL") }.forEach { pair ->
             val (name, value) = pair.split('=', limit = 2).map { it.trim() }
             BooleanKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toBoolean(); return@forEach }
             DoubleKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toDouble(); return@forEach }

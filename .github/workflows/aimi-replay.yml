@@ -103,6 +103,7 @@ jobs:
           AIMI_REPLAY_TRACE: '1'
           AIMI_REPLAY_NO_BOOSTER: ${{ inputs.no_booster && '1' || '0' }}
           AIMI_REPLAY_BOOSTER_IOB: ${{ inputs.booster_iob && '1' || '0' }}
+          AIMI_REPLAY_SMB_INTERVAL: ${{ contains(inputs.prefs, 'SMB_INTERVAL_10') && '10' || '' }}
           AIMI_REPLAY_PASSES: ${{ inputs.pretrained && '2' || '1' }}
         run: |
           set +e

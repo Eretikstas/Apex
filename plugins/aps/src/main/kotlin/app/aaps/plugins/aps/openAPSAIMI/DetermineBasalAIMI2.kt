@@ -17021,7 +17021,7 @@ class DetermineBasalaimiSMB2 @Inject constructor(
         return manualSport || recentBurst || sustainedActivity || highTargetExercise
     }
     private fun calculateSMBInterval(): Int {
-        val defaultInterval = 3
+        val defaultInterval = AimiReplayClock.smbIntervalMin ?: 3
 
         // 1) Lecture des préférences
         val intervals = SMBIntervals(

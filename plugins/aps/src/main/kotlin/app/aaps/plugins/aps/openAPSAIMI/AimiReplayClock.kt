@@ -23,5 +23,8 @@ object AimiReplayClock {
     /** Replay trial: the basal booster takes off what the insulin on board will do in its 60 min. AIMI_REPLAY_BOOSTER_IOB=1. */
     val boosterSeesInsulin: Boolean = System.getenv("AIMI_REPLAY_BOOSTER_IOB") == "1"
 
+    /** Replay trial: AIMI's base SMB interval in minutes (AIMI: 3). AIMI_REPLAY_SMB_INTERVAL. */
+    val smbIntervalMin: Int? = System.getenv("AIMI_REPLAY_SMB_INTERVAL")?.toIntOrNull()?.coerceIn(1, 30)
+
     fun now(): Long = override?.invoke() ?: System.currentTimeMillis()
 }
