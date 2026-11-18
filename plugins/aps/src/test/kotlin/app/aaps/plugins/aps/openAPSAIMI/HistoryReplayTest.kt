@@ -64,6 +64,8 @@ import org.json.JSONObject
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.io.File
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
@@ -120,7 +122,12 @@ class HistoryReplayTest {
     private fun replayOnce(data: JSONObject, storageDir: File, outPath: String, learn: Boolean) {
         val meta = data.getJSONObject("meta")
         val history = readHistory(data)
-        val ticks = data.getJSONArray("ticks")
+        val prefsText = System.getenv("AIMI_REPLAY_PREFS").orEmpty()
+        // LOOP_MIN_<n>: the loop runs every n minutes (AAPS: 5). Extra cycles copy the inputs of the cycle before.
+        val loopMin = Regex("LOOP_MIN_([0-9]+)").find(prefsText)?.groupValues?.get(1)?.toLong()
+        // AISF_LIVE: AutoISF 3.2.1 works out its ISF factor from the model glucose (else: the factor AAPS logged).
+        val aisfLive = prefsText.contains("AISF_LIVE")
+        val ticks = loopMin?.let { expandTicks(data.getJSONArray("ticks"), it) } ?: data.getJSONArray("ticks")
 
         var now = ticks.getJSONObject(0).getLong("t")
         // Every AIMI timer and learner window follows the replayed time.
@@ -345,7 +352,10 @@ class HistoryReplayTest {
                 val smbOk = if (sim) smbState else tick.optBoolean("smbOk", true)
                 val rt = when (algo) {
                     "aimi" -> runTick(harness, tick, meta, now, chained, gsSim, smbOk)
-                    "autoisf" -> runTickAutoIsf(autoIsf, tick, meta, now, chained, gsSim!!, smbOk)
+                    "autoisf" -> runTickAutoIsf(
+                        autoIsf, tick, meta, now, chained, gsSim!!, smbOk,
+                        liveVs = if (aisfLive) autoIsf321Sens(history.bg, bgT, now, tick) else null,
+                    )
                     else -> realTick(realSmbAfter, prevNowOf(ticks, i), now, realRateAt(now), basalAt(now))
                 }
                 if (sim && algo != "real") (rt.units ?: 0.0).takeIf { it > 0.0 }?.let { body.addInsulin(now, it) }
@@ -533,7 +543,7 @@ class HistoryReplayTest {
         every { get(UnitDoubleKey.ApsLgsThreshold) } returns meta.getDouble("lgs")
         // Settings to try, from the workflow: "Name=value,Name=value" with enum names of BooleanKey,
         // DoubleKey or IntKey.
-        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("SMB_INTERVAL") && !it.startsWith("LATE_BOLUS") && !it.startsWith("NEED_") && !it.startsWith("CARBS_") }.forEach { pair ->
+        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("LOOP_MIN") && !it.startsWith("AISF_LIVE") && !it.startsWith("SMB_INTERVAL") && !it.startsWith("LATE_BOLUS") && !it.startsWith("NEED_") && !it.startsWith("CARBS_") }.forEach { pair ->
             val (name, value) = pair.split('=', limit = 2).map { it.trim() }
             BooleanKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toBoolean(); return@forEach }
             DoubleKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toDouble(); return@forEach }
@@ -643,11 +653,12 @@ class HistoryReplayTest {
     /** AutoISF of AAPS (the oref core with Eva's SMB settings). Its ISF factor is the one AAPS had at the tick. */
     private fun runTickAutoIsf(
         det: DetermineBasalAutoISF, tick: JSONObject, meta: JSONObject, now: Long, chained: Chained, gs: GlucoseStatusAIMI, smbOk: Boolean,
+        liveVs: Double? = null,
     ): RT {
         val prof = tick.getJSONObject("prof")
         val tt = if (tick.isNull("tt")) null else tick.getDouble("tt")
         val target = tt ?: prof.getDouble("target")
-        val vs = tick.getJSONObject("aaps").optDouble("vs", 0.0).takeIf { it > 0.0 } ?: prof.getDouble("isf")
+        val vs = liveVs ?: tick.getJSONObject("aaps").optDouble("vs", 0.0).takeIf { it > 0.0 } ?: prof.getDouble("isf")
         val profile = OapsProfileAutoIsf(
             dia = 0.0, min_5m_carbimpact = 0.0, max_iob = meta.getDouble("maxIob"), max_daily_basal = prof.getDouble("basal"),
             max_basal = meta.getDouble("maxBasal"), min_bg = target, max_bg = target, target_bg = target,
@@ -680,6 +691,131 @@ class HistoryReplayTest {
             profile_percentage = 100, smb_ratio = 0.5, smb_max_range_extension = 1.0, iob_threshold_percent = 100,
             auto_isf_consoleError = mutableListOf(), auto_isf_consoleLog = mutableListOf(),
         )
+    }
+
+    /** More loop cycles: between two recorded cycles, one every [stepMin] minutes, each a copy of the earlier one. */
+    private fun expandTicks(src: JSONArray, stepMin: Long): JSONArray {
+        val out = JSONArray()
+        for (i in 0 until src.length()) {
+            val a = src.getJSONObject(i)
+            val t0 = a.getLong("t")
+            val t1 = if (i + 1 < src.length()) src.getJSONObject(i + 1).getLong("t") else t0 + 5 * minute
+            var t = t0
+            while (t < t1) {
+                out.put(JSONObject(a.toString()).put("t", t))
+                t += stepMin * minute
+            }
+        }
+        return out
+    }
+
+    /**
+     * ISF of AutoISF 3.2.1 (blaqone/JetFoxy port, OpenAPSAutoISFPlugin.autoISF) from the model glucose of the last
+     * 47 minutes, one reading a minute (the raw fit path of GlucoseStatusCalculatorAutoIsf, shortest parabola 10 min).
+     * Eva's weights: acce 0.1, brake 0.20, lower range 0.15, higher range 0.1, pp 0.01, dura 0.5, min 0.3, max 1.2;
+     * autosens ratio 1, no activity, no exercise mode.
+     */
+    private fun autoIsf321Sens(bg: List<GV>, bgT: LongArray, now: Long, tick: JSONObject): Double {
+        val prof = tick.getJSONObject("prof")
+        val sens = prof.getDouble("isf")
+        val target = if (tick.isNull("tt")) prof.getDouble("target") else tick.getDouble("tt")
+        val i0 = bgT.binarySearch(now).let { if (it >= 0) it else -it - 2 }
+        if (i0 < 4) return sens
+        val src = ArrayList<Pair<Long, Double>>()
+        var k = i0
+        while (k >= 0 && bgT[i0] - bgT[k] <= 60 * minute) { src.add(Pair(bgT[k], bg[k].value)); k-- }
+        val gNow = src[0].second
+        // dura: minutes the glucose stayed within +-5 % of its running mean
+        var sumBG = gNow; var oldAvg = gNow; var minutesDur = 0L; var n = 1
+        for (j in 1 until src.size) {
+            val (tj, v) = src[j]
+            if (v <= 39) continue
+            n += 1
+            if (((src[0].first - tj) / 60_000.0).roundToInt() - minutesDur > 13) break
+            if (v > oldAvg * 0.95 && v < oldAvg * 1.05) { sumBG += v; oldAvg = sumBG / n; minutesDur = ((src[0].first - tj) / 60_000.0).roundToLong() } else break
+        }
+        // parabola: best fit over the last 10..47 minutes
+        var corrMax = 0.0; var a0 = 0.0; var a1 = 0.0; var a2 = 0.0; var acc = 0.0
+        var sy = 0.0; var sx = 0.0; var sx2 = 0.0; var sx3 = 0.0; var sx4 = 0.0; var sxy = 0.0; var sx2y = 0.0
+        var tiLast = 0.0; var nn = 0
+        val time0 = src[0].first
+        for (j in src.indices) {
+            val v = src[j].second
+            if (v <= 39) continue
+            nn += 1
+            val ti = (src[j].first - time0) / 1000.0
+            if (-ti > 47 * 60) break
+            if (ti < tiLast - 11.0 * 60) break
+            tiLast = ti
+            sx += ti; sx2 += ti * ti; sx3 += ti * ti * ti; sx4 += ti * ti * ti * ti; sy += v; sxy += ti * v; sx2y += ti * ti * v
+            if (nn > 3 && -ti > 10 * 60) {
+                val detH = sx4 * (sx2 * nn - sx * sx) - sx3 * (sx3 * nn - sx * sx2) + sx2 * (sx3 * sx - sx2 * sx2)
+                if (detH == 0.0) continue
+                val detA = sx2y * (sx2 * nn - sx * sx) - sxy * (sx3 * nn - sx * sx2) + sy * (sx3 * sx - sx2 * sx2)
+                val detB = sx4 * (sxy * nn - sy * sx) - sx3 * (sx2y * nn - sy * sx2) + sx2 * (sx2y * sx - sxy * sx2)
+                val detC = sx4 * (sx2 * sy - sx * sxy) - sx3 * (sx3 * sy - sx * sx2y) + sx2 * (sx3 * sxy - sx2 * sx2y)
+                val a = detA / detH * 300.0 * 300.0; val b = detB / detH * 300.0; val c = detC / detH
+                val yMean = sy / nn
+                var ss = 0.0; var sr = 0.0
+                for (q in 0..j) {
+                    val dt = (src[q].first - time0) / 1000.0 / 300.0
+                    ss += (src[q].second - yMean).let { it * it }
+                    sr += (src[q].second - (a * dt * dt + b * dt + c)).let { it * it }
+                }
+                val r2 = if (ss != 0.0) 1 - sr / ss else 0.0
+                if (r2 >= corrMax) { corrMax = r2; acc = 2 * a; a0 = c; a1 = b; a2 = a }
+            }
+        }
+        // delta as oref: change over the last 5 minutes
+        val delta = src.firstOrNull { src[0].first - it.first >= 5 * minute }?.let { gNow - it.second } ?: 0.0
+        val bgOff = target + 10.0 - gNow
+        var acceWeight = 1.0
+        if (a2 != 0.0 && corrMax >= 0.9) {
+            val mmDelta = -a1 / 2 / a2 * 5
+            val mmValue = a0 - mmDelta * mmDelta / 25 * a2
+            if (mmDelta > 0 && acc > 0.0 && mmDelta <= 30 && mmValue < target) acceWeight = -0.20
+        }
+        var acceIsf = 1.0; var modified = false
+        if (corrMax >= 0.9) {
+            val share = 10 * (corrMax - 0.9)
+            var cap = 1.0
+            if (acceWeight == 1.0 && gNow < target) {
+                if (acc > 0) { if (acc > 1) cap = 0.5; acceWeight = 0.20 } else if (acc < 0) acceWeight = 0.1
+            } else if (acceWeight == 1.0) {
+                if (acc < 0) acceWeight = 0.20 else if (acc > 0) acceWeight = 0.1
+            }
+            acceIsf = 1.0 + acc * cap * acceWeight * share
+            if (acceIsf != 1.0) modified = true
+        }
+        val bgIsf = 1 + aisfInterpolate(100 - bgOff)
+        fun limit(lift: Double): Double { val l = lift.coerceIn(0.3, 1.2); return if (l >= 1) maxOf(l, 1.0) else minOf(l, 1.0) }
+        if (bgIsf < 1.0) {
+            val lift = if (acceIsf > 1.0) bgIsf * acceIsf else minOf(bgIsf, acceIsf)
+            return minOf(720.0, sens / limit(lift))
+        } else if (bgIsf > 1.0) modified = true
+        var ppIsf = 1.0
+        if (bgOff <= 0.0 && delta >= 0) { ppIsf = 1.0 + maxOf(0.0, delta * 0.01); if (ppIsf != 1.0) modified = true }
+        var duraIsf = 1.0
+        if (minutesDur >= 10 && oldAvg > target) { duraIsf += minutesDur / 60.0 * (0.5 / target) * (oldAvg - target); modified = true }
+        if (!modified) return sens
+        var lift = maxOf(duraIsf, maxOf(bgIsf, maxOf(acceIsf, ppIsf)))
+        if (acceIsf < 1.0) lift *= acceIsf
+        return sens / limit(lift)
+    }
+
+    private fun aisfInterpolate(x: Double): Double {
+        val px = doubleArrayOf(50.0, 60.0, 80.0, 90.0, 100.0, 110.0, 150.0, 180.0, 200.0)
+        val py = doubleArrayOf(-0.5, -0.5, -0.3, -0.2, 0.0, 0.0, 0.5, 0.7, 0.7)
+        val v = when {
+            x < px[0] -> py[0] + (py[1] - py[0]) / (px[1] - px[0]) * (x - px[0])
+            x > px.last() -> py[7] + (py[8] - py[7]) / (px[8] - px[7]) * (x - px[7])
+            else -> {
+                var r = py.last()
+                for (i in 1 until px.size) if (x <= px[i]) { r = py[i - 1] + (py[i] - py[i - 1]) / (px[i] - px[i - 1]) * (x - px[i - 1]); break }
+                r
+            }
+        }
+        return v * (if (x > 100) 0.1 else 0.15)
     }
 
     private class Chained(val iobArray: Array<IobTotal>, val cur: Double, val fut: Double, val lag: Double, val hist: Double, val temp: CurrentTemp)
