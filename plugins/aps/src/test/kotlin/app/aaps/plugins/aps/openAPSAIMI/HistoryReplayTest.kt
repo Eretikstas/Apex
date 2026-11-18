@@ -259,7 +259,7 @@ class HistoryReplayTest {
         movedBoluses.forEach { (from, to, u) -> body.addInsulin(from, -u); body.addInsulin(to, u) }
         // Scenario NEED_<pct>: the body needs pct % more basal insulin (lower sensitivity). It acts like
         // insulin that is used up by the body, so glucose drifts up unless the algorithm gives more.
-        val prefsText = System.getenv("AIMI_REPLAY_PREFS").orEmpty()
+        // prefsText is read at the top of replayOnce
         val needPct = Regex("NEED_([0-9]+)").find(prefsText)?.groupValues?.get(1)?.toDouble() ?: 0.0
         // Scenario CARBS_<pct>: every meal (> 12 g) is pct % bigger; the parent enters it and gives the
         // meal bolus for it with the profile carb ratio, as with the real meals.
