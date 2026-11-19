@@ -254,7 +254,7 @@ dependencies {
     // verified by building an APK with comboctl un-excluded. Keeping
     // them out of this list would only be tidiness, and it is tidiness that has to be maintained by
     // hand every time a module is added.
-    val pumpExclusions = setOf(":pump:virtual")
+    val pumpExclusions = setOf(":pump:virtual", ":pump:atc3-emulator")
     rootProject.subprojects
         .filter { it.path.startsWith(":pump:") && it.path !in pumpExclusions && it.buildFile.exists() }
         .forEach {
