@@ -753,17 +753,18 @@ class HistoryReplayTest {
         // >10 % more or less on two cards in a row, all hours move together (up to +-15 %).
         val lb2 = prefsText.contains("LEARNB2")
         val lastDir = IntArray(24); var lastShift = 0; val upCount = IntArray(24)
-        val lb3 = prefsText.contains("LEARNB3")
+        val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5")
         val lbLowMax = tok("LBLOWMAX", 0.0).toInt()
         fun hourNeeds(w: Int): Array<ArrayList<Double>> {
             val n = out.length(); val s0 = n - w
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
-            val hr = IntArray(w); val mn = IntArray(w)
+            val hr = IntArray(w); val mn = IntArray(w); val canOld = BooleanArray(w)
             fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
             for (i in 0 until w) {
                 val r = out.getJSONObject(s0 + i)
                 bg[i] = r.optDouble("bg", Double.NaN); meal[i] = num(r, "meal"); hypo[i] = num(r, "hypo")
                 val z = Instant.ofEpochMilli(r.getLong("t")).atZone(tz); hr[i] = z.hour; mn[i] = z.minute
+                canOld[i] = lb5 && r.optDouble("can", 0.0) > 72.0
                 val nx = if (i + 1 < w) out.getJSONObject(s0 + i + 1) else r
                 ins[i] = num(nx, "deliv") * 5 / 60 + num(r, "units") + num(r, "man")
             }
@@ -772,6 +773,8 @@ class HistoryReplayTest {
             for (k in 0 until w) { if (meal[k] > 0) last = k; since[k] = (k - last) * 5 }
             val needs = Array(24) { ArrayList<Double>() }
             for (k in 60 until w - 12) {
+                // LEARNB5: hours with a cannula older than 72 h are not used (user rule 19.11).
+                if (canOld[k] || canOld[k + 12]) continue
                 if (mn[k] != 0 || since[k] < 300 || bg[k].isNaN() || bg[k + 12].isNaN() || bg[k] !in 70.0..216.0) continue
                 if ((k until k + 12).any { meal[it] > 0 }) continue
                 var a = 0.0; for (j in k until k + 12) a += act[j]
@@ -826,22 +829,25 @@ class HistoryReplayTest {
             val ratios = (0 until 24).filter { n7[it].size >= 2 }.map { med(n7[it]) / profBasal[it] }
             val ratio = if (ratios.size >= 5) med(ratios) else 1.0
             val dirS = if (ratio > 1.10) 1 else if (ratio < 0.90) -1 else 0
-            if (!lb3 && dirS != 0 && dirS == lastShift) {
+            if (!lb3 && !lb5 && dirS != 0 && dirS == lastShift) {
                 val f = ratio.coerceIn(0.85, 1.15)
                 for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
                 sb.append(" SHIFT x%.2f".format(f)); changed = 24; lastShift = 0
                 lastDir.fill(0)
             } else {
                 lastShift = dirS
-                val own = DoubleArray(24) { if (needs[it].size >= 3) med(needs[it]) else Double.NaN }
+                val own = DoubleArray(24) { if (needs[it].size >= (if (lb5) 4 else 3)) med(needs[it]) else Double.NaN }
                 for (h in 0 until 24) {
                     if (own[h].isNaN()) { lastDir[h] = 0; continue }
                     val nb = listOf(own[(h + 23) % 24], own[(h + 1) % 24]).filter { !it.isNaN() }
                     val v = if (nb.isEmpty()) own[h] else 0.5 * own[h] + 0.5 * nb.average()
                     // LEARNB3: no shift detector; asymmetric - lower after 2 cards at -10 %, raise only after 3 cards at
                     // +15 % and only if the last 7 days had no sensor value < 3.9 within 2 h of this hour.
-                    val dir = if (v > profBasal[h] * (if (lb3) 1.15 else 1.10)) 1 else if (v < profBasal[h] * 0.90) -1 else 0
-                    val lowNear = lb3 && dir == 1 && run {
+                    // LEARNB5: the same rule both ways (+-10 % on 2 cards in a row), a raise is still blocked by many lows near
+                    // the hour, and each step goes only half way to the estimate (noise does not push it around).
+                    val strict = lb3 && !lb5
+                    val dir = if (v > profBasal[h] * (if (strict) 1.15 else 1.10)) 1 else if (v < profBasal[h] * 0.90) -1 else 0
+                    val lowNear = (lb3 || lb5) && dir == 1 && run {
                         // LBLOWMAX_<n>: a raise is blocked when more than n five-minute readings < 3.9 were within +-2 h of
                         // this hour in the last 7 days (default 0 = any low blocks, LEARNB3).
                         val n = out.length(); var cnt = 0
@@ -852,11 +858,12 @@ class HistoryReplayTest {
                         }
                         cnt > lbLowMax
                     }
-                    val need = if (lb3 && dir == 1) 3 else 2
+                    val need = if (strict && dir == 1) 3 else 2
                     if (dir == 1 && lowNear) { lastDir[h] = 0; upCount[h] = 0; continue }
                     if (dir != 0 && dir == lastDir[h]) upCount[h]++ else upCount[h] = if (dir != 0) 1 else 0
                     if (dir != 0 && upCount[h] >= need) {
-                        val nv = Math.round(v.coerceIn(profBasal[h] * 0.8, profBasal[h] * 1.2) * 100) / 100.0
+                        val target = if (lb5) profBasal[h] + 0.5 * (v - profBasal[h]) else v
+                        val nv = Math.round(target.coerceIn(profBasal[h] * 0.8, profBasal[h] * 1.2) * 100) / 100.0
                         sb.append(" %02d:%.2f->%.2f".format(h, profBasal[h], nv)); profBasal[h] = nv; changed++; lastDir[h] = 0; upCount[h] = 0
                     } else lastDir[h] = dir
                 }
@@ -865,7 +872,7 @@ class HistoryReplayTest {
             println("AIMI replay: learner basal card v2 day $day: $changed hours changed, total ${"%.2f".format(profBasal.sum())} U/day (shift ratio ${"%.2f".format(ratio)});$sb")
         }
         fun learnBasal(day: Int) {
-            if (lb2 || lb3) { learnBasal2(day); return }
+            if (lb2 || lb3 || lb5) { learnBasal2(day); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
             val hr = IntArray(w); val mn = IntArray(w)
@@ -1176,6 +1183,7 @@ class HistoryReplayTest {
                 val row = JSONObject().put("t", t).put("bg", reading).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
                     .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
                 row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h]).put("lbg", gs?.glucose ?: JSONObject.NULL)
+                if (canEvery > 0) row.put("can", ((t - t0) / 3_600_000.0) % canEvery)
                 manThisTick = 0.0; mealThisTick = 0.0; hypoThisTick = 0.0
                 try {
                     if (gs == null) throw IllegalStateException("no glucose")
