@@ -747,6 +747,7 @@ class HistoryReplayTest {
         val lb2 = prefsText.contains("LEARNB2")
         val lastDir = IntArray(24); var lastShift = 0; val upCount = IntArray(24)
         val lb3 = prefsText.contains("LEARNB3")
+        val lbLowMax = tok("LBLOWMAX", 0.0).toInt()
         fun hourNeeds(w: Int): Array<ArrayList<Double>> {
             val n = out.length(); val s0 = n - w
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
@@ -797,13 +798,15 @@ class HistoryReplayTest {
                     // +15 % and only if the last 7 days had no sensor value < 3.9 within 2 h of this hour.
                     val dir = if (v > profBasal[h] * (if (lb3) 1.15 else 1.10)) 1 else if (v < profBasal[h] * 0.90) -1 else 0
                     val lowNear = lb3 && dir == 1 && run {
-                        val n = out.length(); var hit = false
+                        // LBLOWMAX_<n>: a raise is blocked when more than n five-minute readings < 3.9 were within +-2 h of
+                        // this hour in the last 7 days (default 0 = any low blocks, LEARNB3).
+                        val n = out.length(); var cnt = 0
                         for (i in maxOf(0, n - 7 * 288) until n) {
                             val r = out.getJSONObject(i); val hh = Instant.ofEpochMilli(r.getLong("t")).atZone(tz).hour
                             val dh = minOf((hh - h + 24) % 24, (h - hh + 24) % 24)
-                            if (dh <= 2 && r.optDouble("bg", 200.0) < 70.0) { hit = true; break }
+                            if (dh <= 2 && r.optDouble("bg", 200.0) < 70.0) cnt++
                         }
-                        hit
+                        cnt > lbLowMax
                     }
                     val need = if (lb3 && dir == 1) 3 else 2
                     if (dir == 1 && lowNear) { lastDir[h] = 0; upCount[h] = 0; continue }
