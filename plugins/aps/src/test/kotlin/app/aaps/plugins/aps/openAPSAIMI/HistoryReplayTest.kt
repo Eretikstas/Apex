@@ -362,9 +362,11 @@ class HistoryReplayTest {
                         val done = ArrayList<Pending>()
                         for (pd in pending) {
                             if (ts < pd.next) continue
-                            val safe = v >= 81.0 && d5 >= 0.0 && ((v >= 99.0 && d5 > 0.0) || v >= pd.g0 + 27.0)
+                            val fireAt = if (prefsText.contains("SMART6")) 108.0 else 99.0
+                            val safe = v >= 81.0 && d5 >= 0.0 && ((v >= fireAt && d5 > 0.0) || v >= pd.g0 + 27.0)
                             if (safe) {
-                                val factor = if (!smartAdj) 1.0 else if (d5 < 2.0) 0.8 else if (d5 > 6.0) 1.1 else 1.0
+                                val lowCut = if (prefsText.contains("SMART_LOW20")) 0.8 else 1.0
+                                val factor = lowCut * (if (!smartAdj) 1.0 else if (d5 < 2.0) 0.8 else if (d5 > 6.0) 1.1 else 1.0)
                                 val smbSince = chain.ownSmb.filter { it.first in pd.t0..ts }.sumOf { it.second }
                                 val dose = (pd.u * factor - smbSince).coerceAtLeast(0.0)
                                 smartUnitsCut += pd.u - dose
@@ -432,7 +434,9 @@ class HistoryReplayTest {
                     chain.ownSmb.add(Pair(now, smb))
                     history.boluses.add(BS(timestamp = now, amount = smb, type = BS.Type.SMB, iCfg = ICfg(insulinLabel = "replay", peak = 45, dia = 5.0, concentration = 1.0)))
                 }
-                val rate = rt.rate
+                // TEMPCAP (test only): while the rebound guard holds, a temp basal above the profile basal is cut to it.
+                val profBasal = tick.getJSONObject("prof").getDouble("basal")
+                val rate = if (guardHold && prefsText.contains("TEMPCAP") && (rt.rate ?: 0.0) > profBasal) profBasal else rt.rate
                 val dur = rt.duration
                 if (rate != null && dur != null) {
                     chain.activeTemp(now)?.let { it.end = now }
