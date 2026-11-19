@@ -644,7 +644,9 @@ class HistoryReplayTest {
         val profName = Regex("PROF_([A-Za-z0-9]+)").find(prefsText)?.groupValues?.get(1)
         val prof = profName?.let { cfg.getJSONObject("profiles").getJSONObject(it) }
         val profBasal = (0 until 24).map { (prof ?: cfg).getJSONArray(if (prof != null) "basal" else "profBasal").getDouble(it) }
-        val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) }
+        // NEEDDX_<x>: the true basal need of the day hours (10-21 h) times x (the encrypted values are night-based).
+        val needDx = tok("NEEDDX", 1.0)
+        val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) * (if (it in 10..21) needDx else 1.0) }
         val isfP = prof?.getDouble("isf") ?: cfg.getDouble("profIsf"); val icP = prof?.getDouble("ic") ?: cfg.getDouble("profIc")
         val targetP = prof?.optDouble("target", cfg.getDouble("profTarget")) ?: cfg.getDouble("profTarget")
         val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / tok("CRT", cfg.getDouble("crTrue"))
