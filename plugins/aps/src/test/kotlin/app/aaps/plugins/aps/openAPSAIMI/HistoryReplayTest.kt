@@ -704,6 +704,9 @@ class HistoryReplayTest {
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
         var smbState = true; var smbOffAt = Long.MIN_VALUE / 2
         var lastTreat = Long.MIN_VALUE / 2; var nTreat = 0; var nCorr = 0; var nMeals = 0; var corrAsked = false
+        val smartS = prefsText.contains("SMARTS")
+        class Pending(val t: Long, val g: Double, val bg: Double)
+        var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
         var lastLoopBg: Double? = null; var lastAct = 0.0
         var mealPtr = 0
         val out = JSONArray()
@@ -790,8 +793,28 @@ class HistoryReplayTest {
                 for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                 val bIob = basalIob(t)
                 val bIobUsed = if (noIob && reading < noIobBg) maxOf(bIob, 0.0) else bIob
-                val wiz = ml.logged / icP + (reading - targetP) / isfP - iobAll - bIobUsed
-                giveBolus(t, (Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05))
+                if (smartS && reading < 81.0) { pend = Pending(t, ml.logged, reading); nDelayed++ }
+                else {
+                    val wiz = ml.logged / icP + (reading - targetP) / isfP - iobAll - bIobUsed
+                    giveBolus(t, (Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05))
+                }
+            }
+            // Smart calculator (SMARTS): a meal at a low glucose - carbs logged now, the bolus waits. Checks at 10 min,
+            // then 15 min, then every minute. Fires when glucose >= 5.5 and rising, or 1.5 mmol/L above the entry.
+            // Never while < 4.5 or falling. After 45 min without firing: cancelled (the loop's UAM/SMB covers the meal).
+            // The dose is the wizard at the moment of firing: all carbs, minus all IOB (SMB given while waiting included).
+            pend?.let { pd ->
+                val m = (t - pd.t) / minute
+                val check = m == 10L || m >= 15L
+                val rising = readV.size > 5 && reading > readV[readV.size - 6]
+                if (m > 45) { pend = null; nCancel++ }
+                else if (check && reading >= 81.0 && rising && (reading >= 99.0 || reading >= pd.bg + 27.0)) {
+                    var iobAll = basalIob(t)
+                    for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
+                    val wiz = pd.g / icP + (reading - targetP) / isfP - iobAll
+                    giveBolus(t, Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05)
+                    pend = null; nFired++; delaySum += m
+                }
             }
             // Family: sometimes a manual correction on a rebound after a low.
             if (!corrAsked && t - lastTreat in 10 * minute..120 * minute && reading > 160.0 && readV.size > 6 && reading > readV[readV.size - 6]) {
@@ -854,7 +877,7 @@ class HistoryReplayTest {
                         else if (release && !meal && !strongRise) episodes.lastOrNull()?.takeIf { !it.done && !it.released }?.let { it.released = true; releases++ }
                     }
                 }
-                val smbOk = smbState && !guardHold
+                val smbOk = smbState && !guardHold && pend == null
                 for (ep in episodes) {
                     if (ep.done) continue
                     if (reading >= 81.0) ep.rose = true
@@ -938,7 +961,7 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
-        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks")
+        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
