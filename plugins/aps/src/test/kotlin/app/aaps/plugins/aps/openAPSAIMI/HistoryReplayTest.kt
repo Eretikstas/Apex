@@ -775,9 +775,39 @@ class HistoryReplayTest {
             return needs
         }
         fun med(a: List<Double>) = a.sorted()[a.size / 2]
+        // LBTREND: a weekly trend card. Last 7 days vs the 14 days before: total insulin per day (TDD), time > 10 and
+        // hypo carbs. TDD +10 % and time > 10 x1.5 (and > 8 %) -> all basal +10 %. TDD -10 % and hypo carbs x1.3 -> -10 %.
+        val lbTrend = prefsText.contains("LBTREND")
+        var lastTrendDay = -100
+        fun weekStats(from: Int, to: Int): DoubleArray {
+            var ins = 0.0; var hi = 0; var hy = 0.0; var nn = 0
+            fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
+            for (i in maxOf(0, from) until to) {
+                val r = out.getJSONObject(i)
+                ins += num(r, "deliv") * 5 / 60 + num(r, "units") + num(r, "man"); hy += num(r, "hypo")
+                if (r.optDouble("bg", 0.0) > 180.0) hi++; nn++
+            }
+            val d = nn / 288.0
+            return doubleArrayOf(ins / d, hi * 100.0 / maxOf(1, nn), hy / d)
+        }
         fun learnBasal2(day: Int) {
             val needs = hourNeeds(minOf(out.length(), lbDays * 288))
             val sb = StringBuilder(); var changed = 0
+            if (lbTrend && day >= 21 && day - lastTrendDay >= 7) {
+                val n = out.length()
+                val now7 = weekStats(n - 7 * 288, n); val base = weekStats(n - 21 * 288, n - 7 * 288)
+                val f = when {
+                    now7[0] > base[0] * 1.10 && now7[1] > base[1] * 1.5 && now7[1] > 8.0 -> 1.10
+                    now7[0] < base[0] * 0.90 && now7[2] > base[2] * 1.3 -> 0.90
+                    else -> 1.0
+                }
+                if (f != 1.0) {
+                    for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
+                    lastTrendDay = day; lastDir.fill(0); upCount.fill(0)
+                    println("AIMI replay: learner TREND card day $day: x$f (TDD ${"%.1f".format(base[0])}->${"%.1f".format(now7[0])}, >10 ${"%.1f".format(base[1])}->${"%.1f".format(now7[1])} %, hypo ${"%.0f".format(base[2])}->${"%.0f".format(now7[2])} g), total ${"%.2f".format(profBasal.sum())}")
+                    return
+                }
+            }
             // shift detector on the last 7 days
             val n7 = hourNeeds(minOf(out.length(), 7 * 288))
             val ratios = (0 until 24).filter { n7[it].size >= 2 }.map { med(n7[it]) / profBasal[it] }
