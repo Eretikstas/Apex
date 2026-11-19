@@ -136,6 +136,21 @@ jobs:
           mkdir -p out/sidebyside
           cp app/build/outputs/apk/full/debug/*.apk out/sidebyside/
 
+      - name: Lint NewApi for Android 10 bench
+        if: ${{ !cancelled() }}
+        run: ./gradlew :app:lintFullDebug --stacktrace || true
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atc3-android10-lint
+          path: |
+            app/build/reports/lint-results-fullDebug.txt
+            app/build/reports/lint-results-fullDebug.html
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4

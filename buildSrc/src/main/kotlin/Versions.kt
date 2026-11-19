@@ -9,7 +9,7 @@ object Versions {
     const val versionCode = 1500
 
     const val compileSdk = 37
-    const val minSdk = 31
+    const val minSdk = 29
     const val targetSdk = 34 // Health Connect / Android 14 compatibility
     const val wearMinSdk = 30
     const val wearTargetSdk = 30

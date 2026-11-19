@@ -43,5 +43,10 @@ android {
         checkReleaseBuilds = false
         disable += "MissingTranslation"
         disable += "ExtraTranslation"
+        // Android 10 bench build: do not fail the build on NewApi, just report it,
+        // so we can see every call that needs a version guard on the old phone.
+        abortOnError = false
+        textReport = true
+        htmlReport = true
     }
 }
