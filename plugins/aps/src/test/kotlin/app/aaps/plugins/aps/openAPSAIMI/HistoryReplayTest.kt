@@ -262,10 +262,28 @@ class HistoryReplayTest {
         // rising, or 1.5 mmol/L above the start and not falling; never below 4.5 or when falling; dropped after 45 min.
         // The dose is cut by the SMB given while waiting. SMART_ADJ: -20 % on a weak rise, +10 % on a sharp one.
         val smart = sim && prefsText.contains("SMART")
+        // NOIOB: the bolus wizard adds negative basal IOB (insulin "owed" after a zero temp) to a meal bolus. With
+        // NOIOB it does not when glucose is below 4.5 mmol/L (NOIOB55: below 5.5): the bolus is cut by that amount.
+        val noIob = sim && prefsText.contains("NOIOB")
+        val noIobBg = if (prefsText.contains("NOIOB55")) 99.0 else 81.0
+        val iobLeft = curve(35.0, 5.0)
+        fun basalIobAt(ts: Long): Double {
+            var sum = 0.0
+            for (tb in chain.realTempsBefore + chain.ownTemps) {
+                var p0 = maxOf(tb.start, ts - 5 * 3_600_000L); val end = minOf(tb.end, ts)
+                while (p0 < end) {
+                    val q = minOf(p0 + 5 * minute, end)
+                    sum += (tb.rate - basalAt(p0)) * (q - p0) / 3_600_000.0 * iobLeft((ts - (p0 + q) / 2) / 60_000.0).first
+                    p0 = q
+                }
+            }
+            return sum
+        }
+        var noIobCut = 0; var noIobUnits = 0.0
         val smartAdj = prefsText.contains("SMART_ADJ")
         class Pending(val t0: Long, val u: Double, val g0: Double, var next: Long)
         val pending = ArrayList<Pending>()
-        val mealBoluses = if (smart) chain.manual.filter { b -> b.first >= startMs &&
+        val mealBoluses = if (smart || noIob) chain.manual.filter { b -> b.first >= startMs &&
             history.carbs.any { it.amount > 12.0 && it.timestamp - b.first in -20 * minute..20 * minute } }.toMutableList() else ArrayList()
         var smartDeferred = 0; var smartGiven = 0; var smartDropped = 0; var smartWaitMin = 0L; var smartUnitsCut = 0.0
         var lastReadingTs = startMs
@@ -347,12 +365,22 @@ class HistoryReplayTest {
                         body.treats.add(Pair(ts, 6.0))
                         history.carbs.add(CA(timestamp = ts, duration = 0L, amount = 6.0))
                     }
-                    if (smart) {
+                    if (smart || noIob) {
                         // A meal bolus whose time has come: wait if glucose is low.
                         val due = mealBoluses.filter { it.first in (lastReadingTs + 1)..ts }
-                        for (b in due) {
-                            mealBoluses.remove(b)
-                            if (v >= 81.0) continue
+                        for (b0 in due) {
+                            mealBoluses.remove(b0)
+                            var b = b0
+                            if (noIob && v < noIobBg) {
+                                val cut = minOf(b.second, -minOf(0.0, basalIobAt(ts)))
+                                if (cut > 0.0) {
+                                    chain.manual.remove(b); b = Pair(b.first, b.second - cut); chain.manual.add(b)
+                                    body.addInsulin(b.first, -cut)
+                                    history.boluses.replaceAll { x -> if (x.type != BS.Type.SMB && x.timestamp == b.first) x.copy(amount = b.second) else x }
+                                    noIobCut++; noIobUnits += cut
+                                }
+                            }
+                            if (!smart || v >= 81.0) continue
                             chain.manual.remove(b); body.addInsulin(b.first, -b.second)
                             history.boluses.removeAll { it.type != BS.Type.SMB && it.timestamp == b.first }
                             pending.add(Pending(b.first, b.second, v, b.first + 10 * minute)); smartDeferred++
@@ -481,6 +509,7 @@ class HistoryReplayTest {
         AimiReplayClock.override = null
         // Counts only: no values of the input reach the test log.
         if (sim) println("AIMI replay: body model, algorithm $algo, ${body.treats.size} model hypo treatments, guard held SMB on $guardTicks ticks")
+        if (noIob) println("AIMI replay: NOIOB cut $noIobCut meal boluses by ${"%.2f".format(noIobUnits)} U in total")
         if (smart) println("AIMI replay: smart calculator deferred $smartDeferred meal boluses, given $smartGiven (mean wait ${if (smartGiven > 0) smartWaitMin / smartGiven else 0} min), dropped $smartDropped, units cut ${"%.2f".format(smartUnitsCut)}")
         println("AIMI replay: ${ticks.length()} ticks, $failed failed")
     }
