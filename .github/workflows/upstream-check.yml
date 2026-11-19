@@ -1,0 +1,62 @@
+name: Upstream check (blaqone into autoisf-atc3)
+
+# Tries a merge of the newest blaqone aaps4-autoisf into our branch, then builds the driver, runs its
+# tests and the temp basal safeguard tests, and builds the app. Nothing is pushed: it only reports
+# whether an update would be clean.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
+        -Dkotlin.daemon.jvm.options="-Xmx2g"
+        -Dkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.workers.max=2
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+      - name: Checkout our branch
+        uses: actions/checkout@v5
+        with:
+          ref: autoisf-atc3
+          fetch-depth: 0
+          filter: blob:none
+      - name: Merge newest blaqone
+        id: merge
+        run: |
+          git config user.name "upstream-check"
+          git config user.email "noreply@example.com"
+          git fetch --filter=blob:none https://github.com/blaqone/AAPS-autoISF aaps4-autoisf
+          echo "blaqone head: $(git rev-parse FETCH_HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "new blaqone commits: $(git rev-list --count HEAD..FETCH_HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          if ! git merge --no-edit FETCH_HEAD; then
+            echo "MERGE CONFLICTS in:" | tee -a "$GITHUB_STEP_SUMMARY"
+            git diff --name-only --diff-filter=U | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "merge: clean" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+      - name: Driver tests
+        run: ./gradlew --console=plain :pump:atc3:testDebugUnitTest --continue
+      - name: Temp basal safeguard tests
+        if: ${{ !cancelled() }}
+        run: ./gradlew --console=plain :database:impl:testAndroidHostTest --tests '*SyncPumpTemporaryBasalTransactionTest*'
+      - name: Build the app
+        if: ${{ !cancelled() }}
+        run: ./gradlew --console=plain :app:assembleFullDebug
