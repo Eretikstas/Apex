@@ -609,6 +609,9 @@ class HistoryReplayTest {
         val cfg = data.getJSONObject("synth")
         // The phone's max basal (the replay input assumes 4.0; Eva's phone has its own value in synth).
         val meta = JSONObject(data.getJSONObject("meta").toString()).put("maxBasal", cfg.optDouble("maxBasal", data.getJSONObject("meta").getDouble("maxBasal")))
+        // SMBMIN_<m> / UAMMIN_<m>: AutoISF maxSMBBasalMinutes / maxUAMSMBBasalMinutes (Eva's phone: 40 / 40).
+        Regex("SMBMIN_([0-9]+)").find(prefsText)?.let { meta.put("maxSmbMin", it.groupValues[1].toInt()) }
+        Regex("UAMMIN_([0-9]+)").find(prefsText)?.let { meta.put("maxUamSmbMin", it.groupValues[1].toInt()) }
         val days = tok("SYNTH", 28.0).toInt()
         val rnd = Random(tok("SEED", 1.0).toLong())
         val kcr = tok("KCR", 0.03)
