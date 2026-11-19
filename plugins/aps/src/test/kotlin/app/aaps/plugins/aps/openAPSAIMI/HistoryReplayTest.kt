@@ -622,7 +622,8 @@ class HistoryReplayTest {
         // three overshoots over 10 mmol/L in a row without a low -> a little looser (window -10 min, cap +0.05x).
         val learnG = prefsText.contains("LEARNG")
         var guardW = if (learnG) 0.0 else guardMin.toDouble()
-        var capMult = if (learnG) 2.0 else 1.0
+        // CAPX_<x>: a fixed temp basal cap on a rebound, x times the profile basal (with TEMPCAP), e.g. what a learner chose.
+        var capMult = if (learnG) 2.0 else tok("CAPX", 1.0)
         val capOn = tempCap || learnG
         var overStreak = 0; var tighten = 0; var loosen = 0
         // Eva changes (CHG_<day>): from that day insulin acts CHGISF_<x> as strongly, the liver answers a low CHGKCR_<x> times.
