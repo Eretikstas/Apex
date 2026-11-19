@@ -738,7 +738,69 @@ class HistoryReplayTest {
         val lbDays = tok("LBDAYS", 14.0).toInt()
         val kern5 = DoubleArray(61) { j -> iobLeft(5.0 * j).first - iobLeft(5.0 * (j + 1)).first }
         var lbCards = 0
+        // LEARNB2 = v2: an hour changes only when its need is >10 % away on two cards in a row (same side); the need of
+        // an hour is smoothed with its neighbours; a SHIFT detector looks at the last 7 days: if the whole day needs
+        // >10 % more or less on two cards in a row, all hours move together (up to +-15 %).
+        val lb2 = prefsText.contains("LEARNB2")
+        val lastDir = IntArray(24); var lastShift = 0
+        fun hourNeeds(w: Int): Array<ArrayList<Double>> {
+            val n = out.length(); val s0 = n - w
+            val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
+            val hr = IntArray(w); val mn = IntArray(w)
+            fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
+            for (i in 0 until w) {
+                val r = out.getJSONObject(s0 + i)
+                bg[i] = r.optDouble("bg", Double.NaN); meal[i] = num(r, "meal"); hypo[i] = num(r, "hypo")
+                val z = Instant.ofEpochMilli(r.getLong("t")).atZone(tz); hr[i] = z.hour; mn[i] = z.minute
+                val nx = if (i + 1 < w) out.getJSONObject(s0 + i + 1) else r
+                ins[i] = num(nx, "deliv") * 5 / 60 + num(r, "units") + num(r, "man")
+            }
+            val act = DoubleArray(w) { k -> var a = 0.0; for (j in 0..minOf(60, k)) a += ins[k - j] * kern5[j]; a }
+            val since = IntArray(w); var last = -100000
+            for (k in 0 until w) { if (meal[k] > 0) last = k; since[k] = (k - last) * 5 }
+            val needs = Array(24) { ArrayList<Double>() }
+            for (k in 60 until w - 12) {
+                if (mn[k] != 0 || since[k] < 300 || bg[k].isNaN() || bg[k + 12].isNaN() || bg[k] !in 70.0..216.0) continue
+                if ((k until k + 12).any { meal[it] > 0 }) continue
+                var a = 0.0; for (j in k until k + 12) a += act[j]
+                var hy = 0.0; for (j in maxOf(0, k - 6) until k + 12) hy += hypo[j]
+                needs[hr[k]].add(a + (bg[k + 12] - bg[k]) / isfP - hy / icP)
+            }
+            return needs
+        }
+        fun med(a: List<Double>) = a.sorted()[a.size / 2]
+        fun learnBasal2(day: Int) {
+            val needs = hourNeeds(minOf(out.length(), lbDays * 288))
+            val sb = StringBuilder(); var changed = 0
+            // shift detector on the last 7 days
+            val n7 = hourNeeds(minOf(out.length(), 7 * 288))
+            val ratios = (0 until 24).filter { n7[it].size >= 2 }.map { med(n7[it]) / profBasal[it] }
+            val ratio = if (ratios.size >= 5) med(ratios) else 1.0
+            val dirS = if (ratio > 1.10) 1 else if (ratio < 0.90) -1 else 0
+            if (dirS != 0 && dirS == lastShift) {
+                val f = ratio.coerceIn(0.85, 1.15)
+                for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
+                sb.append(" SHIFT x%.2f".format(f)); changed = 24; lastShift = 0
+                lastDir.fill(0)
+            } else {
+                lastShift = dirS
+                val own = DoubleArray(24) { if (needs[it].size >= 3) med(needs[it]) else Double.NaN }
+                for (h in 0 until 24) {
+                    if (own[h].isNaN()) { lastDir[h] = 0; continue }
+                    val nb = listOf(own[(h + 23) % 24], own[(h + 1) % 24]).filter { !it.isNaN() }
+                    val v = if (nb.isEmpty()) own[h] else 0.5 * own[h] + 0.5 * nb.average()
+                    val dir = if (v > profBasal[h] * 1.10) 1 else if (v < profBasal[h] * 0.90) -1 else 0
+                    if (dir != 0 && dir == lastDir[h]) {
+                        val nv = Math.round(v.coerceIn(profBasal[h] * 0.8, profBasal[h] * 1.2) * 100) / 100.0
+                        sb.append(" %02d:%.2f->%.2f".format(h, profBasal[h], nv)); profBasal[h] = nv; changed++; lastDir[h] = 0
+                    } else lastDir[h] = dir
+                }
+            }
+            lbCards++
+            println("AIMI replay: learner basal card v2 day $day: $changed hours changed, total ${"%.2f".format(profBasal.sum())} U/day (shift ratio ${"%.2f".format(ratio)});$sb")
+        }
         fun learnBasal(day: Int) {
+            if (lb2) { learnBasal2(day); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
             val hr = IntArray(w); val mn = IntArray(w)
