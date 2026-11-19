@@ -7,7 +7,7 @@ the tests named next to it.
 
 ## Our own modules (blaqone never touches them)
 - `pump/atc3` - ATC3 (Apex TruCare III) pump driver. Tests: `:pump:atc3:testDebugUnitTest`.
-- `pump/atc3-emulator` - virtual ATC3 pump for tests only (excluded from the app).
+- `pump/atc3-emulator` - virtual ATC3 pump for tests only (excluded from the app). Its control API (`PumpEmulatorControl`, the official AAPS emulator shape) lives in the module (`app.aaps.pump.atc3.emulator.control`), blaqone has none.
 - `tools/atc3_emulator_check.sh` - emulator check used by CI.
 - `.github/workflows/autoisf-atc3-ci.yml`, `.github/workflows/upstream-check.yml` - our CI.
 

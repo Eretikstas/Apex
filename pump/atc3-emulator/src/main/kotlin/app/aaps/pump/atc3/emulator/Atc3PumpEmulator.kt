@@ -1,11 +1,11 @@
 package app.aaps.pump.atc3.emulator
 
-import app.aaps.core.interfaces.pump.emulator.EmulatedAlarm
-import app.aaps.core.interfaces.pump.emulator.EmulatedCommand
-import app.aaps.core.interfaces.pump.emulator.EmulatedPumpState
-import app.aaps.core.interfaces.pump.emulator.EmulatedTempBasal
-import app.aaps.core.interfaces.pump.emulator.EmulatorSpeed
-import app.aaps.core.interfaces.pump.emulator.PumpEmulatorControl
+import app.aaps.pump.atc3.emulator.control.EmulatedAlarm
+import app.aaps.pump.atc3.emulator.control.EmulatedCommand
+import app.aaps.pump.atc3.emulator.control.EmulatedPumpState
+import app.aaps.pump.atc3.emulator.control.EmulatedTempBasal
+import app.aaps.pump.atc3.emulator.control.EmulatorSpeed
+import app.aaps.pump.atc3.emulator.control.PumpEmulatorControl
 import kotlin.math.roundToInt
 
 /**
