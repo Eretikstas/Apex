@@ -655,7 +655,9 @@ class HistoryReplayTest {
         // PROF_<name>: run with another phone profile kept in synth.profiles.<name> of the encrypted input (basal, isf, ic).
         val profName = Regex("PROF_([A-Za-z0-9]+)").find(prefsText)?.groupValues?.get(1)
         val prof = profName?.let { cfg.getJSONObject("profiles").getJSONObject(it) }
-        val profBasal = DoubleArray(24) { (prof ?: cfg).getJSONArray(if (prof != null) "basal" else "profBasal").getDouble(it) }
+        // PROFX_<x>: the phone profile basal starts x times off (stress test: far start).
+        val profX = tok("PROFX", 1.0)
+        val profBasal = DoubleArray(24) { Math.round((prof ?: cfg).getJSONArray(if (prof != null) "basal" else "profBasal").getDouble(it) * profX * 100) / 100.0 }
         // NEEDDX_<x>: the true basal need of the day hours (10-21 h) times x (the encrypted values are night-based).
         val needDx = tok("NEEDDX", 1.0)
         val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) * (if (it in 10..21) needDx else 1.0) }
@@ -678,7 +680,7 @@ class HistoryReplayTest {
             val sl = slots.getJSONArray(k)
             if (rnd.nextDouble() > sl.getDouble(2)) continue
             val tm = t0 + d * 86_400_000L + (sl.getDouble(0) * 60 + rnd.nextGaussian() * sl.getDouble(1)).toLong().coerceAtLeast(0) * minute
-            val g = (sl.getDouble(3) + rnd.nextGaussian() * sl.getDouble(4)).coerceIn(5.0, 60.0).roundToInt().toDouble()
+            val g = ((sl.getDouble(3) + rnd.nextGaussian() * sl.getDouble(4)) * tok("MEALX", 1.0)).coerceIn(5.0, 80.0).roundToInt().toDouble()
             val eaten = if (rnd.nextDouble() < 0.15) g * (0.6 + 0.2 * rnd.nextDouble()) else g
             val fast = rnd.nextDouble() < 0.25
             meals.add(Meal(tm, g, eaten, if (fast) 60.0 else 150.0, if (fast) 150.0 else 270.0))
@@ -711,6 +713,10 @@ class HistoryReplayTest {
         val lateOn = prefsText.contains("LATE"); val lateCob = prefsText.contains("LATECOB"); val latePct = tok("LATEPCT", 50.0) / 100.0
         val mealLog = ArrayList<Pair<Long, Double>>(); val lateDone = HashSet<Long>(); var nLate = 0; var lateU = 0.0
         val canEvery = tok("CANCH", 0.0)
+        val stDrift = tok("DRIFT", 0.0); val stIll = tok("ILL", -1.0).toInt(); val stDawn = tok("DAWN", 1.0)
+        val stAct = tok("ACT", -1.0).toInt(); val stFail = tok("CANFAIL", 0.0).toInt(); val stComp = tok("COMPRESS", 0.0)
+        val stUnlog = tok("UNLOG", 0.0); val compRnd = Random(tok("SEED", 1.0).toLong() + 11); val unRnd = Random(tok("SEED", 1.0).toLong() + 13)
+        var compUntil = 0L; var nUnlog = 0
         val treatFix = tok("TREAT", 6.0); val treatL = prefsText.contains("TREATL"); var treatSum = 0.0
         val smartS = prefsText.contains("SMARTS")
         class Pending(val t: Long, val g: Double, val bg: Double)
@@ -939,13 +945,29 @@ class HistoryReplayTest {
             // CANCH_<h>: the cannula is changed every h hours; from 60 h it works worse (insulin acts down to 75 % at 96 h).
             val canAge = if (canEvery > 0) ((t - t0) / 3_600_000.0) % canEvery else 0.0
             val canF = if (canEvery > 0 && canAge > 60.0) 1.0 - 0.25 * minOf(1.0, (canAge - 60.0) / 36.0) else 1.0
-            g += isfT * needBasal[h] / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * canF * acting + csfT * carbsAbs + z + e
+            // Stress tests. DRIFT_<pct>: insulin need grows pct % per week (child growth). ILL_<day>: days day..day+2 insulin
+            // works 30 % weaker. DAWN_<x>: liver output 04-08 h times x. ACT_<day>: from that day, every 7 days an active day -
+            // insulin 30 % stronger 10-22 h and 20 % stronger the night after. CANFAIL_<n>: every n days a cannula failure,
+            // insulin works half 14-20 h.
+            val week = (t - t0) / (7 * 86_400_000.0)
+            val driftF = 1.0 / (1.0 + stDrift / 100.0 * week)
+            val illF = if (stIll >= 0 && day in stIll..stIll + 2) 0.7 else 1.0
+            val actDay = stAct >= 0 && day >= stAct && (day - stAct) % 7 == 0
+            val actNight = stAct >= 0 && day > stAct && (day - 1 - stAct) % 7 == 0 && h < 6
+            val actF = if (actDay && h in 10..21) 1.3 else if (actDay && h >= 22 || actNight) 1.2 else 1.0
+            val failF = if (stFail > 0 && day > 0 && day % stFail == 0 && h in 14..19) 0.5 else 1.0
+            val stressF = driftF * illF * actF * failF
+            val needNow = needBasal[h] * (if (h in 4..7) stDawn else 1.0)
+            g += isfT * needNow / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * canF * stressF * acting + csfT * carbsAbs + z + e
             g = g.coerceIn(30.0, 450.0)
             // Sensor.
             sens += (g - sens) / 5.0
             var reading = sens + rnd.nextGaussian() * 3.0
             if (sens < 100.0) reading -= sBias * (100.0 - sens)
             if (rnd.nextDouble() < 0.001) reading += if (rnd.nextBoolean()) 25.0 else -25.0
+            // COMPRESS_<n>: n false night lows a week (sensor pressed, 0-6 h): the reading drops ~40 mg/dL for 20 min.
+            if (stComp > 0 && h < 6 && t >= compUntil && compRnd.nextDouble() < stComp / (7.0 * 6 * 60)) compUntil = t + 20 * minute
+            if (t < compUntil) reading = maxOf(45.0, reading - 40.0)
             reading = reading.coerceIn(39.0, 400.0)
             readT.add(t); readV.add(reading)
 
@@ -971,6 +993,8 @@ class HistoryReplayTest {
             // Family: meals with a wizard bolus.
             while (mealPtr < meals.size && meals[mealPtr].t <= t) {
                 val ml = meals[mealPtr]; mealPtr++
+                // UNLOG_<pct>: pct % of meals are eaten but not entered (no carbs logged, no bolus).
+                if (stUnlog > 0 && unRnd.nextDouble() * 100 < stUnlog) { eatenList.add(Meal(t, 0.0, ml.eaten, ml.a, ml.b)); nUnlog++; continue }
                 if (ml.logged >= 13.0) mealLog.add(Pair(t, ml.logged))
                 eatenList.add(Meal(t, ml.logged, ml.eaten, ml.a, ml.b)); logged.add(Logged(t, ml.logged, ml.logged)); nMeals++; mealThisTick += ml.logged
                 var iobAll = 0.0
@@ -1198,7 +1222,7 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
-        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
+        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, unlogged meals $nUnlog, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
