@@ -617,6 +617,17 @@ class HistoryReplayTest {
         val tempCap = prefsText.contains("TEMPCAP")
         val noIob = prefsText.contains("NOIOB")
         val noIobBg = if (prefsText.contains("NOIOB55")) 99.0 else 81.0
+        // Learner (LEARNG): learns the guard window (from 0 = no guard) and the temp basal cap on a rebound (from 2x profile)
+        // from the outcome of each rebound. A new low after SMB or a high temp -> stricter (window +20 min, cap -0.2x);
+        // three overshoots over 10 mmol/L in a row without a low -> a little looser (window -10 min, cap +0.05x).
+        val learnG = prefsText.contains("LEARNG")
+        var guardW = if (learnG) 0.0 else guardMin.toDouble()
+        var capMult = if (learnG) 2.0 else 1.0
+        val capOn = tempCap || learnG
+        var overStreak = 0; var tighten = 0; var loosen = 0
+        // Eva changes (CHG_<day>): from that day insulin acts CHGISF_<x> as strongly, the liver answers a low CHGKCR_<x> times.
+        val chgDay = tok("CHG", 9999.0).toInt()
+        val chgIsf = tok("CHGISF", 1.0); val chgKcr = tok("CHGKCR", 1.0)
         val profBasal = (0 until 24).map { cfg.getJSONArray("profBasal").getDouble(it) }
         val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) }
         val isfP = cfg.getDouble("profIsf"); val icP = cfg.getDouble("profIc"); val targetP = cfg.getDouble("profTarget")
@@ -692,6 +703,8 @@ class HistoryReplayTest {
             chain.manual.add(Pair(now, u)); doses.add(Pair(now, u)); manThisTick += u
         }
 
+        class Episode(val t0: Long) { var smb = 0.0; var highTemp = false; var rose = false; var newLow = false; var highMin = 0; var done = false }
+        val episodes = ArrayList<Episode>()
         while (t < end) {
             val h = hourOf(t)
             val day = ((t - t0) / 86_400_000L).toInt()
@@ -713,9 +726,10 @@ class HistoryReplayTest {
                 carbsAbs += ml.eaten * (triCdf(m, ml.a, ml.b) - triCdf(m - 1, ml.a, ml.b))
             }
             eatenList.removeAll { (t - it.t) / 60_000.0 > it.b + 1 }
-            z += (kcr * maxOf(0.0, 75.0 - g) - z) / 20.0
+            val changed = day >= chgDay
+            z += ((if (changed) kcr * chgKcr else kcr) * maxOf(0.0, 75.0 - g) - z) / 20.0
             e = 0.98 * e + rnd.nextGaussian() * noiseSd
-            g += isfT * needBasal[h] / 60.0 - isfT * dayFactor[day] * acting + csfT * carbsAbs + z + e
+            g += isfT * needBasal[h] / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * acting + csfT * carbsAbs + z + e
             g = g.coerceIn(30.0, 450.0)
             // Sensor.
             sens += (g - sens) / 5.0
@@ -729,6 +743,8 @@ class HistoryReplayTest {
             // The family treats a low the sensor shows for 2 minutes (not a one-minute spike).
             if (reading < 70.0 && readV.size > 1 && readV[readV.size - 2] < 70.0 && t - lastTreat >= 20 * minute) {
                 eatenList.add(Meal(t, 6.0, 6.0, 10.0, 30.0)); logged.add(Logged(t, 6.0, 6.0))
+                val last = episodes.lastOrNull()
+                if (last == null || last.done || t - last.t0 > 45 * minute) episodes.add(Episode(t))
                 lastTreat = t; nTreat++; corrAsked = false
             }
             // Family: meals with a wizard bolus.
@@ -781,15 +797,35 @@ class HistoryReplayTest {
                     if (gs.glucose < 75.6) { smbState = false; smbOffAt = t }
                     else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true
                     else if (!smbState && t - smbOffAt >= 90 * minute) smbState = true
-                    if (guardMin > 0 && t - lastTreat < guardMin * minute) {
+                    if (guardW > 0 && t - lastTreat < guardW * minute) {
                         val meal = logged.any { it.g > 12.0 && it.t >= lastTreat - 30 * minute }
                         val strongRise = gs.glucose > 162.0 && gs.shortAvgDelta > 3.6
                         if (!meal && !strongRise) guardHold = true
                     }
                 }
                 val smbOk = smbState && !guardHold
+                for (ep in episodes) {
+                    if (ep.done) continue
+                    if (reading >= 81.0) ep.rose = true
+                    else if (ep.rose && reading < 70.0) ep.newLow = true
+                    if (reading > 180.0) ep.highMin += 5
+                    if (t - ep.t0 >= 180 * minute) {
+                        ep.done = true
+                        if (learnG) {
+                            if (ep.newLow && (ep.smb > 0.05 || ep.highTemp)) {
+                                guardW = minOf(180.0, maxOf(guardW, 60.0) + 20.0)
+                                if (ep.highTemp) capMult = maxOf(1.0, capMult - 0.2)
+                                overStreak = 0; tighten++
+                            } else if (!ep.newLow && ep.highMin >= 20) {
+                                overStreak++
+                                if (overStreak >= 3) { guardW = maxOf(0.0, guardW - 10.0); capMult = minOf(2.0, capMult + 0.05); overStreak = 0; loosen++ }
+                            } else if (!ep.newLow) overStreak = 0
+                        }
+                    }
+                }
+                episodes.removeAll { it.done && t - it.t0 > 6 * 3_600_000L }
                 val row = JSONObject().put("t", t).put("bg", reading).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
-                    .put("ntreat", nTreat).put("man", manThisTick).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
+                    .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
                 manThisTick = 0.0
                 try {
                     if (gs == null) throw IllegalStateException("no glucose")
@@ -798,8 +834,13 @@ class HistoryReplayTest {
                     val rt = runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbOk, liveVs = autoIsf321Sens(winV, winT, t, tick))
                     val smb = rt.units ?: 0.0
                     if (smb > 0.0) { chain.ownSmb.add(Pair(t, smb)); doses.add(Pair(t, smb)) }
-                    val rate = if (guardHold && tempCap && (rt.rate ?: 0.0) > profBasal[h]) profBasal[h] else rt.rate
+                    val capRate = profBasal[h] * capMult
+                    val rate = if (guardHold && capOn && (rt.rate ?: 0.0) > capRate) capRate else rt.rate
                     val dur = rt.duration
+                    episodes.lastOrNull()?.takeIf { !it.done && t - it.t0 <= 150 * minute }?.let { ep ->
+                        ep.smb += smb
+                        if ((rate ?: 0.0) > profBasal[h] * 1.05 && (dur ?: 0) > 0) ep.highTemp = true
+                    }
                     if (rate != null && dur != null) {
                         chain.activeTemp(t)?.let { it.end = t }
                         if (dur > 0) chain.ownTemps.add(OwnTemp(t, rate, t + dur * minute))
@@ -816,6 +857,7 @@ class HistoryReplayTest {
         }
         write(outPath, out)
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks")
+        if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
         println("AIMI replay: ${out.length()} ticks, $failed failed")
     }
 
