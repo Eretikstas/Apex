@@ -611,6 +611,9 @@ class HistoryReplayTest {
         val kcr = tok("KCR", 0.03)
         val noiseSd = tok("NOISE", 0.25)
         val daySd = tok("DAYSD", 0.12)
+        // NOISEPHI_<x>: how slowly the glucose noise changes (0.98 = minutes, 0.995 = hours); SBIAS_<x>: low-end sensor bias.
+        val noisePhi = tok("NOISEPHI", 0.98)
+        val sBias = tok("SBIAS", 0.3)
         val corrPct = tok("CORR", 30.0)
         val z2On = tok("Z2", 117.0)
         val guardMin = tok("GUARD", 0.0).toLong()
@@ -754,13 +757,13 @@ class HistoryReplayTest {
             eatenList.removeAll { (t - it.t) / 60_000.0 > it.b + 1 }
             val changed = day >= chgDay
             z += ((if (changed) kcr * chgKcr else kcr) * maxOf(0.0, 75.0 - g) - z) / 20.0
-            e = 0.98 * e + rnd.nextGaussian() * noiseSd
+            e = noisePhi * e + rnd.nextGaussian() * noiseSd
             g += isfT * needBasal[h] / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * acting + csfT * carbsAbs + z + e
             g = g.coerceIn(30.0, 450.0)
             // Sensor.
             sens += (g - sens) / 5.0
             var reading = sens + rnd.nextGaussian() * 3.0
-            if (sens < 100.0) reading -= 0.3 * (100.0 - sens)
+            if (sens < 100.0) reading -= sBias * (100.0 - sens)
             if (rnd.nextDouble() < 0.001) reading += if (rnd.nextBoolean()) 25.0 else -25.0
             reading = reading.coerceIn(39.0, 400.0)
             readT.add(t); readV.add(reading)
