@@ -753,7 +753,7 @@ class HistoryReplayTest {
         // >10 % more or less on two cards in a row, all hours move together (up to +-15 %).
         val lb2 = prefsText.contains("LEARNB2")
         val lastDir = IntArray(24); var lastShift = 0; val upCount = IntArray(24)
-        val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5"); val lbFill = prefsText.contains("LBFILL"); val lbMin = tok("LBMIN", 0.0).toInt()
+        val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5"); val lbFill = prefsText.contains("LBFILL"); val lbFill2 = prefsText.contains("LBFILL2"); val lbMin = tok("LBMIN", 0.0).toInt()
         val lbLowMax = tok("LBLOWMAX", 0.0).toInt()
         fun hourNeeds(w: Int): Array<ArrayList<Double>> {
             val n = out.length(); val s0 = n - w
@@ -846,8 +846,17 @@ class HistoryReplayTest {
                 for (h in 0 until 24) {
                     val v: Double
                     if (own[h].isNaN()) {
-                        if (fillRatio.isNaN()) { lastDir[h] = 0; continue }
-                        v = profBasal[h] * fillRatio
+                        // LBFILL2: an hour with no data takes the value between the nearest measured hours before and
+                        // after it (over midnight too), not one ratio for all - an hour set too high comes down.
+                        val prevH = (1..23).firstOrNull { !own[(h - it + 24) % 24].isNaN() }
+                        val nextH = (1..23).firstOrNull { !own[(h + it) % 24].isNaN() }
+                        if (lbFill2 && prevH != null && nextH != null) {
+                            val a = own[(h - prevH + 24) % 24]; val b = own[(h + nextH) % 24]
+                            v = a + (b - a) * prevH / (prevH + nextH).toDouble()
+                        } else {
+                            if (fillRatio.isNaN()) { lastDir[h] = 0; continue }
+                            v = profBasal[h] * fillRatio
+                        }
                     } else {
                         val nb = listOf(own[(h + 23) % 24], own[(h + 1) % 24]).filter { !it.isNaN() }
                         v = if (nb.isEmpty()) own[h] else 0.5 * own[h] + 0.5 * nb.average()
