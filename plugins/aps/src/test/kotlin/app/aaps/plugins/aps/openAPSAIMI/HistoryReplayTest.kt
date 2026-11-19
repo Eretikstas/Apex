@@ -621,6 +621,11 @@ class HistoryReplayTest {
         // from the outcome of each rebound. A new low after SMB or a high temp -> stricter (window +20 min, cap -0.2x);
         // three overshoots over 10 mmol/L in a row without a low -> a little looser (window -10 min, cap +0.05x).
         val learnG = prefsText.contains("LEARNG")
+        // LEARNG2: the learner asks "what if": a low counts against the loop only if, without the extra insulin the loop
+        // gave in the rebound window (SMB, temp basal above profile), the lowest value would have stayed at 75 or more;
+        // an overshoot counts against the guard only if the insulin it held back would have kept the peak under 180.
+        val learnG2 = prefsText.contains("LEARNG2")
+        var lowsByLoop = 0; var lowsAnyway = 0; var overAvoidable = 0; var loosenScore = 0
         var guardW = if (learnG) 0.0 else guardMin.toDouble()
         // CAPX_<x>: a fixed temp basal cap on a rebound, x times the profile basal (with TEMPCAP), e.g. what a learner chose.
         var capMult = if (learnG) 2.0 else tok("CAPX", 1.0)
@@ -704,7 +709,13 @@ class HistoryReplayTest {
             chain.manual.add(Pair(now, u)); doses.add(Pair(now, u)); manThisTick += u
         }
 
-        class Episode(val t0: Long) { var smb = 0.0; var highTemp = false; var rose = false; var newLow = false; var highMin = 0; var done = false }
+        class Episode(val t0: Long) {
+            var smb = 0.0; var highTemp = false; var rose = false; var newLow = false; var highMin = 0; var done = false
+            val extra = ArrayList<Triple<Long, Double, Boolean>>()   // insulin above profile: time, units, from a temp basal
+            val held = ArrayList<Pair<Long, Double>>()               // insulin AutoISF wanted but the guard held back
+            var nadir = 999.0; var nadirT = 0L; var peak = 0.0; var peakT = 0L
+        }
+        fun effectAt(doses: List<Pair<Long, Double>>, at: Long) = doses.filter { it.first <= at }.sumOf { (dt, u) -> u * isfP * (1 - iobLeft((at - dt) / 60_000.0).first) }
         val episodes = ArrayList<Episode>()
         while (t < end) {
             val h = hourOf(t)
@@ -809,10 +820,26 @@ class HistoryReplayTest {
                     if (ep.done) continue
                     if (reading >= 81.0) ep.rose = true
                     else if (ep.rose && reading < 70.0) ep.newLow = true
+                    if (ep.rose && reading < ep.nadir) { ep.nadir = reading; ep.nadirT = t }
+                    if (reading > ep.peak) { ep.peak = reading; ep.peakT = t }
                     if (reading > 180.0) ep.highMin += 5
                     if (t - ep.t0 >= 180 * minute) {
                         ep.done = true
-                        if (learnG) {
+                        if (learnG2) {
+                            val smbEff = effectAt(ep.extra.filter { !it.third }.map { Pair(it.first, it.second) }, ep.nadirT)
+                            val tempEff = effectAt(ep.extra.filter { it.third }.map { Pair(it.first, it.second) }, ep.nadirT)
+                            val heldEff = effectAt(ep.held, ep.peakT)
+                            if (ep.newLow && ep.nadir + smbEff + tempEff >= 75.0) {
+                                lowsByLoop++
+                                if (tempEff > smbEff) capMult = maxOf(1.0, capMult - 0.2) else guardW = minOf(240.0, maxOf(guardW, 60.0) + 20.0)
+                                loosenScore = 0; tighten++
+                            } else if (ep.newLow) {
+                                lowsAnyway++
+                            } else if (ep.highMin >= 20 && heldEff > 0.0 && ep.peak - heldEff < 180.0) {
+                                overAvoidable++; loosenScore++
+                                if (loosenScore >= 3) { guardW = maxOf(0.0, guardW - 10.0); capMult = minOf(2.0, capMult + 0.05); loosenScore = 0; loosen++ }
+                            }
+                        } else if (learnG) {
                             if (ep.newLow && (ep.smb > 0.05 || ep.highTemp)) {
                                 guardW = minOf(180.0, maxOf(guardW, 60.0) + 20.0)
                                 if (ep.highTemp) capMult = maxOf(1.0, capMult - 0.2)
@@ -841,6 +868,17 @@ class HistoryReplayTest {
                     episodes.lastOrNull()?.takeIf { !it.done && t - it.t0 <= 150 * minute }?.let { ep ->
                         ep.smb += smb
                         if ((rate ?: 0.0) > profBasal[h] * 1.05 && (dur ?: 0) > 0) ep.highTemp = true
+                        if (learnG2) {
+                            if (smb > 0.0) ep.extra.add(Triple(t, smb, false))
+                            val applied = chain.activeTemp(t)?.rate ?: profBasal[h]
+                            if (applied > profBasal[h]) ep.extra.add(Triple(t, (applied - profBasal[h]) * 5 / 60.0, true))
+                            if (guardHold) {
+                                val want = runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbState, liveVs = autoIsf321Sens(winV, winT, t, tick))
+                                val heldU = maxOf(0.0, (want.units ?: 0.0) - smb) +
+                                    maxOf(0.0, (want.rate ?: profBasal[h]) - (rate ?: profBasal[h])) * 5 / 60.0
+                                if (heldU > 0.0) ep.held.add(Pair(t, heldU))
+                            }
+                        }
                     }
                     if (rate != null && dur != null) {
                         chain.activeTemp(t)?.let { it.end = t }
@@ -858,6 +896,7 @@ class HistoryReplayTest {
         }
         write(outPath, out)
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks")
+        if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
         println("AIMI replay: ${out.length()} ticks, $failed failed")
     }
