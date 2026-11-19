@@ -710,6 +710,7 @@ class HistoryReplayTest {
         val splitMin = tok("SPLITMIN", 45.0).toLong()
         class Split(val t: Long, val u: Double, val smb0: Double, val maxMin: Long)
         val splitType = prefsText.contains("SPLITTYPE")
+        val markRnd = Random(tok("SEED", 1.0).toLong() + 7)
         // SPLITABS: the rest waits for SEEN absorption - the AAPS deviation (rise beyond what insulin explains) above
         // 6 mg/dL per 5 min in two loop cycles in a row - instead of a glucose level.
         val splitAbs = prefsText.contains("SPLITABS")
@@ -807,7 +808,7 @@ class HistoryReplayTest {
                     val wiz = ml.logged / icP + (reading - targetP) / isfP - iobAll - bIobUsed
                     // SPLITTYPE: the family marks the meal fast or slow in the calculator (right 85 % of the time);
                     // a fast meal gets the whole bolus now, only a slow one is split.
-                    val markedFast = splitType && (if (rnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0)
+                    val markedFast = splitType && (if (markRnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0)
                     if (splitP < 1.0 && ml.logged >= 13.0 && !(splitType && markedFast)) {
                         // Split bolus: part now, the rest of the meal part waits for the rise.
                         val now1 = maxOf(wiz - ml.logged / icP * (1 - splitP), 0.0)
