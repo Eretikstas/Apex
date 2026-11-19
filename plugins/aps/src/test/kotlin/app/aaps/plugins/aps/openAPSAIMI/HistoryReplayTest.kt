@@ -285,6 +285,14 @@ class HistoryReplayTest {
         fun realRateAt(p: Long): Double? = realTemps.lastOrNull { it.first <= p && p < it.first + it.third }?.second
         var bgIdx = bgT.indexOfFirst { it > startMs }.let { if (it < 0) bgT.size else it }
         var smbState = ticks.getJSONObject(0).optBoolean("smbOk", true)
+        // Phone automations. Hypo protection: below 4.2 mmol/L SMB off for 90 min (a temp target that ends by
+        // itself). "Защита 2": SMB back on above Z2_<mg/dL> (default 117 = 6.5) when rising.
+        val z2On = Regex("Z2_([0-9]+)").find(prefsText)?.groupValues?.get(1)?.toDouble() ?: 117.0
+        var smbOffAt = Long.MIN_VALUE / 2
+        // Learner "rebound guard": after a hypo treatment, SMB is held for GUARD_<min> unless food shows up
+        // (a meal over 12 g logged, or glucose over 9 mmol/L and rising fast). It can only hold insulin.
+        val guardMin = Regex("GUARD_([0-9]+)").find(prefsText)?.groupValues?.get(1)?.toLong() ?: 0L
+        var guardTicks = 0
         var prevNow = startMs
         var traceLeft = if (System.getenv("AIMI_REPLAY_TRACE") == "1") 25 else 0
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
@@ -292,6 +300,7 @@ class HistoryReplayTest {
         val out = JSONArray()
         var failed = 0
         var lastGuardRefresh = 0L
+        var guardHold = false
         for (i in 0 until ticks.length()) {
             val tick = ticks.getJSONObject(i)
             now = tick.getLong("t")
@@ -331,8 +340,19 @@ class HistoryReplayTest {
                 gsSim = glucoseStatus(history.bg, bgT, now)
                 // The automations of the phone: SMB off below 4.2 mmol/L, back on above 6.5 when rising.
                 gsSim?.let { gs ->
-                    if (gs.glucose < 75.6) smbState = false
-                    else if (gs.glucose > 117.0 && gs.shortAvgDelta > 1.8) smbState = true
+                    if (gs.glucose < 75.6) { smbState = false; smbOffAt = now }
+                    else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true
+                    else if (!smbState && now - smbOffAt >= 90 * minute) smbState = true
+                }
+                guardHold = false
+                if (guardMin > 0) {
+                    val lt = body.treats.lastOrNull()?.first
+                    val gs = gsSim
+                    if (lt != null && gs != null && now - lt < guardMin * minute) {
+                        val meal = history.carbs.any { it.amount > 12.0 && it.timestamp in (lt - 30 * minute)..now }
+                        val strongRise = gs.glucose > 162.0 && gs.shortAvgDelta > 3.6
+                        if (!meal && !strongRise) { guardHold = true; if (smbState) guardTicks++ }
+                    }
                 }
                 val d24 = body.insulinBetween(now - 86_400_000L, now)
                 val d7 = body.insulinBetween(now - 7 * 86_400_000L, now) / 7.0
@@ -349,7 +369,7 @@ class HistoryReplayTest {
             val row = JSONObject().put("t", now)
             try {
                 val chained = chainedInputs(chain, tick, now)
-                val smbOk = if (sim) smbState else tick.optBoolean("smbOk", true)
+                val smbOk = if (sim) smbState && !guardHold else tick.optBoolean("smbOk", true)
                 val rt = when (algo) {
                     "aimi" -> runTick(harness, tick, meta, now, chained, gsSim, smbOk)
                     "autoisf" -> runTickAutoIsf(
@@ -359,7 +379,7 @@ class HistoryReplayTest {
                     else -> realTick(realSmbAfter, prevNowOf(ticks, i), now, realRateAt(now), basalAt(now))
                 }
                 if (sim && algo != "real") (rt.units ?: 0.0).takeIf { it > 0.0 }?.let { body.addInsulin(now, it) }
-                if (sim) row.put("bg", gsSim?.glucose ?: JSONObject.NULL).put("smbOk", smbOk)
+                if (sim) row.put("bg", gsSim?.glucose ?: JSONObject.NULL).put("smbOk", smbOk).put("guard", guardHold).put("ntreat", body.treats.size)
                 val smb = rt.units ?: 0.0
                 if (smb > 0.0) {
                     chain.ownSmb.add(Pair(now, smb))
@@ -409,7 +429,7 @@ class HistoryReplayTest {
         write(outPath, out)
         AimiReplayClock.override = null
         // Counts only: no values of the input reach the test log.
-        if (sim) println("AIMI replay: body model, algorithm $algo, ${body.treats.size} model hypo treatments")
+        if (sim) println("AIMI replay: body model, algorithm $algo, ${body.treats.size} model hypo treatments, guard held SMB on $guardTicks ticks")
         println("AIMI replay: ${ticks.length()} ticks, $failed failed")
     }
 
@@ -543,7 +563,7 @@ class HistoryReplayTest {
         every { get(UnitDoubleKey.ApsLgsThreshold) } returns meta.getDouble("lgs")
         // Settings to try, from the workflow: "Name=value,Name=value" with enum names of BooleanKey,
         // DoubleKey or IntKey.
-        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("LOOP_MIN") && !it.startsWith("AISF_LIVE") && !it.startsWith("SMB_INTERVAL") && !it.startsWith("LATE_BOLUS") && !it.startsWith("NEED_") && !it.startsWith("CARBS_") }.forEach { pair ->
+        System.getenv("AIMI_REPLAY_PREFS").orEmpty().split(',').map { it.trim() }.filter { it.contains('=') && !it.startsWith("LOOP_MIN") && !it.startsWith("AISF_LIVE") && !it.startsWith("SMB_INTERVAL") && !it.startsWith("LATE_BOLUS") && !it.startsWith("NEED_") && !it.startsWith("CARBS_") && !it.startsWith("Z2_") && !it.startsWith("GUARD_") }.forEach { pair ->
             val (name, value) = pair.split('=', limit = 2).map { it.trim() }
             BooleanKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toBoolean(); return@forEach }
             DoubleKey.entries.firstOrNull { it.name == name }?.let { key -> every { get(key) } returns value.toDouble(); return@forEach }
