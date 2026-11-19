@@ -232,7 +232,7 @@ class HistoryReplayTest {
         history.boluses.sortBy { it.timestamp }
         val chain = Chain(
             startMs = startMs,
-            manual = bolusRows.filter { !it.getBoolean(2) }.map { Pair(movedTime(it.getLong(0)), it.getDouble(1)) },
+            manual = bolusRows.filter { !it.getBoolean(2) }.map { Pair(movedTime(it.getLong(0)), it.getDouble(1)) }.toMutableList(),
             realBefore = bolusRows.filter { it.getBoolean(2) && it.getLong(0) < startMs }.map { Pair(it.getLong(0), it.getDouble(1)) },
             realTempsBefore = data.getJSONArray("temps").rows().filter { it.getLong(0) < startMs }
                 .map { OwnTemp(it.getLong(0), it.getDouble(1), minOf(it.getLong(0) + it.getLong(2), startMs)) },
@@ -257,6 +257,18 @@ class HistoryReplayTest {
             .map { Pair(it.timestamp, it.amount) }
         val body = Body(bodyIsf, bodyIsf / prof0.getDouble("ic"), realTreats)
         movedBoluses.forEach { (from, to, u) -> body.addInsulin(from, -u); body.addInsulin(to, u) }
+        // Learner "smart calculator" (SMART): a meal bolus (13 g or more carbs within 20 min) at model glucose below
+        // 4.5 mmol/L waits. Checks at +10 min, +15 min, then every reading: given when glucose is at least 5.5 and
+        // rising, or 1.5 mmol/L above the start and not falling; never below 4.5 or when falling; dropped after 45 min.
+        // The dose is cut by the SMB given while waiting. SMART_ADJ: -20 % on a weak rise, +10 % on a sharp one.
+        val smart = sim && prefsText.contains("SMART")
+        val smartAdj = prefsText.contains("SMART_ADJ")
+        class Pending(val t0: Long, val u: Double, val g0: Double, var next: Long)
+        val pending = ArrayList<Pending>()
+        val mealBoluses = if (smart) chain.manual.filter { b -> b.first >= startMs &&
+            history.carbs.any { it.amount > 12.0 && it.timestamp - b.first in -20 * minute..20 * minute } }.toMutableList() else ArrayList()
+        var smartDeferred = 0; var smartGiven = 0; var smartDropped = 0; var smartWaitMin = 0L; var smartUnitsCut = 0.0
+        var lastReadingTs = startMs
         // Scenario NEED_<pct>: the body needs pct % more basal insulin (lower sensitivity). It acts like
         // insulin that is used up by the body, so glucose drifts up unless the algorithm gives more.
         // prefsText is read at the top of replayOnce
@@ -335,6 +347,41 @@ class HistoryReplayTest {
                         body.treats.add(Pair(ts, 6.0))
                         history.carbs.add(CA(timestamp = ts, duration = 0L, amount = 6.0))
                     }
+                    if (smart) {
+                        // A meal bolus whose time has come: wait if glucose is low.
+                        val due = mealBoluses.filter { it.first in (lastReadingTs + 1)..ts }
+                        for (b in due) {
+                            mealBoluses.remove(b)
+                            if (v >= 81.0) continue
+                            chain.manual.remove(b); body.addInsulin(b.first, -b.second)
+                            history.boluses.removeAll { it.type != BS.Type.SMB && it.timestamp == b.first }
+                            pending.add(Pending(b.first, b.second, v, b.first + 10 * minute)); smartDeferred++
+                        }
+                        val it5 = (bgT.binarySearch(ts - 5 * minute).let { k -> if (k >= 0) k else -k - 2 }).coerceAtLeast(0)
+                        val d5 = v - history.bg[it5].value
+                        val done = ArrayList<Pending>()
+                        for (pd in pending) {
+                            if (ts < pd.next) continue
+                            val safe = v >= 81.0 && d5 >= 0.0 && ((v >= 99.0 && d5 > 0.0) || v >= pd.g0 + 27.0)
+                            if (safe) {
+                                val factor = if (!smartAdj) 1.0 else if (d5 < 2.0) 0.8 else if (d5 > 6.0) 1.1 else 1.0
+                                val smbSince = chain.ownSmb.filter { it.first in pd.t0..ts }.sumOf { it.second }
+                                val dose = (pd.u * factor - smbSince).coerceAtLeast(0.0)
+                                smartUnitsCut += pd.u - dose
+                                if (dose > 0.0) {
+                                    chain.manual.add(Pair(ts, dose)); body.addInsulin(ts, dose)
+                                    history.boluses.add(BS(timestamp = ts, amount = dose, type = BS.Type.NORMAL, iCfg = ICfg(insulinLabel = "replay", peak = 45, dia = 5.0, concentration = 1.0)))
+                                }
+                                smartGiven++; smartWaitMin += (ts - pd.t0) / minute; done.add(pd)
+                            } else if (ts - pd.t0 >= 45 * minute) {
+                                smartDropped++; smartUnitsCut += pd.u; done.add(pd)
+                            } else {
+                                pd.next = if (pd.next == pd.t0 + 10 * minute) pd.t0 + 15 * minute else ts + minute
+                            }
+                        }
+                        pending.removeAll(done)
+                    }
+                    lastReadingTs = ts
                     bgIdx++
                 }
                 gsSim = glucoseStatus(history.bg, bgT, now)
@@ -430,6 +477,7 @@ class HistoryReplayTest {
         AimiReplayClock.override = null
         // Counts only: no values of the input reach the test log.
         if (sim) println("AIMI replay: body model, algorithm $algo, ${body.treats.size} model hypo treatments, guard held SMB on $guardTicks ticks")
+        if (smart) println("AIMI replay: smart calculator deferred $smartDeferred meal boluses, given $smartGiven (mean wait ${if (smartGiven > 0) smartWaitMin / smartGiven else 0} min), dropped $smartDropped, units cut ${"%.2f".format(smartUnitsCut)}")
         println("AIMI replay: ${ticks.length()} ticks, $failed failed")
     }
 
@@ -448,7 +496,7 @@ class HistoryReplayTest {
      */
     private inner class Chain(
         val startMs: Long,
-        val manual: List<Pair<Long, Double>>,
+        val manual: MutableList<Pair<Long, Double>>,
         val realBefore: List<Pair<Long, Double>>,
         val realTempsBefore: List<OwnTemp>,
         val basalAt: (Long) -> Double,
