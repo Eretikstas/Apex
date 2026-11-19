@@ -624,7 +624,13 @@ class HistoryReplayTest {
         // LEARNG2: the learner asks "what if": a low counts against the loop only if, without the extra insulin the loop
         // gave in the rebound window (SMB, temp basal above profile), the lowest value would have stayed at 75 or more;
         // an overshoot counts against the guard only if the insulin it held back would have kept the peak under 180.
-        val learnG2 = prefsText.contains("LEARNG2")
+        val learnG3 = prefsText.contains("LEARNG3")
+        val learnG2 = prefsText.contains("LEARNG2") || learnG3
+        // LEARNG3: the guard lets SMB go before the window ends when insulin is really needed: glucose went higher than the
+        // treatment explains (glucose at the treatment + expected rebound + margin) and still rises, or it stays flat over 10
+        // mmol/L for 15 min after the peak. Expected rebound is learned from rebounds without food; the margin grows after a
+        // release that the what-if check blames for a low, and shrinks a little after an overshoot the guard caused.
+        var expRise = 50.0; var relMargin = 30.0; var treatBg = 0.0; var releases = 0
         var lowsByLoop = 0; var lowsAnyway = 0; var overAvoidable = 0; var loosenScore = 0
         var guardW = if (learnG) 0.0 else guardMin.toDouble()
         // CAPX_<x>: a fixed temp basal cap on a rebound, x times the profile basal (with TEMPCAP), e.g. what a learner chose.
@@ -714,6 +720,7 @@ class HistoryReplayTest {
             val extra = ArrayList<Triple<Long, Double, Boolean>>()   // insulin above profile: time, units, from a temp basal
             val held = ArrayList<Pair<Long, Double>>()               // insulin AutoISF wanted but the guard held back
             var nadir = 999.0; var nadirT = 0L; var peak = 0.0; var peakT = 0L
+            var treatBg = 0.0; var released = false; var meal = false
         }
         fun effectAt(doses: List<Pair<Long, Double>>, at: Long) = doses.filter { it.first <= at }.sumOf { (dt, u) -> u * isfP * (1 - iobLeft((at - dt) / 60_000.0).first) }
         val episodes = ArrayList<Episode>()
@@ -756,8 +763,8 @@ class HistoryReplayTest {
             if (reading < 70.0 && readV.size > 1 && readV[readV.size - 2] < 70.0 && t - lastTreat >= 20 * minute) {
                 eatenList.add(Meal(t, 6.0, 6.0, 10.0, 30.0)); logged.add(Logged(t, 6.0, 6.0))
                 val last = episodes.lastOrNull()
-                if (last == null || last.done || t - last.t0 > 45 * minute) episodes.add(Episode(t))
-                lastTreat = t; nTreat++; corrAsked = false
+                if (last == null || last.done || t - last.t0 > 45 * minute) episodes.add(Episode(t).also { it.treatBg = reading })
+                lastTreat = t; nTreat++; corrAsked = false; treatBg = reading
             }
             // Family: meals with a wizard bolus.
             while (mealPtr < meals.size && meals[mealPtr].t <= t) {
@@ -812,7 +819,15 @@ class HistoryReplayTest {
                     if (guardW > 0 && t - lastTreat < guardW * minute) {
                         val meal = logged.any { it.g > 12.0 && it.t >= lastTreat - 30 * minute }
                         val strongRise = gs.glucose > 162.0 && gs.shortAvgDelta > 3.6
-                        if (!meal && !strongRise) guardHold = true
+                        var release = false
+                        if (learnG3) {
+                            val unexplained = gs.glucose > treatBg + expRise + relMargin && gs.shortAvgDelta > 1.0
+                            val flatHigh = gs.glucose > 180.0 && gs.shortAvgDelta in -1.0..1.0 && t - lastTreat > 45 * minute
+                            release = unexplained || flatHigh
+                        }
+                        if (meal) episodes.lastOrNull()?.meal = true
+                        if (!meal && !strongRise && !release) guardHold = true
+                        else if (release && !meal && !strongRise) episodes.lastOrNull()?.takeIf { !it.done && !it.released }?.let { it.released = true; releases++ }
                     }
                 }
                 val smbOk = smbState && !guardHold
@@ -829,6 +844,9 @@ class HistoryReplayTest {
                             val smbEff = effectAt(ep.extra.filter { !it.third }.map { Pair(it.first, it.second) }, ep.nadirT)
                             val tempEff = effectAt(ep.extra.filter { it.third }.map { Pair(it.first, it.second) }, ep.nadirT)
                             val heldEff = effectAt(ep.held, ep.peakT)
+                            if (learnG3 && !ep.meal && !ep.newLow && ep.peak > ep.treatBg) expRise = 0.8 * expRise + 0.2 * (ep.peak - ep.treatBg)
+                            if (learnG3 && ep.released && ep.newLow && ep.nadir + smbEff + tempEff >= 75.0) relMargin = minOf(120.0, relMargin + 10.0)
+                            if (learnG3 && !ep.released && ep.highMin >= 20 && heldEff > 0.0 && ep.peak - heldEff < 180.0) relMargin = maxOf(0.0, relMargin - 5.0)
                             if (ep.newLow && ep.nadir + smbEff + tempEff >= 75.0) {
                                 lowsByLoop++
                                 if (tempEff > smbEff) capMult = maxOf(1.0, capMult - 0.2) else guardW = minOf(240.0, maxOf(guardW, 60.0) + 20.0)
@@ -853,7 +871,7 @@ class HistoryReplayTest {
                 }
                 episodes.removeAll { it.done && t - it.t0 > 6 * 3_600_000L }
                 val row = JSONObject().put("t", t).put("bg", reading).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
-                    .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
+                    .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
                 manThisTick = 0.0
                 try {
                     if (gs == null) throw IllegalStateException("no glucose")
@@ -896,6 +914,7 @@ class HistoryReplayTest {
         }
         write(outPath, out)
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks")
+        if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
         println("AIMI replay: ${out.length()} ticks, $failed failed")
