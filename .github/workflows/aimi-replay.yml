@@ -49,6 +49,10 @@ on:
         description: 'ISF of the body model in mg/dL per unit (empty = profile ISF)'
         type: string
         default: ''
+      batch:
+        description: 'Many runs at once: prefs lists separated by | (each one is its own job; prefs above is ignored)'
+        type: string
+        default: ''
   # A push only makes the workflow known to GitHub (so it can be started by hand); it runs nothing.
   push:
     branches:
@@ -58,8 +62,30 @@ permissions:
   contents: read
 
 jobs:
-  replay:
+  plan:
     if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          BATCH: ${{ inputs.batch }}
+          ONE: ${{ inputs.prefs }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          b = os.environ.get("BATCH", "").strip()
+          items = [x.strip() for x in b.split("|") if x.strip()] if b else [os.environ.get("ONE", "")]
+          print("matrix=" + json.dumps({"include": [{"i": i, "prefs": p} for i, p in enumerate(items)]}))
+          PY
+
+  replay:
+    needs: plan
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -94,7 +120,7 @@ jobs:
         env:
           AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}
           # Passed as an environment value, never pasted into the script text.
-          AIMI_REPLAY_PREFS: ${{ inputs.prefs }}
+          AIMI_REPLAY_PREFS: ${{ matrix.prefs }}
           AIMI_REPLAY_SIM: ${{ inputs.sim && '1' || '0' }}
           AIMI_REPLAY_ALGO: ${{ inputs.algo }}
           AIMI_REPLAY_SIM_ISF: ${{ inputs.isf }}
@@ -133,7 +159,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: aimi-replay-result
+          name: aimi-replay-result-${{ matrix.i }}
           path: out/result.enc
           if-no-files-found: ignore
           retention-days: 7
