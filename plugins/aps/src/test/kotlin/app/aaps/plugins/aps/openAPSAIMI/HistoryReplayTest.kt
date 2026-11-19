@@ -742,7 +742,8 @@ class HistoryReplayTest {
         // an hour is smoothed with its neighbours; a SHIFT detector looks at the last 7 days: if the whole day needs
         // >10 % more or less on two cards in a row, all hours move together (up to +-15 %).
         val lb2 = prefsText.contains("LEARNB2")
-        val lastDir = IntArray(24); var lastShift = 0
+        val lastDir = IntArray(24); var lastShift = 0; val upCount = IntArray(24)
+        val lb3 = prefsText.contains("LEARNB3")
         fun hourNeeds(w: Int): Array<ArrayList<Double>> {
             val n = out.length(); val s0 = n - w
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
@@ -777,7 +778,7 @@ class HistoryReplayTest {
             val ratios = (0 until 24).filter { n7[it].size >= 2 }.map { med(n7[it]) / profBasal[it] }
             val ratio = if (ratios.size >= 5) med(ratios) else 1.0
             val dirS = if (ratio > 1.10) 1 else if (ratio < 0.90) -1 else 0
-            if (dirS != 0 && dirS == lastShift) {
+            if (!lb3 && dirS != 0 && dirS == lastShift) {
                 val f = ratio.coerceIn(0.85, 1.15)
                 for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
                 sb.append(" SHIFT x%.2f".format(f)); changed = 24; lastShift = 0
@@ -789,10 +790,24 @@ class HistoryReplayTest {
                     if (own[h].isNaN()) { lastDir[h] = 0; continue }
                     val nb = listOf(own[(h + 23) % 24], own[(h + 1) % 24]).filter { !it.isNaN() }
                     val v = if (nb.isEmpty()) own[h] else 0.5 * own[h] + 0.5 * nb.average()
-                    val dir = if (v > profBasal[h] * 1.10) 1 else if (v < profBasal[h] * 0.90) -1 else 0
-                    if (dir != 0 && dir == lastDir[h]) {
+                    // LEARNB3: no shift detector; asymmetric - lower after 2 cards at -10 %, raise only after 3 cards at
+                    // +15 % and only if the last 7 days had no sensor value < 3.9 within 2 h of this hour.
+                    val dir = if (v > profBasal[h] * (if (lb3) 1.15 else 1.10)) 1 else if (v < profBasal[h] * 0.90) -1 else 0
+                    val lowNear = lb3 && dir == 1 && run {
+                        val n = out.length(); var hit = false
+                        for (i in maxOf(0, n - 7 * 288) until n) {
+                            val r = out.getJSONObject(i); val hh = Instant.ofEpochMilli(r.getLong("t")).atZone(tz).hour
+                            val dh = minOf((hh - h + 24) % 24, (h - hh + 24) % 24)
+                            if (dh <= 2 && r.optDouble("bg", 200.0) < 70.0) { hit = true; break }
+                        }
+                        hit
+                    }
+                    val need = if (lb3 && dir == 1) 3 else 2
+                    if (dir == 1 && lowNear) { lastDir[h] = 0; upCount[h] = 0; continue }
+                    if (dir != 0 && dir == lastDir[h]) upCount[h]++ else upCount[h] = if (dir != 0) 1 else 0
+                    if (dir != 0 && upCount[h] >= need) {
                         val nv = Math.round(v.coerceIn(profBasal[h] * 0.8, profBasal[h] * 1.2) * 100) / 100.0
-                        sb.append(" %02d:%.2f->%.2f".format(h, profBasal[h], nv)); profBasal[h] = nv; changed++; lastDir[h] = 0
+                        sb.append(" %02d:%.2f->%.2f".format(h, profBasal[h], nv)); profBasal[h] = nv; changed++; lastDir[h] = 0; upCount[h] = 0
                     } else lastDir[h] = dir
                 }
             }
@@ -800,7 +815,7 @@ class HistoryReplayTest {
             println("AIMI replay: learner basal card v2 day $day: $changed hours changed, total ${"%.2f".format(profBasal.sum())} U/day (shift ratio ${"%.2f".format(ratio)});$sb")
         }
         fun learnBasal(day: Int) {
-            if (lb2) { learnBasal2(day); return }
+            if (lb2 || lb3) { learnBasal2(day); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
             val hr = IntArray(w); val mn = IntArray(w)
