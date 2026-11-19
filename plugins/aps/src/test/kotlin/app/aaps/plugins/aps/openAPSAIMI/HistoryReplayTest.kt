@@ -784,7 +784,8 @@ class HistoryReplayTest {
         // LBTREND: a weekly trend card. Last 7 days vs the 14 days before: total insulin per day (TDD), time > 10 and
         // hypo carbs. TDD +10 % and time > 10 x1.5 (and > 8 %) -> all basal +10 %. TDD -10 % and hypo carbs x1.3 -> -10 %.
         val lbTrend = prefsText.contains("LBTREND")
-        var lastTrendDay = -100
+        var lastTrendDay = -100; var lastTrendF = 1.0
+        val lbTrend2 = prefsText.contains("LBTREND2")
         fun weekStats(from: Int, to: Int): DoubleArray {
             var ins = 0.0; var hi = 0; var hy = 0.0; var nn = 0
             fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
@@ -801,13 +802,19 @@ class HistoryReplayTest {
             val sb = StringBuilder(); var changed = 0
             if (lbTrend && day >= 21 && day - lastTrendDay >= 7) {
                 val n = out.length()
-                val now7 = weekStats(n - 7 * 288, n); val base = weekStats(n - 21 * 288, n - 7 * 288)
-                val f = when {
+                // LBTREND2: the base window never reaches back over the last trend card (no reaction to its own change),
+                // and the same direction must show on two checks in a row.
+                val baseFrom = if (lbTrend2 && lastTrendDay >= 0) maxOf(n - 21 * 288, n - (day - lastTrendDay) * 288) else n - 21 * 288
+                val enough = !(lbTrend2 && n - 7 * 288 - baseFrom < 7 * 288)
+                val now7 = weekStats(n - 7 * 288, n); val base = weekStats(baseFrom, n - 7 * 288)
+                val f0 = if (!enough) 1.0 else when {
                     now7[0] > base[0] * 1.10 && now7[1] > base[1] * 1.5 && now7[1] > 8.0 -> 1.10
                     now7[0] < base[0] * 0.90 && now7[2] > base[2] * 1.3 -> 0.90
                     else -> 1.0
                 }
+                val f = if (!lbTrend2) f0 else if (f0 != 1.0 && f0 == lastTrendF) f0 else { lastTrendF = f0; 1.0 }
                 if (f != 1.0) {
+                    lastTrendF = 1.0
                     for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
                     lastTrendDay = day; lastDir.fill(0); upCount.fill(0)
                     println("AIMI replay: learner TREND card day $day: x$f (TDD ${"%.1f".format(base[0])}->${"%.1f".format(now7[0])}, >10 ${"%.1f".format(base[1])}->${"%.1f".format(now7[1])} %, hypo ${"%.0f".format(base[2])}->${"%.0f".format(now7[2])} g), total ${"%.2f".format(profBasal.sum())}")
