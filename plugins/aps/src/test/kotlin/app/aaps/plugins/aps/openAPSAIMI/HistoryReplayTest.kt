@@ -640,9 +640,13 @@ class HistoryReplayTest {
         // Eva changes (CHG_<day>): from that day insulin acts CHGISF_<x> as strongly, the liver answers a low CHGKCR_<x> times.
         val chgDay = tok("CHG", 9999.0).toInt()
         val chgIsf = tok("CHGISF", 1.0); val chgKcr = tok("CHGKCR", 1.0)
-        val profBasal = (0 until 24).map { cfg.getJSONArray("profBasal").getDouble(it) }
+        // PROF_<name>: run with another phone profile kept in synth.profiles.<name> of the encrypted input (basal, isf, ic).
+        val profName = Regex("PROF_([A-Za-z0-9]+)").find(prefsText)?.groupValues?.get(1)
+        val prof = profName?.let { cfg.getJSONObject("profiles").getJSONObject(it) }
+        val profBasal = (0 until 24).map { (prof ?: cfg).getJSONArray(if (prof != null) "basal" else "profBasal").getDouble(it) }
         val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) }
-        val isfP = cfg.getDouble("profIsf"); val icP = cfg.getDouble("profIc"); val targetP = cfg.getDouble("profTarget")
+        val isfP = prof?.getDouble("isf") ?: cfg.getDouble("profIsf"); val icP = prof?.getDouble("ic") ?: cfg.getDouble("profIc")
+        val targetP = prof?.optDouble("target", cfg.getDouble("profTarget")) ?: cfg.getDouble("profTarget")
         val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / tok("CRT", cfg.getDouble("crTrue"))
         val peak = cfg.getDouble("peak"); val dia = cfg.getDouble("dia")
         val t0 = cfg.getLong("t0")
@@ -696,6 +700,7 @@ class HistoryReplayTest {
         val end = t0 + days * 86_400_000L
         var t = t0
         var manThisTick = 0.0
+        var mealThisTick = 0.0; var hypoThisTick = 0.0
 
         fun basalIob(now: Long): Double {
             var sum = 0.0
@@ -761,7 +766,7 @@ class HistoryReplayTest {
             // Family: a low is treated with 6 g.
             // The family treats a low the sensor shows for 2 minutes (not a one-minute spike).
             if (reading < 70.0 && readV.size > 1 && readV[readV.size - 2] < 70.0 && t - lastTreat >= 20 * minute) {
-                eatenList.add(Meal(t, 6.0, 6.0, 10.0, 30.0)); logged.add(Logged(t, 6.0, 6.0))
+                eatenList.add(Meal(t, 6.0, 6.0, 10.0, 30.0)); logged.add(Logged(t, 6.0, 6.0)); hypoThisTick += 6.0
                 val last = episodes.lastOrNull()
                 if (last == null || last.done || t - last.t0 > 45 * minute) episodes.add(Episode(t).also { it.treatBg = reading })
                 lastTreat = t; nTreat++; corrAsked = false; treatBg = reading
@@ -769,7 +774,7 @@ class HistoryReplayTest {
             // Family: meals with a wizard bolus.
             while (mealPtr < meals.size && meals[mealPtr].t <= t) {
                 val ml = meals[mealPtr]; mealPtr++
-                eatenList.add(Meal(t, ml.logged, ml.eaten, ml.a, ml.b)); logged.add(Logged(t, ml.logged, ml.logged)); nMeals++
+                eatenList.add(Meal(t, ml.logged, ml.eaten, ml.a, ml.b)); logged.add(Logged(t, ml.logged, ml.logged)); nMeals++; mealThisTick += ml.logged
                 var iobAll = 0.0
                 for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                 val bIob = basalIob(t)
@@ -872,7 +877,8 @@ class HistoryReplayTest {
                 episodes.removeAll { it.done && t - it.t0 > 6 * 3_600_000L }
                 val row = JSONObject().put("t", t).put("bg", reading).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
                     .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
-                manThisTick = 0.0
+                row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h])
+                manThisTick = 0.0; mealThisTick = 0.0; hypoThisTick = 0.0
                 try {
                     if (gs == null) throw IllegalStateException("no glucose")
                     val chained = chainedInputs(chain, tick, t)
