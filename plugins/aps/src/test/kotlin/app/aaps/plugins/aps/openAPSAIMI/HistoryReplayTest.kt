@@ -807,7 +807,7 @@ class HistoryReplayTest {
                     val wiz = ml.logged / icP + (reading - targetP) / isfP - iobAll - bIobUsed
                     // SPLITTYPE: the family marks the meal fast or slow in the calculator (right 85 % of the time);
                     // a fast meal gets the whole bolus now, only a slow one is split.
-                    val markedFast = if (rnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0
+                    val markedFast = splitType && (if (rnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0)
                     if (splitP < 1.0 && ml.logged >= 13.0 && !(splitType && markedFast)) {
                         // Split bolus: part now, the rest of the meal part waits for the rise.
                         val now1 = maxOf(wiz - ml.logged / icP * (1 - splitP), 0.0)
