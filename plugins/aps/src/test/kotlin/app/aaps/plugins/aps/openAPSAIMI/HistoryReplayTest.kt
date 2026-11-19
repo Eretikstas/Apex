@@ -704,6 +704,7 @@ class HistoryReplayTest {
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
         var smbState = true; var smbOffAt = Long.MIN_VALUE / 2
         var lastTreat = Long.MIN_VALUE / 2; var nTreat = 0; var nCorr = 0; var nMeals = 0; var corrAsked = false
+        val canEvery = tok("CANCH", 0.0)
         val treatFix = tok("TREAT", 6.0); val treatL = prefsText.contains("TREATL"); var treatSum = 0.0
         val smartS = prefsText.contains("SMARTS")
         class Pending(val t: Long, val g: Double, val bg: Double)
@@ -819,7 +820,10 @@ class HistoryReplayTest {
             val changed = day >= chgDay
             z += ((if (changed) kcr * chgKcr else kcr) * maxOf(0.0, 75.0 - g) - z) / 20.0
             e = noisePhi * e + rnd.nextGaussian() * noiseSd
-            g += isfT * needBasal[h] / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * acting + csfT * carbsAbs + z + e
+            // CANCH_<h>: the cannula is changed every h hours; from 60 h it works worse (insulin acts down to 75 % at 96 h).
+            val canAge = if (canEvery > 0) ((t - t0) / 3_600_000.0) % canEvery else 0.0
+            val canF = if (canEvery > 0 && canAge > 60.0) 1.0 - 0.25 * minOf(1.0, (canAge - 60.0) / 36.0) else 1.0
+            g += isfT * needBasal[h] / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * canF * acting + csfT * carbsAbs + z + e
             g = g.coerceIn(30.0, 450.0)
             // Sensor.
             sens += (g - sens) / 5.0
