@@ -620,7 +620,7 @@ class HistoryReplayTest {
         val profBasal = (0 until 24).map { cfg.getJSONArray("profBasal").getDouble(it) }
         val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) }
         val isfP = cfg.getDouble("profIsf"); val icP = cfg.getDouble("profIc"); val targetP = cfg.getDouble("profTarget")
-        val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / cfg.getDouble("crTrue")
+        val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / tok("CRT", cfg.getDouble("crTrue"))
         val peak = cfg.getDouble("peak"); val dia = cfg.getDouble("dia")
         val t0 = cfg.getLong("t0")
         val tz = ZoneOffset.ofHours(3)
