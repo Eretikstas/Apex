@@ -604,7 +604,8 @@ class HistoryReplayTest {
     private fun synthetic(data: JSONObject, outPath: String, prefsText: String) {
         fun tok(name: String, def: Double) = Regex("${name}_([0-9.]+)").find(prefsText)?.groupValues?.get(1)?.toDouble() ?: def
         val cfg = data.getJSONObject("synth")
-        val meta = data.getJSONObject("meta")
+        // The phone's max basal (the replay input assumes 4.0; Eva's phone has its own value in synth).
+        val meta = JSONObject(data.getJSONObject("meta").toString()).put("maxBasal", cfg.optDouble("maxBasal", data.getJSONObject("meta").getDouble("maxBasal")))
         val days = tok("SYNTH", 28.0).toInt()
         val rnd = Random(tok("SEED", 1.0).toLong())
         val kcr = tok("KCR", 0.03)
