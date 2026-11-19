@@ -704,6 +704,7 @@ class HistoryReplayTest {
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
         var smbState = true; var smbOffAt = Long.MIN_VALUE / 2
         var lastTreat = Long.MIN_VALUE / 2; var nTreat = 0; var nCorr = 0; var nMeals = 0; var corrAsked = false
+        val treatFix = tok("TREAT", 6.0); val treatL = prefsText.contains("TREATL"); var treatSum = 0.0
         val smartS = prefsText.contains("SMARTS")
         class Pending(val t: Long, val g: Double, val bg: Double)
         val splitP = tok("SPLIT", 100.0) / 100.0
@@ -831,7 +832,18 @@ class HistoryReplayTest {
             // Family: a low is treated with 6 g.
             // The family treats a low the sensor shows for 2 minutes (not a one-minute spike).
             if (reading < 70.0 && readV.size > 1 && readV[readV.size - 2] < 70.0 && t - lastTreat >= 20 * minute) {
-                eatenList.add(Meal(t, 6.0, 6.0, 10.0, 30.0)); logged.add(Logged(t, 6.0, 6.0)); hypoThisTick += 6.0
+                // TREAT_<g>: fixed treatment size (default 6 g). TREATL: the learner's size - enough carbs to lift glucose
+                // to ~5.5 after the fall still coming (the last 15 min trend for 15 more min) and a part of the active
+                // insulin, at the profile carb sensitivity; 4-10 g, whole grams.
+                val tg = if (treatL) {
+                    val slope = if (readV.size > 15) (reading - readV[readV.size - 16]) / 3.0 else 0.0
+                    var iobAll = basalIob(t)
+                    for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
+                    val needMg = (99.0 - reading) + maxOf(0.0, -slope * 3) + maxOf(0.0, iobAll) * isfP * 0.3
+                    Math.round((needMg / (isfP / icP)).coerceIn(4.0, 10.0)).toDouble()
+                } else treatFix
+                treatSum += tg
+                eatenList.add(Meal(t, tg, tg, 10.0, 30.0)); logged.add(Logged(t, tg, tg)); hypoThisTick += tg
                 val last = episodes.lastOrNull()
                 if (last == null || last.done || t - last.t0 > 45 * minute) episodes.add(Episode(t).also { it.treatBg = reading })
                 lastTreat = t; nTreat++; corrAsked = false; treatBg = reading
@@ -1038,7 +1050,7 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
-        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
+        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
