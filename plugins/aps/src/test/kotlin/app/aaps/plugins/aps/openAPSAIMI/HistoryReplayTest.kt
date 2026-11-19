@@ -707,6 +707,7 @@ class HistoryReplayTest {
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
         var smbState = true; var smbOffAt = Long.MIN_VALUE / 2
         var lastTreat = Long.MIN_VALUE / 2; var nTreat = 0; var nCorr = 0; var nMeals = 0; var corrAsked = false
+        val lateB = tok("LATEB", 0.0); var nLateB = 0
         val lateOn = prefsText.contains("LATE"); val lateCob = prefsText.contains("LATECOB"); val latePct = tok("LATEPCT", 50.0) / 100.0
         val mealLog = ArrayList<Pair<Long, Double>>(); val lateDone = HashSet<Long>(); var nLate = 0; var lateU = 0.0
         val canEvery = tok("CANCH", 0.0)
@@ -1123,8 +1124,17 @@ class HistoryReplayTest {
                     val smb = rt.units ?: 0.0
                     if (smb > 0.0) { chain.ownSmb.add(Pair(t, smb)); doses.add(Pair(t, smb)) }
                     val capRate = profBasal[h] * capMult
-                    val rate = if (guardHold && capOn && (rt.rate ?: 0.0) > capRate) capRate else rt.rate
-                    val dur = rt.duration
+                    var rate = if (guardHold && capOn && (rt.rate ?: 0.0) > capRate) capRate else rt.rate
+                    var dur = rt.duration
+                    // LATEB_<x>: in the late meal window (90-240 min after a meal >= 13 g, absorption seen in 2 cycles,
+                    // glucose > 7.8 and rising) the temp basal is at least x times the profile basal (max basal respected).
+                    // Not when the loop asks for a zero temp, not while the rebound guard holds.
+                    if (lateB > 0.0 && !guardHold && devStreak >= 2 && gs.glucose > 140.0 && gs.delta > 0 &&
+                        mealLog.any { (t - it.first) / minute in 90L..240L } && rt.rate != 0.0) {
+                        val floor = minOf(profBasal[h] * lateB, meta.getDouble("maxBasal"))
+                        val cur = rate ?: (chain.activeTemp(t)?.rate ?: profBasal[h])
+                        if (cur < floor) { rate = floor; dur = 30; nLateB++ }
+                    }
                     episodes.lastOrNull()?.takeIf { !it.done && t - it.t0 <= 150 * minute }?.let { ep ->
                         ep.smb += smb
                         if ((rate ?: 0.0) > profBasal[h] * 1.05 && (dur ?: 0) > 0) ep.highTemp = true
@@ -1158,7 +1168,7 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
-        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, late tail $nLate boluses ${"%.1f".format(lateU)} U, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
+        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
