@@ -704,7 +704,7 @@ class HistoryReplayTest {
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
         var smbState = true; var smbOffAt = Long.MIN_VALUE / 2
         var lastTreat = Long.MIN_VALUE / 2; var nTreat = 0; var nCorr = 0; var nMeals = 0; var corrAsked = false
-        val lateOn = prefsText.contains("LATE"); val latePct = tok("LATEPCT", 50.0) / 100.0
+        val lateOn = prefsText.contains("LATE"); val lateCob = prefsText.contains("LATECOB"); val latePct = tok("LATEPCT", 50.0) / 100.0
         val mealLog = ArrayList<Pair<Long, Double>>(); val lateDone = HashSet<Long>(); var nLate = 0; var lateU = 0.0
         val canEvery = tok("CANCH", 0.0)
         val treatFix = tok("TREAT", 6.0); val treatL = prefsText.contains("TREATL"); var treatSum = 0.0
@@ -1013,7 +1013,9 @@ class HistoryReplayTest {
                         if (age !in 90L..240L || ml.first in lateDone) continue
                         var iobAll = basalIob(t)
                         for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
-                        val want = ((gs.glucose - targetP) / isfP - iobAll) * latePct
+                        // LATECOB: also count the carbs AAPS still sees as not absorbed (COB) - the wizard way.
+                        val cobU = if (lateCob) logged.sumOf { it.left } / icP else 0.0
+                        val want = ((gs.glucose - targetP) / isfP + cobU - iobAll) * latePct
                         val u = Math.round(minOf(want, 0.3 * ml.second / icP) / 0.05) * 0.05
                         lateDone.add(ml.first)
                         if (u >= 0.1) { giveBolus(t, u); nLate++; lateU += u }
