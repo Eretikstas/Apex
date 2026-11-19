@@ -652,7 +652,7 @@ class HistoryReplayTest {
         // PROF_<name>: run with another phone profile kept in synth.profiles.<name> of the encrypted input (basal, isf, ic).
         val profName = Regex("PROF_([A-Za-z0-9]+)").find(prefsText)?.groupValues?.get(1)
         val prof = profName?.let { cfg.getJSONObject("profiles").getJSONObject(it) }
-        val profBasal = (0 until 24).map { (prof ?: cfg).getJSONArray(if (prof != null) "basal" else "profBasal").getDouble(it) }
+        val profBasal = DoubleArray(24) { (prof ?: cfg).getJSONArray(if (prof != null) "basal" else "profBasal").getDouble(it) }
         // NEEDDX_<x>: the true basal need of the day hours (10-21 h) times x (the encrypted values are night-based).
         val needDx = tok("NEEDDX", 1.0)
         val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) * (if (it in 10..21) needDx else 1.0) }
@@ -726,6 +726,47 @@ class HistoryReplayTest {
         var manThisTick = 0.0
         var mealThisTick = 0.0; var hypoThisTick = 0.0
 
+        // Learner basal advisor (same method as advisor v3): clock hours with no meal 5 h before and no meal inside,
+        // glucose 3.9-12 at the start; need = insulin acting in the hour + glucose change / ISF - hypo carbs / CR.
+        // Median per hour from >= 3 hours = "measured"; step limited to +-20 % of the current value; other hours stay.
+        val learnB = prefsText.contains("LEARNB")
+        val lbEvery = tok("LBEVERY", 4.0).toInt()
+        val lbDays = tok("LBDAYS", 14.0).toInt()
+        val kern5 = DoubleArray(61) { j -> iobLeft(5.0 * j).first - iobLeft(5.0 * (j + 1)).first }
+        var lbCards = 0
+        fun learnBasal(day: Int) {
+            val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
+            val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
+            val hr = IntArray(w); val mn = IntArray(w)
+            fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
+            for (i in 0 until w) {
+                val r = out.getJSONObject(s0 + i)
+                bg[i] = r.optDouble("bg", Double.NaN); meal[i] = num(r, "meal"); hypo[i] = num(r, "hypo")
+                val z = Instant.ofEpochMilli(r.getLong("t")).atZone(tz); hr[i] = z.hour; mn[i] = z.minute
+                val nx = if (i + 1 < w) out.getJSONObject(s0 + i + 1) else r
+                ins[i] = num(nx, "deliv") * 5 / 60 + num(r, "units") + num(r, "man")
+            }
+            val act = DoubleArray(w) { k -> var a = 0.0; for (j in 0..minOf(60, k)) a += ins[k - j] * kern5[j]; a }
+            val since = IntArray(w); var last = -100000
+            for (k in 0 until w) { if (meal[k] > 0) last = k; since[k] = (k - last) * 5 }
+            val needs = Array(24) { ArrayList<Double>() }
+            for (k in 60 until w - 12) {
+                if (mn[k] != 0 || since[k] < 300 || bg[k].isNaN() || bg[k + 12].isNaN() || bg[k] !in 70.0..216.0) continue
+                if ((k until k + 12).any { meal[it] > 0 }) continue
+                var a = 0.0; for (j in k until k + 12) a += act[j]
+                var hy = 0.0; for (j in maxOf(0, k - 6) until k + 12) hy += hypo[j]
+                needs[hr[k]].add(a + (bg[k + 12] - bg[k]) / isfP - hy / icP)
+            }
+            val sb = StringBuilder(); var changed = 0
+            for (h in 0 until 24) {
+                if (needs[h].size < 3) continue
+                val med = needs[h].sorted()[needs[h].size / 2]
+                val nv = (Math.round(med.coerceIn(profBasal[h] * 0.8, profBasal[h] * 1.2) * 100) / 100.0)
+                if (Math.abs(nv - profBasal[h]) >= 0.02) { sb.append(" %02d:%.2f->%.2f".format(h, profBasal[h], nv)); profBasal[h] = nv; changed++ }
+            }
+            lbCards++
+            println("AIMI replay: learner basal card day $day: $changed hours changed, total ${"%.2f".format(profBasal.sum())} U/day;$sb")
+        }
         fun basalIob(now: Long): Double {
             var sum = 0.0
             for (tb in chain.ownTemps) {
@@ -989,6 +1030,9 @@ class HistoryReplayTest {
                     row.put("error", ex.javaClass.simpleName)
                 }
                 out.put(row)
+                // LEARNB: the learner's basal card every LBEVERY_<d> days (default 4) at 06:00, accepted at once.
+                val lt = Instant.ofEpochMilli(t).atZone(tz)
+                if (learnB && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnBasal(day)
                 if (out.length() % 500 == 0) clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
             }
             t += minute
