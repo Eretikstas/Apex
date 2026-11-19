@@ -6,7 +6,6 @@ import app.aaps.core.data.model.RM
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.pump.defs.TimeChangeType
 import app.aaps.core.interfaces.db.PersistenceLayer
-import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.pump.BlePreCheck
 import app.aaps.core.interfaces.pump.BolusProgressData
 import app.aaps.core.interfaces.pump.DetailedBolusInfo

@@ -1,7 +1,6 @@
 package app.aaps.pump.atc3
 
 import app.aaps.core.interfaces.notifications.AlarmSound
-import app.aaps.core.interfaces.notifications.Notification
 import app.aaps.core.interfaces.notifications.NotificationAction
 import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.notifications.NotificationLevel

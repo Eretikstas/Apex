@@ -6,7 +6,7 @@ import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.TE
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.db.PersistenceLayer
-import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.pump.atc3.Notification
 import app.aaps.core.interfaces.pump.PumpInsulin
 import app.aaps.core.interfaces.pump.PumpRate
 import app.aaps.core.interfaces.pump.PumpSync

@@ -6,7 +6,7 @@ import app.aaps.core.data.model.IDs
 import app.aaps.core.data.model.RM
 import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.interfaces.db.PersistenceLayer
-import app.aaps.core.interfaces.notifications.Notification
+import app.aaps.pump.atc3.Notification
 import app.aaps.core.interfaces.pump.BlePreCheck
 import app.aaps.core.interfaces.pump.BolusProgressData
 import app.aaps.core.interfaces.pump.DetailedBolusInfo
