@@ -64,6 +64,7 @@ import org.json.JSONObject
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.util.Random
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import java.util.zip.GZIPInputStream
@@ -95,6 +96,13 @@ class HistoryReplayTest {
         val passes = System.getenv("AIMI_REPLAY_PASSES")?.toIntOrNull()?.coerceIn(1, 2) ?: 1
         // Learner files live in a fresh folder of this run, kept between the passes.
         val storageDir = Files.createTempDirectory("aimi-replay").toFile()
+        val prefsAll = System.getenv("AIMI_REPLAY_PREFS").orEmpty()
+        if (prefsAll.contains("SYNTH")) {
+            val data = JSONObject(GZIPInputStream(File(inPath!!).inputStream()).bufferedReader().readText())
+            synthetic(data, outPath!!, prefsAll)
+            println("AIMI replay: pass 1 of 1 done")
+            return
+        }
         for (pass in 0 until passes) {
             val data = JSONObject(GZIPInputStream(File(inPath!!).inputStream()).bufferedReader().readText())
             if (pass > 0) shiftTimes(data, pass * 16 * 86_400_000L)
@@ -579,6 +587,234 @@ class HistoryReplayTest {
                 )
             }
         }
+    }
+
+    /**
+     * Virtual Eva 2.0 (prefs SYNTH_<days>): a made-up but Eva-like life in closed loop with the real AutoISF.
+     *
+     * Body, per minute: glucose change = liver output (true basal need x true ISF) - insulin acting x true ISF x day factor
+     * + carbs absorbed x true CSF + the liver's answer to a low (KCR) + slow noise (NOISE). The phone profile (what AAPS
+     * believes) and the true body values come from `synth` in the encrypted input, never from this file.
+     * Sensor: 5 min lag, noise, reads low at the bottom, rare one-minute spikes.
+     * Family: meals on Eva's daily pattern with a bolus from the wizard (it adds negative basal IOB back, as the real
+     * wizard does; NOIOB stops that at low glucose), 6 g for a low (sensor below 3.9, again after 20 min), and sometimes
+     * a manual correction on a rebound (CORR_<percent>, default 30). Phone automations and the learner switches
+     * (Z2_, GUARD_, TEMPCAP, NOIOB) work as in the replay. Other tokens: SEED_<n>, KCR_<x>, NOISE_<x>, DAYSD_<x>.
+     */
+    private fun synthetic(data: JSONObject, outPath: String, prefsText: String) {
+        fun tok(name: String, def: Double) = Regex("${name}_([0-9.]+)").find(prefsText)?.groupValues?.get(1)?.toDouble() ?: def
+        val cfg = data.getJSONObject("synth")
+        val meta = data.getJSONObject("meta")
+        val days = tok("SYNTH", 28.0).toInt()
+        val rnd = Random(tok("SEED", 1.0).toLong())
+        val kcr = tok("KCR", 0.03)
+        val noiseSd = tok("NOISE", 0.25)
+        val daySd = tok("DAYSD", 0.12)
+        val corrPct = tok("CORR", 30.0)
+        val z2On = tok("Z2", 117.0)
+        val guardMin = tok("GUARD", 0.0).toLong()
+        val tempCap = prefsText.contains("TEMPCAP")
+        val noIob = prefsText.contains("NOIOB")
+        val noIobBg = if (prefsText.contains("NOIOB55")) 99.0 else 81.0
+        val profBasal = (0 until 24).map { cfg.getJSONArray("profBasal").getDouble(it) }
+        val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) }
+        val isfP = cfg.getDouble("profIsf"); val icP = cfg.getDouble("profIc"); val targetP = cfg.getDouble("profTarget")
+        val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / cfg.getDouble("crTrue")
+        val peak = cfg.getDouble("peak"); val dia = cfg.getDouble("dia")
+        val t0 = cfg.getLong("t0")
+        val tz = ZoneOffset.ofHours(3)
+        fun hourOf(t: Long) = Instant.ofEpochMilli(t).atZone(tz).hour
+        val iobCurve = curve(peak, dia)
+        // Share of a dose still to act after m minutes: all of it before the dose acts.
+        fun iobLeft(m: Double): Pair<Double, Double> = if (m <= 0.0) Pair(1.0, 0.0) else iobCurve(m)
+
+        // Meals of every day: slot (hour, minute sd, probability, grams, grams sd).
+        class Meal(val t: Long, val logged: Double, val eaten: Double, val a: Double, val b: Double)
+        val meals = ArrayList<Meal>()
+        val slots = cfg.getJSONArray("meals")
+        for (d in 0 until days) for (k in 0 until slots.length()) {
+            val sl = slots.getJSONArray(k)
+            if (rnd.nextDouble() > sl.getDouble(2)) continue
+            val tm = t0 + d * 86_400_000L + (sl.getDouble(0) * 60 + rnd.nextGaussian() * sl.getDouble(1)).toLong().coerceAtLeast(0) * minute
+            val g = (sl.getDouble(3) + rnd.nextGaussian() * sl.getDouble(4)).coerceIn(5.0, 60.0).roundToInt().toDouble()
+            val eaten = if (rnd.nextDouble() < 0.15) g * (0.6 + 0.2 * rnd.nextDouble()) else g
+            val fast = rnd.nextDouble() < 0.25
+            meals.add(Meal(tm, g, eaten, if (fast) 60.0 else 150.0, if (fast) 150.0 else 270.0))
+        }
+        meals.sortBy { it.t }
+        val dayFactor = DoubleArray(days + 1) { Math.exp(rnd.nextGaussian() * daySd) }
+
+        fun triCdf(m: Double, a: Double, b: Double) = when {
+            m <= 0 -> 0.0
+            m <= a -> m * m / (a * b)
+            m < b -> 1.0 - (b - m) * (b - m) / ((b - a) * b)
+            else -> 1.0
+        }
+        // Body state.
+        val doses = ArrayList<Pair<Long, Double>>()          // insulin really given (basal minutes, SMB, boluses)
+        var donePtr = 0
+        val eatenList = ArrayList<Meal>()                    // carbs really eaten (meals and treatments)
+        var g = 110.0
+        var z = 0.0; var e = 0.0; var sens = g
+        // AAPS side.
+        val chain = Chain(startMs = t0, manual = ArrayList(), realBefore = emptyList(), realTempsBefore = emptyList(),
+            basalAt = { t -> profBasal[hourOf(t)] })
+        class Logged(val t: Long, val g: Double, var left: Double)
+        val logged = ArrayList<Logged>()
+        val readT = ArrayList<Long>(); val readV = ArrayList<Double>()
+        val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
+        var smbState = true; var smbOffAt = Long.MIN_VALUE / 2
+        var lastTreat = Long.MIN_VALUE / 2; var nTreat = 0; var nCorr = 0; var nMeals = 0; var corrAsked = false
+        var lastLoopBg: Double? = null; var lastAct = 0.0
+        var mealPtr = 0
+        val out = JSONArray()
+        var failed = 0
+        val end = t0 + days * 86_400_000L
+        var t = t0
+        var manThisTick = 0.0
+
+        fun basalIob(now: Long): Double {
+            var sum = 0.0
+            for (tb in chain.ownTemps) {
+                if (tb.end < now - (dia * 3_600_000).toLong()) continue
+                var p0 = maxOf(tb.start, now - (dia * 3_600_000).toLong()); val en = minOf(tb.end, now)
+                while (p0 < en) {
+                    val q = minOf(p0 + 5 * minute, en)
+                    sum += (tb.rate - profBasal[hourOf(p0)]) * (q - p0) / 3_600_000.0 * iobLeft((now - (p0 + q) / 2) / 60_000.0).first
+                    p0 = q
+                }
+            }
+            return sum
+        }
+        fun giveBolus(now: Long, u: Double) {
+            if (u <= 0.0) return
+            chain.manual.add(Pair(now, u)); doses.add(Pair(now, u)); manThisTick += u
+        }
+
+        while (t < end) {
+            val h = hourOf(t)
+            val day = ((t - t0) / 86_400_000L).toInt()
+            // Insulin given this minute: the running temp or the profile basal.
+            val rateNow = chain.activeTemp(t)?.rate ?: profBasal[h]
+            doses.add(Pair(t, rateNow / 60.0))
+            // Insulin acting this minute (true curve).
+            while (donePtr < doses.size && t - doses[donePtr].first >= (dia * 3_600_000).toLong()) donePtr++
+            var acting = 0.0
+            for (k in donePtr until doses.size) {
+                val (dt, u) = doses[k]
+                val m = (t - dt) / 60_000.0
+                acting += u * (iobLeft(m - 1).first - iobLeft(m).first)
+            }
+            var carbsAbs = 0.0
+            for (ml in eatenList) {
+                val m = (t - ml.t) / 60_000.0
+                if (m > ml.b + 1) continue
+                carbsAbs += ml.eaten * (triCdf(m, ml.a, ml.b) - triCdf(m - 1, ml.a, ml.b))
+            }
+            eatenList.removeAll { (t - it.t) / 60_000.0 > it.b + 1 }
+            z += (kcr * maxOf(0.0, 75.0 - g) - z) / 20.0
+            e = 0.98 * e + rnd.nextGaussian() * noiseSd
+            g += isfT * needBasal[h] / 60.0 - isfT * dayFactor[day] * acting + csfT * carbsAbs + z + e
+            g = g.coerceIn(30.0, 450.0)
+            // Sensor.
+            sens += (g - sens) / 5.0
+            var reading = sens + rnd.nextGaussian() * 3.0
+            if (sens < 100.0) reading -= 0.3 * (100.0 - sens)
+            if (rnd.nextDouble() < 0.002) reading += if (rnd.nextBoolean()) 25.0 else -25.0
+            reading = reading.coerceIn(39.0, 400.0)
+            readT.add(t); readV.add(reading)
+
+            // Family: a low is treated with 6 g.
+            if (reading < 70.0 && t - lastTreat >= 20 * minute) {
+                eatenList.add(Meal(t, 6.0, 6.0, 10.0, 30.0)); logged.add(Logged(t, 6.0, 6.0))
+                lastTreat = t; nTreat++; corrAsked = false
+            }
+            // Family: meals with a wizard bolus.
+            while (mealPtr < meals.size && meals[mealPtr].t <= t) {
+                val ml = meals[mealPtr]; mealPtr++
+                eatenList.add(Meal(t, ml.logged, ml.eaten, ml.a, ml.b)); logged.add(Logged(t, ml.logged, ml.logged)); nMeals++
+                var iobAll = 0.0
+                for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
+                val bIob = basalIob(t)
+                val bIobUsed = if (noIob && reading < noIobBg) maxOf(bIob, 0.0) else bIob
+                val wiz = ml.logged / icP + (reading - targetP) / isfP - iobAll - bIobUsed
+                giveBolus(t, (Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05))
+            }
+            // Family: sometimes a manual correction on a rebound after a low.
+            if (!corrAsked && t - lastTreat in 10 * minute..120 * minute && reading > 160.0 && readV.size > 6 && reading > readV[readV.size - 6]) {
+                corrAsked = true
+                if (rnd.nextDouble() * 100 < corrPct) {
+                    var iobAll = basalIob(t)
+                    for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
+                    val u = Math.round(maxOf((reading - targetP) / isfP - iobAll, 0.0) / 0.05) * 0.05
+                    if (u >= 0.1) { giveBolus(t, u); nCorr++ }
+                }
+            }
+
+            // The loop, every 5 minutes.
+            if ((t - t0) % (5 * minute) == 0L) {
+                var a = readT.size - 1
+                while (a > 0 && t - readT[a - 1] <= 61 * minute) a--
+                val winT = LongArray(readT.size - a) { readT[a + it] }
+                val winV = (a until readT.size).map { GV(timestamp = readT[it], raw = null, value = readV[it], trendArrow = TrendArrow.NONE, noise = null, sourceSensor = SourceSensor.UNKNOWN) }
+                val gs = glucoseStatus(winV, winT, t)
+                // COB the AAPS way: deviation-based absorption, at least min carb impact (4 mg/dL per 5 min).
+                val csfP = isfP / icP
+                if (gs != null && lastLoopBg != null) {
+                    val dev = (gs.glucose - lastLoopBg!!) + lastAct * isfP * 5
+                    var absorbed = maxOf(dev, 4.0) / csfP
+                    for (l in logged) { if (absorbed <= 0) break; val x = minOf(l.left, absorbed); l.left -= x; absorbed -= x }
+                }
+                logged.removeAll { t - it.t > 6 * 3_600_000L || it.left <= 0.0 }
+                lastLoopBg = gs?.glucose
+                val tick = JSONObject().put("t", t)
+                    .put("prof", JSONObject().put("basal", profBasal[h]).put("isf", isfP).put("ic", icP).put("target", targetP).put("peak", peak).put("dia", dia))
+                    .put("tt", JSONObject.NULL).put("aaps", JSONObject())
+                    .put("cob", logged.sumOf { it.left })
+                    .put("carbs3h", logged.filter { t - it.t <= 3 * 3_600_000L }.sumOf { it.g })
+                    .put("lastCarb", logged.maxOfOrNull { it.t } ?: 0L)
+                // Phone automations and the learner's rebound guard.
+                var guardHold = false
+                if (gs != null) {
+                    if (gs.glucose < 75.6) { smbState = false; smbOffAt = t }
+                    else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true
+                    else if (!smbState && t - smbOffAt >= 90 * minute) smbState = true
+                    if (guardMin > 0 && t - lastTreat < guardMin * minute) {
+                        val meal = logged.any { it.g > 12.0 && it.t >= lastTreat - 30 * minute }
+                        val strongRise = gs.glucose > 162.0 && gs.shortAvgDelta > 3.6
+                        if (!meal && !strongRise) guardHold = true
+                    }
+                }
+                val smbOk = smbState && !guardHold
+                val row = JSONObject().put("t", t).put("bg", reading).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
+                    .put("ntreat", nTreat).put("man", manThisTick).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
+                manThisTick = 0.0
+                try {
+                    if (gs == null) throw IllegalStateException("no glucose")
+                    val chained = chainedInputs(chain, tick, t)
+                    lastAct = chained.iobArray[0].activity
+                    val rt = runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbOk, liveVs = autoIsf321Sens(winV, winT, t, tick))
+                    val smb = rt.units ?: 0.0
+                    if (smb > 0.0) { chain.ownSmb.add(Pair(t, smb)); doses.add(Pair(t, smb)) }
+                    val rate = if (guardHold && tempCap && (rt.rate ?: 0.0) > profBasal[h]) profBasal[h] else rt.rate
+                    val dur = rt.duration
+                    if (rate != null && dur != null) {
+                        chain.activeTemp(t)?.let { it.end = t }
+                        if (dur > 0) chain.ownTemps.add(OwnTemp(t, rate, t + dur * minute))
+                    }
+                    row.put("units", smb).put("rate", rate ?: JSONObject.NULL).put("dur", dur ?: JSONObject.NULL).put("iob", chained.iobArray[0].iob)
+                } catch (ex: Throwable) {
+                    failed++
+                    row.put("error", ex.javaClass.simpleName)
+                }
+                out.put(row)
+                if (out.length() % 500 == 0) clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
+            }
+            t += minute
+        }
+        write(outPath, out)
+        println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks")
+        println("AIMI replay: ${out.length()} ticks, $failed failed")
     }
 
     private fun readHistory(data: JSONObject): History {
