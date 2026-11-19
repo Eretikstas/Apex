@@ -753,7 +753,7 @@ class HistoryReplayTest {
         // >10 % more or less on two cards in a row, all hours move together (up to +-15 %).
         val lb2 = prefsText.contains("LEARNB2")
         val lastDir = IntArray(24); var lastShift = 0; val upCount = IntArray(24)
-        val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5"); val lbFill = prefsText.contains("LBFILL")
+        val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5"); val lbFill = prefsText.contains("LBFILL"); val lbMin = tok("LBMIN", 0.0).toInt()
         val lbLowMax = tok("LBLOWMAX", 0.0).toInt()
         fun hourNeeds(w: Int): Array<ArrayList<Double>> {
             val n = out.length(); val s0 = n - w
@@ -836,7 +836,9 @@ class HistoryReplayTest {
                 lastDir.fill(0)
             } else {
                 lastShift = dirS
-                val own = DoubleArray(24) { if (needs[it].size >= (if (lb5 && !lbFill) 4 else 3)) med(needs[it]) else Double.NaN }
+                // LBMIN_<n>: clean hour windows needed to call an hour "measured" (user 19.11: 2).
+                val minN = if (lbMin > 0) lbMin else if (lb5 && !lbFill) 4 else 3
+                val own = DoubleArray(24) { if (needs[it].size >= minN) med(needs[it]) else Double.NaN }
                 // LBFILL: hours with no data follow the measured hours - the median ratio estimate/profile of the measured
                 // hours, half of it per step, with the same 2-card rule ("estimate" hours in the app).
                 val measuredRatios = (0 until 24).filter { !own[it].isNaN() }.map { own[it] / profBasal[it] }
