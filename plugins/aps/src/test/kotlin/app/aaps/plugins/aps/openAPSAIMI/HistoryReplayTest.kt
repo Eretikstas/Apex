@@ -753,7 +753,7 @@ class HistoryReplayTest {
         // >10 % more or less on two cards in a row, all hours move together (up to +-15 %).
         val lb2 = prefsText.contains("LEARNB2")
         val lastDir = IntArray(24); var lastShift = 0; val upCount = IntArray(24)
-        val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5")
+        val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5"); val lbFill = prefsText.contains("LBFILL")
         val lbLowMax = tok("LBLOWMAX", 0.0).toInt()
         fun hourNeeds(w: Int): Array<ArrayList<Double>> {
             val n = out.length(); val s0 = n - w
@@ -836,11 +836,20 @@ class HistoryReplayTest {
                 lastDir.fill(0)
             } else {
                 lastShift = dirS
-                val own = DoubleArray(24) { if (needs[it].size >= (if (lb5) 4 else 3)) med(needs[it]) else Double.NaN }
+                val own = DoubleArray(24) { if (needs[it].size >= (if (lb5 && !lbFill) 4 else 3)) med(needs[it]) else Double.NaN }
+                // LBFILL: hours with no data follow the measured hours - the median ratio estimate/profile of the measured
+                // hours, half of it per step, with the same 2-card rule ("estimate" hours in the app).
+                val measuredRatios = (0 until 24).filter { !own[it].isNaN() }.map { own[it] / profBasal[it] }
+                val fillRatio = if (lbFill && measuredRatios.size >= 4) med(measuredRatios) else Double.NaN
                 for (h in 0 until 24) {
-                    if (own[h].isNaN()) { lastDir[h] = 0; continue }
-                    val nb = listOf(own[(h + 23) % 24], own[(h + 1) % 24]).filter { !it.isNaN() }
-                    val v = if (nb.isEmpty()) own[h] else 0.5 * own[h] + 0.5 * nb.average()
+                    val v: Double
+                    if (own[h].isNaN()) {
+                        if (fillRatio.isNaN()) { lastDir[h] = 0; continue }
+                        v = profBasal[h] * fillRatio
+                    } else {
+                        val nb = listOf(own[(h + 23) % 24], own[(h + 1) % 24]).filter { !it.isNaN() }
+                        v = if (nb.isEmpty()) own[h] else 0.5 * own[h] + 0.5 * nb.average()
+                    }
                     // LEARNB3: no shift detector; asymmetric - lower after 2 cards at -10 %, raise only after 3 cards at
                     // +15 % and only if the last 7 days had no sensor value < 3.9 within 2 h of this hour.
                     // LEARNB5: the same rule both ways (+-10 % on 2 cards in a row), a raise is still blocked by many lows near
