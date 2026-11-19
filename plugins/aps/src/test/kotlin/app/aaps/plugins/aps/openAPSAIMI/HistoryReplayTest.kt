@@ -707,6 +707,7 @@ class HistoryReplayTest {
         val smartS = prefsText.contains("SMARTS")
         class Pending(val t: Long, val g: Double, val bg: Double)
         val splitP = tok("SPLIT", 100.0) / 100.0
+        val splitMin = tok("SPLITMIN", 45.0).toLong()
         class Split(val t: Long, val u: Double, val smb0: Double)
         val splits = ArrayList<Split>(); var nSplit = 0; var nSplitGiven = 0; var nSplitDrop = 0
         var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
@@ -812,13 +813,13 @@ class HistoryReplayTest {
             // then 15 min, then every minute. Fires when glucose >= 5.5 and rising, or 1.5 mmol/L above the entry.
             // Never while < 4.5 or falling. After 45 min without firing: cancelled (the loop's UAM/SMB covers the meal).
             // The dose is the wizard at the moment of firing: all carbs, minus all IOB (SMB given while waiting included).
-            // Split bolus second part (SPLIT_<percent now>): checked from 45 min every minute; given when glucose >= 5.5
+            // Split bolus second part (SPLIT_<percent now>): checked from SPLITMIN_<min> (default 45) every minute; given when glucose >= 5.5
             // and not falling, minus the SMB the loop gave since the meal. Dropped after 90 min or if glucose < 4.5.
             splits.removeAll { sp ->
                 val m = (t - sp.t) / minute
                 val rising = readV.size > 5 && reading >= readV[readV.size - 6]
-                if (m > 90 || (m >= 45 && reading < 81.0)) { nSplitDrop++; true }
-                else if (m >= 45 && reading >= 99.0 && rising) {
+                if (m > 90 || (m >= splitMin && reading < 81.0)) { nSplitDrop++; true }
+                else if (m >= splitMin && reading >= 99.0 && rising) {
                     val rest = sp.u - (chain.ownSmb.sumOf { it.second } - sp.smb0)
                     if (rest >= 0.1) { giveBolus(t, Math.round(rest / 0.05) * 0.05); nSplitGiven++ } else nSplitDrop++
                     true
