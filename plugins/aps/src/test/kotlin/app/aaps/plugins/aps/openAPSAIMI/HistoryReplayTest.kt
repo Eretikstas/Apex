@@ -65,6 +65,9 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.util.Random
+import app.aaps.core.data.iob.InMemoryGlucoseValue
+import app.aaps.plugins.smoothing.UnscentedKalmanFilterPlugin
+import kotlinx.coroutines.runBlocking
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import java.util.zip.GZIPInputStream
@@ -619,6 +622,9 @@ class HistoryReplayTest {
         val guardMin = tok("GUARD", 0.0).toLong()
         val tempCap = prefsText.contains("TEMPCAP")
         val noIob = prefsText.contains("NOIOB")
+        // UKF: the loop sees the AAPS Kalman (UKF) smoothed glucose on 5-minute data, as on Eva's phone.
+        // The family (alarms, wizard) still sees the raw sensor value.
+        val ukf = if (prefsText.contains("UKF")) UnscentedKalmanFilterPlugin(mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true)) else null
         val noIobBg = if (prefsText.contains("NOIOB55")) 99.0 else 81.0
         // Learner (LEARNG): learns the guard window (from 0 = no guard) and the temp basal cap on a rebound (from 2x profile)
         // from the outcome of each rebound. A new low after SMB or a high temp -> stricter (window +20 min, cap -0.2x);
@@ -804,7 +810,15 @@ class HistoryReplayTest {
                 while (a > 0 && t - readT[a - 1] <= 61 * minute) a--
                 val winT = LongArray(readT.size - a) { readT[a + it] }
                 val winV = (a until readT.size).map { GV(timestamp = readT[it], raw = null, value = readV[it], trendArrow = TrendArrow.NONE, noise = null, sourceSensor = SourceSensor.UNKNOWN) }
-                val gs = glucoseStatus(winV, winT, t)
+                val gs = if (ukf == null) glucoseStatus(winV, winT, t) else {
+                    // last 6 h, one value per 5 minutes, newest first
+                    val n5 = minOf(72, (readT.size - 1) / 5 + 1)
+                    val list = MutableList(n5) { j -> InMemoryGlucoseValue(timestamp = readT[readT.size - 1 - 5 * j], value = readV[readT.size - 1 - 5 * j]) }
+                    runBlocking { ukf.smooth(list) }
+                    val sT = LongArray(n5) { list[n5 - 1 - it].timestamp }
+                    val sV = (0 until n5).map { val x = list[n5 - 1 - it]; GV(timestamp = x.timestamp, raw = null, value = x.smoothed ?: x.value, trendArrow = TrendArrow.NONE, noise = null, sourceSensor = SourceSensor.UNKNOWN) }
+                    glucoseStatus(sV, sT, t)
+                }
                 // COB the AAPS way: deviation-based absorption, at least min carb impact (4 mg/dL per 5 min).
                 val csfP = isfP / icP
                 if (gs != null && lastLoopBg != null) {
@@ -882,7 +896,7 @@ class HistoryReplayTest {
                 episodes.removeAll { it.done && t - it.t0 > 6 * 3_600_000L }
                 val row = JSONObject().put("t", t).put("bg", reading).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
                     .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
-                row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h])
+                row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h]).put("lbg", gs?.glucose ?: JSONObject.NULL)
                 manThisTick = 0.0; mealThisTick = 0.0; hypoThisTick = 0.0
                 try {
                     if (gs == null) throw IllegalStateException("no glucose")

@@ -37,6 +37,7 @@ dependencies {
 
     testImplementation(project(":pump:virtual"))
     testImplementation(project(":shared:tests"))
+    testImplementation(project(":plugins:smoothing"))
 
     api(kotlin("reflect"))
 
