@@ -721,12 +721,13 @@ class HistoryReplayTest {
             sens += (g - sens) / 5.0
             var reading = sens + rnd.nextGaussian() * 3.0
             if (sens < 100.0) reading -= 0.3 * (100.0 - sens)
-            if (rnd.nextDouble() < 0.002) reading += if (rnd.nextBoolean()) 25.0 else -25.0
+            if (rnd.nextDouble() < 0.001) reading += if (rnd.nextBoolean()) 25.0 else -25.0
             reading = reading.coerceIn(39.0, 400.0)
             readT.add(t); readV.add(reading)
 
             // Family: a low is treated with 6 g.
-            if (reading < 70.0 && t - lastTreat >= 20 * minute) {
+            // The family treats a low the sensor shows for 2 minutes (not a one-minute spike).
+            if (reading < 70.0 && readV.size > 1 && readV[readV.size - 2] < 70.0 && t - lastTreat >= 20 * minute) {
                 eatenList.add(Meal(t, 6.0, 6.0, 10.0, 30.0)); logged.add(Logged(t, 6.0, 6.0))
                 lastTreat = t; nTreat++; corrAsked = false
             }
