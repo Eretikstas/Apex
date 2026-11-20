@@ -3,6 +3,7 @@ package app.aaps.ui.compose.overview.ring
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.requiredSize
@@ -12,9 +13,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
@@ -40,7 +42,10 @@ import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.ui.compose.LocalMetroViewModelFactory
 import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
+import app.aaps.ui.compose.main.MainNavigationBar
+import app.aaps.ui.compose.main.MainTopBar
 import app.aaps.ui.compose.main.TempTargetChipState
+import app.aaps.ui.search.SearchUiState
 import app.aaps.ui.compose.overview.OverviewScreen
 import app.aaps.ui.compose.testing.AapsScreenFixture
 import app.aaps.ui.compose.testing.OverviewViewModelFixture
@@ -116,7 +121,14 @@ class RingScreenshotTest {
     @Test
     fun night() = shoot("ring_night", dark = true)
 
-    private fun shoot(name: String, dark: Boolean) {
+    /** The phone screen as one sees it: the app's top bar and bottom bar around the start of the ring screen. */
+    @Test
+    fun dayScreen() = shoot("ring_day_screen", dark = false, phone = true)
+
+    @Test
+    fun nightScreen() = shoot("ring_night_screen", dark = true, phone = true)
+
+    private fun shoot(name: String, dark: Boolean, phone: Boolean = false) {
         whenever(screen.preferences.observe(StringKey.GeneralDarkMode)).thenReturn(MutableStateFlow(if (dark) "dark" else "light"))
         val factory = ShotViewModelFactory(mapOf(RingViewModel::class to { ringViewModel() }))
         compose.setContent {
@@ -124,12 +136,22 @@ class RingScreenshotTest {
                 LocalMetroViewModelFactory provides factory,
                 LocalViewModelStoreOwner provides viewModelStoreOwner
             ) {
-                Portrait(dark) { screen.Content { Surface(Modifier.fillMaxSize()) { Overview() } } }
+                Portrait(dark, if (phone) PHONE_HEIGHT_DP else HEIGHT_DP) {
+                    screen.Content {
+                        Surface(Modifier.fillMaxSize()) {
+                            if (phone) Column(Modifier.fillMaxSize()) {
+                                MainTopBar(SearchUiState(), onMenuClick = {}, onPreferencesClick = {}, onSearchQueryChange = {}, onSearchClear = {}, onSearchActiveChange = {})
+                                Box(Modifier.weight(1f)) { Overview() }
+                                MainNavigationBar(onManageClick = {}, onTreatmentClick = {}, objectivesProgressText = "0/10", objectivesProgressDescription = "0 / 10")
+                            } else Overview()
+                        }
+                    }
+                }
             }
         }
         compose.waitForIdle()
         val dir = File("build/ring-shots").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(dir, "$name.png").outputStream().use { compose.onNodeWithTag(SHOT_TAG).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     private fun ringViewModel(): RingViewModel {
@@ -220,17 +242,17 @@ class RingScreenshotTest {
 
     /** A tall phone in portrait, so the whole screen fits in one picture. */
     @Composable
-    private fun Portrait(dark: Boolean, content: @Composable () -> Unit) {
+    private fun Portrait(dark: Boolean, heightDp: Int, content: @Composable () -> Unit) {
         val base = LocalConfiguration.current
         val configuration = Configuration(base).apply {
             screenWidthDp = WIDTH_DP
-            screenHeightDp = HEIGHT_DP
+            screenHeightDp = heightDp
             orientation = Configuration.ORIENTATION_PORTRAIT
             uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
                 (if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)
         }
         CompositionLocalProvider(LocalConfiguration provides configuration) {
-            Box(Modifier.requiredSize(WIDTH_DP.dp, HEIGHT_DP.dp)) { content() }
+            Box(Modifier.requiredSize(WIDTH_DP.dp, heightDp.dp).testTag(SHOT_TAG)) { content() }
         }
     }
 
@@ -246,5 +268,7 @@ class RingScreenshotTest {
 
         const val WIDTH_DP = 411
         const val HEIGHT_DP = 1500
+        const val PHONE_HEIGHT_DP = 891
+        const val SHOT_TAG = "ring_shot"
     }
 }
