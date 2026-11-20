@@ -155,7 +155,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: autoisf-atc3-ring-shots
-          path: ui/build/ring-shots
+          path: |
+            ui/build/ring-shots
+            plugins/learner/build/learner-shots
           if-no-files-found: warn
 
   # How ready is this base? The app on an emulator: first a fresh install tapped at random (crashes

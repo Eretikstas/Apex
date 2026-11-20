@@ -61,6 +61,24 @@ class LearnerComposeContent(private val plugin: LearnerPlugin) : ComposablePlugi
 @Composable
 private fun LearnerScreen(plugin: LearnerPlugin) {
     val status by plugin.status.collectAsStateWithLifecycle()
+    LearnerScreenContent(
+        status = status,
+        onAccept = { plugin.accept() },
+        onRefuse = plugin::refuse,
+        onAcceptDura = plugin::acceptDura,
+        onRefuseDura = plugin::refuseDura
+    )
+}
+
+/** The screen itself, from the status only, so it can also be drawn in a test. */
+@Composable
+internal fun LearnerScreenContent(
+    status: Status,
+    onAccept: () -> Unit,
+    onRefuse: () -> Unit,
+    onAcceptDura: () -> Unit,
+    onRefuseDura: () -> Unit
+) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
     Column(
@@ -86,7 +104,7 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
                     p.changes.forEach { ChangeRow(it) }
                     Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
                         Button(onClick = { confirm = true }, enabled = !status.busy) { Text(stringResource(R.string.learner_accept)) }
-                        OutlinedButton(onClick = { plugin.refuse() }, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
+                        OutlinedButton(onClick = onRefuse, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
                     }
                 }
             }
@@ -102,14 +120,14 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
                 confirmButton = {
                     TextButton(onClick = {
                         confirm = false
-                        plugin.accept()
+                        onAccept()
                     }) { Text(stringResource(R.string.learner_accept)) }
                 },
                 dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
             )
         } ?: Text(stringResource(R.string.learner_no_proposal), style = MaterialTheme.typography.bodyMedium)
 
-        DuraSection(plugin, status)
+        DuraSection(status, onAcceptDura, onRefuseDura)
 
         if (status.hours.isNotEmpty()) {
             Text(stringResource(R.string.learner_hours_title), style = MaterialTheme.typography.titleMedium)
@@ -141,7 +159,7 @@ private fun ChangeRow(c: BasalChange) {
 
 /** The dura card: what it saw, the rule, and a proposal with "Внести" / "Отказаться" when there is one. */
 @Composable
-private fun DuraSection(plugin: LearnerPlugin, status: Status) {
+private fun DuraSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Unit) {
     var confirm by remember { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
@@ -153,7 +171,7 @@ private fun DuraSection(plugin: LearnerPlugin, status: Status) {
                 Text(stringResource(R.string.learner_dura_change, p.from, p.to), fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
                     Button(onClick = { confirm = true }, enabled = !status.busy) { Text(stringResource(R.string.learner_accept)) }
-                    OutlinedButton(onClick = { plugin.refuseDura() }, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
+                    OutlinedButton(onClick = onRefuse, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
                 }
                 if (confirm) AlertDialog(
                     onDismissRequest = { confirm = false },
@@ -162,7 +180,7 @@ private fun DuraSection(plugin: LearnerPlugin, status: Status) {
                     confirmButton = {
                         TextButton(onClick = {
                             confirm = false
-                            plugin.acceptDura()
+                            onAccept()
                         }) { Text(stringResource(R.string.learner_accept)) }
                     },
                     dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
