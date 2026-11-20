@@ -912,6 +912,29 @@ class HistoryReplayTest {
                 println("AIMI replay: learner CR day $day: basal x${"%.2f".format(r)} -> CR ${"%.1f".format(icNow)} (profile ${"%.1f".format(icP)})")
             }
         }
+        // LEARNCR2: the meal CR learns from what happened after the meals of the last 7 days (>= 13 g, at least 6 meals).
+        // A meal is "high" when the sensor went over 10 mmol/L 90-240 min after it, "low" when it went under 3.9 within
+        // 240 min. Many lows (>= 25 %) -> CR weaker by 7 %; many highs (>= 40 %) with few lows (<= 10 %) -> CR stronger by
+        // 7 %. Both ways, kept within 0.75-1.25 of the profile CR. Runs with the basal card, every LBEVERY days at 06:00.
+        val learnCr2 = prefsText.contains("LEARNCR2")
+        fun learnCrFromMeals(day: Int) {
+            val nowT = out.getJSONObject(out.length() - 1).getLong("t")
+            val rows = (0 until out.length()).map { out.getJSONObject(it) }.filter { it.getLong("t") >= nowT - 7 * 86_400_000L && it.has("bg") }
+            val meals = rows.filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 240 * minute }
+            if (meals.size < 6) return
+            var highs = 0; var lows = 0
+            for (m in meals) {
+                val tm = m.getLong("t")
+                val w = rows.filter { it.getLong("t") in tm..(tm + 240 * minute) }
+                if (w.any { it.getDouble("bg") < 70.2 }) lows++
+                else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
+            }
+            val hf = highs.toDouble() / meals.size; val lf = lows.toDouble() / meals.size
+            val old = icNow
+            if (lf >= 0.25) icNow = minOf(icNow * 1.07, icP * 1.25)
+            else if (hf >= 0.40 && lf <= 0.10) icNow = maxOf(icNow / 1.07, icP * 0.75)
+            println("AIMI replay: learner CR2 day $day: ${meals.size} meals, high ${"%.0f".format(hf * 100)} %, low ${"%.0f".format(lf * 100)} % -> CR ${"%.1f".format(old)} -> ${"%.1f".format(icNow)}")
+        }
         fun learnBasal(day: Int) {
             if (lb2 || lb3 || lb5) { learnBasal2(day); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
@@ -1273,6 +1296,7 @@ class HistoryReplayTest {
                 // LEARNB: the learner's basal card every LBEVERY_<d> days (default 4) at 06:00, accepted at once.
                 val lt = Instant.ofEpochMilli(t).atZone(tz)
                 if (learnB && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnBasal(day)
+                if (learnCr2 && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrFromMeals(day)
                 if (out.length() % 500 == 0) clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
             }
             t += minute
