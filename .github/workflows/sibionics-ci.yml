@@ -1,7 +1,7 @@
 name: Sibionics source
 
-# The native Sibionics source taken from JugglucoNG: builds the module and runs the vendored JugglucoNG
-# tests (same numbers on the same real sensor traces).
+# The Sibionics core taken from JugglucoNG (sibionics-core/, not part of the AAPS build): builds it and runs the
+# JugglucoNG tests (same numbers on the same real sensor traces).
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
     branches:
       - autoisf-atc3
     paths:
-      - 'plugins/source-sibionics/**'
+      - 'sibionics-core/**'
 
 concurrency:
   group: sibionics-ci-${{ github.ref }}
@@ -40,14 +40,14 @@ jobs:
           java-version: '21'
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+        with:
+          gradle-version: '8.14.3'
       - name: Build and test
-        run: ./gradlew --console=plain :plugins:source-sibionics:testDebugUnitTest --continue --stacktrace
+        run: gradle --console=plain -p sibionics-core test --continue --stacktrace
       - name: Upload test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: sibionics-test-reports
-          path: plugins/source-sibionics/build/reports/tests
+          path: sibionics-core/build/reports/tests
           if-no-files-found: ignore

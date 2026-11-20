@@ -9,8 +9,8 @@ the tests named next to it.
 - `pump/atc3` - ATC3 (Apex TruCare III) pump driver. Tests: `:pump:atc3:testDebugUnitTest`.
 - `pump/atc3-emulator` - virtual ATC3 pump for tests only (excluded from the app). Its control API (`PumpEmulatorControl`, the official AAPS emulator shape) lives in the module (`app.aaps.pump.atc3.emulator.control`), blaqone has none.
 - `tools/atc3_emulator_check.sh` - emulator check used by CI.
-- `plugins/source-sibionics` - native Sibionics source (work in progress). `tk/glucodata/**` is JugglucoNG code taken
-  unchanged (GPL-3.0, see the module README): to update, copy the files again from JugglucoNG.
+- `sibionics-core/` - NOT part of the AAPS build: a small plain Kotlin project with the Sibionics code taken from
+  JugglucoNG (GPL-3.0, see its README) and its tests. It moves into AAPS only when the source plugin is made.
 - `.github/workflows/autoisf-atc3-ci.yml`, `.github/workflows/upstream-check.yml` - our CI.
 
 ## Edits in blaqone files (keep this list complete)
@@ -23,7 +23,7 @@ the tests named next to it.
 | `database/impl/.../embedments/InterfaceIDs.kt` | `PumpType.ATC3` | driver tests |
 | `database/persistence/.../PumpTypeExtension.kt` | ATC3 both ways | driver tests |
 | `database/impl/.../SyncPumpTemporaryBasalTransaction.kt` | temp basal safeguard | `SyncPumpTemporaryBasalTransactionTest` |
-| `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator`, `:plugins:source-sibionics` | build |
+| `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator` | build |
 | `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
 | `app/src/androidTest/.../di/Atc3EmulatedRadio.kt`, `.../e2e/Atc3EmulatorScenarioTest.kt` | our files in the app's device tests (radio swap through `Atc3RadioSwap`) | emulator job |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
