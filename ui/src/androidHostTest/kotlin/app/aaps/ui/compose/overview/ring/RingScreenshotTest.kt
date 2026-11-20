@@ -2,14 +2,13 @@ package app.aaps.ui.compose.overview.ring
 
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalConfiguration
@@ -125,7 +124,7 @@ class RingScreenshotTest {
                 LocalMetroViewModelFactory provides factory,
                 LocalViewModelStoreOwner provides viewModelStoreOwner
             ) {
-                Portrait(dark) { screen.Content { Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { Overview() } } }
+                Portrait(dark) { screen.Content { Surface(Modifier.fillMaxSize()) { Overview() } } }
             }
         }
         compose.waitForIdle()
