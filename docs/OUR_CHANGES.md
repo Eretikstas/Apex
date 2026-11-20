@@ -35,6 +35,7 @@ the tests named next to it.
 | `app/src/testFull/resources/prefs-schema.txt` | `overview_ring_layout` | `PreferenceKeySnapshotTest` |
 | `ui/.../search/BuiltInSearchables.kt` | the ring switch in Appearance | - |
 | `ui/.../main/MainScreen.kt`, `ui/.../overview/OverviewScreen.kt` | read the switch, phone portrait -> `OverviewScreenRing` | `OverviewSizeSweepTest` |
+| `ui/.../overview/OverviewChipsColumn.kt` | parameter `showIobCob` (default true): the ring screen hides the IOB/COB chips, they are at the ring | ring screenshot test |
 | `ui/src/androidMain/res/values/strings.xml` | `ring_*` strings at the end; Russian in `values-ru-rRU/strings_ring.xml` | build |
 | `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator`, `:plugins:sibionics`, `:plugins:learner` | build |
 | `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; full flavor depends on `:plugins:sibionics` and `:plugins:learner`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator`; `-PbenchApk` gives the full flavor the package suffix `.bench` and the name "AAPS bench" | build |

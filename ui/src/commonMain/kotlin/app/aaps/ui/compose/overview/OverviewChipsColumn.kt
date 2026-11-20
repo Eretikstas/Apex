@@ -57,6 +57,8 @@ fun OverviewChipsColumn(
     // The command chips (running mode / profile / temp target) open mutating screens — their click is disabled on an
     // unpaired client (same MASTER_OR_PAIRED_CLIENT gate as nav/Manage), while the chip stays visible as status.
     commandsAllowed: Boolean = true,
+    /** Our addition (docs/OUR_CHANGES.md): the "Кольцо" screen shows IOB and COB at the ring and hides this row. */
+    showIobCob: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -87,7 +89,7 @@ fun OverviewChipsColumn(
             onTbrChipClick = onTbrChipClick,
             commandsAllowed = commandsAllowed
         )
-        IobCobChipsRow(
+        if (showIobCob) IobCobChipsRow(
             iobUiState = iobUiState,
             cobUiState = cobUiState,
             onIobChipClick = onIobChipClick

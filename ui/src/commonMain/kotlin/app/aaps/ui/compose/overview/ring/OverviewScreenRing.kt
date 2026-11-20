@@ -171,6 +171,7 @@ fun OverviewScreenRing(
             onTbrChipClick = onTbrChipClick,
             onIobChipClick = onIobChipClick,
             commandsAllowed = commandsAllowed,
+            showIobCob = false,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -179,7 +180,8 @@ fun OverviewScreenRing(
             timeAgo = bgInfoState.timeAgoText,
             stats = ringState.stats,
             iobText = iobUiState.text,
-            cobText = cobUiState.text
+            cobText = cobUiState.text,
+            onIobClick = onIobChipClick
         )
         RingPeriodRow(period = ringState.period, stats = ringState.stats, onPick = ringViewModel::selectPeriod)
         RingHourTile(

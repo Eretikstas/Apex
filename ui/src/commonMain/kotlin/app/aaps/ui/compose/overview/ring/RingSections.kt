@@ -1,6 +1,7 @@
 package app.aaps.ui.compose.overview.ring
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -59,13 +61,13 @@ internal fun toMgdl(valueInUnits: Double): Double =
  * delta in the middle, IOB on the left and COB on the right.
  */
 @Composable
-internal fun RingHero(bgInfo: BgInfoData?, timeAgo: String, stats: RingStats?, iobText: String, cobText: String) {
+internal fun RingHero(bgInfo: BgInfoData?, timeAgo: String, stats: RingStats?, iobText: String, cobText: String, onIobClick: (() -> Unit)? = null) {
     val low = AapsTheme.generalColors.bgLow
     val inRange = AapsTheme.generalColors.bgInRange
     val high = AapsTheme.generalColors.bgHigh
     val track = MaterialTheme.colorScheme.surfaceVariant
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        SideValue(stringResource(CoreUiStrings.iob), iobText, Alignment.Start, Modifier.weight(1f))
+        SideValue(stringResource(CoreUiStrings.iob), iobText, Alignment.Start, Modifier.weight(1f), onClick = onIobClick)
         Box(modifier = Modifier.size(RING_SIZE), contentAlignment = Alignment.Center) {
             Canvas(modifier = Modifier.size(RING_SIZE)) {
                 val stroke = RING_STROKE.toPx()
@@ -98,8 +100,9 @@ internal fun RingHero(bgInfo: BgInfoData?, timeAgo: String, stats: RingStats?, i
 }
 
 @Composable
-private fun SideValue(title: String, value: String, align: Alignment.Horizontal, modifier: Modifier) {
-    Column(modifier = modifier, horizontalAlignment = align) {
+private fun SideValue(title: String, value: String, align: Alignment.Horizontal, modifier: Modifier, onClick: (() -> Unit)? = null) {
+    // Tappable like the IOB chip of the usual screen: it opens the same details.
+    Column(modifier = if (onClick != null) modifier.clickable(role = Role.Button, onClick = onClick) else modifier, horizontalAlignment = align) {
         Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value.ifEmpty { "—" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     }

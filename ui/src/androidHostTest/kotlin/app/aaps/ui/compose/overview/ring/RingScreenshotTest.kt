@@ -225,7 +225,7 @@ class RingScreenshotTest {
         OverviewScreen(
             ringLayout = true,
             profileName = "Профиль", isProfileModified = false, profileProgress = 0f,
-            tempTargetText = "", tempTargetState = TempTargetChipState.None,
+            tempTargetText = "6,0", tempTargetState = TempTargetChipState.None,
             tempTargetProgress = 0f, tempTargetReason = null,
             runningMode = RM.Mode.CLOSED_LOOP, runningModeText = "Замкнутый цикл",
             runningModeRemaining = "", runningModeProgress = 0f,
