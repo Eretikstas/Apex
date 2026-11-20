@@ -935,6 +935,26 @@ class HistoryReplayTest {
             else if (hf >= 0.40 && lf <= 0.10) icNow = maxOf(icNow / 1.07, icP * 0.75)
             println("AIMI replay: learner CR2 day $day: ${meals.size} meals, high ${"%.0f".format(hf * 100)} %, low ${"%.0f".format(lf * 100)} % -> CR ${"%.1f".format(old)} -> ${"%.1f".format(icNow)}")
         }
+        // LEARNDURA: the learner's dura card, every LBEVERY days at 06:00 with the basal card, last 7 days. "Flat high" =
+        // a 5 min reading over 10 mmol/L that ends 30 min all over 10 and within 1 mmol/L (what dura acts on). Flat highs
+        // >= 2 % of the time with lows (< 3.9) <= 3 % -> dura +0.25 (max 2.0); lows > 4 % -> dura -0.25 (min 0.25).
+        val learnDura = prefsText.contains("LEARNDURA")
+        fun learnDuraCard(day: Int) {
+            val n = out.length()
+            val bgs = (maxOf(0, n - 7 * 288) until n).map { out.getJSONObject(it).optDouble("bg", Double.NaN) }.filter { !it.isNaN() }
+            if (bgs.size < 288) return
+            var flat = 0
+            for (i in 6 until bgs.size) {
+                val w = bgs.subList(i - 6, i + 1)
+                if (w.all { it > 180.0 } && w.max() - w.min() < 18.0) flat++
+            }
+            val flatPct = flat * 100.0 / bgs.size
+            val lowPct = bgs.count { it < 70.0 } * 100.0 / bgs.size
+            val old = aw.dura
+            if (flatPct >= 2.0 && lowPct <= 3.0) aw = aw.copy(dura = minOf(2.0, aw.dura + 0.25))
+            else if (lowPct > 4.0) aw = aw.copy(dura = maxOf(0.25, aw.dura - 0.25))
+            println("AIMI replay: learner DURA day $day: flat high ${"%.1f".format(flatPct)} %, low ${"%.1f".format(lowPct)} % -> dura ${"%.2f".format(old)} -> ${"%.2f".format(aw.dura)}")
+        }
         fun learnBasal(day: Int) {
             if (lb2 || lb3 || lb5) { learnBasal2(day); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
@@ -1297,6 +1317,7 @@ class HistoryReplayTest {
                 val lt = Instant.ofEpochMilli(t).atZone(tz)
                 if (learnB && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnBasal(day)
                 if (learnCr2 && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrFromMeals(day)
+                if (learnDura && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnDuraCard(day)
                 if (out.length() % 500 == 0) clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
             }
             t += minute
