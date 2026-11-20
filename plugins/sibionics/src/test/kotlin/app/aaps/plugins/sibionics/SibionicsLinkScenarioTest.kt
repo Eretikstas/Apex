@@ -244,8 +244,8 @@ class SibionicsLinkScenarioTest {
         val a = whole.readings.associateBy { it.index }
         val worst = broken.readings.maxOf { abs(it.glucoseMgdl - a.getValue(it.index).glucoseMgdl) }
         println("gap $gap min: largest difference to the unbroken link ${"%.2f".format(worst)} mg/dL")
-        // Minutes read back after the loss are replay minutes for the vendor algorithm (no live delta smoothing).
-        assertTrue(worst <= 9.0, "largest difference $worst mg/dL (gap $gap)")
+        // The same raw minutes must give the same values, link loss or not.
+        assertEquals(0.0, worst, 0.0001, "largest difference $worst mg/dL (gap $gap)")
     }
 
     @Test
@@ -451,11 +451,13 @@ class SibionicsLinkScenarioTest {
         link.down()
         link.pass(20)
         // Stick taken during the loss, 10 minutes ago.
-        link.anchors = listOf(SibionicsCalibrationAnchor(7f, 8f, now - 10 * minute))
+        val stick = now - 10 * minute
+        link.anchors = listOf(SibionicsCalibrationAnchor(7f, 8f, stick))
         link.connect()
         link.pass(2)
         val backlog = link.readings.filter { it.index in 101..120 }
-        backlog.filter { it.timestamp < now - 11 * minute }.forEach { assertEquals(it.stockMgdl, it.glucoseMgdl, 0.0001, "idx ${it.index} is before the stick") }
-        backlog.filter { it.timestamp >= now - 10 * minute }.forEach { assertTrue(it.glucoseMgdl > it.stockMgdl, "idx ${it.index} is after the stick") }
+        // JugglucoNG lets a stick count from one minute before its time (the minute it was paired with).
+        backlog.filter { it.timestamp < stick - minute }.forEach { assertEquals(it.stockMgdl, it.glucoseMgdl, 0.0001, "idx ${it.index} is before the stick") }
+        backlog.filter { it.timestamp >= stick }.forEach { assertTrue(it.glucoseMgdl > it.stockMgdl, "idx ${it.index} is after the stick") }
     }
 }

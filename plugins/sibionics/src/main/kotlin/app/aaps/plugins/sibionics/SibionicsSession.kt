@@ -291,7 +291,7 @@ internal class SibionicsSession(
                 impedance = entry.rawImpedance.toFloat(),
                 variantId = SibionicsIdentity.VARIANT.ordinal
             )
-            val glucoseMmol = runAlgorithm(entry.index, entry.rawMmol, entry.temperatureC, entry.rawImpedance.toFloat(), time, live)
+            val glucoseMmol = runAlgorithm(entry.index, entry.rawMmol, entry.temperatureC, entry.rawImpedance.toFloat(), time)
             nextIndex = entry.index + 1
             if (live) lastLiveIndex = entry.index
             if (time > lastSeen) lastSeen = time
@@ -360,13 +360,17 @@ internal class SibionicsSession(
         }
     }
 
-    private fun runAlgorithm(index: Int, rawMmol: Float, temperatureC: Float, impedance: Float, time: Long, live: Boolean): Float {
+    private fun runAlgorithm(index: Int, rawMmol: Float, temperatureC: Float, impedance: Float, time: Long): Float {
         if (index <= 1) algorithm.reset()
+        // Always the REPLAY mode, also for live minutes. Between two exact refreshes the vendor wrapper reuses the last
+        // correction, but it keeps one for LIVE and one for REPLAY: minutes read back after a link loss then started
+        // without any correction (up to 1.4 mmol/L off in the tests). One mode for all gives the same value for a minute
+        // whether it came live, after a link loss or from the journal after an app restart.
         return algorithm.process(
             rawMmol = rawMmol,
             temperatureC = temperatureC,
             index = index,
-            mode = if (live) SibionicsAlgorithmMode.LIVE else SibionicsAlgorithmMode.REPLAY,
+            mode = SibionicsAlgorithmMode.REPLAY,
             impedance = impedance,
             eventTimeMs = time
         )
@@ -400,7 +404,7 @@ internal class SibionicsSession(
         }
         var last: Float? = null
         for (sample in samples) {
-            val value = runAlgorithm(sample.index, sample.rawMmol, sample.temperatureC, sample.impedance, sample.timestampMs, live = false)
+            val value = runAlgorithm(sample.index, sample.rawMmol, sample.temperatureC, sample.impedance, sample.timestampMs)
             if (value.isFinite()) last = value
         }
         nextIndex = samples.last().index + 1
