@@ -21,9 +21,6 @@ import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.pump.atc3.trace.Atc3Trace
 import app.aaps.pump.atc3.trace.Atc3TraceCat
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -58,8 +55,6 @@ import java.util.concurrent.TimeUnit
  * in place of the radio (`EmulatedAtc3BLE` in the app's androidTest). Nothing in the app extends it.
  */
 @SuppressLint("MissingPermission")
-@SingleIn(AppScope::class)
-@Inject
 open class Atc3BLE(
     private val aapsLogger: AAPSLogger,
     private val context: Context,

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs on the emulator (see atc3-kmp-ci.yml). Never stops at the first failure: it writes what
+# Runs on the emulator (see autoisf-atc3-ci.yml). Never stops at the first failure: it writes what
 # happened to emu-out/summary.txt and keeps going.
 set +e
 OUT=emu-out; mkdir -p $OUT/shots
@@ -40,10 +40,7 @@ if [ -n "$TEST" ]; then
   adb install -r -g "$TEST" >> $S 2>&1
   TPKG=$(adb shell pm list instrumentation | tr -d '\r' | grep "target=$PKG" | head -1 | sed -E 's#instrumentation:([^ ]+).*#\1#')
   echo "== end to end tests ($TPKG)" >> $S
-  for C in app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.EmulatedOptionsTest app.aaps.e2e.ErrorActivityInjectionTest \
-           app.aaps.e2e.DanaRSScenarioTest app.aaps.e2e.DanaRSUiTest app.aaps.e2e.DanaRUiTest \
-           app.aaps.e2e.EquilScenarioTest app.aaps.e2e.EquilUiTest app.aaps.e2e.DiaconnScenarioTest app.aaps.e2e.DiaconnUiTest \
-           app.aaps.e2e.CarelevoScenarioTest app.aaps.e2e.CarelevoUiTest \
+  for C in app.aaps.e2e.Atc3EmulatorScenarioTest app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.ErrorActivityInjectionTest \
            app.aaps.LoopTest app.aaps.RunningConfigurationTest app.aaps.CobExtendedCarbsTest app.aaps.RunningModeReconcilerIntegrationTest; do
     adb logcat -c
     timeout 1200 adb shell am instrument -w -e class $C $TPKG > $OUT/test_$C.txt 2>&1
