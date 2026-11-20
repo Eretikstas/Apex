@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="insulin_migration_default_dia_used">В старых записях не было длительности инсулина, поэтому для %2$s взято %1$.1f ч. Проверьте настройки инсулина — уже перенесённые записи потом не обновляются.</string>
+    <string name="settings_unreadable_title">Не удаётся прочитать настройки AAPS</string>
+    <string name="settings_unreadable_key_explanation">Настройки на этом телефоне зашифрованы ключом, который Android хранит для AAPS, и этот ключ их больше не открывает. Так бывает после сброса хранилища ключей телефона.</string>
+    <string name="settings_unreadable_keystore_explanation">Хранилище ключей телефона не ответило, поэтому AAPS не смог открыть настройки.</string>
+    <string name="settings_unreadable_not_running">AAPS не работает и не управляет помпой. Идущий временный базал закончится в своё время, потом помпа будет вводить свой базал.</string>
+    <string name="settings_unreadable_what_to_do">«Повторить» закрывает AAPS и запускает снова. Если не помогло, перезагрузите телефон. «Начать с нуля» выбирайте, только если ничего не помогает: нечитаемые настройки откладываются, и AAPS запускается с пустыми настройками. Потом импортируйте последний экспорт настроек в мастере настройки.</string>
+    <string name="settings_unreadable_start_fresh">Начать с нуля</string>
+    <string name="settings_unreadable_confirm_title">Начать с пустыми настройками?</string>
+    <string name="settings_unreadable_confirm_text">Нечитаемый файл настроек переименовывается и сохраняется. Все настройки берут значения по умолчанию. Потом настройте AAPS заново или импортируйте экспорт настроек.</string>
+    <string name="settings_unreadable_notification">AAPS не работает. Откройте AAPS, чтобы узнать, что делать.</string>
+</resources>

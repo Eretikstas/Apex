@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="safety">Безопасность</string>
+    <string name="bg_doubled_lgs">Режим LGS: в источнике глюкозы повторяются значения</string>
+</resources>

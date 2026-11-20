@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="no_calibration_name">Без калибровки</string>
+    <string name="description_no_calibration">"Калибровка не применяется. Значения сенсора берутся как есть. Для сенсора, который откалиброван на заводе и точен."</string>
+    <string name="linear_calibration_name">Линейная калибровка</string>
+    <string name="description_linear_calibration">"Линейная калибровка для каждого сенсора (наклон и сдвиг) по вашим замерам из пальца. Свежие замеры весят больше. Действует после начала текущей сессии сенсора; первые 2 часа пропускаются как прогрев."</string>
+    <string name="sensor_change_detected_text">Возможно, в %1$s сменили сенсор. Отметить как новый сенсор?</string>
+    <string name="sensor_change_detected_action">Отметить смену сенсора</string>
+    <string name="cal_status_no_session">Запишите смену сенсора, чтобы включить калибровку.</string>
+    <string name="cal_status_warmup">Прогрев сенсора — калибровка начнёт действовать после %1$s.</string>
+    <string name="cal_status_need_more_entries">Нужно хотя бы 2 замера из пальца (сейчас %1$d).</string>
+    <string name="cal_status_unsafe_fit">Расчёт вне безопасного диапазона — калибровка не применена.</string>
+    <string name="cal_status_applied">Калибровка применена.</string>
+    <string name="cal_status_applied_offset_only">Применён только сдвиг — диапазон значений сенсора слишком узкий для наклона.</string>
+    <string name="cal_status_applied_slope_clamped">Калибровка применена — наклон ограничен безопасным диапазоном. Добавьте замеры, чтобы снять ограничение.</string>
+    <string name="cal_slope_offset">Наклон %1$.2f, поправка в середине диапазона %2$s</string>
+    <string name="cal_session_started">Сессия начата: %1$s</string>
+    <string name="cal_mark_sensor_change_now">Записать смену сенсора</string>
+    <string name="cal_add_calibration">Добавить калибровку</string>
+    <string name="cal_entries_header">Замеры из пальца (%1$d)</string>
+    <string name="cal_no_entries">Замеров из пальца пока нет.</string>
+    <string name="cal_entry_pair">Палец %1$s → сенсор %2$s (Δ %3$s)</string>
+    <string name="cal_chart_entry_readout">Замер %1$d/%2$d · %3$s · сенсор %4$s → глюкоза %5$s</string>
+</resources>

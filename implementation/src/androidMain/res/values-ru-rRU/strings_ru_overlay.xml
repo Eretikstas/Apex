@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="smb_being_delivered">Сейчас вводится SMB. Повторите, когда он закончится.</string>
+    <string name="profile_set_ok_rounded">Базальный профиль в помпе обновлён. Помпа округляет базал до своего шага: даёт %1$s в сутки вместо %2$s.</string>
+    <string name="basal_reported_far_from_profile">Помпа сообщает базал, далёкий от профиля. AAPS оставляет базал профиля. Проверьте скорости базала в помпе.</string>
+    <string name="permission_battery_title">Оптимизация батареи</string>
+    <string name="permission_battery_description">Приложение нужно исключить из оптимизации батареи, чтобы оно надёжно работало в фоне</string>
+    <string name="permission_directory_title">Папка AAPS</string>
+    <string name="permission_directory_description">Выберите папку для настроек приложения и журналов</string>
+    <string name="permission_notifications_title">Уведомления</string>
+    <string name="permission_notifications_description">Нужно для сигналов, тревог и состояния помпы</string>
+    <string name="permission_schedule_exact_alarm_title">Будильники и напоминания</string>
+    <string name="permission_schedule_exact_alarm_description">Нужно, чтобы тревоги включали экран, когда AAPS в фоне, и напоминания звучали вовремя</string>
+    <string name="permission_activity_recognition_title">Физическая активность</string>
+    <string name="permission_activity_recognition_description">Нужно, чтобы считать шаги и распознавать ходьбу, бег или велосипед — тогда AutoISF может менять чувствительность при нагрузке</string>
+    <string name="alarm_channel_group">Тревоги AAPS</string>
+    <string name="alarm_channel_standard">Обычная тревога</string>
+    <string name="alarm_channel_bolus_error">Ошибка болюса</string>
+    <string name="alarm_channel_error">Общая ошибка</string>
+    <string name="alarm_channel_urgent">Срочная тревога</string>
+    <string name="alarm_channel_eat_reminder">Пора есть</string>
+    <string name="alarm_channel_override_dnd">%1$s (звучит в «Не беспокоить»)</string>
+    <string name="alarm_channel_respects_dnd">%1$s (молчит в «Не беспокоить»)</string>
+    <string name="alarm_channel_silent_urgent">Срочная тревога (нарастающая громкость)</string>
+    <string name="alarm_channel_silent">Тревога (нарастающая громкость)</string>
+    <string name="alarm_channel_silent_description">Используется, когда включено «Постепенно повышать громкость». Звук играет экран тревоги.</string>
+    <string name="ongoing_channel_name">Постоянное состояние</string>
+    <string name="eat_reminder_channel">Отсчёт до еды</string>
+    <string name="eat_reminder_channel_description">Показывает, сколько осталось до еды. Без звука; звучит сигнал в конце.</string>
+    <string name="notifications_channel_name">Уведомления AAPS</string>
+    <string name="exported_to_cloud">Настройки экспортированы в облако</string>
+    <string name="google_drive_token_refresh_failed">Не удалось обновить доступ к Google Drive</string>
+</resources>

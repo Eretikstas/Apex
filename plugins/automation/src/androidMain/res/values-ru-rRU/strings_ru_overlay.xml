@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="automation_enabled">Включено</string>
+    <string name="automation_read_only">Только чтение</string>
+    <string name="automation_new_rule">Новое правило</string>
+    <string name="automation_empty_desc">Создайте правило, чтобы действия выполнялись сами по условиям.</string>
+    <string name="automation_edit_rule">Изменить правило</string>
+    <string name="automation_discard_title">Отменить изменения?</string>
+    <string name="automation_discard_message">Правило не закончено и не может быть сохранено. Отменить изменения?</string>
+    <string name="automation_discard_confirm">Отменить</string>
+    <string name="automation_category_time">Время и расписание</string>
+    <string name="automation_category_glucose">Глюкоза и назначения</string>
+    <string name="automation_category_device">Состояние устройства</string>
+    <string name="automation_category_sensors">Датчики и связь</string>
+    <string name="automation_category_other">Другое</string>
+    <string name="automation_choose_trigger">Добавить условие</string>
+    <string name="automation_add_group">Группа</string>
+    <string name="automation_choose_action">Добавить действие</string>
+    <string name="automation_category_targets">Цели</string>
+    <string name="automation_category_profile">Профиль</string>
+    <string name="automation_category_loop">Цикл и инсулин</string>
+    <string name="automation_category_alerts">Сигналы</string>
+    <string name="automation_category_system">Система</string>
+    <string name="automation_category_scenes">Сценарии</string>
+    <string name="action_run_scene">Запустить сценарий</string>
+    <string name="action_run_scene_short">Запустить сценарий: %1$s</string>
+    <string name="action_enable_scene">Включить сценарий</string>
+    <string name="action_enable_scene_short">Включить сценарий: %1$s</string>
+    <string name="action_disable_scene">Выключить сценарий</string>
+    <string name="action_disable_scene_short">Выключить сценарий: %1$s</string>
+    <string name="action_scene_label">Сценарий</string>
+    <string name="trigger_scene_active">Сценарий</string>
+    <string name="trigger_scene_active_compared">Сценарий %1$s</string>
+    <string name="action_scene_not_found">Сценарий не найден</string>
+    <string name="action_scene_disabled">Сценарий выключен</string>
+    <string name="automation_unit_meters">м</string>
+    <string name="automation_unit_bpm">уд/мин</string>
+    <string name="time_range">Промежуток времени</string>
+    <string name="triggerUnknownLabel">Неизвестное условие</string>
+    <string name="triggerUnknownDesc">Неизвестное условие %1$s — никогда не выполняется</string>
+    <string name="change_smoothing">Сменить сглаживание</string>
+    <string name="change_smoothing_to">Сменить сглаживание на %1$s</string>
+    <string name="smoothing_label">Сглаживание</string>
+    <string name="precondition_smoothing_not_active_name">Сглаживание не активно</string>
+    <string name="precondition_smoothing_not_active">Сглаживание %1$s не активно</string>
+    <string name="pick_from_map">Выбрать на карте</string>
+    <string name="tap_to_select_location">Нажмите на карту, чтобы выбрать место</string>
+    <string name="selected_coords">Выбрано: %1$.6f, %2$.6f</string>
+    <string name="permission_location_title">Местоположение</string>
+    <string name="permission_location_description">Нужно для условий автоматизации по месту и для распознавания сети Wi-Fi</string>
+    <string name="permission_background_location_description">Нужно, чтобы условия автоматизации работали, когда приложение в фоне</string>
+    <string name="set_state">Задать состояние автоматизации</string>
+    <string name="set_state_description">Задать состояние автоматизации %1$s=%2$s</string>
+    <string name="check_state_name">Проверить состояние автоматизации</string>
+    <string name="check_state_description">Проверить состояние автоматизации %1$s=%2$s</string>
+    <string name="state_name_label">Имя состояния</string>
+    <string name="state_value_label">Значение состояния</string>
+    <string name="autoisf_enable">Включить AutoISF</string>
+    <string name="autoisf_disable">Выключить AutoISF</string>
+    <string name="autoisf_enabled">AutoISF включён</string>
+    <string name="autoisf_disabled">AutoISF выключен</string>
+    <string name="autoisf_already_enabled">AutoISF уже был включён</string>
+    <string name="autoisf_already_disabled">AutoISF уже был выключен</string>
+    <string name="autoisf_set_acce_weight">Задать вес acce AutoISF</string>
+    <string name="autoisf_set_acce_weight_to">Задать вес acce %1$.2f</string>
+    <string name="autoisf_set_iobth">Задать iobTH AutoISF</string>
+    <string name="autoisf_set_iobth_to">Задать iobTH %1$d %%</string>
+    <string name="autoisf_acce_weight_label">вес acce</string>
+    <string name="autoisf_value_changed">Новое значение задано</string>
+    <string name="autoisf_value_unchanged">Значение уже было таким</string>
+    <string name="autoisf_acce_weight_trigger">Вес acce AutoISF</string>
+    <string name="autoisf_acce_weight_compared">вес acce %1$s %2$.2f</string>
+    <string name="autoisf_iobth_trigger">iobTH AutoISF</string>
+    <string name="autoisf_only_note">Работает только с OpenAPS AutoISF.</string>
+</resources>

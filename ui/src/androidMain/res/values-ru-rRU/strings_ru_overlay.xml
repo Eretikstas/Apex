@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="agp_title">Амбулаторный профиль глюкозы</string>
+    <string name="agp_glycemic_overview">Обзор гликемии</string>
+    <string name="agp_today">Сегодня</string>
+    <string name="agp_hours">%1$d ч</string>
+    <string name="agp_days">%1$d д</string>
+    <string name="agp_no_data">За этот период нет данных глюкозы.</string>
+    <string name="agp_load_failed">Не удалось загрузить статистику AGP. Попробуйте ещё раз.</string>
+    <string name="agp_chart_description">График процентилей глюкозы</string>
+    <string name="agp_tir_chart">График времени в диапазоне</string>
+    <string name="agp_average">Среднее</string>
+    <string name="agp_median">Медиана</string>
+    <string name="agp_available_days">Дней</string>
+    <string name="cgp_tor">Вне диапазона</string>
+    <string name="wizard_calc_carbs_with_ic">%1$s %2$s (IC: %3$s)</string>
+    <string name="wizard_carbs_type_desc">Углеводы уменьшены на %1$d%%, добавлены eCarbs %2$d%% с задержкой %3$d мин на %4$d ч</string>
+    <string name="a11y_show_controls">Показать управление</string>
+    <string name="a11y_notifications">Уведомления: %1$d</string>
+    <string name="a11y_tt_none">нет временной цели, цель профиля</string>
+    <string name="a11y_tt_adjusted">изменена циклом</string>
+    <string name="a11y_profile_entry">%1$s в %2$s</string>
+    <string name="a11y_bg_delta">дельта %1$s</string>
+    <string name="a11y_bg_old_reading">старое значение</string>
+    <string name="a11y_predictions">Прогнозы. %1$s</string>
+    <string name="a11y_prediction_rises">%1$s растёт до %2$s.</string>
+    <string name="a11y_prediction_falls">%1$s падает до %2$s.</string>
+    <string name="a11y_prediction_flat">%1$s держится на %2$s.</string>
+    <string name="a11y_prediction_name_iob">Прогноз по IOB</string>
+    <string name="a11y_prediction_name_cob">Прогноз по COB</string>
+    <string name="a11y_prediction_name_acob">Прогноз по усвоенным COB</string>
+    <string name="a11y_prediction_name_uam">Прогноз UAM</string>
+    <string name="a11y_prediction_name_zt">Прогноз при нулевом базале</string>
+    <string name="a11y_badge_attention">нужно действие</string>
+    <string name="a11y_badge_available">доступно: %1$d</string>
+    <string name="a11y_objectives_progress">выполнено %1$d из %2$d</string>
+    <string name="stats_tab_cycle">Цикл</string>
+    <string name="a11y_quick_launch_add">Добавить %1$s</string>
+    <string name="a11y_quick_launch_remove">Убрать %1$s</string>
+    <string name="overview_autoisf_open">Открыть расчёт AutoISF</string>
+    <string name="overview_autoisf_pinned">Закреплено %1$d из %2$d</string>
+    <string name="overview_autoisf_footer">AutoISF v%1$s · закреплено %2$d из %3$d</string>
+    <string name="overview_autoisf_expand">Показать все значения AutoISF</string>
+    <string name="overview_autoisf_collapse">Скрыть значения AutoISF</string>
+    <string name="overview_autoisf_pin">Показывать это значение, когда плашка свёрнута</string>
+    <string name="overview_autoisf_unpin">Не показывать это значение, когда плашка свёрнута</string>
+    <string name="graph_inspect_raw_value">(сырое %1$s)</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="status_label">Состояние:</string>
+    <string name="setupwizard_client_control_title">Управление с клиентов</string>
+    <string name="setupwizard_client_control_info">Сопрягите клиентские устройства, чтобы они могли отправлять этому мастеру подписанные команды через Nightscout. Это новый рекомендуемый способ удалённо управлять AAPS.</string>
+    <string name="setupwizard_ns_receive_info">Приём назначений и данных прямо из Nightscout (менее безопасный способ) теперь по умолчанию выключен. Открывайте настройки ниже, только если он вам всё ещё нужен — например, чтобы вводить данные через NS или сторонние приложения.</string>
+    <string name="setupwizard_open_ns_receive_settings">Приём данных из Nightscout</string>
+    <string name="setupwizard_pair_with_master_info">Сопрягите этот клиент с вашим главным AAPS, чтобы отправлять команды по защищённому каналу. После сопряжения настройка закончена.</string>
+    <string name="setupwizard_setup_from_master_title">Настройка с главного телефона</string>
+    <string name="setupwizard_setup_from_master_info">На главном телефоне откройте «Разрешённые клиенты» и добавьте этот телефон по QR-коду. Сканирование настраивает Nightscout с собственным токеном и может сразу сопрячь телефон. После сканирования настройка закончена. Без QR-кода пропустите этот шаг и настройте Nightscout сами.</string>
+    <string name="setupwizard_scan_master_qr">Сканировать QR-код</string>
+    <string name="setupwizard_pairing_ws_warning">Для сопряжения нужно соединение Nightscout через WebSocket. Вернитесь на предыдущий шаг и сначала включите его.</string>
+    <string name="setupwizard_pairing_status_master">Сопряжено клиентов: %1$d</string>
+    <string name="setupwizard_pairing_status_master_none">Клиентов пока нет</string>
+    <string name="setupwizard_pairing_status_client_paired">Сопряжено с главным телефоном</string>
+    <string name="setupwizard_pairing_status_client_not_paired">Ещё не сопряжено</string>
+    <string name="setupwizard_instance_name_title">Кто пользуется этим телефоном?</string>
+</resources>

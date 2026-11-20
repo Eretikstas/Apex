@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="description_source_patched_si_app">Получать глюкозу из изменённого приложения Sibionic SI или из приложения Sibionics.</string>
+    <string name="description_source_instara_app">Получать глюкозу из приложения Instara.</string>
+    <string name="pref_title_instara_history_request">Запрос истории Instara</string>
+    <string name="pref_summary_instara_history_request">В фоне запрашивать пропущенные данные истории</string>
+    <string name="notification_reader">Чтение уведомлений</string>
+    <string name="description_source_notification_reader">Читать глюкозу из уведомлений официальных приложений CGM (Dexcom, Medtronic, Eversense и др.).</string>
+    <string name="permission_dexcom_title">Dexcom CGM</string>
+    <string name="permission_dexcom_description">Нужно разрешение получать данные CGM из приложения Dexcom</string>
+    <string name="permission_notification_listener_description">Нужно, чтобы читать глюкозу из уведомлений приложения CGM</string>
+    <string name="aidex">Приложение MicroTech CGM</string>
+    <string name="description_source_aidex">Получать значения CGM из LinX, LinX vista, Equil G. Smart 2, Diaexpert 2 и др.</string>
+    <string name="aidex_sensor_expired">Срок сенсора истёк, замените сенсор</string>
+    <string name="aidex_sensor_error">Ошибка сенсора, проверьте его состояние</string>
+    <string name="aidex_sensor_stabilizing">Сенсор стабилизируется, подождите…</string>
+    <string name="aidex_sensor_replace">Нужна замена сенсора, замените его как можно скорее</string>
+    <string name="aidex_signal_lost">Сигнал сенсора потерян, проверьте связь</string>
+    <string name="a11y_bg_duplicate">повторное значение</string>
+</resources>

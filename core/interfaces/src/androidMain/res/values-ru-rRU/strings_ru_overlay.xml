@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="days_ago">%1$.1f дн. назад</string>
+    <string name="days_ago_round">%1$.0f дн. назад</string>
+    <string name="pref_show_complication1">Показывать усложнение 1</string>
+    <string name="pref_show_complication2">Показывать усложнение 2</string>
+    <string name="pref_show_complication3">Показывать усложнение 3</string>
+    <string name="pref_show_complication4">Показывать усложнение 4</string>
+    <string name="pref_show_complication5">Показывать усложнение 5</string>
+    <string name="profile_isf_units_mgdl">мг/дл/ЕД</string>
+    <string name="profile_isf_units_mmol">ммоль/л/ЕД</string>
+    <string name="mins">%1$d мин</string>
+    <string name="profile_low_target">Нижняя цель профиля</string>
+    <string name="slowabsorptiondetected_plain">!!!!! Найдено медленное усвоение углеводов: %1$d%% времени. Перепроверьте расчёт. COB может быть завышен, и тогда инсулина будет введено больше !!!!!</string>
+    <string name="wizard_ecarbs">eCarbs %1$d г / %2$d ч (+%3$d мин)</string>
+    <string name="plugin_start_failed">Плагин %1$s не запустился и может не работать. Перезапустите AAPS.</string>
+    <string name="plugin_work_failed">В плагине %1$s ошибка, часть его остановлена. Перезапустите AAPS.</string>
+</resources>
