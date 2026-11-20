@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sibionics_native">Sibionics 2 (напрямую)</string>
+    <string name="sibionics_native_description">AAPS сам читает сенсор Sibionics 2 по Bluetooth, алгоритмом производителя. Другое приложение не нужно.</string>
+    <string name="sibionics_calibration">Калибровка Sibionics</string>
+    <string name="sibionics_calibration_description">Калибровка по пальцу для прямого источника Sibionics. Источник сам применяет её к значению производителя, двойной калибровки нет.</string>
+    <string name="sibionics_permission_title">Bluetooth</string>
+    <string name="sibionics_permission_description">AAPS нужен доступ к Bluetooth, чтобы найти и читать сенсор Sibionics.</string>
+    <string name="sibionics_no_permission">Нет доступа к Bluetooth. Сенсор не читается.</string>
+    <string name="sibionics_camera_refused">Нет доступа к камере. Введите серийный номер вручную.</string>
+    <string name="sibionics_retry">Ещё раз</string>
+    <string name="sibionics_step_code">1. Считайте код с коробки сенсора</string>
+    <string name="sibionics_scan_code">Сканировать код камерой</string>
+    <string name="sibionics_serial">Или введите серийный номер</string>
+    <string name="sibionics_code_not_valid">Это не код и не серийный номер Sibionics 2.</string>
+    <string name="sibionics_save_code">Сохранить номер</string>
+    <string name="sibionics_sensor">Сенсор: %1$s</string>
+    <string name="sibionics_sensitivity">Заводская чувствительность: %1$s</string>
+    <string name="sibionics_sensitivity_default">Чувствительность не найдена в коде, взята по умолчанию. Для точных значений отсканируйте код с коробки.</string>
+    <string name="sibionics_transmitter">Передатчик: %1$s</string>
+    <string name="sibionics_step_search">2. Найдите передатчик</string>
+    <string name="sibionics_search">Искать</string>
+    <string name="sibionics_searching">Поиск…</string>
+    <string name="sibionics_found_device">%1$s (%2$d дБм)</string>
+    <string name="sibionics_state_streaming">Подключён, значения каждую минуту</string>
+    <string name="sibionics_state_handshake">Подключён, настройка связи</string>
+    <string name="sibionics_state_connected">Подключён</string>
+    <string name="sibionics_state_searching">Не подключён, пробую снова</string>
+    <string name="sibionics_auth_failed">Сенсор не принял подключение.</string>
+    <string name="sibionics_last_value">Последнее значение: %1$s в %2$s</string>
+    <string name="sibionics_session_start">Сенсор запущен: %1$s</string>
+    <string name="sibionics_forget">Забыть сенсор</string>
+    <string name="sibionics_forget_confirm">Забыть этот сенсор? Связь остановится, его сохранённое состояние удалится. Значения в AAPS останутся.</string>
+    <string name="sibionics_cancel">Отмена</string>
+</resources>

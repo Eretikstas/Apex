@@ -2,12 +2,14 @@ package app.aaps.plugins.sibionics
 
 import android.Manifest
 import android.content.Context
+import app.aaps.core.data.model.CAL
 import app.aaps.core.data.model.GV
 import app.aaps.core.data.model.SourceSensor
 import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.db.observeChanges
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.NotificationManager
@@ -33,11 +35,14 @@ import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import tk.glucodata.drivers.sibionics.SibionicsCalibrationAnchor
+import tk.glucodata.drivers.sibionics.SibionicsConstants
 
 /**
  * Sibionics 2 read by AAPS itself over Bluetooth, no other app in between. The vendor's own algorithm (V116A,
@@ -112,12 +117,32 @@ class SibionicsPlugin(
         icon = pluginDescription.icon
     )
 
+    /** Finger-stick calibrations, cached for the radio thread; refreshed whenever a calibration changes. */
+    @Volatile private var anchors: List<SibionicsCalibrationAnchor> = emptyList()
+    private var calibrationWatch: Job? = null
+
     override suspend fun onStart() {
         super.onStart()
+        reloadAnchors()
+        calibrationWatch?.cancel()
+        calibrationWatch = scope.launch { persistenceLayer.observeChanges<CAL>().collect { reloadAnchors() } }
         startLink()
     }
 
+    private suspend fun reloadAnchors() {
+        val start = store.identity()?.let { store.sessionStore(it).sessionStart } ?: 0L
+        anchors = runCatching { persistenceLayer.getValidCalibrationEntriesSince(start) }.getOrDefault(emptyList()).map {
+            SibionicsCalibrationAnchor(
+                sensorMmol = (it.sensorMgdlAtPairing / SibionicsConstants.MGDL_PER_MMOLL).toFloat(),
+                referenceMmol = (it.fingerstickMgdl / SibionicsConstants.MGDL_PER_MMOLL).toFloat(),
+                timestampMs = it.timestamp
+            )
+        }
+    }
+
     override suspend fun onStop() {
+        calibrationWatch?.cancel()
+        calibrationWatch = null
         radio.stop()
         super.onStop()
     }
@@ -168,6 +193,9 @@ class SibionicsPlugin(
 
     fun sensorCode(): String = store.sensorCode
 
+    /** Start of the current sensor session (ms), 0 when not known. */
+    fun sessionStart(): Long = store.identity()?.let { store.sessionStore(it).sessionStart } ?: 0L
+
     private fun startLink() {
         val identity = store.identity()
         val address = store.address
@@ -175,7 +203,7 @@ class SibionicsPlugin(
         if (identity == null || address.isBlank() || !isEnabled()) return
         aapsLogger.debug(LTag.BGSOURCE, "Sibionics: starting ${identity.displayName} at $address")
         radio.start(address) { io ->
-            SibionicsSession(identity, address, store.sessionStore(identity), io, sessionListener)
+            SibionicsSession(identity, address, store.sessionStore(identity), io, sessionListener, anchors = { anchors })
         }
     }
 
@@ -215,11 +243,14 @@ class SibionicsPlugin(
     }
 }
 
-/** A reading as AAPS stores it: the algorithm value, the raw value beside it, trend left to AAPS. */
+/**
+ * A reading as AAPS stores it: the calibrated value, and as raw the Stock value without calibration, which is what
+ * a finger stick is paired with (`SibionicsCalibrationPlugin`). Trend is left to AAPS.
+ */
 internal fun SibionicsReading.toGv(): GV = GV(
     timestamp = timestamp,
     value = glucoseMgdl,
-    raw = rawMgdl,
+    raw = stockMgdl,
     noise = null,
     trendArrow = TrendArrow.NONE,
     sourceSensor = SourceSensor.SIBIONICS_NATIVE

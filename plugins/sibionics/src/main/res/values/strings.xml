@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sibionics_native">Sibionics 2 (native)</string>
+    <string name="sibionics_native_description">AAPS reads a Sibionics 2 sensor itself over Bluetooth, with the vendor algorithm. No other app is needed.</string>
+    <string name="sibionics_calibration">Sibionics calibration</string>
+    <string name="sibionics_calibration_description">Finger sticks for the native Sibionics source. The source applies them to the vendor value; nothing is calibrated twice.</string>
+    <string name="sibionics_permission_title">Bluetooth</string>
+    <string name="sibionics_permission_description">AAPS needs Bluetooth access to find and read the Sibionics sensor.</string>
+    <string name="sibionics_no_permission">Bluetooth access is not given. The sensor cannot be read.</string>
+    <string name="sibionics_camera_refused">Camera access is not given. Type the serial instead.</string>
+    <string name="sibionics_retry">Try again</string>
+    <string name="sibionics_step_code">1. Read the code on the sensor box</string>
+    <string name="sibionics_scan_code">Scan the code with the camera</string>
+    <string name="sibionics_serial">Or type the serial</string>
+    <string name="sibionics_code_not_valid">This is not a Sibionics 2 code or serial.</string>
+    <string name="sibionics_save_code">Save the serial</string>
+    <string name="sibionics_sensor" comment="%1$s=sensor name, e.g. 0683013AQT9">Sensor: %1$s</string>
+    <string name="sibionics_sensitivity" comment="%1$s=factory sensitivity, e.g. 1.39">Factory sensitivity: %1$s</string>
+    <string name="sibionics_sensitivity_default">The sensitivity was not found in the code, a default is used. Scan the code on the box for exact values.</string>
+    <string name="sibionics_transmitter" comment="%1$s=Bluetooth name of the transmitter">Transmitter: %1$s</string>
+    <string name="sibionics_step_search">2. Find the transmitter</string>
+    <string name="sibionics_search">Search</string>
+    <string name="sibionics_searching">Searching…</string>
+    <string name="sibionics_found_device" comment="%1$s=Bluetooth name, %2$d=signal in dBm, e.g. P225043JMV (-60 dBm)">%1$s (%2$d dBm)</string>
+    <string name="sibionics_state_streaming">Connected, values come every minute</string>
+    <string name="sibionics_state_handshake">Connected, setting up</string>
+    <string name="sibionics_state_connected">Connected</string>
+    <string name="sibionics_state_searching">Not connected, trying again</string>
+    <string name="sibionics_auth_failed">The sensor did not accept the connection.</string>
+    <string name="sibionics_last_value" comment="%1$s=glucose with unit, %2$s=date and time">Last value: %1$s at %2$s</string>
+    <string name="sibionics_session_start" comment="%1$s=date and time">Sensor started: %1$s</string>
+    <string name="sibionics_forget">Forget sensor</string>
+    <string name="sibionics_forget_confirm">Forget this sensor? The link stops and its saved state is removed. The values already in AAPS stay.</string>
+    <string name="sibionics_cancel">Cancel</string>
+</resources>

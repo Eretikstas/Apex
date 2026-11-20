@@ -76,6 +76,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: ./gradlew --console=plain :database:impl:testAndroidHostTest --tests '*SyncPumpTemporaryBasalTransactionTest*' --stacktrace
 
+      - name: Native Sibionics source tests (and the new SourceSensor entry)
+        if: ${{ !cancelled() }}
+        run: |
+          ./gradlew --console=plain :plugins:sibionics:testDebugUnitTest --continue --stacktrace
+          ./gradlew --console=plain :database:impl:testAndroidHostTest --tests '*SourceSensor*' --stacktrace
+
       - name: Build the app
         if: ${{ !cancelled() && (github.event_name == 'push' || inputs.app) }}
         run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
@@ -88,6 +94,7 @@ jobs:
           path: |
             pump/atc3/build/reports/tests
             database/impl/build/reports/tests
+            plugins/sibionics/build/reports/tests
           if-no-files-found: ignore
 
   # How ready is this base? The app on an emulator: first a fresh install tapped at random (crashes

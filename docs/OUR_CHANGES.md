@@ -13,6 +13,8 @@ the tests named next to it.
   JugglucoNG (GPL-3.0, see its README) and its tests. It moves into AAPS only when the source plugin is made.
 - `.github/workflows/autoisf-atc3-ci.yml`, `.github/workflows/upstream-check.yml` - our CI.
 
+- `plugins/sibionics` - native Sibionics 2 source + its calibration plugin; compiles `sibionics-core/` (JugglucoNG, GPL-3.0) in unchanged.
+
 ## Edits in blaqone files (keep this list complete)
 | File | What | Test |
 |---|---|---|
@@ -23,8 +25,12 @@ the tests named next to it.
 | `database/impl/.../embedments/InterfaceIDs.kt` | `PumpType.ATC3` | driver tests |
 | `database/persistence/.../PumpTypeExtension.kt` | ATC3 both ways | driver tests |
 | `database/impl/.../SyncPumpTemporaryBasalTransaction.kt` | temp basal safeguard | `SyncPumpTemporaryBasalTransactionTest` |
-| `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator` | build |
-| `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
+| `core/data/.../model/SourceSensor.kt` | `SIBIONICS_NATIVE("SibionicsNative")` | sibionics job |
+| `core/data/.../model/RawObservationSource.kt` | `SIBIONICS_NATIVE` in the one-minute set, like the other Sibionics | sibionics job |
+| `database/impl/.../entities/GlucoseValue.kt` | `SIBIONICS_NATIVE` (stored by name, no migration) | `ConvertersSourceSensorTest` |
+| `database/persistence/.../SourceSensorExtension.kt` | `SIBIONICS_NATIVE` both ways | `SourceSensorExtensionTest` |
+| `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator`, `:plugins:sibionics` | build |
+| `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; full flavor depends on `:plugins:sibionics`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
 | `app/src/androidTest/.../di/Atc3EmulatedRadio.kt`, `.../e2e/Atc3EmulatorScenarioTest.kt` | our files in the app's device tests (radio swap through `Atc3RadioSwap`) | emulator job |
 | `app/src/androidTest/.../ReplayApsResultsTest.kt` | blaqone bug: `activity_consoleLog = ""` added to the AutoISF call, or device tests do not compile | emulator job |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |

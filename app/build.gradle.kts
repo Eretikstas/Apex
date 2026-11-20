@@ -262,6 +262,9 @@ dependencies {
             "pumpcontrolImplementation"(project(it.path))
         }
 
+    // Our native Sibionics 2 source and its calibration (full flavor only: a client takes values from its master).
+    "fullImplementation"(project(":plugins:sibionics"))
+
     implementation(libs.androidx.core)
     implementation(libs.androidx.lifecycle.process)
 

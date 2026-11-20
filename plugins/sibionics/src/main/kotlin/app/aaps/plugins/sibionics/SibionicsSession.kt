@@ -1,8 +1,10 @@
 package app.aaps.plugins.sibionics
 
+import tk.glucodata.drivers.sibionics.SibionicsAdaptiveAlgorithmContext
 import tk.glucodata.drivers.sibionics.SibionicsAlgorithmContext
 import tk.glucodata.drivers.sibionics.SibionicsAlgorithmMode
 import tk.glucodata.drivers.sibionics.SibionicsAlgorithmSelection
+import tk.glucodata.drivers.sibionics.SibionicsCalibrationAnchor
 import tk.glucodata.drivers.sibionics.SibionicsConstants
 import tk.glucodata.drivers.sibionics.SibionicsProtocol
 import tk.glucodata.drivers.sibionics.SibionicsSessionPolicy
@@ -12,8 +14,10 @@ import tk.glucodata.drivers.sibionics.SibionicsVariantLock
 /** One glucose value made from one sensor minute. */
 data class SibionicsReading(
     val timestamp: Long,
-    /** Vendor algorithm value (Stock, no calibration), mg/dL. */
+    /** The value AAPS uses: the vendor algorithm value with the finger-stick calibration applied, mg/dL. */
     val glucoseMgdl: Double,
+    /** The vendor algorithm value without calibration (Stock), mg/dL. A finger stick is paired with this one. */
+    val stockMgdl: Double,
     /** Raw sensor value, mg/dL. */
     val rawMgdl: Double,
     val index: Int,
@@ -79,6 +83,8 @@ class SibionicsSession(
     private val store: SibionicsSessionStore,
     private val io: SibionicsSessionIo,
     private val listener: SibionicsSessionListener,
+    /** Finger-stick calibrations of this session: stock value at pairing and finger value, both mmol/L. */
+    private val anchors: () -> List<SibionicsCalibrationAnchor> = { emptyList() },
     private val clock: () -> Long = System::currentTimeMillis
 ) {
 
@@ -96,6 +102,10 @@ class SibionicsSession(
     )
 
     private val algorithm = SibionicsAlgorithmContext(identity.sensorId)
+
+    // Only its calibration formula is used (JugglucoNG "integrated calibration", Stock calibrated): it keeps no state.
+    // The algorithm itself stays on plain Stock, so the journal replay never depends on calibrations.
+    private val calibrator = SibionicsAdaptiveAlgorithmContext()
     private var phase = Phase.IDLE
 
     /** Next index to ask the sensor for: everything below it was processed. */
@@ -279,12 +289,14 @@ class SibionicsSession(
             nextIndex = entry.index + 1
             if (live) lastLiveIndex = entry.index
             if (time > lastSeen) lastSeen = time
-            val glucoseMgdl = glucoseMmol * SibionicsConstants.MGDL_PER_MMOLL
-            if (!SibionicsConstants.isValidAlgorithmGlucoseMgdl(glucoseMgdl)) {
-                io.log("invalid glucose idx=${entry.index} value=$glucoseMgdl raw=${entry.rawMgdl}")
+            val stockMgdl = glucoseMmol * SibionicsConstants.MGDL_PER_MMOLL
+            if (!SibionicsConstants.isValidAlgorithmGlucoseMgdl(stockMgdl)) {
+                io.log("invalid glucose idx=${entry.index} value=$stockMgdl raw=${entry.rawMgdl}")
                 continue
             }
-            readings += SibionicsReading(time, glucoseMgdl.toDouble(), entry.rawMgdl.toDouble(), entry.index, live)
+            val calibratedMgdl = calibrate(glucoseMmol, time) * SibionicsConstants.MGDL_PER_MMOLL
+            val glucoseMgdl = if (SibionicsConstants.isValidAlgorithmGlucoseMgdl(calibratedMgdl)) calibratedMgdl else stockMgdl
+            readings += SibionicsReading(time, glucoseMgdl.toDouble(), stockMgdl.toDouble(), entry.rawMgdl.toDouble(), entry.index, live)
         }
         // The raw minutes are stored before anything is reported: a restart then rebuilds the same state.
         if (journal.isNotEmpty()) store.appendJournal(journal)
@@ -352,6 +364,13 @@ class SibionicsSession(
             impedance = impedance,
             eventTimeMs = time
         )
+    }
+
+    /** Stock value [stockMmol] at [time] with the calibrations made up to then; Stock itself when there are none. */
+    private fun calibrate(stockMmol: Float, time: Long): Float {
+        val list = anchors().filter { it.timestampMs >= sessionStart }
+        if (list.isEmpty()) return stockMmol
+        return calibrator.applyIntegratedCalibration(stockMmol, time, list)
     }
 
     private fun configureAlgorithm() {
