@@ -80,6 +80,15 @@ jobs:
         if: ${{ !cancelled() && (github.event_name == 'push' || inputs.app) }}
         run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
 
+      - name: Upload the app (test only, not for Eva's pump)
+        if: ${{ !cancelled() && (github.event_name == 'push' || inputs.app) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoisf-atc3-fullDebug-apk
+          path: app/build/outputs/apk/full/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
