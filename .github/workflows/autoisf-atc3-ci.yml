@@ -106,6 +106,12 @@ jobs:
           d['client'].append(bench)
           json.dump(d, open(p, 'w'), indent=2)
           PY
+          # AAPS declares the permission app.aaps.weardata.permission. Android refuses a second app with another key that
+          # declares the same name, so the bench build gets its own name (in this run only).
+          sed -i 's/app\.aaps\.weardata\.permission/app.aaps.weardata.permission.bench/g' \
+            plugins/sync/src/androidMain/AndroidManifest.xml \
+            plugins/sync/src/androidMain/kotlin/app/aaps/plugins/sync/wear/receivers/WearDataReceiver.kt
+          grep -c 'weardata.permission.bench' plugins/sync/src/androidMain/AndroidManifest.xml
           ./gradlew --console=plain :app:assembleFullDebug -PbenchApk --stacktrace
           mkdir -p bench-apk
           cp app/build/outputs/apk/full/debug/*.apk bench-apk/
