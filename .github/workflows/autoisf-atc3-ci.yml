@@ -95,6 +95,17 @@ jobs:
       - name: Bench APK (own package info.nightscout.androidaps.bench, installs next to AAPS)
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.app }}
         run: |
+          # Firebase needs a client entry for the bench package: a copy of the AAPS one, in this run only.
+          python3 - <<'PY'
+          import json, copy
+          p = 'app/google-services.json'
+          d = json.load(open(p))
+          src = next(c for c in d['client'] if c['client_info']['android_client_info']['package_name'] == 'info.nightscout.androidaps')
+          bench = copy.deepcopy(src)
+          bench['client_info']['android_client_info']['package_name'] = 'info.nightscout.androidaps.bench'
+          d['client'].append(bench)
+          json.dump(d, open(p, 'w'), indent=2)
+          PY
           ./gradlew --console=plain :app:assembleFullDebug -PbenchApk --stacktrace
           mkdir -p bench-apk
           cp app/build/outputs/apk/full/debug/*.apk bench-apk/
