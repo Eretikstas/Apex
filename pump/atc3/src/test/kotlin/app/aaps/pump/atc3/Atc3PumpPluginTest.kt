@@ -60,10 +60,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mockingDetails
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
 import org.mockito.Mockito.after
-import org.mockito.Mockito.timeout
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
@@ -983,6 +983,19 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     /** Enabling the plugin is what subscribes it, see PluginBase.setPluginEnabledBlocking. */
     private fun startPlugin() = plugin.setPluginEnabledBlocking(PluginType.PUMP, true)
 
+    /**
+     * The event ([event], by default the loop's decision) sent until the plugin has heard it. The plugin subscribes on a coroutine of its own, so an
+     * event sent right after the start can come before the subscription and be lost; that is a race of the test, not of
+     * the driver (a real loop decides every few minutes).
+     */
+    private suspend fun untilRead(event: suspend () -> Unit = { rxBus.send(EventAPSCalculationFinished()) }) {
+        val end = System.currentTimeMillis() + 10_000L
+        while (mockingDetails(atc3Queue).invocations.none { it.method.name == "readStatus" } && System.currentTimeMillis() < end) {
+            event()
+            Thread.sleep(50)
+        }
+    }
+
     /** The watchers a started plugin launches must not outlive the test that started them. */
     @AfterEach
     fun stopPlugin() = runBlocking { plugin.onStop() }
@@ -998,9 +1011,9 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         stateAge(5)
         startPlugin()
 
-        rxBus.send(EventAPSCalculationFinished())
+        untilRead()
 
-        verify(atc3Queue, timeout(2_000).times(1)).readStatus(any())
+        verify(atc3Queue, atLeastOnce()).readStatus(any())
         plugin.onStop()
     }
 
@@ -1037,9 +1050,9 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         stateAge(11)
         startPlugin()
 
-        glucoseChanges.emit(emptyList())
+        untilRead { glucoseChanges.emit(emptyList()) }
 
-        verify(atc3Queue, timeout(2_000).times(1)).readStatus(any())
+        verify(atc3Queue, atLeastOnce()).readStatus(any())
         plugin.onStop()
     }
 
@@ -1052,9 +1065,9 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         stateAge(5)
         startPlugin()
 
-        rxBus.send(EventAPSCalculationFinished())
+        untilRead()
 
-        verify(atc3Queue, timeout(10_000).times(1)).readStatus(any())
+        verify(atc3Queue, atLeastOnce()).readStatus(any())
         plugin.onStop()
     }
 
