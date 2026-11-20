@@ -118,7 +118,7 @@ class SibionicsSessionTest {
     @Test
     fun `after an app restart the journal gives the same cursor and the next request goes on from it`() {
         val store = FakeStore()
-        runFirstLink(session(store, FakeIo(), FakeListener()), FakeIo())
+        FakeIo().let { firstIo -> runFirstLink(session(store, firstIo, FakeListener()), firstIo) }
         val io = FakeIo()
         val listener = FakeListener()
         val restarted = session(store, io, listener)
@@ -154,7 +154,7 @@ class SibionicsSessionTest {
     @Test
     fun `a journal with a hole is dropped at start and the session is read again`() {
         val store = FakeStore()
-        runFirstLink(session(store, FakeIo(), FakeListener()), FakeIo())
+        FakeIo().let { firstIo -> runFirstLink(session(store, firstIo, FakeListener()), firstIo) }
         store.samples.remove(3)
 
         val s = session(store, FakeIo(), FakeListener())
@@ -166,7 +166,7 @@ class SibionicsSessionTest {
     @Test
     fun `a finger stick moves the value but not the stock value`() {
         val plain = FakeListener()
-        runFirstLink(session(FakeStore(), FakeIo(), plain), FakeIo())
+        FakeIo().let { firstIo -> runFirstLink(session(FakeStore(), firstIo, plain), firstIo) }
         val calibrated = FakeListener()
         val anchor = SibionicsCalibrationAnchor(sensorMmol = 6.0f, referenceMmol = 7.0f, timestampMs = now - 2 * 60_000L)
         val io = FakeIo()

@@ -27,12 +27,14 @@ class SibionicsIdentityParserTest {
     }
 
     @Test
-    fun `XPT serial uses the type fallback sensitivity`() {
+    fun `XPT serial takes its sensitivity from the probe code, not from the short code`() {
         val id = SibionicsIdentityParser.parse("\u001D0106972831641476112512181727061710LT46251212C\u001D21XPT1EEX2NRU16U")!!
         assertEquals("1EEX2NRU16U", id.displayName)
         assertEquals("1EEX2NRU", id.shortCode)
-        assertEquals(1.44f, id.sensitivity, 0.0001f)
-        assertFalse(id.sensitivityFromCode)
+        // The XPT value is a valid probe code (JugglucoNG keeps it the same way); without it the type fallback 1.44 would apply.
+        assertEquals("XPT1EEX2NRU16U", id.probeCode)
+        assertEquals(1.26f, id.sensitivity, 0.0001f)
+        assertTrue(id.sensitivityFromCode)
     }
 
     @Test
