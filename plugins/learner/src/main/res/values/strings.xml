@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="learner_name">Learner</string>
+    <string name="learner_description">Learns the basal from clean hours and proposes small changes. Nothing changes without your tap.</string>
+    <string name="learner_notice_proposal">Learner: a basal proposal is ready. Open the Learner to see it.</string>
+    <string name="learner_last_card" comment="%1$s=date and time">Last check: %1$s</string>
+    <string name="learner_no_card_yet">No check yet. The first one runs at 06:00.</string>
+    <string name="learner_next_card" comment="%1$s=date and time">Next check: %1$s</string>
+    <string name="learner_proposal_title" comment="%1$s=profile name">Basal proposal for %1$s</string>
+    <string name="learner_proposal_why" formatted="false">Seen on two checks in a row; half way to the measured need, at most 20 % per step.</string>
+    <string name="learner_change" comment="%1$02d=hour, %2$.2f=basal now U/h, %3$.2f=proposed U/h. Example: 03:00 0.18 -> 0.21 U/h">%1$02d:00  %2$.2f → %3$.2f U/h</string>
+    <string name="learner_accept">Apply</string>
+    <string name="learner_refuse">Refuse</string>
+    <string name="learner_cancel">Cancel</string>
+    <string name="learner_confirm_title" comment="%1$s=profile name">Change %1$s?</string>
+    <string name="learner_confirm_text" formatted="false">The profile is edited in place (same name) and switched to at 100 %. The pump gets the new basal.</string>
+    <string name="learner_no_proposal">No proposal now.</string>
+    <string name="learner_hours_title">What the last check measured (profile / need)</string>
+    <string name="learner_hour" comment="%1$02d=hour">%1$02d:00</string>
+    <string name="learner_rate" comment="%1$.2f=basal U/h">%1$.2f</string>
+    <string name="learner_measured">measured</string>
+    <string name="learner_estimate">estimate</string>
+    <string name="learner_no_data">no data</string>
+    <string name="learner_switch_note">Learner: basal</string>
+    <string name="learner_applied" formatted="false">Applied: the profile is edited and active at 100 %.</string>
+    <string name="learner_saved_no_switch">The profile is edited, but the switch to it failed. Switch to it by hand.</string>
+    <string name="learner_refused">Refused. Nothing changed.</string>
+    <string name="learner_profile_gone">The profile of the proposal no longer exists. Nothing changed.</string>
+    <string name="learner_profile_changed">The profile was edited after the check. The proposal is dropped; the next check makes a new one.</string>
+    <string name="learner_profile_invalid" comment="%1$s=what is wrong">The edited profile is not valid (%1$s). Nothing changed.</string>
+</resources>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="learner_name">Ученик</string>
+    <string name="learner_description">Учит базал по чистым часам и предлагает небольшие изменения. Без вашего нажатия ничего не меняется.</string>
+    <string name="learner_notice_proposal">Ученик: готово предложение по базалу. Откройте «Ученик».</string>
+    <string name="learner_last_card">Последняя проверка: %1$s</string>
+    <string name="learner_no_card_yet">Проверок ещё не было. Первая — в 06:00.</string>
+    <string name="learner_next_card">Следующая проверка: %1$s</string>
+    <string name="learner_proposal_title">Предложение по базалу для %1$s</string>
+    <string name="learner_proposal_why" formatted="false">Видно на двух проверках подряд; полшага к измеренной потребности, не больше 20 % за шаг.</string>
+    <string name="learner_change">%1$02d:00  %2$.2f → %3$.2f ЕД/ч</string>
+    <string name="learner_accept">Внести</string>
+    <string name="learner_refuse">Отказаться</string>
+    <string name="learner_cancel">Отмена</string>
+    <string name="learner_confirm_title">Изменить %1$s?</string>
+    <string name="learner_confirm_text" formatted="false">Профиль меняется на месте (то же имя) и включается на 100 %. Помпа получит новый базал.</string>
+    <string name="learner_no_proposal">Предложений сейчас нет.</string>
+    <string name="learner_hours_title">Что измерила последняя проверка (профиль / потребность)</string>
+    <string name="learner_hour">%1$02d:00</string>
+    <string name="learner_rate">%1$.2f</string>
+    <string name="learner_measured">измерено</string>
+    <string name="learner_estimate">оценка</string>
+    <string name="learner_no_data">нет данных</string>
+    <string name="learner_switch_note">Ученик: базал</string>
+    <string name="learner_applied" formatted="false">Внесено: профиль изменён и включён на 100 %.</string>
+    <string name="learner_saved_no_switch">Профиль изменён, но переключение не прошло. Включите его вручную.</string>
+    <string name="learner_refused">Отказ. Ничего не изменено.</string>
+    <string name="learner_profile_gone">Профиля из предложения больше нет. Ничего не изменено.</string>
+    <string name="learner_profile_changed">Профиль меняли после проверки. Предложение снято; следующая проверка сделает новое.</string>
+    <string name="learner_profile_invalid">Изменённый профиль не прошёл проверку (%1$s). Ничего не изменено.</string>
+</resources>

@@ -80,6 +80,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           ./gradlew --console=plain :plugins:sibionics:testDebugUnitTest --continue --stacktrace
+          ./gradlew --console=plain :plugins:learner:testDebugUnitTest --continue --stacktrace
           ./gradlew --console=plain :database:impl:testAndroidHostTest --tests '*SourceSensor*' --stacktrace
 
       - name: Ring overview tests (and the preference key list)
@@ -101,6 +102,7 @@ jobs:
             pump/atc3/build/reports/tests
             database/impl/build/reports/tests
             plugins/sibionics/build/reports/tests
+            plugins/learner/build/reports/tests
             ui/build/reports/tests
             app/build/reports/tests
           if-no-files-found: ignore

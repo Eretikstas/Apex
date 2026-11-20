@@ -10,7 +10,7 @@ This is a small plain Kotlin project on its own: it is not in the AAPS `settings
 uses it. CI (`sibionics-ci.yml`) builds it and runs the JugglucoNG tests on the real sensor traces.
 
 ## The part we need (Sibionics 2, Stock algorithm)
-Eva's sensor is a Sibionics 2 (JugglucoNG variant `SIBIONICS2`, protocol `V120`, algorithm `V116A`).
+The target sensor is a Sibionics 2 (JugglucoNG variant `SIBIONICS2`, protocol `V120`, algorithm `V116A`).
 - `SibionicsConstants` - variants, `SIBIONICS2` (official life 22 days), protocol mode `V120`, sensor id and BLE name rules.
 - `SibionicsProtocol` - RC4 frames, session key, auth / activation / time sync / data request / reset packets, `parseV120`.
 - `SibionicsSensitivity` (in `SibionicsProtocol.kt`) - the sensitivity code from the sensor's short code.

@@ -14,6 +14,7 @@ the tests named next to it.
 - `.github/workflows/autoisf-atc3-ci.yml`, `.github/workflows/upstream-check.yml` - our CI.
 
 - `ui/.../overview/ring/` - the "Кольцо" overview: ring, period numbers, next hour, plain "why" of oref/AutoISF decisions (`RingWhyMapper`, tests in `ui/src/commonTest/.../ring`).
+- `plugins/learner` - the learner, first part: basal card every 4 days at 06:00 (`BasalCardEngine`, the rules tested on the body model), proposal with "Внести" / "Отказаться"; apply edits the active profile in place and switches to it at 100 %.
 - `plugins/sibionics` - native Sibionics 2 source + its calibration plugin; compiles `sibionics-core/` (JugglucoNG, GPL-3.0) in unchanged.
 
 ## Edits in blaqone files (keep this list complete)
@@ -35,8 +36,8 @@ the tests named next to it.
 | `ui/.../search/BuiltInSearchables.kt` | the ring switch in Appearance | - |
 | `ui/.../main/MainScreen.kt`, `ui/.../overview/OverviewScreen.kt` | read the switch, phone portrait -> `OverviewScreenRing` | `OverviewSizeSweepTest` |
 | `ui/src/androidMain/res/values/strings.xml` | `ring_*` strings at the end; Russian in `values-ru-rRU/strings_ring.xml` | build |
-| `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator`, `:plugins:sibionics` | build |
-| `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; full flavor depends on `:plugins:sibionics`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
+| `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator`, `:plugins:sibionics`, `:plugins:learner` | build |
+| `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; full flavor depends on `:plugins:sibionics` and `:plugins:learner`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
 | `app/src/androidTest/.../di/Atc3EmulatedRadio.kt`, `.../e2e/Atc3EmulatorScenarioTest.kt` | our files in the app's device tests (radio swap through `Atc3RadioSwap`) | emulator job |
 | `app/src/androidTest/.../ReplayApsResultsTest.kt` | blaqone bug: `activity_consoleLog = ""` added to the AutoISF call, or device tests do not compile | emulator job |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
