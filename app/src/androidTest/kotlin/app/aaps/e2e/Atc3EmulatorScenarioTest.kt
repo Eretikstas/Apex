@@ -1,5 +1,8 @@
 package app.aaps.e2e
 
+import app.aaps.core.data.time.T
+import app.aaps.core.data.model.data.TargetBlock
+import app.aaps.core.data.model.data.Block
 import android.Manifest
 import android.content.Context
 import android.os.SystemClock
@@ -45,7 +48,6 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.json.JSONArray
 import app.aaps.pump.atc3.emulator.control.EmulatedAlarm
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.After
@@ -640,14 +642,14 @@ class Atc3EmulatorScenarioTest {
     // Set up, as in Atc3UiSmokeTest
 
     private fun seedLocalProfile() {
-        val profile = profileRepository.newDraft().apply {
-            mgdl = true
-            ic = JSONArray(singleValue(10.0))
-            isf = JSONArray(singleValue(50.0))
-            basal = JSONArray(singleValue(0.5))
-            targetLow = JSONArray(singleValue(100.0))
-            targetHigh = JSONArray(singleValue(110.0))
-        }
+        val day = T.hours(24).msecs()
+        val profile = profileRepository.newDraft().copy(
+            mgdl = true,
+            ic = listOf(Block(day, 10.0)),
+            isf = listOf(Block(day, 50.0)),
+            basal = listOf(Block(day, 0.5)),
+            target = listOf(TargetBlock(day, 100.0, 110.0))
+        )
         runBlocking { profileRepository.add(profile) }.getOrThrow()
     }
 
@@ -666,8 +668,6 @@ class Atc3EmulatorScenarioTest {
         }
         checkNotNull(switch) { "Could not activate the seeded local profile" }
     }
-
-    private fun singleValue(value: Double) = """[{"time":"00:00","timeAsSeconds":0,"value":$value}]"""
 
     private fun <T> awaitNotNull(timeoutMs: Long, supplier: () -> T?): T? {
         val end = SystemClock.uptimeMillis() + timeoutMs
