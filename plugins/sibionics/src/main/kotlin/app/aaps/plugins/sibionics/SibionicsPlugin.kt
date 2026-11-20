@@ -76,7 +76,7 @@ class SibionicsPlugin(
 ), BgSource {
 
     /** What the screen shows. */
-    data class Status(
+    internal data class Status(
         val sensorName: String = "",
         val sensitivity: Float = 0f,
         val sensitivityFromCode: Boolean = false,
@@ -95,10 +95,10 @@ class SibionicsPlugin(
     private val radio = SibionicsRadio(context, aapsLogger)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val _status = MutableStateFlow(Status())
-    val status: StateFlow<Status> = _status.asStateFlow()
+    internal val status: StateFlow<Status> = _status.asStateFlow()
 
     private val _found = MutableStateFlow<List<SibionicsFoundDevice>>(emptyList())
-    val found: StateFlow<List<SibionicsFoundDevice>> = _found.asStateFlow()
+    internal val found: StateFlow<List<SibionicsFoundDevice>> = _found.asStateFlow()
     private val _scanning = MutableStateFlow(false)
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
 
@@ -177,7 +177,7 @@ class SibionicsPlugin(
     }
 
     /** Use [device] as the sensor's transmitter and start reading it. */
-    fun choose(device: SibionicsFoundDevice) {
+    internal fun choose(device: SibionicsFoundDevice) {
         store.address = device.address
         store.bleName = device.name
         _found.value = emptyList()

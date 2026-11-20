@@ -25,7 +25,7 @@ import tk.glucodata.drivers.sibionics.SibionicsConstants
 import tk.glucodata.drivers.sibionics.SibionicsProtocol
 
 /** A transmitter seen while searching. */
-data class SibionicsFoundDevice(val name: String, val address: String, val rssi: Int)
+internal data class SibionicsFoundDevice(val name: String, val address: String, val rssi: Int)
 
 /**
  * The Android Bluetooth side of one sensor: GATT link, notifications, writes, reconnects and the search for the
@@ -35,7 +35,7 @@ data class SibionicsFoundDevice(val name: String, val address: String, val rssi:
  * to FF32, retry a refused write, reconnect after 8 s) follow JugglucoNG's `SibionicsBleManager`.
  */
 @SuppressLint("MissingPermission") // every Bluetooth call is behind hasPermissions()
-class SibionicsRadio(
+internal class SibionicsRadio(
     private val context: Context,
     private val aapsLogger: AAPSLogger
 ) {

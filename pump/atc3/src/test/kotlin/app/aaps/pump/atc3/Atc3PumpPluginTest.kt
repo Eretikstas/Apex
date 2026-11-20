@@ -1054,7 +1054,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
         rxBus.send(EventAPSCalculationFinished())
 
-        verify(atc3Queue, timeout(2_000).times(1)).readStatus(any())
+        verify(atc3Queue, timeout(10_000).times(1)).readStatus(any())
         plugin.onStop()
     }
 

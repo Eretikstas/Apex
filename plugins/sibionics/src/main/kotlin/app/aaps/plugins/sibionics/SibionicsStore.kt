@@ -11,7 +11,7 @@ import java.io.File
  * The sensor that is set up, and its session state. Kept apart from the AAPS preferences, like a pump's own
  * store: it is device state, not a setting, and must not travel with a settings export to another phone.
  */
-class SibionicsStore(context: Context) {
+internal class SibionicsStore(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val dir = File(context.filesDir, "sibionics")

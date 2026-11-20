@@ -12,7 +12,7 @@ import tk.glucodata.drivers.sibionics.SibionicsSourceSample
 import tk.glucodata.drivers.sibionics.SibionicsVariantLock
 
 /** One glucose value made from one sensor minute. */
-data class SibionicsReading(
+internal data class SibionicsReading(
     val timestamp: Long,
     /** The value AAPS uses: the vendor algorithm value with the finger-stick calibration applied, mg/dL. */
     val glucoseMgdl: Double,
@@ -25,7 +25,7 @@ data class SibionicsReading(
 )
 
 /** What the session needs from the radio. All calls come on the radio's own thread. */
-interface SibionicsSessionIo {
+internal interface SibionicsSessionIo {
 
     /** Write [bytes] to the sensor; false when the radio refused it (busy or not connected). */
     fun write(bytes: ByteArray, label: String): Boolean
@@ -42,7 +42,7 @@ interface SibionicsSessionIo {
 }
 
 /** What the session tells AAPS. */
-interface SibionicsSessionListener {
+internal interface SibionicsSessionListener {
 
     /** New values, oldest first. [sensorStart] is set once, with the first values of a new sensor session. */
     fun onReadings(readings: List<SibionicsReading>, sensorStart: Long?)
@@ -51,7 +51,7 @@ interface SibionicsSessionListener {
 }
 
 /** Where the session keeps what must survive an app restart. */
-interface SibionicsSessionStore {
+internal interface SibionicsSessionStore {
 
     /** Start of the sensor session (ms), 0 if not known. */
     var sessionStart: Long
@@ -77,7 +77,7 @@ interface SibionicsSessionStore {
  * pages of one-minute samples -> live samples every minute. The algorithm state is rebuilt at start by replaying
  * the journal of raw minutes (no binary checkpoint): what was replayed is exactly what was processed.
  */
-class SibionicsSession(
+internal class SibionicsSession(
     private val identity: SibionicsIdentity,
     private val bleAddress: String,
     private val store: SibionicsSessionStore,
