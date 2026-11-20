@@ -114,7 +114,16 @@ jobs:
           grep -c 'weardata.permission.bench' plugins/sync/src/androidMain/AndroidManifest.xml
           ./gradlew --console=plain :app:assembleFullDebug -PbenchApk --stacktrace
           mkdir -p bench-apk
-          cp app/build/outputs/apk/full/debug/*.apk bench-apk/
+          cp app/build/outputs/apk/full/debug/app-full-debug.apk bench-apk/aaps-bench-debug.apk
+          # The same as a release build (not debuggable, no LeakCanary, smaller), signed with the runner's debug key.
+          ./gradlew --console=plain :app:assembleFullRelease -PbenchApk --stacktrace
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          IN=$(ls app/build/outputs/apk/full/release/*.apk | head -1)
+          "$BT/zipalign" -f -p 16 "$IN" aligned.apk
+          "$BT/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-pass pass:android --key-pass pass:android \
+            --ks-key-alias androiddebugkey --out bench-apk/aaps-bench-release.apk aligned.apk
+          "$BT/apksigner" verify --print-certs bench-apk/aaps-bench-release.apk | head -3
+          ls -la bench-apk
       - name: Upload bench APK
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.app }}
         uses: actions/upload-artifact@v4
