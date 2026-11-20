@@ -92,6 +92,19 @@ jobs:
       - name: Build the app
         if: ${{ !cancelled() && (github.event_name == 'push' || inputs.app) }}
         run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
+      - name: Bench APK (own package info.nightscout.androidaps.bench, installs next to AAPS)
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.app }}
+        run: |
+          ./gradlew --console=plain :app:assembleFullDebug -PbenchApk --stacktrace
+          mkdir -p bench-apk
+          cp app/build/outputs/apk/full/debug/*.apk bench-apk/
+      - name: Upload bench APK
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.app }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoisf-atc3-bench-apk
+          path: bench-apk/*.apk
+          retention-days: 30
 
       - name: Upload test reports
         if: ${{ always() }}

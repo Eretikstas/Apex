@@ -136,8 +136,13 @@ android {
             isDefault = true
             applicationId = "info.nightscout.androidaps"
             dimension = "standard"
-            resValue("string", "app_name", "AAPS")
             versionName = Versions.appVersion
+            // Bench build (-PbenchApk): its own package and name, so it installs next to the real AAPS and never replaces it.
+            if (project.hasProperty("benchApk")) {
+                applicationIdSuffix = ".bench"
+                versionNameSuffix = "-bench"
+                resValue("string", "app_name", "AAPS bench")
+            } else resValue("string", "app_name", "AAPS")
             manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
             manifestPlaceholders["appIconRound"] = "@mipmap/ic_launcher_round"
         }
