@@ -47,6 +47,12 @@ if [ -n "$TEST" ]; then
   adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
   for C in app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.Atc3EmulatorScenarioTest app.aaps.e2e.ErrorActivityInjectionTest \
            app.aaps.LoopTest app.aaps.RunningConfigurationTest app.aaps.CobExtendedCarbsTest app.aaps.RunningModeReconcilerIntegrationTest; do
+    # Each class on a fresh install: our long ATC3 scenarios leave a configured ATC3 pump and a running mode behind,
+    # which the following blaqone tests are not written for.
+    adb uninstall $PKG > /dev/null 2>&1
+    adb install -r -g "$APP" > /dev/null 2>&1
+    adb install -r -g "$TEST" > /dev/null 2>&1
+    adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
     adb logcat -c
     # Our ATC3 scenarios take about 2 min each (30+ of them); the other classes are short.
     T=1200; [ "$C" = app.aaps.e2e.Atc3EmulatorScenarioTest ] && T=6000
