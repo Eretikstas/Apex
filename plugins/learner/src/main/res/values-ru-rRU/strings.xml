@@ -28,4 +28,7 @@
     <string name="learner_profile_gone">Профиля из предложения больше нет. Ничего не изменено.</string>
     <string name="learner_profile_changed">Профиль меняли после проверки. Предложение снято; следующая проверка сделает новое.</string>
     <string name="learner_profile_invalid">Изменённый профиль не прошёл проверку (%1$s). Ничего не изменено.</string>
+    <string name="learner_why_proposal">Ученик: предложение по базалу (%1$d ч) ждёт вашего ответа.</string>
+    <string name="learner_why_no_change">Ученик: базал проверен сегодня, менять не нужно.</string>
+    <string name="learner_why_applied">Ученик: базал изменён (%1$d ч). Оценка — следующие 3–4 дня.</string>
 </resources>

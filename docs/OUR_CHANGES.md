@@ -40,6 +40,7 @@ the tests named next to it.
 | `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; full flavor depends on `:plugins:sibionics` and `:plugins:learner`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
 | `app/src/androidTest/.../di/Atc3EmulatedRadio.kt`, `.../e2e/Atc3EmulatorScenarioTest.kt` | our files in the app's device tests (radio swap through `Atc3RadioSwap`) | emulator job |
 | `app/src/androidTest/.../ReplayApsResultsTest.kt` | blaqone bug: `activity_consoleLog = ""` added to the AutoISF call, or device tests do not compile | emulator job |
+| `core/interfaces/.../aps/LoopNotes.kt` (new) + `core/objects/.../di/CoreObjectsGraph.kt` | one shared holder of plugin notes for the ring "why" (the learner writes, the ring reads) | `LoopNotesTest` |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules

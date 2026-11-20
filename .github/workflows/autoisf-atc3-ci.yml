@@ -86,7 +86,7 @@ jobs:
       - name: Ring overview tests (and the preference key list)
         if: ${{ !cancelled() }}
         run: |
-          ./gradlew --console=plain :ui:testAndroidHostTest --tests '*Ring*' --tests '*OverviewSizeSweepTest*' --continue --stacktrace
+          ./gradlew --console=plain :ui:testAndroidHostTest --tests '*Ring*' --tests '*OverviewSizeSweepTest*' :core:interfaces:testAndroidHostTest --tests '*LoopNotesTest*' --continue --stacktrace
           ./gradlew --console=plain :app:testFullDebugUnitTest --tests '*PreferenceKeySnapshotTest*' --tests '*RawPreferenceStoreScanTest*' --continue --stacktrace
 
       - name: Build the app

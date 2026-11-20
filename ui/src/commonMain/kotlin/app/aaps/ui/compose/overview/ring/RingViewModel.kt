@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.aaps.core.data.model.GV
 import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.aps.LoopNote
+import app.aaps.core.interfaces.aps.LoopNotes
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.db.observeChanges
 import app.aaps.core.interfaces.rx.bus.RxBus
@@ -33,6 +35,8 @@ data class RingUiState(
     val whyTime: Long = 0L,
     val period: RingPeriod = RingPeriod.DAY,
     val stats: RingStats? = null,
+    /** Notes of other plugins (the learner) for the "why", newest first. */
+    val notes: List<LoopNote> = emptyList(),
 )
 
 /**
@@ -48,6 +52,7 @@ class RingViewModel(
     private val loop: Loop,
     private val persistenceLayer: PersistenceLayer,
     private val dateUtil: DateUtil,
+    private val loopNotes: LoopNotes,
     rxBus: RxBus
 ) : ViewModel() {
 
@@ -55,11 +60,16 @@ class RingViewModel(
     val uiState: StateFlow<RingUiState> = _uiState.asStateFlow()
 
     init {
-        rxBus.toFlow(EventLoopUpdateGui::class).onEach { refreshWhy() }.launchIn(viewModelScope)
+        rxBus.toFlow(EventLoopUpdateGui::class).onEach { refreshWhy(); refreshNotes() }.launchIn(viewModelScope)
         rxBus.toFlow(EventRefreshOverview::class).onEach { refreshWhy() }.launchIn(viewModelScope)
         persistenceLayer.observeChanges<GV>().onEach { refreshStats() }.launchIn(viewModelScope)
+        loopNotes.notes.onEach { refreshNotes() }.launchIn(viewModelScope)
         refreshWhy()
         refreshStats()
+    }
+
+    private fun refreshNotes() {
+        _uiState.update { it.copy(notes = loopNotes.valid(dateUtil.now())) }
     }
 
     fun selectPeriod(period: RingPeriod) {

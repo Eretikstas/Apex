@@ -28,4 +28,7 @@
     <string name="learner_profile_gone">The profile of the proposal no longer exists. Nothing changed.</string>
     <string name="learner_profile_changed">The profile was edited after the check. The proposal is dropped; the next check makes a new one.</string>
     <string name="learner_profile_invalid" comment="%1$s=what is wrong">The edited profile is not valid (%1$s). Nothing changed.</string>
+    <string name="learner_why_proposal" comment="%1$d = number of hours that would change. Example: 3">Learner: a basal proposal for %1$d hours waits for your answer.</string>
+    <string name="learner_why_no_change">Learner: basal checked today, no change needed.</string>
+    <string name="learner_why_applied" comment="%1$d = number of hours changed. Example: 3">Learner: basal of %1$d hours changed. It is judged over the next 3–4 days.</string>
 </resources>

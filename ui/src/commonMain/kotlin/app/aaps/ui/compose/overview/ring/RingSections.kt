@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import app.aaps.core.data.model.GlucoseUnit
+import app.aaps.core.interfaces.aps.LoopNote
 import app.aaps.core.interfaces.overview.graph.BgDataPoint
 import app.aaps.core.interfaces.overview.graph.BgInfoData
 import app.aaps.core.interfaces.overview.graph.BgRange
@@ -197,43 +198,53 @@ private fun HourGraph(readings: List<BgDataPoint>, prediction: List<BgDataPoint>
 
 /** "Почему": the plain words of the loop's last decision, what it did, a limit if one cut it, and the expected end. */
 @Composable
-internal fun RingWhyCard(why: RingWhy?, whyTime: Long, eventualText: String?) {
-    if (why == null) return
-    val dateUtil = LocalDateUtil.current
+internal fun RingWhyCard(why: RingWhy?, whyTime: Long, eventualText: String?, notes: List<LoopNote> = emptyList()) {
+    if (why == null && notes.isEmpty()) return
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
             Text(stringResource(UiStrings.ring_why_title), style = MaterialTheme.typography.labelLarge)
-            Text(
-                when (why.family) {
-                    RingWhyFamily.NO_DATA    -> stringResource(UiStrings.ring_why_no_data)
-                    RingWhyFamily.LOW        -> stringResource(UiStrings.ring_why_low)
-                    RingWhyFamily.ENOUGH_IOB -> stringResource(UiStrings.ring_why_enough_iob)
-                    RingWhyFamily.MEAL       -> stringResource(UiStrings.ring_why_meal, why.cobG.roundToInt())
-                    RingWhyFamily.RISE       -> stringResource(UiStrings.ring_why_rise)
-                    RingWhyFamily.IN_RANGE   -> stringResource(UiStrings.ring_why_in_range)
-                    RingWhyFamily.UNKNOWN    -> stringResource(UiStrings.ring_why_unknown)
-                },
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Text(
-                when (val a = why.action) {
-                    is RingAction.Smb       ->
-                        if (a.rateUph != null && a.durationMin != null) stringResource(UiStrings.ring_act_smb_tbr, a.units, a.rateUph, a.durationMin)
-                        else stringResource(UiStrings.ring_act_smb, a.units)
-
-                    is RingAction.ZeroBasal -> stringResource(UiStrings.ring_act_zero, a.durationMin)
-                    is RingAction.TempBasal -> stringResource(UiStrings.ring_act_tbr, a.rateUph, a.durationMin)
-                    RingAction.NoChange     -> stringResource(UiStrings.ring_act_none)
-                },
-                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold
-            )
-            if (why.limitWantedU != null && why.limitGivenU != null)
-                Text(stringResource(UiStrings.ring_limited, why.limitWantedU, why.limitGivenU), style = MaterialTheme.typography.bodyMedium)
-            eventualText?.let { Text(stringResource(UiStrings.ring_eventual, it), style = MaterialTheme.typography.bodyMedium) }
-            if (whyTime > 0) Text(
-                stringResource(UiStrings.ring_decided_at, dateUtil.timeString(whyTime)),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (why != null) RingWhyBody(why, whyTime, eventualText)
+            notes.forEach { note ->
+                Text(note.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+            }
         }
+    }
+}
+
+@Composable
+private fun RingWhyBody(why: RingWhy, whyTime: Long, eventualText: String?) {
+    val dateUtil = LocalDateUtil.current
+    Column(verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+        Text(
+            when (why.family) {
+                RingWhyFamily.NO_DATA    -> stringResource(UiStrings.ring_why_no_data)
+                RingWhyFamily.LOW        -> stringResource(UiStrings.ring_why_low)
+                RingWhyFamily.ENOUGH_IOB -> stringResource(UiStrings.ring_why_enough_iob)
+                RingWhyFamily.MEAL       -> stringResource(UiStrings.ring_why_meal, why.cobG.roundToInt())
+                RingWhyFamily.RISE       -> stringResource(UiStrings.ring_why_rise)
+                RingWhyFamily.IN_RANGE   -> stringResource(UiStrings.ring_why_in_range)
+                RingWhyFamily.UNKNOWN    -> stringResource(UiStrings.ring_why_unknown)
+            },
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            when (val a = why.action) {
+                is RingAction.Smb       ->
+                    if (a.rateUph != null && a.durationMin != null) stringResource(UiStrings.ring_act_smb_tbr, a.units, a.rateUph, a.durationMin)
+                    else stringResource(UiStrings.ring_act_smb, a.units)
+
+                is RingAction.ZeroBasal -> stringResource(UiStrings.ring_act_zero, a.durationMin)
+                is RingAction.TempBasal -> stringResource(UiStrings.ring_act_tbr, a.rateUph, a.durationMin)
+                RingAction.NoChange     -> stringResource(UiStrings.ring_act_none)
+            },
+            style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold
+        )
+        if (why.limitWantedU != null && why.limitGivenU != null)
+            Text(stringResource(UiStrings.ring_limited, why.limitWantedU, why.limitGivenU), style = MaterialTheme.typography.bodyMedium)
+        eventualText?.let { Text(stringResource(UiStrings.ring_eventual, it), style = MaterialTheme.typography.bodyMedium) }
+        if (whyTime > 0) Text(
+            stringResource(UiStrings.ring_decided_at, dateUtil.timeString(whyTime)),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

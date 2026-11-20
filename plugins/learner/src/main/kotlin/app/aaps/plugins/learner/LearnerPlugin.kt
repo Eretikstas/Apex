@@ -4,6 +4,8 @@ import app.aaps.core.data.model.data.Block
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
+import app.aaps.core.interfaces.aps.LoopNote
+import app.aaps.core.interfaces.aps.LoopNotes
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.NotificationId
@@ -60,6 +62,7 @@ class LearnerPlugin(
     private val profileFunction: ProfileFunction,
     private val profileRepository: ProfileRepository,
     private val dateUtil: DateUtil,
+    private val loopNotes: LoopNotes,
 ) : PluginBaseWithPreferences(
     PluginDescription()
         .mainType(PluginType.GENERAL)
@@ -134,7 +137,7 @@ class LearnerPlugin(
         if (card.changes.isNotEmpty()) {
             store.proposal = BasalProposal(name, now, card.changes)
             notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_proposal), level = NotificationLevel.INFO)
-        }
+        } else note(rh.gs(R.string.learner_why_no_change), now, NOTE_SHORT_MS)
         refresh()
     }
 
@@ -173,6 +176,7 @@ class LearnerPlugin(
             listValues = emptyList(), timestamp = dateUtil.now()
         )
         store.proposal = null
+        note(rh.gs(R.string.learner_why_applied, proposal.changes.size), dateUtil.now(), NOTE_LONG_MS)
         aapsLogger.debug(LTag.APS, "Learner: basal proposal applied to ${proposal.profileName}, switch=${switch != null}")
         finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
     }
@@ -180,6 +184,7 @@ class LearnerPlugin(
     /** "Отказаться": the proposal is dropped and not remembered. */
     fun refuse() {
         store.proposal = null
+        loopNotes.clear(NOTE_SOURCE)
         refresh(rh.gs(R.string.learner_refused))
     }
 
@@ -191,8 +196,13 @@ class LearnerPlugin(
         refresh(message)
     }
 
+    /** A line for the "why" of the overview (one learner line at a time). */
+    private fun note(text: String, now: Long, keepMs: Long) = loopNotes.put(LoopNote(NOTE_SOURCE, text, now, now + keepMs))
+
     private fun refresh(message: String = "") {
         val last = store.lastCardAt
+        // A waiting proposal is always in the "why", also after a restart of the app.
+        store.proposal?.let { note(rh.gs(R.string.learner_why_proposal, it.changes.size), it.madeAt, PROPOSAL_NOTE_MS) }
         _status.value = Status(
             lastCardAt = last,
             nextCardAt = nextCardAt(last),
@@ -232,5 +242,9 @@ class LearnerPlugin(
         const val CARD_EVERY_MS = 4 * 86_400_000L
         const val HOUR_MS = 3_600_000L
         const val TICK_MS = 10 * 60_000L
+        const val NOTE_SOURCE = "learner"
+        const val NOTE_SHORT_MS = 12 * 3_600_000L
+        const val NOTE_LONG_MS = 24 * 3_600_000L
+        const val PROPOSAL_NOTE_MS = 7 * 86_400_000L
     }
 }

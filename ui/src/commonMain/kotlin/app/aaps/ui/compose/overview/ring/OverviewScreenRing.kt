@@ -148,7 +148,7 @@ fun OverviewScreenRing(
         )
         RingPeriodRow(period = ringState.period, stats = ringState.stats, onPick = ringViewModel::selectPeriod)
         RingHourTile(hour = hour, readings = readings, prediction = mainPrediction, now = now, pred60Text = pred60Text)
-        RingWhyCard(why = ringState.why, whyTime = ringState.whyTime, eventualText = eventualText)
+        RingWhyCard(why = ringState.why, whyTime = ringState.whyTime, eventualText = eventualText, notes = ringState.notes)
 
         // The loop's command chips (running mode, profile, temp target, temp basal) stay as on the usual screen.
         OverviewChipsColumn(

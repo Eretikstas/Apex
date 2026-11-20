@@ -2,6 +2,7 @@ package app.aaps.core.objects.di
 
 import app.aaps.core.interfaces.alerts.EatReminder
 import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.aps.LoopNotes
 import app.aaps.core.interfaces.automation.Automation
 import app.aaps.core.interfaces.bolus.MasterActionExecutor
 import app.aaps.core.interfaces.configuration.Config
@@ -49,6 +50,11 @@ object CoreObjectsGraph {
     @SingleIn(AppScope::class)
     @Provides
     fun provideUiRestart(): UiRestart = UiRestartImpl()
+
+    /** One per app: plugins write notes, the overview "why" reads them. */
+    @SingleIn(AppScope::class)
+    @Provides
+    fun provideLoopNotes(): LoopNotes = LoopNotes()
 
     @SingleIn(AppScope::class)
     @Provides
