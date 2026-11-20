@@ -83,6 +83,7 @@ class SibionicsScreenshotTest {
         File(dir, "$name.png").outputStream().use { compose.onNodeWithTag("shot").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    @Composable
     private fun screen(status: SibionicsPlugin.Status) {
         SibionicsScreenContent(
             status = status, found = emptyList(), scanning = false, initialCode = "", hasPermission = true,
