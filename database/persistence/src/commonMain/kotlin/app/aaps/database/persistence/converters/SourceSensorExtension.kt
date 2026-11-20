@@ -19,6 +19,7 @@ fun GlucoseValue.SourceSensor.fromDb(): SourceSensor =
         GlucoseValue.SourceSensor.SIBIONIC_UNKNOWN  -> SourceSensor.SIBIONIC_UNKNOWN
         GlucoseValue.SourceSensor.SIBIONIC_GS1      -> SourceSensor.SIBIONIC_GS1
         GlucoseValue.SourceSensor.SIBIONIC_GS3      -> SourceSensor.SIBIONIC_GS3
+        GlucoseValue.SourceSensor.SIBIONICS_NATIVE  -> SourceSensor.SIBIONICS_NATIVE
         GlucoseValue.SourceSensor.ACCU_CHEK         -> SourceSensor.ACCU_CHEK
         GlucoseValue.SourceSensor.CARESENS_AIR      -> SourceSensor.CARESENS_AIR
         GlucoseValue.SourceSensor.AIDEX             -> SourceSensor.AIDEX
@@ -59,6 +60,7 @@ fun SourceSensor.toDb(): GlucoseValue.SourceSensor =
         SourceSensor.SIBIONIC_UNKNOWN  -> GlucoseValue.SourceSensor.SIBIONIC_UNKNOWN
         SourceSensor.SIBIONIC_GS1      -> GlucoseValue.SourceSensor.SIBIONIC_GS1
         SourceSensor.SIBIONIC_GS3      -> GlucoseValue.SourceSensor.SIBIONIC_GS3
+        SourceSensor.SIBIONICS_NATIVE  -> GlucoseValue.SourceSensor.SIBIONICS_NATIVE
         SourceSensor.ACCU_CHEK         -> GlucoseValue.SourceSensor.ACCU_CHEK
         SourceSensor.CARESENS_AIR      -> GlucoseValue.SourceSensor.CARESENS_AIR
         SourceSensor.AIDEX             -> GlucoseValue.SourceSensor.AIDEX

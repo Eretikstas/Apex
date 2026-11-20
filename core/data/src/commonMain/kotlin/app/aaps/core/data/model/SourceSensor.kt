@@ -30,6 +30,9 @@ enum class SourceSensor(val text: String, val aliases: Set<String> = emptySet())
     SIBIONIC_UNKNOWN("SI App"),
     SIBIONIC_GS1("GS1Sb"),
     SIBIONIC_GS3("GS3"),
+    // Sibionics read by AAPS itself over Bluetooth (our source in :plugins:sibionics), no other app between.
+    // Same text as in the JetFoxy 4e21417 build, so readings already sent to Nightscout map back here.
+    SIBIONICS_NATIVE("SibionicsNative"),
     ACCU_CHEK("AccuChek"),
     CARESENS_AIR("CareSenseAir"),
     AIDEX("GlucoRx Aidex"),

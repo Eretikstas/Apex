@@ -83,6 +83,7 @@ data class GlucoseValue(
         SIBIONIC_UNKNOWN,
         SIBIONIC_GS1,
         SIBIONIC_GS3,
+        SIBIONICS_NATIVE,
         ACCU_CHEK,
         CARESENS_AIR,
         AIDEX,

@@ -17,6 +17,7 @@ private val RAW_OBSERVATION_SOURCES = setOf(
     SourceSensor.SIBIONIC_GS1,
     SourceSensor.SIBIONIC_GS3,
     SourceSensor.SIBIONIC_UNKNOWN,
+    SourceSensor.SIBIONICS_NATIVE,
     // AiDex broadcasts every minute; feeding the estimator its own readings avoids the 5-minute
     // bucket interpolation. Newer senders name it `AidexX`, older ones `GlucoRx Aidex`.
     SourceSensor.AIDEX,
