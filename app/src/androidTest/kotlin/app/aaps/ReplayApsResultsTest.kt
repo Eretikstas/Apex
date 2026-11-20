@@ -742,6 +742,7 @@ class ReplayApsResultsTest : AapsInstrumentedTest() {
             profile_percentage = profile.profile_percentage, // 100,
             smb_ratio = profile.smb_delivery_ratio, // 0.5,
             loop_wanted_smb = "dummy",
+            activity_consoleLog = "",
             auto_isf_consoleLog = mutableListOf<String>("end AutoISF"),
             auto_isf_consoleError = mutableListOf<String>("start AutoISF")
         )

@@ -26,6 +26,7 @@ the tests named next to it.
 | `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator` | build |
 | `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
 | `app/src/androidTest/.../di/Atc3EmulatedRadio.kt`, `.../e2e/Atc3EmulatorScenarioTest.kt` | our files in the app's device tests (radio swap through `Atc3RadioSwap`) | emulator job |
+| `app/src/androidTest/.../ReplayApsResultsTest.kt` | blaqone bug: `activity_consoleLog = ""` added to the AutoISF call, or device tests do not compile | emulator job |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules
