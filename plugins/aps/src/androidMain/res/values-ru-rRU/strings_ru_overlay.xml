@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Our Russian overlay (docs/OUR_CHANGES.md): strings that have no Russian yet. Not from Crowdin. -->
+<resources>
+    <string name="description_auto_isf">Экспериментальный алгоритм для опытных пользователей, с расширениями AutoISF</string>
+    <string name="zero_basal_not_set">Помпа не приняла нулевой временный базал. Она может всё ещё вводить базальный инсулин. Проверьте помпу.</string>
+    <string name="loop_notification_channel_name">Предложения цикла</string>
+    <string name="loop_notification_channel_silent_name">Предложения цикла в режиме «Не беспокоить»</string>
+    <string name="open_loop_suggestion_too_old">Это предложение устарело. На помпу ничего не отправлено. Дождитесь следующего.</string>
+</resources>
