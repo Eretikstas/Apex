@@ -7,6 +7,9 @@ import org.json.JSONObject
 /** A basal proposal waiting for the user: the profile it is for, when it was made, and the hours that change. */
 data class BasalProposal(val profileName: String, val madeAt: Long, val changes: List<BasalChange>)
 
+/** A proposal for the AutoISF weight dura: the weight now, the weight proposed, and what the card saw. */
+data class DuraProposal(val from: Double, val to: Double, val madeAt: Long, val flatHighPct: Double, val lowPct: Double)
+
 /**
  * The learner's memory: the state of the basal card, when the last card ran, and a proposal waiting for an answer. One
  * document under [LearnerStringNonKey.State].
@@ -64,6 +67,28 @@ class LearnerStore(private val preferences: Preferences) {
             )
         }
 
+    /** When the user last applied a learner proposal (any kind): the next one waits for the 3-4 day evaluation. */
+    var lastAppliedAt: Long
+        get() = read().optLong(KEY_LAST_APPLIED, 0L)
+        set(value) = edit { put(KEY_LAST_APPLIED, value) }
+
+    var duraProposal: DuraProposal?
+        get() = read().optJSONObject(KEY_DURA)?.let { o ->
+            runCatching { DuraProposal(o.getDouble("from"), o.getDouble("to"), o.getLong("madeAt"), o.getDouble("flat"), o.getDouble("low")) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_DURA)
+            else put(
+                KEY_DURA,
+                JSONObject().put("from", value.from).put("to", value.to).put("madeAt", value.madeAt).put("flat", value.flatHighPct).put("low", value.lowPct)
+            )
+        }
+
+    /** The last dura card, for the screen: "flat|low" in percent, empty before the first card. */
+    var lastDura: Pair<Double, Double>?
+        get() = read().optString(KEY_LAST_DURA).ifEmpty { null }?.split('|')?.takeIf { it.size == 2 }?.let { Pair(it[0].toDouble(), it[1].toDouble()) }
+        set(value) = edit { if (value == null) remove(KEY_LAST_DURA) else put(KEY_LAST_DURA, "${value.first}|${value.second}") }
+
     /** The hours of the last card, for the screen: "need|source|windows" per hour. */
     var lastHours: List<HourResult>
         get() = read().optString(KEY_HOURS).ifEmpty { null }?.split(';')?.mapNotNull { row ->
@@ -82,5 +107,8 @@ class LearnerStore(private val preferences: Preferences) {
         const val KEY_COUNT = "card_count"
         const val KEY_PROPOSAL = "basal_proposal"
         const val KEY_HOURS = "last_hours"
+        const val KEY_LAST_APPLIED = "last_applied_at"
+        const val KEY_DURA = "dura_proposal"
+        const val KEY_LAST_DURA = "last_dura"
     }
 }

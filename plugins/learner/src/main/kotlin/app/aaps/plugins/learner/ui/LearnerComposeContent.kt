@@ -34,6 +34,7 @@ import app.aaps.core.ui.compose.ComposablePluginContent
 import app.aaps.core.ui.compose.LocalDateUtil
 import app.aaps.core.ui.compose.ToolbarConfig
 import app.aaps.plugins.learner.BasalChange
+import app.aaps.plugins.learner.LearnerPlugin.Status
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin
 import app.aaps.plugins.learner.R
@@ -108,6 +109,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
             )
         } ?: Text(stringResource(R.string.learner_no_proposal), style = MaterialTheme.typography.bodyMedium)
 
+        DuraSection(plugin, status)
+
         if (status.hours.isNotEmpty()) {
             Text(stringResource(R.string.learner_hours_title), style = MaterialTheme.typography.titleMedium)
             status.hours.forEach { h ->
@@ -134,4 +137,37 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
 @Composable
 private fun ChangeRow(c: BasalChange) {
     Text(stringResource(R.string.learner_change, c.hour, c.from, c.to), fontWeight = FontWeight.SemiBold)
+}
+
+/** The dura card: what it saw, the rule, and a proposal with "Внести" / "Отказаться" when there is one. */
+@Composable
+private fun DuraSection(plugin: LearnerPlugin, status: Status) {
+    var confirm by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Text(stringResource(R.string.learner_dura_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.learner_dura_now, status.dura), style = MaterialTheme.typography.bodyMedium)
+            status.lastDura?.let { Text(stringResource(R.string.learner_dura_seen, it.first, it.second), style = MaterialTheme.typography.bodyMedium) }
+            Text(stringResource(R.string.learner_dura_rule), style = MaterialTheme.typography.bodySmall)
+            status.duraProposal?.let { p ->
+                Text(stringResource(R.string.learner_dura_change, p.from, p.to), fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
+                    Button(onClick = { confirm = true }, enabled = !status.busy) { Text(stringResource(R.string.learner_accept)) }
+                    OutlinedButton(onClick = { plugin.refuseDura() }, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
+                }
+                if (confirm) AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text(stringResource(R.string.learner_dura_title)) },
+                    text = { Text(stringResource(R.string.learner_dura_change, p.from, p.to), fontWeight = FontWeight.SemiBold) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirm = false
+                            plugin.acceptDura()
+                        }) { Text(stringResource(R.string.learner_accept)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
+                )
+            }
+        }
+    }
 }

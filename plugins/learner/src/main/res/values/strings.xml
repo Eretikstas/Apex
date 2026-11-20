@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="learner_name">Learner</string>
-    <string name="learner_description">Learns the basal from clean hours and proposes small changes. Nothing changes without your tap.</string>
+    <string name="learner_description">Learns the basal from clean hours and the AutoISF weight dura, and proposes small changes. Nothing changes without your tap.</string>
     <string name="learner_notice_proposal">Learner: a basal proposal is ready. Open the Learner to see it.</string>
     <string name="learner_last_card" comment="%1$s=date and time">Last check: %1$s</string>
     <string name="learner_no_card_yet">No check yet. The first one runs at 06:00.</string>
@@ -31,4 +31,15 @@
     <string name="learner_why_proposal" comment="%1$d = number of hours that would change. Example: 3">Learner: a basal proposal for %1$d hours waits for your answer.</string>
     <string name="learner_why_no_change">Learner: basal checked today, no change needed.</string>
     <string name="learner_why_applied" comment="%1$d = number of hours changed. Example: 3">Learner: basal of %1$d hours changed. It is judged over the next 3–4 days.</string>
+    <string name="learner_why_judging">Learner: the last applied change is judged now (3–4 days). No new proposal until then.</string>
+    <string name="learner_notice_dura">Learner: a proposal for the AutoISF weight dura is ready. Open the Learner to see it.</string>
+    <string name="learner_why_dura_proposal" comment="%1$.2f=dura now, %2$.2f=dura proposed. Example: 0.50 -> 0.75">Learner: proposal dura %1$.2f → %2$.2f waits for your answer.</string>
+    <string name="learner_why_dura_applied" comment="%1$.2f=old dura, %2$.2f=new dura">Learner: dura changed %1$.2f → %2$.2f. It is judged over the next 3–4 days.</string>
+    <string name="learner_dura_applied">Applied: the AutoISF weight dura is changed.</string>
+    <string name="learner_dura_changed">dura was changed after the check. The proposal is dropped; the next check makes a new one.</string>
+    <string name="learner_dura_title">AutoISF weight dura</string>
+    <string name="learner_dura_now" comment="%1$.2f=dura now">dura now: %1$.2f</string>
+    <string name="learner_dura_seen" formatted="false" comment="%1$.1f=share of flat highs in percent, %2$.1f=share of readings under 3.9 in percent, last 7 days">Last 7 days: flat highs %1$.1f %, under 3.9 %2$.1f %.</string>
+    <string name="learner_dura_rule" formatted="false">Up one step (+0.25, up to 2.0) when flat highs are 2 % or more and lows 3 % or less; down one step when lows are over 4 %.</string>
+    <string name="learner_dura_change" comment="%1$.2f=dura now, %2$.2f=dura proposed">dura %1$.2f → %2$.2f</string>
 </resources>

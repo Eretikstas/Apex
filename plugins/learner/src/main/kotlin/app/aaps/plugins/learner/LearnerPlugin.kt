@@ -18,6 +18,7 @@ import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileRepository
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.ui.compose.icons.IcStats
@@ -57,7 +58,7 @@ class LearnerPlugin(
     override val rh: ResourceHelper,
     aapsLogger: AAPSLogger,
     notificationManager: NotificationManager,
-    preferences: Preferences,
+    private val prefs: Preferences,
     private val history: LearnerHistory,
     private val profileFunction: ProfileFunction,
     private val profileRepository: ProfileRepository,
@@ -71,19 +72,23 @@ class LearnerPlugin(
         .icon(IcStats)
         .pluginName(TextRef.AndroidRes(R.string.learner_name))
         .description(TextRef.AndroidRes(R.string.learner_description)),
-    LearnerStringNonKey.entries, aapsLogger, rh, preferences, notificationManager
+    LearnerStringNonKey.entries, aapsLogger, rh, prefs, notificationManager
 ) {
 
     data class Status(
         val lastCardAt: Long = 0L,
         val nextCardAt: Long = 0L,
         val proposal: BasalProposal? = null,
+        val duraProposal: DuraProposal? = null,
+        /** The last dura card: flat highs and lows in percent. */
+        val lastDura: Pair<Double, Double>? = null,
+        val dura: Double = 0.0,
         val hours: List<HourResult> = emptyList(),
         val message: String = "",
         val busy: Boolean = false,
     )
 
-    private val store = LearnerStore(preferences)
+    private val store = LearnerStore(prefs)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
     private val _status = MutableStateFlow(Status())
@@ -134,10 +139,28 @@ class LearnerPlugin(
         store.lastCardAt = now
         store.lastHours = card.hours
         aapsLogger.debug(LTag.APS, "Learner: basal card, ${card.changes.size} changes: ${card.changes}")
-        if (card.changes.isNotEmpty()) {
-            store.proposal = BasalProposal(name, now, card.changes)
-            notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_proposal), level = NotificationLevel.INFO)
-        } else note(rh.gs(R.string.learner_why_no_change), now, NOTE_SHORT_MS)
+        // The dura card looks at the last 7 days of the same history.
+        val dura = prefs.get(DoubleKey.ApsAutoIsfDuraWeight)
+        val duraCard = DuraCardEngine.card(steps.takeLast(DuraCardEngine.DAYS * STEPS_PER_DAY), dura)
+        store.lastDura = Pair(duraCard.flatHighPct, duraCard.lowPct)
+        aapsLogger.debug(LTag.APS, "Learner: dura card $duraCard")
+        // One change at a time: the basal first; nothing new while the last applied change is still judged.
+        val judging = store.lastAppliedAt > 0 && now - store.lastAppliedAt < CARD_EVERY_MS - 2 * 3_600_000L
+        when {
+            judging                     -> note(rh.gs(R.string.learner_why_judging), now, NOTE_SHORT_MS)
+            card.changes.isNotEmpty()   -> {
+                store.proposal = BasalProposal(name, now, card.changes)
+                store.duraProposal = null
+                notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_proposal), level = NotificationLevel.INFO)
+            }
+
+            duraCard.to != null         -> {
+                store.duraProposal = DuraProposal(dura, duraCard.to, now, duraCard.flatHighPct, duraCard.lowPct)
+                notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_dura), level = NotificationLevel.INFO)
+            }
+
+            else                        -> note(rh.gs(R.string.learner_why_no_change), now, NOTE_SHORT_MS)
+        }
         refresh()
     }
 
@@ -176,9 +199,31 @@ class LearnerPlugin(
             listValues = emptyList(), timestamp = dateUtil.now()
         )
         store.proposal = null
+        store.lastAppliedAt = dateUtil.now()
         note(rh.gs(R.string.learner_why_applied, proposal.changes.size), dateUtil.now(), NOTE_LONG_MS)
         aapsLogger.debug(LTag.APS, "Learner: basal proposal applied to ${proposal.profileName}, switch=${switch != null}")
         finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
+    }
+
+    /** "Внести" for dura: the AutoISF weight gets the proposed value, if nobody changed it since the card. */
+    fun acceptDura() {
+        val p = store.duraProposal ?: return
+        store.duraProposal = null
+        if (abs(prefs.get(DoubleKey.ApsAutoIsfDuraWeight) - p.from) > 0.001) {
+            refresh(rh.gs(R.string.learner_dura_changed))
+            return
+        }
+        prefs.put(DoubleKey.ApsAutoIsfDuraWeight, p.to)
+        store.lastAppliedAt = dateUtil.now()
+        note(rh.gs(R.string.learner_why_dura_applied, p.from, p.to), dateUtil.now(), NOTE_LONG_MS)
+        aapsLogger.debug(LTag.APS, "Learner: dura ${p.from} -> ${p.to} applied")
+        refresh(rh.gs(R.string.learner_dura_applied))
+    }
+
+    fun refuseDura() {
+        store.duraProposal = null
+        loopNotes.clear(NOTE_SOURCE)
+        refresh(rh.gs(R.string.learner_refused))
     }
 
     /** "Отказаться": the proposal is dropped and not remembered. */
@@ -203,10 +248,14 @@ class LearnerPlugin(
         val last = store.lastCardAt
         // A waiting proposal is always in the "why", also after a restart of the app.
         store.proposal?.let { note(rh.gs(R.string.learner_why_proposal, it.changes.size), it.madeAt, PROPOSAL_NOTE_MS) }
+        store.duraProposal?.let { note(rh.gs(R.string.learner_why_dura_proposal, it.from, it.to), it.madeAt, PROPOSAL_NOTE_MS) }
         _status.value = Status(
             lastCardAt = last,
             nextCardAt = nextCardAt(last),
             proposal = store.proposal,
+            duraProposal = store.duraProposal,
+            lastDura = store.lastDura,
+            dura = prefs.get(DoubleKey.ApsAutoIsfDuraWeight),
             hours = store.lastHours,
             message = message,
             busy = false,
@@ -242,6 +291,7 @@ class LearnerPlugin(
         const val CARD_EVERY_MS = 4 * 86_400_000L
         const val HOUR_MS = 3_600_000L
         const val TICK_MS = 10 * 60_000L
+        const val STEPS_PER_DAY = 288
         const val NOTE_SOURCE = "learner"
         const val NOTE_SHORT_MS = 12 * 3_600_000L
         const val NOTE_LONG_MS = 24 * 3_600_000L

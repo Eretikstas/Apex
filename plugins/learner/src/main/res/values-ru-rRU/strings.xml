@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="learner_name">Ученик</string>
-    <string name="learner_description">Учит базал по чистым часам и предлагает небольшие изменения. Без вашего нажатия ничего не меняется.</string>
+    <string name="learner_description">Учит базал по чистым часам и вес AutoISF dura и предлагает небольшие изменения. Без вашего нажатия ничего не меняется.</string>
     <string name="learner_notice_proposal">Ученик: готово предложение по базалу. Откройте «Ученик».</string>
     <string name="learner_last_card">Последняя проверка: %1$s</string>
     <string name="learner_no_card_yet">Проверок ещё не было. Первая — в 06:00.</string>
@@ -31,4 +31,15 @@
     <string name="learner_why_proposal">Ученик: предложение по базалу (%1$d ч) ждёт вашего ответа.</string>
     <string name="learner_why_no_change">Ученик: базал проверен сегодня, менять не нужно.</string>
     <string name="learner_why_applied">Ученик: базал изменён (%1$d ч). Оценка — следующие 3–4 дня.</string>
+    <string name="learner_why_judging">Ученик: идёт оценка последнего внесённого изменения (3–4 дня). Новых предложений до её конца нет.</string>
+    <string name="learner_notice_dura">Ученик: готово предложение по весу AutoISF dura. Откройте «Ученик».</string>
+    <string name="learner_why_dura_proposal">Ученик: предложение dura %1$.2f → %2$.2f ждёт вашего ответа.</string>
+    <string name="learner_why_dura_applied">Ученик: dura изменён %1$.2f → %2$.2f. Оценка — следующие 3–4 дня.</string>
+    <string name="learner_dura_applied">Внесено: вес AutoISF dura изменён.</string>
+    <string name="learner_dura_changed">dura изменили после проверки. Предложение снято; следующая проверка сделает новое.</string>
+    <string name="learner_dura_title">Вес AutoISF dura</string>
+    <string name="learner_dura_now">dura сейчас: %1$.2f</string>
+    <string name="learner_dura_seen" formatted="false">Последние 7 дней: ровные высокие %1$.1f %, ниже 3,9 %2$.1f %.</string>
+    <string name="learner_dura_rule" formatted="false">Шаг вверх (+0,25, до 2,0), когда ровных высоких 2 % и больше, а низких 3 % и меньше; шаг вниз, когда низких больше 4 %.</string>
+    <string name="learner_dura_change">dura %1$.2f → %2$.2f</string>
 </resources>
