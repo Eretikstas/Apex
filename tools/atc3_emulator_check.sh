@@ -40,10 +40,17 @@ if [ -n "$TEST" ]; then
   adb install -r -g "$TEST" >> $S 2>&1
   TPKG=$(adb shell pm list instrumentation | tr -d '\r' | grep "target=$PKG" | head -1 | sed -E 's#instrumentation:([^ ]+).*#\1#')
   echo "== end to end tests ($TPKG)" >> $S
-  for C in app.aaps.e2e.Atc3EmulatorScenarioTest app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.ErrorActivityInjectionTest \
+  # The set-up wizard test wants a fresh install: the random taps above have already walked through it.
+  adb uninstall $PKG >> $S 2>&1
+  adb install -r -g "$APP" >> $S 2>&1
+  adb install -r -g "$TEST" >> $S 2>&1
+  adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
+  for C in app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.Atc3EmulatorScenarioTest app.aaps.e2e.ErrorActivityInjectionTest \
            app.aaps.LoopTest app.aaps.RunningConfigurationTest app.aaps.CobExtendedCarbsTest app.aaps.RunningModeReconcilerIntegrationTest; do
     adb logcat -c
-    timeout 1200 adb shell am instrument -w -e class $C $TPKG > $OUT/test_$C.txt 2>&1
+    # Our ATC3 scenarios take about 2 min each (30+ of them); the other classes are short.
+    T=1200; [ "$C" = app.aaps.e2e.Atc3EmulatorScenarioTest ] && T=6000
+    timeout $T adb shell am instrument -w -e class $C $TPKG > $OUT/test_$C.txt 2>&1
     res=$(grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION_FAILED|Process crashed|INSTRUMENTATION_RESULT: shortMsg" $OUT/test_$C.txt | tr '\n' ' ')
     echo "$C: ${res:-no result (timeout?)}" >> $S
     adb logcat -d > $OUT/logcat_$C.txt
