@@ -245,6 +245,12 @@ internal class SibionicsSession(
     }
 
     private fun onData(entries: List<SibionicsProtocol.V120Entry>) {
+        // Some sensors stream their own current minute right after auth, before our data request. That page is not
+        // what we asked for: it is skipped quietly, the request follows and the sensor then serves from our cursor.
+        if (phase != Phase.REQUESTING_DATA && phase != Phase.STREAMING) {
+            io.log("page idx=${entries.firstOrNull()?.index} before our request, skipped (phase $phase)")
+            return
+        }
         io.cancel(Timer.HANDSHAKE)
         phase = Phase.STREAMING
         io.schedule(Timer.STREAMING, STREAMING_CHECK_MS)

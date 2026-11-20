@@ -10,6 +10,7 @@ on:
       - autoisf-atc3
     paths:
       - 'sibionics-core/**'
+      - 'plugins/sibionics/**'
 
 concurrency:
   group: sibionics-ci-${{ github.ref }}
@@ -42,12 +43,17 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14.3'
-      - name: Build and test
+      - name: Native source session and box code tests (plain JVM)
+        run: gradle --console=plain -p plugins/sibionics/jvm-check test --continue --stacktrace
+      - name: JugglucoNG core tests
+        if: ${{ !cancelled() }}
         run: gradle --console=plain -p sibionics-core test --continue --stacktrace
       - name: Upload test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: sibionics-test-reports
-          path: sibionics-core/build/reports/tests
+          path: |
+            sibionics-core/build/reports/tests
+            plugins/sibionics/jvm-check/build/reports/tests
           if-no-files-found: ignore
