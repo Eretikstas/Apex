@@ -1,6 +1,5 @@
 package app.aaps.plugins.learner
 
-import android.content.Context
 import app.aaps.core.data.model.data.Block
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.ue.Action
@@ -11,11 +10,13 @@ import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.interfaces.notifications.NotificationLevel
 import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.plugin.PluginBase
+import app.aaps.core.interfaces.plugin.PluginBaseWithPreferences
 import app.aaps.core.interfaces.plugin.PluginDescription
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileRepository
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.core.keys.interfaces.TextRef
 import app.aaps.core.ui.compose.icons.IcStats
 import app.aaps.plugins.learner.ui.LearnerComposeContent
@@ -51,15 +52,15 @@ import kotlin.math.abs
 @SingleIn(AppScope::class)
 @Inject
 class LearnerPlugin(
-    context: Context,
     override val rh: ResourceHelper,
     aapsLogger: AAPSLogger,
     notificationManager: NotificationManager,
+    preferences: Preferences,
     private val history: LearnerHistory,
     private val profileFunction: ProfileFunction,
     private val profileRepository: ProfileRepository,
     private val dateUtil: DateUtil,
-) : PluginBase(
+) : PluginBaseWithPreferences(
     PluginDescription()
         .mainType(PluginType.GENERAL)
         .setDefault(true)
@@ -67,7 +68,7 @@ class LearnerPlugin(
         .icon(IcStats)
         .pluginName(TextRef.AndroidRes(R.string.learner_name))
         .description(TextRef.AndroidRes(R.string.learner_description)),
-    aapsLogger, rh, notificationManager
+    LearnerStringNonKey.entries, aapsLogger, rh, preferences, notificationManager
 ) {
 
     data class Status(
@@ -79,7 +80,7 @@ class LearnerPlugin(
         val busy: Boolean = false,
     )
 
-    private val store = LearnerStore(context)
+    private val store = LearnerStore(preferences)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
     private val _status = MutableStateFlow(Status())

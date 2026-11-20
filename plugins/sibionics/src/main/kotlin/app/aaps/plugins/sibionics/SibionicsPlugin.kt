@@ -72,7 +72,7 @@ class SibionicsPlugin(
         .pluginName(TextRef.AndroidRes(R.string.sibionics_native))
         .preferencesVisibleInSimpleMode(false)
         .description(TextRef.AndroidRes(R.string.sibionics_native_description)),
-    emptyList(), aapsLogger, rh, preferences, notificationManager
+    SibionicsStringNonKey.entries, aapsLogger, rh, preferences, notificationManager
 ), BgSource {
 
     /** What the screen shows. */
@@ -91,7 +91,7 @@ class SibionicsPlugin(
         val nextIndex: Int = 0
     )
 
-    private val store = SibionicsStore(context)
+    private val store = SibionicsStore(context, preferences)
     private val radio = SibionicsRadio(context, aapsLogger)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val _status = MutableStateFlow(Status())

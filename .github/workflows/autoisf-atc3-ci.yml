@@ -105,6 +105,7 @@ jobs:
             plugins/learner/build/reports/tests
             ui/build/reports/tests
             app/build/reports/tests
+            app/src/testFull/resources/prefs-schema.txt
           if-no-files-found: ignore
 
   # How ready is this base? The app on an emulator: first a fresh install tapped at random (crashes

@@ -1,35 +1,42 @@
 package app.aaps.plugins.sibionics
 
 import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
+import app.aaps.core.keys.interfaces.Preferences
+import org.json.JSONObject
 import tk.glucodata.drivers.sibionics.SibionicsSampleJournal
 import tk.glucodata.drivers.sibionics.SibionicsSourceSample
 import java.io.File
 
 /**
- * The sensor that is set up, and its session state. Kept apart from the AAPS preferences, like a pump's own
- * store: it is device state, not a setting, and must not travel with a settings export to another phone.
+ * The sensor that is set up, and its session state, kept as one document under [SibionicsStringNonKey.State] (device
+ * state, not exported). The journal of raw minutes is a file of its own.
  */
-internal class SibionicsStore(context: Context) {
+internal class SibionicsStore(context: Context, private val preferences: Preferences) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val dir = File(context.filesDir, "sibionics")
+
+    private fun read(): JSONObject = runCatching { JSONObject(preferences.get(SibionicsStringNonKey.State)) }.getOrElse { JSONObject() }
+
+    private fun update(block: JSONObject.() -> Unit) {
+        val o = read()
+        o.block()
+        preferences.put(SibionicsStringNonKey.State, o.toString())
+    }
 
     /** The code read from the box (QR text or serial), empty when no sensor is set up. */
     var sensorCode: String
-        get() = prefs.getString(KEY_CODE, "").orEmpty()
-        set(value) = prefs.edit { putString(KEY_CODE, value) }
+        get() = read().optString(KEY_CODE)
+        set(value) = update { put(KEY_CODE, value) }
 
     /** Bluetooth address of the transmitter, empty until it was found. */
     var address: String
-        get() = prefs.getString(KEY_ADDRESS, "").orEmpty()
-        set(value) = prefs.edit { putString(KEY_ADDRESS, value) }
+        get() = read().optString(KEY_ADDRESS)
+        set(value) = update { put(KEY_ADDRESS, value) }
 
     /** Name the transmitter advertises. */
     var bleName: String
-        get() = prefs.getString(KEY_BLE_NAME, "").orEmpty()
-        set(value) = prefs.edit { putString(KEY_BLE_NAME, value) }
+        get() = read().optString(KEY_BLE_NAME)
+        set(value) = update { put(KEY_BLE_NAME, value) }
 
     fun identity(): SibionicsIdentity? = SibionicsIdentityParser.parse(sensorCode.ifBlank { null })
 
@@ -39,21 +46,21 @@ internal class SibionicsStore(context: Context) {
     /** Forget the sensor: its code, address and session files. */
     fun forget() {
         identity()?.let { SessionFiles(it.sensorId).clearAll() }
-        prefs.edit { clear() }
+        preferences.put(SibionicsStringNonKey.State, "")
     }
 
-    private inner class SessionFiles(private val sensorId: String) : SibionicsSessionStore {
+    private inner class SessionFiles(sensorId: String) : SibionicsSessionStore {
 
         private val safeId = sensorId.filter { it.isLetterOrDigit() }
         private val journal = SibionicsSampleJournal(File(dir, "$safeId.journal"))
 
         override var sessionStart: Long
-            get() = prefs.getLong(KEY_START + safeId, 0L)
-            set(value) = prefs.edit { putLong(KEY_START + safeId, value) }
+            get() = read().optLong(KEY_START + safeId, 0L)
+            set(value) = update { put(KEY_START + safeId, value) }
 
         override var lastSeen: Long
-            get() = prefs.getLong(KEY_LAST_SEEN + safeId, 0L)
-            set(value) = prefs.edit { putLong(KEY_LAST_SEEN + safeId, value) }
+            get() = read().optLong(KEY_LAST_SEEN + safeId, 0L)
+            set(value) = update { put(KEY_LAST_SEEN + safeId, value) }
 
         override fun journal(): List<SibionicsSourceSample> = journal.snapshot()
 
@@ -65,7 +72,7 @@ internal class SibionicsStore(context: Context) {
 
         fun clearAll() {
             journal.clear()
-            prefs.edit {
+            update {
                 remove(KEY_START + safeId)
                 remove(KEY_LAST_SEEN + safeId)
             }
@@ -74,7 +81,6 @@ internal class SibionicsStore(context: Context) {
 
     private companion object {
 
-        const val PREFS = "sibionics_native"
         const val KEY_CODE = "sensor_code"
         const val KEY_ADDRESS = "address"
         const val KEY_BLE_NAME = "ble_name"
