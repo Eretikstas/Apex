@@ -2,11 +2,14 @@ package app.aaps.ui.compose.overview.ring
 
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalConfiguration
@@ -32,8 +35,10 @@ import app.aaps.core.interfaces.overview.graph.BgInfoData
 import app.aaps.core.interfaces.overview.graph.BgRange
 import app.aaps.core.interfaces.overview.graph.BgType
 import app.aaps.core.interfaces.overview.graph.TbrState
+import app.aaps.core.interfaces.overview.graph.TimeRange
 import app.aaps.core.interfaces.rx.events.Event
 import app.aaps.core.keys.StringKey
+import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.ui.compose.LocalMetroViewModelFactory
 import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
 import app.aaps.ui.compose.main.TempTargetChipState
@@ -74,7 +79,7 @@ import app.aaps.core.ui.R as CoreUiR
  * Pictures of the "Кольцо" overview, in Russian and mmol/L, day and night, for a person to look at. Writes PNG files to
  * `build/ring-shots` (CI uploads them). The only check is that the screen draws; the pictures are the result.
  *
- * Test data: 6 hours of glucose (a meal rise and a fall back), the loop's last answer an SMB, and a learner note.
+ * Test data: 6 hours of glucose (dinner, then a slow rise now), the loop's last answer an SMB on that rise, and a learner note.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -120,7 +125,7 @@ class RingScreenshotTest {
                 LocalMetroViewModelFactory provides factory,
                 LocalViewModelStoreOwner provides viewModelStoreOwner
             ) {
-                Portrait(dark) { screen.Content { Overview() } }
+                Portrait(dark) { screen.Content { Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { Overview() } } }
             }
         }
         compose.waitForIdle()
@@ -141,29 +146,35 @@ class RingScreenshotTest {
         whenever(screen.profileUtil.fromMgdlToStringWithUnits(anyOrNull())).thenAnswer { inv ->
             (inv.arguments[0] as Double?)?.let { String.format(Locale("ru"), "%.1f ммоль/л", it / 18.0) } ?: "—"
         }
+        whenever(screen.preferences.get(UnitDoubleKey.OverviewHighMark)).thenReturn(10.0)
+        whenever(screen.preferences.get(UnitDoubleKey.OverviewLowMark)).thenReturn(3.9)
+        whenever(screen.preferences.observe(UnitDoubleKey.OverviewHighMark)).thenReturn(MutableStateFlow(10.0))
+        whenever(screen.preferences.observe(UnitDoubleKey.OverviewLowMark)).thenReturn(MutableStateFlow(3.9))
         whenever(screen.dateUtil.now()).thenReturn(NOW)
         whenever(screen.dateUtil.timeString(any<Long>())).thenReturn("21:30")
         whenever(screen.dateUtil.dateAndTimeString(any<Long>())).thenReturn("20.11 21:30")
     }
 
-    /** 6 h of readings every 5 min: in range, a meal rise to about 11, back to about 6.5. Last 6.4 and falling a bit. */
+    /** 6 h of readings every 5 min: a dinner rise to about 11 and back to 6, then a new slow rise to 8.6 now. */
     private fun glucose() {
         val points = (72 downTo 0).map { k ->
-            val t = NOW - k * 300_000L
-            val x = (72 - k) / 72.0
-            val mgdl = 110.0 + 90.0 * maxOf(0.0, sin(x * Math.PI * 1.2)) - 4.0 * x
-            Triple(t, mgdl, if (mgdl > 180) BgRange.HIGH else BgRange.IN_RANGE)
+            val h = (72 - k) / 12.0
+            val meal = if (h < 4.0) 90.0 * sin(Math.PI * h / 4.0) else 0.0
+            val rise = if (h > 4.5) 50.0 * (h - 4.5) / 1.5 else 0.0
+            val mgdl = 108.0 + meal + rise
+            Triple(NOW - k * 300_000L, mgdl, if (mgdl > 180) BgRange.HIGH else if (mgdl < 70) BgRange.LOW else BgRange.IN_RANGE)
         }
+        viewModels.cache.timeRangeFlow.value = TimeRange(NOW - 6 * 3_600_000L, NOW, NOW + 3_600_000L)
         viewModels.cache.bgReadingsFlow.value = points.map { BgDataPoint(it.first, it.second / 18.0, it.third, BgType.REGULAR) }
         val last = points.last().second
         viewModels.cache.bgInfoFlow.value = BgInfoData(
             bgValue = last / 18.0, bgText = String.format(Locale("ru"), "%.1f", last / 18.0), bgRange = BgRange.IN_RANGE,
-            isOutdated = false, timestamp = NOW - 60_000L, trendArrow = TrendArrow.FORTY_FIVE_DOWN,
-            trendDescription = "", delta = -0.2, deltaText = "-0,2",
+            isOutdated = false, timestamp = NOW - 60_000L, trendArrow = TrendArrow.FORTY_FIVE_UP,
+            trendDescription = "", delta = 0.3, deltaText = "+0,3",
             shortAvgDelta = null, shortAvgDeltaText = null, longAvgDelta = null, longAvgDeltaText = null
         )
         viewModels.cache.predictionsFlow.value = (1..12).map { k ->
-            BgDataPoint(NOW + k * 300_000L, (last - k * 1.5) / 18.0, BgRange.IN_RANGE, BgType.IOB_PREDICTION)
+            BgDataPoint(NOW + k * 300_000L, (last + 14.0 * sin(Math.PI * k / 16.0)) / 18.0, BgRange.IN_RANGE, BgType.UAM_PREDICTION)
         }
         val day = (288 downTo 0).map { k ->
             val v = 130.0 + 70.0 * sin(k / 40.0) - if (k % 97 < 4) 70.0 else 0.0
@@ -177,7 +188,7 @@ class RingScreenshotTest {
         val request: APSResult = mock()
         whenever(request.reason).thenReturn(
             "COB: 12, Dev: 18, BGI: -1.1, ISF: 9.0, CR: 25.8, Target: 6, minPredBG 6.1, minGuardBG 5.8, IOBpredBG 6.0; " +
-                "Eventual BG 8.4 >= 6.0, insulinReq 0.32. Microbolusing 0.15U. "
+                "Eventual BG 9.1 >= 6.0, insulinReq 0.32. Microbolusing 0.15U. "
         )
         whenever(request.smb).thenReturn(0.15)
         whenever(request.isTempBasalRequested).thenReturn(false)
