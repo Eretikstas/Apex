@@ -1,0 +1,53 @@
+name: Sibionics source
+
+# The native Sibionics source taken from JugglucoNG: builds the module and runs the vendored JugglucoNG
+# tests (same numbers on the same real sensor traces).
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - autoisf-atc3
+    paths:
+      - 'plugins/source-sibionics/**'
+
+concurrency:
+  group: sibionics-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
+        -Dkotlin.daemon.jvm.options="-Xmx3g"
+        -Dkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.workers.max=2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+      - name: Build and test
+        run: ./gradlew --console=plain :plugins:source-sibionics:testDebugUnitTest --continue --stacktrace
+      - name: Upload test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sibionics-test-reports
+          path: plugins/source-sibionics/build/reports/tests
+          if-no-files-found: ignore
