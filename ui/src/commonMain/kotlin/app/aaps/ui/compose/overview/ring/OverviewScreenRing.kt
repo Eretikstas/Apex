@@ -143,21 +143,7 @@ fun OverviewScreenRing(
             formatDuration = formatDuration
         )
         eatReminderBanner()
-        RingHero(
-            bgInfo = bgInfoState.bgInfo,
-            timeAgo = bgInfoState.timeAgoText,
-            stats = ringState.stats,
-            iobText = iobUiState.text,
-            cobText = cobUiState.text
-        )
-        RingPeriodRow(period = ringState.period, stats = ringState.stats, onPick = ringViewModel::selectPeriod)
-        RingHourTile(
-            hour = hour, readings = readings, prediction = mainPrediction, now = now, horizon = horizon, onHorizon = { horizon = it },
-            forecast = forecast, forecastText = forecastText
-        )
-        RingWhyCard(why = ringState.why, whyTime = ringState.whyTime, eventualText = eventualText, notes = ringState.notes)
-
-        // The loop's command chips (running mode, profile, temp target, temp basal) stay as on the usual screen.
+        // The loop's command chips (running mode, profile, temp target, temp basal) at the top, as on the usual screen.
         OverviewChipsColumn(
             runningMode = runningMode,
             runningModeText = runningModeText,
@@ -187,6 +173,20 @@ fun OverviewScreenRing(
             commandsAllowed = commandsAllowed,
             modifier = Modifier.fillMaxWidth()
         )
+
+        RingHero(
+            bgInfo = bgInfoState.bgInfo,
+            timeAgo = bgInfoState.timeAgoText,
+            stats = ringState.stats,
+            iobText = iobUiState.text,
+            cobText = cobUiState.text
+        )
+        RingPeriodRow(period = ringState.period, stats = ringState.stats, onPick = ringViewModel::selectPeriod)
+        RingHourTile(
+            hour = hour, readings = readings, prediction = mainPrediction, now = now, horizon = horizon, onHorizon = { horizon = it },
+            forecast = forecast, forecastText = forecastText
+        )
+        RingWhyCard(why = ringState.why, whyTime = ringState.whyTime, eventualText = eventualText, notes = ringState.notes)
 
         AutoIsfChip(
             state = autoIsfFactorsUiState,
