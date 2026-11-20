@@ -173,8 +173,8 @@ class RingScreenshotTest {
             trendDescription = "", delta = 0.3, deltaText = "+0,3",
             shortAvgDelta = null, shortAvgDeltaText = null, longAvgDelta = null, longAvgDeltaText = null
         )
-        viewModels.cache.predictionsFlow.value = (1..12).map { k ->
-            BgDataPoint(NOW + k * 300_000L, (last + 14.0 * sin(Math.PI * k / 16.0)) / 18.0, BgRange.IN_RANGE, BgType.UAM_PREDICTION)
+        viewModels.cache.predictionsFlow.value = (1..36).map { k ->
+            BgDataPoint(NOW + k * 300_000L, (last + 14.0 * sin(Math.PI * minOf(k, 16) / 16.0) - 1.2 * maxOf(0, k - 16)) / 18.0, BgRange.IN_RANGE, BgType.UAM_PREDICTION)
         }
         val day = (288 downTo 0).map { k ->
             val v = 130.0 + 70.0 * sin(k / 40.0) - if (k % 97 < 4) 70.0 else 0.0

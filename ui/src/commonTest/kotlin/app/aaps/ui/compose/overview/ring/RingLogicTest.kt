@@ -46,4 +46,31 @@ class RingLogicTest {
     fun noGlucoseIsUnknown() {
         assertEquals(RingHour.UNKNOWN, RingLogic.hour(null, null, null, smbLimited = false))
     }
+
+    private val now = 1_000_000_000L
+    private fun line(minutes: Int) = (5..minutes step 5).map { now + it * 60_000L to 100.0 + it }
+
+    @Test
+    fun forecastTakesTheLoopValueAtTheHorizon() {
+        val f = RingLogic.forecast(line(240), now, 2 * 3_600_000L)!!
+        assertEquals(now + 120 * 60_000L, f.time)
+        assertEquals(220.0, f.value)
+        assertEquals(true, f.reachesHorizon)
+    }
+
+    @Test
+    fun forecastSaysWhereALineThatEndsEarlyEnds() {
+        // oref stopped the line at 95 min: for 2 h the tile shows the last point, at 95 min, not a made-up value.
+        val f = RingLogic.forecast(line(95), now, 2 * 3_600_000L)!!
+        assertEquals(now + 95 * 60_000L, f.time)
+        assertEquals(195.0, f.value)
+        assertEquals(false, f.reachesHorizon)
+    }
+
+    @Test
+    fun forecastIsNullWithoutAFutureLine() {
+        assertEquals(null, RingLogic.forecast(emptyList(), now, 3_600_000L))
+        assertEquals(null, RingLogic.forecast(listOf(now - 60_000L to 100.0), now, 3_600_000L))
+    }
 }
+

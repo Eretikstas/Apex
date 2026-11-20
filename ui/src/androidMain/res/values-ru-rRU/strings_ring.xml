@@ -7,12 +7,15 @@
     <string name="ring_in_range">В диапазоне %1$d %%</string>
     <string name="ring_low_high">Ниже %1$d %% · выше %2$d %% · CV %3$d %%</string>
     <string name="ring_no_stats">Нет значений за этот период</string>
-    <string name="ring_hour_title">Ближайший час</string>
+    <string name="ring_hour_title">Ближайшие часы</string>
     <string name="ring_hour_stable">Стабильно</string>
     <string name="ring_hour_rising">Растёт</string>
     <string name="ring_hour_falling">Падает</string>
     <string name="ring_hour_unknown">Нет данных</string>
-    <string name="ring_pred_60">Через 1 ч: %1$s</string>
+    <string name="ring_horizon_hours">%1$d ч</string>
+    <string name="ring_pred_in">Через %1$d ч: %2$s</string>
+    <string name="ring_pred_until">Прогноз цикла до %1$s: %2$s</string>
+    <string name="ring_pred_none">Прогноза цикла пока нет</string>
     <string name="ring_why_title">Почему</string>
     <string name="ring_why_no_data">Нет пригодных данных сенсора: цикл ждёт.</string>
     <string name="ring_why_low">Сахар низкий или будет низким: инсулин придержан.</string>

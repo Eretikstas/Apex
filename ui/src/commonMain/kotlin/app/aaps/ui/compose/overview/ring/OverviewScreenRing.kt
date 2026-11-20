@@ -107,16 +107,20 @@ fun OverviewScreenRing(
 
     val readings = bgReadings.filter { it.type == BgType.REGULAR }.ifEmpty { bgReadings.filter { it.type == BgType.BUCKETED } }
         .sortedBy { it.timestamp }
+    // The state word keeps its tested rule: the lowest prediction of the next hour, all lines.
     val future = predictions.filter { it.timestamp in (now + 1)..(now + 60 * 60_000L) }
-    val mainPrediction = future.filter { it.type == BgType.UAM_PREDICTION }.ifEmpty { future.filter { it.type == BgType.COB_PREDICTION } }
-        .ifEmpty { future.filter { it.type == BgType.IOB_PREDICTION } }
-    val pred60 = mainPrediction.maxByOrNull { it.timestamp }
     val minPredMgdl = future.minOfOrNull { it.value }?.let { toMgdl(it) }
+    // The graph and the value: one line of the loop's own prediction up to the chosen horizon, UAM first, then COB, then IOB.
+    var horizon by rememberSaveable { mutableStateOf(RingHorizon.H1) }
+    val ahead = predictions.filter { it.timestamp in (now + 1)..(now + horizon.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS) }
+    val mainPrediction = ahead.filter { it.type == BgType.UAM_PREDICTION }.ifEmpty { ahead.filter { it.type == BgType.COB_PREDICTION } }
+        .ifEmpty { ahead.filter { it.type == BgType.IOB_PREDICTION } }
+    val forecast = RingLogic.forecast(mainPrediction.map { it.timestamp to it.value }, now, horizon.hours * 3_600_000L)
     val bgMgdl = bgInfoState.bgInfo?.let { if (it.isOutdated) null else toMgdl(it.bgValue) }
     val deltaMgdl = if (readings.size >= 2 && abs(readings.last().timestamp - readings[readings.size - 2].timestamp) <= 6 * 60_000L)
         toMgdl(readings.last().value - readings[readings.size - 2].value) else null
     val hour = RingLogic.hour(bgMgdl, deltaMgdl, minPredMgdl, ringState.why?.limited == true)
-    val pred60Text = pred60?.let { profileUtil.fromMgdlToStringWithUnits(toMgdl(it.value)) }
+    val forecastText = forecast?.let { profileUtil.fromMgdlToStringWithUnits(toMgdl(it.value)) }
     val eventualText = ringState.why?.eventualMgdl?.let { profileUtil.fromMgdlToStringWithUnits(it) }
 
     var statusExpanded by rememberSaveable { mutableStateOf(false) }
@@ -147,7 +151,10 @@ fun OverviewScreenRing(
             cobText = cobUiState.text
         )
         RingPeriodRow(period = ringState.period, stats = ringState.stats, onPick = ringViewModel::selectPeriod)
-        RingHourTile(hour = hour, readings = readings, prediction = mainPrediction, now = now, pred60Text = pred60Text)
+        RingHourTile(
+            hour = hour, readings = readings, prediction = mainPrediction, now = now, horizon = horizon, onHorizon = { horizon = it },
+            forecast = forecast, forecastText = forecastText
+        )
         RingWhyCard(why = ringState.why, whyTime = ringState.whyTime, eventualText = eventualText, notes = ringState.notes)
 
         // The loop's command chips (running mode, profile, temp target, temp basal) stay as on the usual screen.

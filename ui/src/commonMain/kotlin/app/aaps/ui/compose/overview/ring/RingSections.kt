@@ -140,18 +140,32 @@ internal fun RingPeriodRow(period: RingPeriod, stats: RingStats?, onPick: (RingP
     }
 }
 
-/** "Next hour": the state word, the last 3 hours with the 1 hour prediction, and the value in one hour. */
+/**
+ * "Next hours": the state word (its rule looks at the next hour), the last 3 hours with the loop's own prediction up to
+ * the chosen horizon (1, 2 or 3 h), and the predicted value at the horizon. When the loop's line ends before the
+ * horizon, the tile says where it ends instead of drawing further.
+ */
 @Composable
-internal fun RingHourTile(hour: RingHour, readings: List<BgDataPoint>, prediction: List<BgDataPoint>, now: Long, pred60Text: String?) {
+internal fun RingHourTile(
+    hour: RingHour,
+    readings: List<BgDataPoint>,
+    prediction: List<BgDataPoint>,
+    now: Long,
+    horizon: RingHorizon,
+    onHorizon: (RingHorizon) -> Unit,
+    forecast: RingForecast?,
+    forecastText: String?
+) {
     val accent = when (hour) {
         RingHour.FALLING -> AapsTheme.generalColors.bgLow
         RingHour.RISING  -> AapsTheme.generalColors.bgHigh
         RingHour.STABLE  -> AapsTheme.generalColors.bgInRange
         RingHour.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val dateUtil = LocalDateUtil.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(AapsSpacing.large)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(UiStrings.ring_hour_title), style = MaterialTheme.typography.labelLarge)
                 Text(
                     stringResource(
@@ -165,16 +179,26 @@ internal fun RingHourTile(hour: RingHour, readings: List<BgDataPoint>, predictio
                     style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.Bold
                 )
             }
-            HourGraph(readings, prediction, now, accent)
-            pred60Text?.let { Text(stringResource(UiStrings.ring_pred_60, it), style = MaterialTheme.typography.bodyMedium) }
+            Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+                RingHorizon.entries.forEach { h ->
+                    FilterChip(selected = h == horizon, onClick = { onHorizon(h) }, label = { Text(stringResource(UiStrings.ring_horizon_hours, h.hours)) })
+                }
+            }
+            HourGraph(readings, prediction, now, horizon.hours * 3_600_000L, accent)
+            if (forecast != null && forecastText != null) Text(
+                if (forecast.reachesHorizon) stringResource(UiStrings.ring_pred_in, horizon.hours, forecastText)
+                else stringResource(UiStrings.ring_pred_until, dateUtil.timeString(forecast.time), forecastText),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            else Text(stringResource(UiStrings.ring_pred_none), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
 @Composable
-private fun HourGraph(readings: List<BgDataPoint>, prediction: List<BgDataPoint>, now: Long, accent: Color) {
+private fun HourGraph(readings: List<BgDataPoint>, prediction: List<BgDataPoint>, now: Long, aheadMs: Long, accent: Color) {
     val past = readings.filter { it.timestamp >= now - 3 * 3_600_000L }
-    val future = prediction.filter { it.timestamp in now..(now + 3_600_000L) }
+    val future = prediction.filter { it.timestamp in now..(now + aheadMs + RingLogic.POINT_TOLERANCE_MS) }
     val all = past + future
     if (all.isEmpty()) return
     val band = AapsTheme.generalColors.bgInRange.copy(alpha = 0.12f)
@@ -185,7 +209,7 @@ private fun HourGraph(readings: List<BgDataPoint>, prediction: List<BgDataPoint>
     val minV = minOf(all.minOf { it.value }, lowLine) * 0.9
     val maxV = maxOf(all.maxOf { it.value }, highLine) * 1.05
     val t0 = now - 3 * 3_600_000L
-    val t1 = now + 3_600_000L
+    val t1 = now + aheadMs
     Canvas(modifier = Modifier.fillMaxWidth().height(96.dp).padding(vertical = AapsSpacing.small)) {
         fun x(t: Long) = ((t - t0).toFloat() / (t1 - t0)) * size.width
         fun y(v: Double) = (size.height - ((v - minV) / (maxV - minV)).toFloat() * size.height)
