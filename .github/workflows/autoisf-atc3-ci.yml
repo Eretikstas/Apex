@@ -90,7 +90,7 @@ jobs:
       - name: Ring overview tests (and the preference key list)
         if: ${{ !cancelled() }}
         run: |
-          ./gradlew --console=plain :ui:testAndroidHostTest --tests '*Ring*' --tests '*OverviewSizeSweepTest*' :core:interfaces:testAndroidHostTest --tests '*LoopNotesTest*' --continue --stacktrace
+          ./gradlew --console=plain :ui:testAndroidHostTest --tests '*Ring*' --tests '*OverviewSizeSweepTest*' --tests '*MenuScreenshotTest*' :core:interfaces:testAndroidHostTest --tests '*LoopNotesTest*' --continue --stacktrace
           ./gradlew --console=plain :app:testFullDebugUnitTest --tests '*PreferenceKeySnapshotTest*' --tests '*RawPreferenceStoreScanTest*' --continue --stacktrace
 
       - name: Build the app
@@ -158,6 +158,8 @@ jobs:
           path: |
             ui/build/ring-shots
             plugins/learner/build/learner-shots
+            pump/atc3/build/screen-shots
+            plugins/sibionics/build/screen-shots
           if-no-files-found: warn
 
   # How ready is this base? The app on an emulator: first a fresh install tapped at random (crashes

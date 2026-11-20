@@ -37,6 +37,7 @@ import app.aaps.core.ui.compose.ComposablePluginContent
 import app.aaps.core.ui.compose.ToolbarConfig
 import app.aaps.core.ui.compose.clearFocusOnTap
 import app.aaps.plugins.sibionics.R
+import app.aaps.plugins.sibionics.SibionicsFoundDevice
 import app.aaps.plugins.sibionics.SibionicsPlugin
 import app.aaps.plugins.sibionics.SibionicsSession
 import java.util.Locale
@@ -65,7 +66,30 @@ private fun SibionicsScreen(plugin: SibionicsPlugin) {
     val status by plugin.status.collectAsStateWithLifecycle()
     val found by plugin.found.collectAsStateWithLifecycle()
     val scanning by plugin.scanning.collectAsStateWithLifecycle()
-    var code by remember { mutableStateOf(plugin.sensorCode()) }
+    SibionicsScreenContent(
+        status = status, found = found, scanning = scanning, initialCode = plugin.sensorCode(),
+        hasPermission = plugin.hasBluetoothPermission(),
+        formatGlucose = plugin::formatGlucose, formatTime = plugin::formatTime,
+        onSetCode = plugin::setSensorCode, onScan = plugin::scan, onChoose = plugin::choose, onForget = plugin::forget
+    )
+}
+
+/** The screen itself, from the status only, so it can also be drawn in a test. */
+@Composable
+internal fun SibionicsScreenContent(
+    status: SibionicsPlugin.Status,
+    found: List<SibionicsFoundDevice>,
+    scanning: Boolean,
+    initialCode: String,
+    hasPermission: Boolean,
+    formatGlucose: (Double?) -> String,
+    formatTime: (Long) -> String,
+    onSetCode: (String) -> Boolean,
+    onScan: () -> Unit,
+    onChoose: (SibionicsFoundDevice) -> Unit,
+    onForget: () -> Unit
+) {
+    var code by remember { mutableStateOf(initialCode) }
     var codeError by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
     var confirmForget by remember { mutableStateOf(false) }
@@ -79,14 +103,14 @@ private fun SibionicsScreen(plugin: SibionicsPlugin) {
             .padding(AapsSpacing.large),
         verticalArrangement = Arrangement.spacedBy(AapsSpacing.medium)
     ) {
-        if (!plugin.hasBluetoothPermission()) Text(stringResource(R.string.sibionics_no_permission), color = MaterialTheme.colorScheme.error)
+        if (!hasPermission) Text(stringResource(R.string.sibionics_no_permission), color = MaterialTheme.colorScheme.error)
 
         if (status.sensorName.isEmpty()) {
             Text(stringResource(R.string.sibionics_step_code), style = MaterialTheme.typography.titleMedium)
             Button(onClick = { showCamera = !showCamera }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.sibionics_scan_code)) }
             if (showCamera) QrScanner(
                 onScanned = { text ->
-                    if (plugin.setSensorCode(text)) {
+                    if (onSetCode(text)) {
                         code = text
                         showCamera = false
                         codeError = false
@@ -105,7 +129,7 @@ private fun SibionicsScreen(plugin: SibionicsPlugin) {
                 modifier = Modifier.fillMaxWidth()
             )
             if (codeError) Text(stringResource(R.string.sibionics_code_not_valid), color = MaterialTheme.colorScheme.error)
-            OutlinedButton(onClick = { codeError = !plugin.setSensorCode(code.trim()) }, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { codeError = !onSetCode(code.trim()) }, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.sibionics_save_code))
             }
             return@Column
@@ -122,13 +146,13 @@ private fun SibionicsScreen(plugin: SibionicsPlugin) {
 
         if (status.bleName.isEmpty()) {
             Text(stringResource(R.string.sibionics_step_search), style = MaterialTheme.typography.titleMedium)
-            Button(onClick = { plugin.scan() }, enabled = !scanning, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onScan, enabled = !scanning, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(if (scanning) R.string.sibionics_searching else R.string.sibionics_search))
             }
             found.forEach { device ->
                 Card(modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { plugin.choose(device) }) {
+                    .clickable { onChoose(device) }) {
                     Text(stringResource(R.string.sibionics_found_device, device.name, device.rssi), modifier = Modifier.padding(AapsSpacing.large))
                 }
             }
@@ -137,8 +161,8 @@ private fun SibionicsScreen(plugin: SibionicsPlugin) {
                 Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
                     Text(stringResource(phaseText(status.phase, status.connected)))
                     if (status.authFailed) Text(stringResource(R.string.sibionics_auth_failed), color = MaterialTheme.colorScheme.error)
-                    Text(stringResource(R.string.sibionics_last_value, plugin.formatGlucose(status.lastGlucoseMgdl), plugin.formatTime(status.lastSeen)))
-                    Text(stringResource(R.string.sibionics_session_start, plugin.formatTime(status.sessionStart)))
+                    Text(stringResource(R.string.sibionics_last_value, formatGlucose(status.lastGlucoseMgdl), formatTime(status.lastSeen)))
+                    Text(stringResource(R.string.sibionics_session_start, formatTime(status.sessionStart)))
                 }
             }
         }
@@ -153,7 +177,7 @@ private fun SibionicsScreen(plugin: SibionicsPlugin) {
             TextButton(onClick = {
                 confirmForget = false
                 code = ""
-                plugin.forget()
+                onForget()
             }) { Text(stringResource(R.string.sibionics_forget)) }
         },
         dismissButton = { TextButton(onClick = { confirmForget = false }) { Text(stringResource(R.string.sibionics_cancel)) } }
