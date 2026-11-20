@@ -72,7 +72,8 @@ class BasalCardEngineTest {
         val h = history(lowsAtHour = 4)
         val first = engine.card(h, profile, BasalCardState())
         val second = engine.card(h, profile, first.state)
-        assertThat(second.changes.map { it.hour }).containsNoneOf(3, 4, 5, 6)
+        // No raise near the lows; the lows themselves may bring an hour down, which is allowed.
+        assertThat(second.changes.filter { it.to > it.from }.map { it.hour }).containsNoneOf(2, 3, 4, 5, 6)
     }
 
     @Test
