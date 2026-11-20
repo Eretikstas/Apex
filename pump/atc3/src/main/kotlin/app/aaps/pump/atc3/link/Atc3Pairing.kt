@@ -103,13 +103,29 @@ class Atc3Pairing(
             commandQueue.isRunning(Command.CommandType.BOLUS) ||
             commandQueue.isRunning(Command.CommandType.SMB_BOLUS)
 
-    /** Forget the pump whole and drop the link; the window of the basal account goes with the rest, and begins anew with the next pump. */
-    fun disconnect() {
-        aapsLogger.debug(LTag.PUMP, "ATC3: user disconnected the pump ${preferences.get(Atc3StringKey.Atc3SerialNumber)}")
+    /**
+     * Remove the pump (acceptance D9). The pump is tried first: its temp basal is cancelled on the queue. Whether
+     * that works or the queue gives up on the link, the pump is removed anyway: everything kept of it is forgotten,
+     * the link is dropped, and AAPS ends its running temp basal and extended bolus (`PumpSync.connectNewPump`), so
+     * nothing more is counted from it. The window of the basal account begins anew with the next pump.
+     *
+     * @return true if the pump was reached; false means it may still run its basal, so the user must take it off
+     */
+    suspend fun disconnect(): Boolean {
+        aapsLogger.debug(LTag.PUMP, "ATC3: user disconnects the pump ${preferences.get(Atc3StringKey.Atc3SerialNumber)}")
+        val reached = try {
+            commandQueue.cancelTempBasal(enforceNew = true).success
+        } catch (e: Exception) {
+            aapsLogger.error(LTag.PUMP, "ATC3: cancel before removal failed", e)
+            false
+        }
+        if (!reached) aapsLogger.debug(LTag.PUMP, "ATC3: the pump was not reached, it is removed anyway")
         forgetCredentials()
         atc3Connection.value.disconnect(UNPAIRED_REASON)
         atc3HistorySync.forgetPump("")
         pumpState.reset()
+        pumpSync.connectNewPump(endRunning = true)
+        return reached
     }
 
     private fun forgetCredentials() {

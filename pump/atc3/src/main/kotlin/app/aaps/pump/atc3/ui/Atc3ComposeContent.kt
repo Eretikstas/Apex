@@ -1,5 +1,7 @@
 package app.aaps.pump.atc3.ui
 
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -240,6 +242,17 @@ private fun Atc3PairingScreen(onMessage: (String) -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(stringResource(if (state.step == Atc3PairingViewModel.Step.SEARCHING) R.string.atc3_scanner_searching else R.string.atc3_scanner_find))
+            }
+        }
+
+        if (state.showPasswordChoice) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(
+                    checked = state.hasPassword,
+                    onCheckedChange = viewModel::onHasPasswordChanged,
+                    enabled = state.passwordEditable
+                )
+                Text(stringResource(R.string.atc3_scanner_has_password), style = MaterialTheme.typography.bodyMedium)
             }
         }
 

@@ -68,14 +68,18 @@ class Atc3PairingViewModel(
         val step: Step,
         val serial: String,
         val password: String,
-        val status: String
+        val status: String,
+        /** The box "the pump has a password". Off: the pump's own "no password" `000000` is presented. */
+        val hasPassword: Boolean = false
     ) {
 
         val serialValid: Boolean get() = Atc3Frame.isValidSerial(serial.trim())
-        val passwordValid: Boolean get() = Atc3BtPassword.isValid(password.trim())
+        val passwordValid: Boolean get() = !hasPassword || Atc3BtPassword.isValid(password.trim())
         val serialEditable: Boolean get() = !paired && (step == Step.SERIAL || step == Step.FOUND)
         val canFind: Boolean get() = !paired && step == Step.SERIAL && serialValid
-        val showPassword: Boolean get() = paired || step == Step.FOUND || step == Step.CONNECTING
+        /** The box is offered once the pump is found, before it is connected. */
+        val showPasswordChoice: Boolean get() = !paired && (step == Step.FOUND || step == Step.CONNECTING)
+        val showPassword: Boolean get() = hasPassword && (paired || step == Step.FOUND || step == Step.CONNECTING)
         val passwordEditable: Boolean get() = !paired && step == Step.FOUND
         val canConnect: Boolean get() = !paired && step == Step.FOUND && passwordValid
     }
@@ -100,13 +104,15 @@ class Atc3PairingViewModel(
     private fun initialState(): State {
         // What is stored is shown only for a connected pump: nothing else is ever stored.
         val paired = pairing.isPaired
+        val stored = if (paired) preferences.get(Atc3StringKey.Atc3BtPassword) else ""
         return withStatus(
             State(
                 paired = paired,
                 step = Step.SERIAL,
                 serial = if (paired) preferences.get(Atc3StringKey.Atc3SerialNumber) else "",
-                password = if (paired) preferences.get(Atc3StringKey.Atc3BtPassword) else "",
-                status = ""
+                password = stored,
+                status = "",
+                hasPassword = paired && stored.isNotBlank() && stored.trim() != Atc3BtPassword.NONE
             )
         )
     }
@@ -136,6 +142,12 @@ class Atc3PairingViewModel(
     fun onPasswordChanged(text: String) {
         if (!_state.value.passwordEditable) return
         setState { it.copy(password = text) }
+    }
+
+    /** The box "the pump has a password": off hides the field and `000000` is presented. */
+    fun onHasPasswordChanged(has: Boolean) {
+        if (!_state.value.passwordEditable) return
+        setState { it.copy(hasPassword = has) }
     }
 
     /** Step 1: look for the pump with the serial on screen. */
@@ -253,7 +265,7 @@ class Atc3PairingViewModel(
         val address = foundAddress ?: return
         if (!state.canConnect) return
         val serial = state.serial.trim()
-        val password = state.password.trim()
+        val password = if (state.hasPassword) state.password.trim() else Atc3BtPassword.NONE
         setState { it.copy(step = Step.CONNECTING) }
         pairing.connect(address, serial, password) { outcome, comment ->
             viewModelScope.launch { onConnectResult(outcome, comment, serial) }
@@ -283,10 +295,12 @@ class Atc3PairingViewModel(
             _messages.tryEmit(rh.gs(R.string.atc3_scanner_bolus_running))
             return
         }
-        pairing.disconnect()
-        foundAddress = null
-        _state.value = initialState()
-        _messages.tryEmit(rh.gs(R.string.atc3_scanner_disconnected))
+        viewModelScope.launch {
+            val reached = pairing.disconnect()
+            foundAddress = null
+            _state.value = initialState()
+            _messages.tryEmit(rh.gs(if (reached) R.string.atc3_scanner_disconnected else R.string.atc3_scanner_disconnected_not_reached))
+        }
     }
 
     override fun onCleared() {

@@ -11,6 +11,7 @@ import android.content.Context
 import android.os.Looper
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.pump.atc3.link.Atc3BtPassword
 import app.aaps.pump.atc3.keys.Atc3StringKey
 import app.aaps.pump.atc3.link.Atc3Pairing
 import app.aaps.shared.tests.AAPSLoggerTest
@@ -35,6 +36,7 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.whenever
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -112,7 +114,9 @@ class Atc3PairingViewModelTest {
 
         assertEquals(Atc3PairingViewModel.Step.FOUND, vm.state.value.step)
         assertTrue("the scan stopped", scans.isEmpty())
-        assertTrue("the password is asked for", vm.state.value.showPassword)
+        assertTrue("the box 'has a password' is offered", vm.state.value.showPasswordChoice)
+        assertFalse("no password field while the box is off", vm.state.value.showPassword)
+        assertTrue("without a password Connect is ready", vm.state.value.canConnect)
     }
 
     @Test
@@ -166,6 +170,8 @@ class Atc3PairingViewModelTest {
     fun connectGoesToThePumpFoundWithTheSerialAndPassword() {
         val vm = searching()
         seen("APEX$SERIAL")
+        vm.onHasPasswordChanged(true)
+        assertFalse("an empty password is not enough once the box is on", vm.state.value.canConnect)
         vm.onPasswordChanged(PASSWORD)
 
         vm.connect()
@@ -178,6 +184,7 @@ class Atc3PairingViewModelTest {
     fun aRefusedPasswordKeepsThePumpFound() {
         val vm = searching()
         seen("APEX$SERIAL")
+        vm.onHasPasswordChanged(true)
         vm.onPasswordChanged("111111")
         vm.connect()
         val result = argumentCaptor<(Atc3Pairing.Outcome, String) -> Unit>()
@@ -188,6 +195,29 @@ class Atc3PairingViewModelTest {
 
         assertEquals(Atc3PairingViewModel.Step.FOUND, vm.state.value.step)
         assertTrue("the password can be corrected", vm.state.value.passwordEditable)
+    }
+
+    @Test
+    fun withoutThePasswordBoxThePumpGetsTheNoPasswordValue() {
+        val vm = searching()
+        seen("APEX$SERIAL")
+
+        vm.connect()
+
+        verify(pairing).connect(eq(ADDRESS), eq(SERIAL), eq(Atc3BtPassword.NONE), any())
+    }
+
+    @Test
+    fun aTypedPasswordIsNotUsedWhenTheBoxIsOffAgain() {
+        val vm = searching()
+        seen("APEX$SERIAL")
+        vm.onHasPasswordChanged(true)
+        vm.onPasswordChanged(PASSWORD)
+        vm.onHasPasswordChanged(false)
+
+        vm.connect()
+
+        verify(pairing).connect(eq(ADDRESS), eq(SERIAL), eq(Atc3BtPassword.NONE), any())
     }
 
     // ---- Leaving the screen (U5) and unpairing (U6) --------------------------------------------------
@@ -210,8 +240,9 @@ class Atc3PairingViewModelTest {
         assertTrue(vm.state.value.paired)
 
         vm.disconnect()
+        settle()
 
-        verify(pairing).disconnect()
+        verifyBlocking(pairing) { disconnect() }
     }
 
     @Test
@@ -221,8 +252,9 @@ class Atc3PairingViewModelTest {
         val vm = viewModel()
 
         vm.disconnect()
+        settle()
 
-        verify(pairing, never()).disconnect()
+        verifyBlocking(pairing, never()) { disconnect() }
     }
 
     private companion object {

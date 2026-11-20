@@ -128,6 +128,8 @@
     <string name="atc3_day_account_value">AAPS %1$.3f Ед · помпа %2$.3f Ед · отклонение %3$+.3f Ед</string>
     <string name="atc3_day_account_none">ещё не сверялось</string>
     <string name="atc3_password_change_hint">Задать помпе новый пароль Bluetooth. Чтобы ввести уже используемый, откройте экран выбора помпы.</string>
+    <string name="atc3_scanner_has_password">У помпы есть пароль Bluetooth (B/P на экране помпы). Выключено: пароля нет, используется 000000</string>
+    <string name="atc3_scanner_disconnected_not_reached">Помпа не ответила, но удалена из AAPS. Она может продолжать давать базал: снимите её.</string>
     <string name="atc3_scanner_password_hint">2. Пароль Bluetooth (B/P на экране помпы), 6 цифр</string>
     <string name="atc3_scanner_serial_hint">1. Серийный номер (на корпусе помпы), 8 цифр</string>
     <string name="atc3_scanner_connect">Подключить</string>

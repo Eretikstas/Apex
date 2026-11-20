@@ -143,6 +143,8 @@
     <string name="atc3_day_account_none">not compared yet</string>
 
     <string name="atc3_password_change_hint">Give the pump a new Bluetooth password. To enter the one it already uses, open the pump selection screen instead.</string>
+    <string name="atc3_scanner_has_password">The pump has a Bluetooth password (B/P on its screen). Off: no password, 000000 is used</string>
+    <string name="atc3_scanner_disconnected_not_reached">The pump was not reached, but it is removed from AAPS. It may still give its basal: take it off.</string>
     <string name="atc3_scanner_password_hint">2. Bluetooth password (B/P on the pump screen), 6 digits</string>
     <string name="atc3_scanner_serial_hint">1. Serial number (on the pump case), 8 digits</string>
     <string name="atc3_scanner_connect">Connect</string>
