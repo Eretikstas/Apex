@@ -88,6 +88,13 @@ class HistoryReplayTest {
 
     private val minute = 60_000L
 
+    /** AutoISF weights of the model loop; Eva's phone values, changed by the W..._<x> tokens (lab only). */
+    private data class AisfWeights(
+        val acce: Double = 0.1, val brake: Double = 0.20, val lower: Double = 0.15, val higher: Double = 0.1,
+        val pp: Double = 0.01, val dura: Double = 0.5, val min: Double = 0.3, val max: Double = 1.2
+    )
+    private var aw = AisfWeights()
+
     @Test
     fun `replay recorded cycles through AIMI`() {
         val inPath = System.getenv("AIMI_REPLAY_IN")
@@ -612,6 +619,12 @@ class HistoryReplayTest {
         // SMBMIN_<m> / UAMMIN_<m>: AutoISF maxSMBBasalMinutes / maxUAMSMBBasalMinutes (Eva's phone: 40 / 40).
         Regex("SMBMIN_([0-9]+)").find(prefsText)?.let { meta.put("maxSmbMin", it.groupValues[1].toInt()) }
         Regex("UAMMIN_([0-9]+)").find(prefsText)?.let { meta.put("maxUamSmbMin", it.groupValues[1].toInt()) }
+        // WACC_/WBRK_/WLOW_/WHIGH_/WPP_/WDUR_/WMIN_/WMAX_<x>: AutoISF weights (accel, brake, lower range, higher range,
+        // pp, dura, min, max) of the model loop.
+        aw = AisfWeights(
+            acce = tok("WACC", 0.1), brake = tok("WBRK", 0.20), lower = tok("WLOW", 0.15), higher = tok("WHIGH", 0.1),
+            pp = tok("WPP", 0.01), dura = tok("WDUR", 0.5), min = tok("WMIN", 0.3), max = tok("WMAX", 1.2)
+        )
         val days = tok("SYNTH", 28.0).toInt()
         val rnd = Random(tok("SEED", 1.0).toLong())
         val kcr = tok("KCR", 0.03)
@@ -1564,23 +1577,23 @@ class HistoryReplayTest {
             val share = 10 * (corrMax - 0.9)
             var cap = 1.0
             if (acceWeight == 1.0 && gNow < target) {
-                if (acc > 0) { if (acc > 1) cap = 0.5; acceWeight = 0.20 } else if (acc < 0) acceWeight = 0.1
+                if (acc > 0) { if (acc > 1) cap = 0.5; acceWeight = aw.brake } else if (acc < 0) acceWeight = aw.acce
             } else if (acceWeight == 1.0) {
-                if (acc < 0) acceWeight = 0.20 else if (acc > 0) acceWeight = 0.1
+                if (acc < 0) acceWeight = aw.brake else if (acc > 0) acceWeight = aw.acce
             }
             acceIsf = 1.0 + acc * cap * acceWeight * share
             if (acceIsf != 1.0) modified = true
         }
         val bgIsf = 1 + aisfInterpolate(100 - bgOff)
-        fun limit(lift: Double): Double { val l = lift.coerceIn(0.3, 1.2); return if (l >= 1) maxOf(l, 1.0) else minOf(l, 1.0) }
+        fun limit(lift: Double): Double { val l = lift.coerceIn(aw.min, aw.max); return if (l >= 1) maxOf(l, 1.0) else minOf(l, 1.0) }
         if (bgIsf < 1.0) {
             val lift = if (acceIsf > 1.0) bgIsf * acceIsf else minOf(bgIsf, acceIsf)
             return minOf(720.0, sens / limit(lift))
         } else if (bgIsf > 1.0) modified = true
         var ppIsf = 1.0
-        if (bgOff <= 0.0 && delta >= 0) { ppIsf = 1.0 + maxOf(0.0, delta * 0.01); if (ppIsf != 1.0) modified = true }
+        if (bgOff <= 0.0 && delta >= 0) { ppIsf = 1.0 + maxOf(0.0, delta * aw.pp); if (ppIsf != 1.0) modified = true }
         var duraIsf = 1.0
-        if (minutesDur >= 10 && oldAvg > target) { duraIsf += minutesDur / 60.0 * (0.5 / target) * (oldAvg - target); modified = true }
+        if (minutesDur >= 10 && oldAvg > target) { duraIsf += minutesDur / 60.0 * (aw.dura / target) * (oldAvg - target); modified = true }
         if (!modified) return sens
         var lift = maxOf(duraIsf, maxOf(bgIsf, maxOf(acceIsf, ppIsf)))
         if (acceIsf < 1.0) lift *= acceIsf
@@ -1599,7 +1612,7 @@ class HistoryReplayTest {
                 r
             }
         }
-        return v * (if (x > 100) 0.1 else 0.15)
+        return v * (if (x > 100) aw.higher else aw.lower)
     }
 
     private class Chained(val iobArray: Array<IobTotal>, val cur: Double, val fut: Double, val lag: Double, val hist: Double, val temp: CurrentTemp)
