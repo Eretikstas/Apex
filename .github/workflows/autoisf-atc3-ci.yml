@@ -11,6 +11,10 @@ on:
         description: 'Also build the app (fullDebug)'
         type: boolean
         default: false
+      bench:
+        description: 'Also build the bench APKs (own package, installs next to AAPS)'
+        type: boolean
+        default: false
       emulator:
         description: 'Run the app on an emulator: random taps, official end to end tests, screenshots'
         type: boolean
@@ -93,7 +97,7 @@ jobs:
         if: ${{ !cancelled() && (github.event_name == 'push' || inputs.app) }}
         run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
       - name: Bench APK (own package info.nightscout.androidaps.bench, installs next to AAPS)
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.app }}
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.bench }}
         run: |
           # Firebase needs a client entry for the bench package: a copy of the AAPS one, in this run only.
           python3 - <<'PY'
@@ -125,7 +129,7 @@ jobs:
           "$BT/apksigner" verify --print-certs bench-apk/aaps-bench-release.apk | head -3
           ls -la bench-apk
       - name: Upload bench APK
-        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.app }}
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.bench }}
         uses: actions/upload-artifact@v4
         with:
           name: autoisf-atc3-bench-apk
