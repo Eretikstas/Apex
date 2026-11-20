@@ -675,6 +675,9 @@ class HistoryReplayTest {
         val needDx = tok("NEEDDX", 1.0)
         val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) * (if (it in 10..21) needDx else 1.0) }
         val isfP = prof?.getDouble("isf") ?: cfg.getDouble("profIsf"); val icP = prof?.getDouble("ic") ?: cfg.getDouble("profIc")
+        // LEARNCR_<k>: the meal CR follows the basal learner. When the learner has moved the whole basal by r (sum now /
+        // sum at start), the CR becomes icP / (1 + k * (r - 1)), kept within 0.75-1.25 of icP; both ways.
+        val basalStart = profBasal.sum(); var icNow = icP; val learnCr = tok("LEARNCR", 0.0)
         val targetP = prof?.optDouble("target", cfg.getDouble("profTarget")) ?: cfg.getDouble("profTarget")
         val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / tok("CRT", cfg.getDouble("crTrue"))
         val peak = cfg.getDouble("peak"); val dia = cfg.getDouble("dia")
@@ -903,6 +906,11 @@ class HistoryReplayTest {
             }
             lbCards++
             println("AIMI replay: learner basal card v2 day $day: $changed hours changed, total ${"%.2f".format(profBasal.sum())} U/day (shift ratio ${"%.2f".format(ratio)});$sb")
+            if (learnCr > 0.0) {
+                val r = profBasal.sum() / basalStart
+                icNow = (icP / (1 + learnCr * (r - 1))).coerceIn(icP * 0.75, icP * 1.25)
+                println("AIMI replay: learner CR day $day: basal x${"%.2f".format(r)} -> CR ${"%.1f".format(icNow)} (profile ${"%.1f".format(icP)})")
+            }
         }
         fun learnBasal(day: Int) {
             if (lb2 || lb3 || lb5) { learnBasal2(day); return }
@@ -1050,16 +1058,16 @@ class HistoryReplayTest {
                 val bIobUsed = if (noIob && reading < noIobBg) maxOf(bIob, 0.0) else bIob
                 if (smartS && reading < 81.0) { pend = Pending(t, ml.logged, reading); nDelayed++ }
                 else {
-                    val wiz = ml.logged / icP + (reading - targetP) / isfP - iobAll - bIobUsed
+                    val wiz = ml.logged / icNow + (reading - targetP) / isfP - iobAll - bIobUsed
                     // SPLITTYPE: the family marks the meal fast or slow in the calculator (right 85 % of the time);
                     // a fast meal gets the whole bolus now, only a slow one is split.
                     val markedFast = splitType && (if (markRnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0)
                     if (splitP < 1.0 && ml.logged >= 13.0 && !(splitType && markedFast)) {
                         // Split bolus: part now, the rest of the meal part waits for the rise.
-                        val now1 = maxOf(wiz - ml.logged / icP * (1 - splitP), 0.0)
+                        val now1 = maxOf(wiz - ml.logged / icNow * (1 - splitP), 0.0)
                         giveBolus(t, Math.round(now1 / 0.05) * 0.05)
                         val smbSoFar = chain.ownSmb.sumOf { it.second }
-                        splits.add(Split(t, ml.logged / icP * (1 - splitP), smbSoFar, if (splitType) 180L else 90L)); nSplit++
+                        splits.add(Split(t, ml.logged / icNow * (1 - splitP), smbSoFar, if (splitType) 180L else 90L)); nSplit++
                     } else giveBolus(t, (Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05))
                 }
             }
@@ -1088,7 +1096,7 @@ class HistoryReplayTest {
                 else if (check && reading >= 81.0 && rising && (reading >= 99.0 || reading >= pd.bg + 27.0)) {
                     var iobAll = basalIob(t)
                     for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
-                    val wiz = pd.g / icP + (reading - targetP) / isfP - iobAll
+                    val wiz = pd.g / icNow + (reading - targetP) / isfP - iobAll
                     giveBolus(t, Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05)
                     pend = null; nFired++; delaySum += m
                 }
@@ -1120,7 +1128,7 @@ class HistoryReplayTest {
                     glucoseStatus(sV, sT, t)
                 }
                 // COB the AAPS way: deviation-based absorption, at least min carb impact (4 mg/dL per 5 min).
-                val csfP = isfP / icP
+                val csfP = isfP / icNow
                 if (gs != null && lastLoopBg != null) {
                     val dev = (gs.glucose - lastLoopBg!!) + lastAct * isfP * 5
                     lastDev = dev; devStreak = if (dev > 6.0) devStreak + 1 else 0
@@ -1137,9 +1145,9 @@ class HistoryReplayTest {
                         var iobAll = basalIob(t)
                         for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                         // LATECOB: also count the carbs AAPS still sees as not absorbed (COB) - the wizard way.
-                        val cobU = if (lateCob) logged.sumOf { it.left } / icP else 0.0
+                        val cobU = if (lateCob) logged.sumOf { it.left } / icNow else 0.0
                         val want = ((gs.glucose - targetP) / isfP + cobU - iobAll) * latePct
-                        val u = Math.round(minOf(want, 0.3 * ml.second / icP) / 0.05) * 0.05
+                        val u = Math.round(minOf(want, 0.3 * ml.second / icNow) / 0.05) * 0.05
                         lateDone.add(ml.first)
                         if (u >= 0.1) { giveBolus(t, u); nLate++; lateU += u }
                         break
@@ -1148,7 +1156,7 @@ class HistoryReplayTest {
                 logged.removeAll { t - it.t > 6 * 3_600_000L || it.left <= 0.0 }
                 lastLoopBg = gs?.glucose
                 val tick = JSONObject().put("t", t)
-                    .put("prof", JSONObject().put("basal", profBasal[h]).put("isf", isfP).put("ic", icP).put("target", targetP).put("peak", peak).put("dia", dia))
+                    .put("prof", JSONObject().put("basal", profBasal[h]).put("isf", isfP).put("ic", icNow).put("target", targetP).put("peak", peak).put("dia", dia))
                     .put("tt", JSONObject.NULL).put("aaps", JSONObject())
                     .put("cob", logged.sumOf { it.left })
                     .put("carbs3h", logged.filter { t - it.t <= 3 * 3_600_000L }.sumOf { it.g })
