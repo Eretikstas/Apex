@@ -44,6 +44,7 @@ import app.aaps.ui.compose.notificationsSheet.NotificationFab
 import app.aaps.ui.compose.overview.chips.ChipsViewModel
 import app.aaps.ui.compose.overview.graphs.GraphViewModel
 import app.aaps.ui.compose.overview.statusLights.StatusViewModel
+import app.aaps.ui.compose.overview.ring.OverviewScreenRing
 import kotlinx.coroutines.delay
 
 private val SPLIT_LAYOUT_MIN_WIDTH: Dp = (2 * PHONE_COLUMN_MIN_WIDTH_DP).dp
@@ -107,6 +108,8 @@ fun OverviewScreen(
     queueStatusText: AnnotatedString? = null,
     isPumpCommunicating: Boolean = false,
     onStopBolus: () -> Unit = {},
+    /** Our addition (docs/OUR_CHANGES.md): the "Кольцо" overview on a phone in portrait instead of the stacked one. */
+    ringLayout: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showNotificationSheet by remember { mutableStateOf(false) }
@@ -198,6 +201,48 @@ fun OverviewScreen(
                 )
             } else if (twoColumns) {
                 OverviewScreenSplit(
+                    profileName = profileName,
+                    isProfileModified = isProfileModified,
+                    profileProgress = profileProgress,
+                    profileSceneManaged = profileSceneManaged,
+                    tempTargetText = tempTargetText,
+                    tempTargetState = tempTargetState,
+                    tempTargetProgress = tempTargetProgress,
+                    tempTargetReason = tempTargetReason,
+                    tempTargetSceneManaged = tempTargetSceneManaged,
+                    runningMode = runningMode,
+                    runningModeText = runningModeText,
+                    runningModeRemaining = runningModeRemaining,
+                    runningModeProgress = runningModeProgress,
+                    runningModeSceneManaged = runningModeSceneManaged,
+                    tbrState = tbrState,
+                    tbrRate = tbrRate,
+                    tbrPercent = tbrPercent,
+                    smbEnabled = smbEnabled,
+                    smbBlocked = smbBlocked,
+                    isSimpleMode = isSimpleMode,
+                    graphViewModel = graphViewModel,
+                    chipsViewModel = chipsViewModel,
+                    manageViewModel = manageViewModel,
+                    statusViewModel = statusViewModel,
+                    statusLightsDef = statusLightsDef,
+                    onNavigate = onNavigate,
+                    onTbrChipClick = onTbrChipClick,
+                    onIobChipClick = onIobChipClick,
+                    paddingValues = paddingValues,
+                    activeSceneState = activeSceneState,
+                    sceneExpired = sceneExpired,
+                    activeSceneChainTargetName = activeSceneChainTargetName,
+                    onEndScene = onEndScene,
+                    onDismissScene = onDismissScene,
+                    endSceneEnabled = endSceneEnabled,
+                    commandsAllowed = commandsAllowed,
+                    formatDuration = formatDuration,
+                    eatReminderBanner = eatReminderBanner,
+                    overlaidBarsHeight = overlaidBarsHeight
+                )
+            } else if (ringLayout) {
+                OverviewScreenRing(
                     profileName = profileName,
                     isProfileModified = isProfileModified,
                     profileProgress = profileProgress,

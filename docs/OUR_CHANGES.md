@@ -13,6 +13,7 @@ the tests named next to it.
   JugglucoNG (GPL-3.0, see its README) and its tests. It moves into AAPS only when the source plugin is made.
 - `.github/workflows/autoisf-atc3-ci.yml`, `.github/workflows/upstream-check.yml` - our CI.
 
+- `ui/.../overview/ring/` - the "Кольцо" overview: ring, period numbers, next hour, plain "why" of oref/AutoISF decisions (`RingWhyMapper`, tests in `ui/src/commonTest/.../ring`).
 - `plugins/sibionics` - native Sibionics 2 source + its calibration plugin; compiles `sibionics-core/` (JugglucoNG, GPL-3.0) in unchanged.
 
 ## Edits in blaqone files (keep this list complete)
@@ -29,6 +30,11 @@ the tests named next to it.
 | `core/data/.../model/RawObservationSource.kt` | `SIBIONICS_NATIVE` in the one-minute set, like the other Sibionics | sibionics job |
 | `database/impl/.../entities/GlucoseValue.kt` | `SIBIONICS_NATIVE` (stored by name, no migration) | `ConvertersSourceSensorTest` |
 | `database/persistence/.../SourceSensorExtension.kt` | `SIBIONICS_NATIVE` both ways | `SourceSensorExtensionTest` |
+| `core/keys/.../BooleanKey.kt` + `core/keys/src/androidMain/res/values/strings.xml` | `OverviewRingLayout` (default on) and its title/summary; Russian in `values-ru-rRU/strings_ring.xml` | `PreferenceKeySnapshotTest` |
+| `app/src/testFull/resources/prefs-schema.txt` | `overview_ring_layout` | `PreferenceKeySnapshotTest` |
+| `ui/.../search/BuiltInSearchables.kt` | the ring switch in Appearance | - |
+| `ui/.../main/MainScreen.kt`, `ui/.../overview/OverviewScreen.kt` | read the switch, phone portrait -> `OverviewScreenRing` | `OverviewSizeSweepTest` |
+| `ui/src/androidMain/res/values/strings.xml` | `ring_*` strings at the end; Russian in `values-ru-rRU/strings_ring.xml` | build |
 | `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator`, `:plugins:sibionics` | build |
 | `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; full flavor depends on `:plugins:sibionics`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator` | build |
 | `app/src/androidTest/.../di/Atc3EmulatedRadio.kt`, `.../e2e/Atc3EmulatorScenarioTest.kt` | our files in the app's device tests (radio swap through `Atc3RadioSwap`) | emulator job |

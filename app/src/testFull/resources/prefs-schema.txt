@@ -406,6 +406,7 @@ openhumans_refresh_token|OhStringKey|true
 openhumans_upload_offset|OhLongKey|false
 overview_autoisf_chip_expanded|BooleanNonKey|true
 overview_autoisf_chip_pinned|StringNonKey|true
+overview_ring_layout|BooleanKey|true
 patch_expiration|MedtrumBooleanKey|true
 patch_id|MedtrumLongNonKey|true
 patch_primed_flag|MedtrumBooleanNonKey|true

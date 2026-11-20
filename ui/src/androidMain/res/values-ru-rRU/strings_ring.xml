@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian for the Ring overview layout (our addition, kept apart from the Crowdin files). -->
+<resources>
+    <string name="ring_period_3h">3 ч</string>
+    <string name="ring_period_day">24 ч</string>
+    <string name="ring_period_week">7 дней</string>
+    <string name="ring_in_range">В диапазоне %1$d %%</string>
+    <string name="ring_low_high">Ниже %1$d %% · выше %2$d %% · CV %3$d %%</string>
+    <string name="ring_no_stats">Нет значений за этот период</string>
+    <string name="ring_hour_title">Ближайший час</string>
+    <string name="ring_hour_stable">Стабильно</string>
+    <string name="ring_hour_rising">Растёт</string>
+    <string name="ring_hour_falling">Падает</string>
+    <string name="ring_hour_unknown">Нет данных</string>
+    <string name="ring_pred_60">Через 1 ч: %1$s</string>
+    <string name="ring_why_title">Почему</string>
+    <string name="ring_why_no_data">Нет пригодных данных сенсора: цикл ждёт.</string>
+    <string name="ring_why_low">Сахар низкий или будет низким: инсулин придержан.</string>
+    <string name="ring_why_enough_iob">Инсулина уже достаточно в работе.</string>
+    <string name="ring_why_meal">Покрываются углеводы на борту (%1$d г).</string>
+    <string name="ring_why_rise">Сахар растёт без углеводов или закончится выше цели.</string>
+    <string name="ring_why_in_range">Сахар в нужном диапазоне: базал без изменений.</string>
+    <string name="ring_why_unknown">Причина не распознана. Полный текст — в деталях цикла.</string>
+    <string name="ring_act_smb">SMB %1$.2f ЕД</string>
+    <string name="ring_act_smb_tbr">SMB %1$.2f ЕД и временный базал %2$.2f ЕД/ч на %3$d мин</string>
+    <string name="ring_act_zero">Нулевой временный базал на %1$d мин</string>
+    <string name="ring_act_tbr">Временный базал %1$.2f ЕД/ч на %2$d мин</string>
+    <string name="ring_act_none">Без изменений</string>
+    <string name="ring_limited">Ограничение уменьшило SMB с %1$.2f ЕД до %2$.2f ЕД.</string>
+    <string name="ring_eventual">Ожидается в конце: %1$s</string>
+    <string name="ring_decided_at">Решение в %1$s</string>
+</resources>

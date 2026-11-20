@@ -65,6 +65,9 @@ import app.aaps.ui.compose.maintenance.MaintenanceViewModel
 import app.aaps.ui.compose.manageSheet.ManageSheetState
 import app.aaps.ui.compose.manageSheet.ManageViewModel
 import app.aaps.ui.compose.overview.EatReminderBanner
+import androidx.compose.runtime.collectAsState
+import app.aaps.core.keys.BooleanKey
+import app.aaps.core.ui.compose.LocalPreferences
 import app.aaps.ui.compose.overview.OverviewScreen
 import app.aaps.ui.compose.overview.chips.ChipsViewModel
 import app.aaps.ui.compose.overview.graphs.GraphViewModel
@@ -257,9 +260,12 @@ fun MainScreen(
                 val masterOrPairedClient by mainViewModel.masterOrPairedClient.collectAsStateWithLifecycle()
                 // (Probe-while-offline is now global — see ComposeMainActivity. This screen still reads
                 // masterReachable for its own gating.)
+                // Our addition (docs/OUR_CHANGES.md): the "Кольцо" overview when it is switched on.
+                val ringLayout by LocalPreferences.current.observe(BooleanKey.OverviewRingLayout).collectAsState()
                 Box(modifier = Modifier.fillMaxSize()) {
                     // Main content
                     OverviewScreen(
+                        ringLayout = ringLayout,
                         profileName = uiState.profileName,
                         profilePsId = uiState.profilePsId,
                         isProfileModified = uiState.isProfileModified,

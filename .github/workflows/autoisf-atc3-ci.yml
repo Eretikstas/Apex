@@ -82,6 +82,12 @@ jobs:
           ./gradlew --console=plain :plugins:sibionics:testDebugUnitTest --continue --stacktrace
           ./gradlew --console=plain :database:impl:testAndroidHostTest --tests '*SourceSensor*' --stacktrace
 
+      - name: Ring overview tests (and the preference key list)
+        if: ${{ !cancelled() }}
+        run: |
+          ./gradlew --console=plain :ui:testAndroidHostTest --tests '*Ring*' --tests '*OverviewSizeSweepTest*' --continue --stacktrace
+          ./gradlew --console=plain :app:testFullDebugUnitTest --tests '*PreferenceKeySnapshotTest*' --tests '*RawPreferenceStoreScanTest*' --continue --stacktrace
+
       - name: Build the app
         if: ${{ !cancelled() && (github.event_name == 'push' || inputs.app) }}
         run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
@@ -95,6 +101,8 @@ jobs:
             pump/atc3/build/reports/tests
             database/impl/build/reports/tests
             plugins/sibionics/build/reports/tests
+            ui/build/reports/tests
+            app/build/reports/tests
           if-no-files-found: ignore
 
   # How ready is this base? The app on an emulator: first a fresh install tapped at random (crashes

@@ -392,4 +392,33 @@
     <string name="overview_autoisf_unpin">Do not show this value when the chip is closed</string>
 
     <string name="graph_inspect_raw_value" comment="In the box shown when holding a point of the BG graph, after the smoothed glucose value. %1$s = the measured raw value, without unit. Example: (raw 151)">(raw %1$s)</string>
+    <!-- Ring overview layout (our addition, see docs/OUR_CHANGES.md) -->
+    <string name="ring_period_3h">3 h</string>
+    <string name="ring_period_day">24 h</string>
+    <string name="ring_period_week">7 days</string>
+    <string name="ring_in_range" comment="%1$d=percent of readings in range 3.9-10 mmol/L. Example: In range 82 %">In range %1$d %%</string>
+    <string name="ring_low_high" comment="%1$d=percent below 3.9 mmol/L, %2$d=percent above 10 mmol/L, %3$d=CV percent">Below %1$d %% · above %2$d %% · CV %3$d %%</string>
+    <string name="ring_no_stats">No readings in this period</string>
+    <string name="ring_hour_title">Next hour</string>
+    <string name="ring_hour_stable">Stable</string>
+    <string name="ring_hour_rising">Rising</string>
+    <string name="ring_hour_falling">Falling</string>
+    <string name="ring_hour_unknown">No data</string>
+    <string name="ring_pred_60" comment="%1$s=predicted glucose with unit in one hour">In 1 h: %1$s</string>
+    <string name="ring_why_title">Why</string>
+    <string name="ring_why_no_data">No usable sensor data: the loop waits.</string>
+    <string name="ring_why_low">Glucose is or will be low: insulin is held back.</string>
+    <string name="ring_why_enough_iob">Enough insulin is already working.</string>
+    <string name="ring_why_meal" comment="%1$d=carbs on board in grams">Carbs on board (%1$d g) are covered.</string>
+    <string name="ring_why_rise">Glucose rises without carbs or would end above target.</string>
+    <string name="ring_why_in_range">Glucose is where it should be: the basal stays.</string>
+    <string name="ring_why_unknown">The reason was not recognised. The loop details show the full text.</string>
+    <string name="ring_act_smb" comment="%1$.2f=micro bolus in units">SMB %1$.2f U</string>
+    <string name="ring_act_smb_tbr" comment="%1$.2f=micro bolus in units, %2$.2f=temp basal rate U/h, %3$d=minutes">SMB %1$.2f U and temp basal %2$.2f U/h for %3$d min</string>
+    <string name="ring_act_zero" comment="%1$d=minutes">Zero temp basal for %1$d min</string>
+    <string name="ring_act_tbr" comment="%1$.2f=temp basal rate U/h, %2$d=minutes">Temp basal %1$.2f U/h for %2$d min</string>
+    <string name="ring_act_none">No change</string>
+    <string name="ring_limited" comment="%1$.2f=micro bolus the loop wanted, %2$.2f=what the limit allowed">A limit cut the SMB from %1$.2f U to %2$.2f U.</string>
+    <string name="ring_eventual" comment="%1$s=glucose with unit">Expected at the end: %1$s</string>
+    <string name="ring_decided_at" comment="%1$s=time of the decision">Decision at %1$s</string>
 </resources>

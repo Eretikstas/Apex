@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian for our Ring overview setting (kept apart from the Crowdin files). -->
+<resources>
+    <string name="pref_title_ring_layout">Главный экран «Кольцо»</string>
+    <string name="pref_summary_ring_layout">На телефоне в вертикальном положении: сахар в кольце со временем в диапазоне, ближайший час и почему цикл так решил.</string>
+</resources>
