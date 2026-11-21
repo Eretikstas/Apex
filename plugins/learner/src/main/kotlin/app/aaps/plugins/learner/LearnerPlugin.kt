@@ -253,12 +253,12 @@ class LearnerPlugin(
      * while a temporary profile runs (tried again on the next tick), not while another proposal waits, not within 2 days
      * of its own last change.
      */
-    private suspend fun maybeRunPctCard() {
+    private suspend fun maybeRunPctCard(force: Boolean = false) {
         val now = dateUtil.now()
         val local = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
-        if (local.hour < CARD_HOUR) return
+        if (!force && local.hour < CARD_HOUR) return
         val today = local.toLocalDate().toEpochDay()
-        if (store.lastPctDay == today) return
+        if (!force && store.lastPctDay == today) return
         val running = profileFunction.getRequestedProfile()
         if (running != null && running.duration > 0L) return
         store.lastPctDay = today
@@ -277,6 +277,14 @@ class LearnerPlugin(
         }
         refresh()
     }
+
+    /**
+     * For the virtual bench (the app's device tests): the basal and dura card, or the percentage card, now - without
+     * their clock gates (06:00, every 4 days, once a day). Not used by the app itself.
+     */
+    suspend fun runBasalCardNowForBench() = runCard(dateUtil.now())
+
+    suspend fun runPctCardNowForBench() = maybeRunPctCard(force = true)
 
     /** "Внести" for the percentage: a permanent switch of the running profile to the new percentage, time shift kept. */
     fun acceptPct() {

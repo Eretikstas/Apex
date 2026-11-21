@@ -1,0 +1,340 @@
+package app.aaps.e2e
+
+import android.Manifest
+import android.content.Context
+import android.os.SystemClock
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.work.WorkManager
+import app.aaps.core.data.model.GV
+import app.aaps.core.data.model.RM
+import app.aaps.core.data.model.SourceSensor
+import app.aaps.core.data.model.TrendArrow
+import app.aaps.core.data.model.data.Block
+import app.aaps.core.data.model.data.TargetBlock
+import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.data.time.T
+import app.aaps.core.data.ue.Action
+import app.aaps.core.data.ue.Sources
+import app.aaps.core.data.ue.ValueWithUnit
+import app.aaps.core.interfaces.aps.Loop
+import app.aaps.core.interfaces.configuration.Config
+import app.aaps.core.interfaces.configuration.ConfigBuilder
+import app.aaps.core.interfaces.db.PersistenceLayer
+import app.aaps.core.interfaces.insulin.InsulinManager
+import app.aaps.core.interfaces.plugin.PluginBase
+import app.aaps.core.interfaces.profile.ProfileFunction
+import app.aaps.core.interfaces.profile.ProfileRepository
+import app.aaps.core.interfaces.pump.PumpEnactResult
+import app.aaps.core.interfaces.queue.CommandQueue
+import app.aaps.core.interfaces.utils.DateUtil
+import app.aaps.core.keys.BooleanComposedKey
+import app.aaps.core.keys.BooleanNonKey
+import app.aaps.core.keys.DoubleKey
+import app.aaps.core.keys.IntKey
+import app.aaps.core.keys.LongNonKey
+import app.aaps.core.keys.StringKey
+import app.aaps.core.keys.interfaces.Preferences
+import app.aaps.di.Atc3Emulation
+import app.aaps.di.EmulatedAtc3BLE
+import app.aaps.di.ResetGraphRule
+import app.aaps.di.testGraphs
+import app.aaps.implementation.plugin.PluginStore
+import app.aaps.plugins.constraints.objectives.ObjectivesPlugin
+import app.aaps.plugins.learner.LearnerPlugin
+import app.aaps.pump.atc3.Atc3PumpPlugin
+import app.aaps.pump.atc3.emulator.Atc3PumpEmulator
+import app.aaps.pump.atc3.emulator.VirtualAtc3Pump
+import app.aaps.pump.atc3.keys.Atc3StringKey
+import app.aaps.pump.atc3.link.Atc3RadioSwap
+import com.google.common.truth.Truth.assertWithMessage
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.After
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.RuleChain
+import org.junit.runner.RunWith
+import java.io.File
+import kotlin.math.abs
+
+/**
+ * The virtual bench (user 21.11: "погоняй на стенде"; no test phone yet): the real app on an Android emulator, the ATC3
+ * driver against the software pump, AutoISF closed loop, the learner. Glucose comes from a small virtual Eva-like body
+ * (made-up child values, no personal data) and from scripted rises and falls.
+ *
+ * What it checks is what the real bench would: the loop's decisions reach the pump and AAPS keeps what the pump does;
+ * the learner's percentage card proposes, "Внести" reaches the pump as a new basal; one change at a time is kept.
+ * It cannot check how well Eva does: that is the body model's job (lab), and the real bench's after it.
+ */
+@RunWith(AndroidJUnit4::class)
+class VirtualBenchTest {
+
+    @get:Rule val rules: RuleChain = RuleChain.outerRule(RetryRule()).around(ResetGraphRule())
+
+    private val preferences: Preferences get() = testGraphs.preferences
+    private val pluginStore: PluginStore get() = testGraphs.pluginStore
+    private val commandQueue: CommandQueue get() = testGraphs.commandQueue
+    private val pluginList: List<PluginBase> get() = testGraphs.allPlugins(testGraphs.aapsLogger)
+    private val atc3Plugin: Atc3PumpPlugin get() = pluginList.filterIsInstance<Atc3PumpPlugin>().single()
+    private val learner: LearnerPlugin get() = pluginList.filterIsInstance<LearnerPlugin>().single()
+    private val configBuilder: ConfigBuilder get() = testGraphs.configBuilder
+    private val config: Config get() = testGraphs.config
+    private val profileFunction: ProfileFunction get() = testGraphs.profileFunction
+    private val profileRepository: ProfileRepository get() = testGraphs.profileRepository
+    private val insulinManager: InsulinManager get() = testGraphs.insulinManager
+    private val dateUtil: DateUtil get() = testGraphs.dateUtil
+    private val persistenceLayer: PersistenceLayer get() = testGraphs.persistenceLayer
+    private val loop: Loop get() = testGraphs.loop
+    private val objectivesPlugin: ObjectivesPlugin get() = testGraphs.objectivesPlugin
+
+    private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
+
+    private lateinit var pump: VirtualAtc3Pump
+    private lateinit var emulator: Atc3PumpEmulator
+
+    @Before
+    fun setUp() {
+        clearAllSharedPrefs()
+        runBlocking { persistenceLayer.clearDatabases() }
+        pump = VirtualAtc3Pump(SERIAL) { System.currentTimeMillis() }
+        emulator = Atc3PumpEmulator(pump)
+        Atc3Emulation.emulator = emulator
+        Atc3RadioSwap.make = { logger, context, trace -> EmulatedAtc3BLE(logger, context, trace) }
+        instrumentation.uiAutomation.grantRuntimePermission(PKG, Manifest.permission.BLUETOOTH_CONNECT)
+        runCatching { instrumentation.uiAutomation.grantRuntimePermission(PKG, Manifest.permission.BLUETOOTH_SCAN) }
+        runCatching { instrumentation.uiAutomation.grantRuntimePermission(PKG, "android.permission.POST_NOTIFICATIONS") }
+
+        preferences.put(BooleanNonKey.GeneralSetupWizardProcessed, true)
+        preferences.put(StringKey.GeneralUnits, "mg/dl")
+        preferences.put(Atc3StringKey.Atc3SerialNumber, SERIAL)
+        preferences.put(Atc3StringKey.Atc3BtPassword, pump.btPassword)
+        preferences.put(Atc3StringKey.Atc3Address, ADDRESS)
+        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_Atc3PumpPlugin", value = true)
+        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
+        // AutoISF with SMB, as on Eva's phone; room for the loop to act (a child's caps).
+        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "APS_OpenAPSSMBPlugin", value = false)
+        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "APS_OpenAPSAutoISFPlugin", value = true)
+        preferences.put(DoubleKey.ApsMaxBasal, 2.0)
+        preferences.put(DoubleKey.ApsSmbMaxIob, 3.0)
+        preferences.put(IntKey.ApsLoopInterval, 1)
+
+        pluginStore.plugins = pluginList
+        configBuilder.initialize()
+        config.initCompleted()
+        seedProfile()
+        activateProfile()
+        // Closed loop allowed: every objective done, running mode closed.
+        objectivesPlugin.objectives.forEach { it.startedOn = 1; it.accomplishedOn = 1 }
+        runBlocking {
+            persistenceLayer.insertOrUpdateRunningMode(
+                runningMode = RM(timestamp = dateUtil.now(), mode = RM.Mode.CLOSED_LOOP, autoForced = false, duration = 0),
+                action = Action.CLOSED_LOOP_MODE, source = Sources.Aaps, listValues = listOf(ValueWithUnit.SimpleString("bench"))
+            )
+        }
+        status("bench start")
+        assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { atc3Plugin.isInitialized() }).isTrue()
+        assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
+        // A record of the same minute as the pump registration is refused by AAPS: start in the next minute.
+        val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
+        val wait = (ready / 60_000L + 1) * 60_000L + 2_000L - System.currentTimeMillis()
+        if (wait > 0) SystemClock.sleep(wait)
+    }
+
+    @After
+    fun tearDown() {
+        runCatching { commandQueue.clear() }
+        runCatching { WorkManager.getInstance(instrumentation.targetContext).cancelAllWork() }
+        runCatching { atc3Plugin.disconnect("bench end") }
+        runCatching { atc3Plugin.setPluginEnabledBlocking(PluginType.PUMP, false) }
+        objectivesPlugin.objectives.forEach { it.startedOn = 0; it.accomplishedOn = 0 }
+        Atc3Emulation.emulator = null
+        Atc3RadioSwap.make = null
+        runCatching { pump.shutdown() }
+        clearAllSharedPrefs()
+    }
+
+    /**
+     * Closed loop on a fast rise, then on a fast fall (one reading a minute, loop every minute). On the rise the loop
+     * must give more insulin (a high temp basal or an SMB) and the pump must have it; on the fall it must hold back
+     * (temp basal under the profile, no new SMB). At every step AAPS and the pump agree on the running temp basal.
+     */
+    @Test
+    fun closedLoop_riseThenFall_reachesThePump() {
+        val start = System.currentTimeMillis()
+        // 30 minutes of steady history so the loop has a trend.
+        backfill(start, minutes = 30, value = 140.0)
+        // Rise: 150 -> 230 mg/dL over 12 minutes.
+        for (i in 0 until RISE_MIN) {
+            reading(150.0 + i * 7.0)
+            waitAMinute()
+        }
+        val onRise = emulator.state()
+        val givenOnRise = (onRise.tempBasal?.absolute ?: 0.0) > PROFILE_BASAL + 0.01 || onRise.boluses.isNotEmpty()
+        assertWithMessage("on a fast rise the loop gave more insulin and the pump has it (temp ${onRise.tempBasal}, boluses ${onRise.boluses})")
+            .that(givenOnRise).isTrue()
+        assertTempBasalSame("after the rise")
+
+        val bolusesBeforeFall = onRise.boluses.size
+        // Fall: 140 -> 70 mg/dL over 12 minutes.
+        for (i in 0 until FALL_MIN) {
+            reading(140.0 - i * 6.0)
+            waitAMinute()
+        }
+        val onFall = emulator.state()
+        assertWithMessage("on a fast fall the pump runs a temp basal under the profile (${onFall.tempBasal})")
+            .that((onFall.tempBasal?.absolute ?: PROFILE_BASAL) < PROFILE_BASAL - 0.01).isTrue()
+        assertWithMessage("no SMB on the fall (${onFall.boluses})").that(onFall.boluses.size).isEqualTo(bolusesBeforeFall)
+        assertTempBasalSame("after the fall")
+        assertWithMessage("the loop ran").that(loop.lastRun).isNotNull()
+    }
+
+    /**
+     * The learner on 17 days of virtual Eva with too many lows in the last 3 days: the percentage card proposes
+     * 100 -> 90 %, "Внести" makes a 90 % switch and the pump gets the 90 % basal. The basal card then does not
+     * propose (one change at a time: the last change is still judged).
+     */
+    @Test
+    fun learner_percentageCard_reachesThePump() {
+        val now = System.currentTimeMillis()
+        seedHistory(now, days = 17, lowsLast3Days = true)
+
+        runBlocking { learner.runPctCardNowForBench() }
+        val proposal = learner.status.value.pctProposal
+        assertWithMessage("the percentage card proposes on many lows (${learner.status.value.lastPct})").that(proposal).isNotNull()
+        assertWithMessage("it proposes 10 % less").that(proposal!!.to).isEqualTo(90)
+
+        learner.acceptPct()
+        assertWithMessage("a 90 % profile runs").that(awaitTrue(SWITCH_TIMEOUT) { runBlocking { profileFunction.getRequestedProfile() }?.percentage == 90 }).isTrue()
+        assertWithMessage("the pump got the 90 % basal (${emulator.state().basal})")
+            .that(awaitTrue(SWITCH_TIMEOUT) { emulator.state().basal?.all { abs(it - PROFILE_BASAL * 0.9) < 0.02 } == true }).isTrue()
+
+        runBlocking { learner.runBasalCardNowForBench() }
+        assertWithMessage("no basal proposal while the last change is judged").that(learner.status.value.proposal).isNull()
+    }
+
+    // The virtual Eva: history and readings
+
+    /** [days] of 5 minute readings: mostly 100-160, meals with a rise, and many lows in the last 3 days if asked. */
+    private fun seedHistory(now: Long, days: Int, lowsLast3Days: Boolean) {
+        val step = 5 * 60_000L
+        val n = days * 288
+        val values = ArrayList<GV>(n)
+        for (k in 0 until n) {
+            val t = now - (n - k) * step
+            val minuteOfDay = ((t / 60_000L) % 1440).toInt()
+            var v = 130.0 + 25.0 * Math.sin(minuteOfDay / 1440.0 * 2 * Math.PI)
+            // A meal rise at 8, 13 and 18 o'clock (UTC on the emulator).
+            for (meal in intArrayOf(8 * 60, 13 * 60, 18 * 60)) {
+                val m = minuteOfDay - meal
+                if (m in 0..180) v += 60.0 * Math.sin(m / 180.0 * Math.PI)
+            }
+            val lastThree = k >= n - 3 * 288
+            // About 6 % of the last 3 days low: 17 readings a day around 3 o'clock.
+            if (lowsLast3Days && lastThree && minuteOfDay in (3 * 60) until (3 * 60 + 85)) v = 62.0
+            values += GV(timestamp = t, value = v, raw = null, noise = null, trendArrow = TrendArrow.FLAT, sourceSensor = SourceSensor.RANDOM)
+        }
+        runBlocking { persistenceLayer.insertCgmSourceData(Sources.Random, values, emptyList(), null) }
+    }
+
+    private fun backfill(now: Long, minutes: Int, value: Double) {
+        val values = (minutes downTo 1).map { m ->
+            GV(timestamp = now - m * 60_000L, value = value, raw = null, noise = null, trendArrow = TrendArrow.FLAT, sourceSensor = SourceSensor.RANDOM)
+        }
+        runBlocking { persistenceLayer.insertCgmSourceData(Sources.Random, values, emptyList(), null) }
+    }
+
+    /** One reading now: AAPS calculates and the loop runs on it (loop interval 1 min). */
+    private fun reading(value: Double) {
+        val gv = GV(timestamp = System.currentTimeMillis(), value = value, raw = null, noise = null, trendArrow = TrendArrow.NONE, sourceSensor = SourceSensor.RANDOM)
+        runBlocking { persistenceLayer.insertCgmSourceData(Sources.Random, listOf(gv), emptyList(), null) }
+    }
+
+    private fun waitAMinute() = SystemClock.sleep(60_000L)
+
+    // Checks
+
+    private fun assertTempBasalSame(where: String) {
+        val agree = awaitTrue(RECORD_TIMEOUT) {
+            val onPump = emulator.state().tempBasal?.absolute
+            val inAaps = runBlocking { persistenceLayer.getTemporaryBasalActiveAt(System.currentTimeMillis()) }?.rate
+            if (onPump == null || inAaps == null) onPump == inAaps else abs(onPump - inAaps) < 0.01
+        }
+        assertWithMessage("AAPS and the pump agree on the temp basal $where").that(agree).isTrue()
+    }
+
+    // Set up
+
+    private fun seedProfile() {
+        val day = T.hours(24).msecs()
+        // Made-up child values (mg/dL): basal 0.4 U/h, ISF 150, IC 25, target 108.
+        val profile = profileRepository.newDraft().copy(
+            mgdl = true,
+            ic = listOf(Block(day, 25.0)),
+            isf = listOf(Block(day, 150.0)),
+            basal = listOf(Block(day, PROFILE_BASAL)),
+            target = listOf(TargetBlock(day, 108.0, 108.0))
+        )
+        runBlocking { profileRepository.add(profile) }.getOrThrow()
+    }
+
+    private fun activateProfile() {
+        val store = checkNotNull(awaitNotNull(PROFILE_STORE_TIMEOUT) { profileRepository.profile.value?.takeIf { it.getSpecificProfile(PROFILE_NAME) != null } }) {
+            "The profile store never published '$PROFILE_NAME'"
+        }
+        val switch = runBlocking {
+            profileFunction.createProfileSwitch(
+                profileStore = store, profileName = PROFILE_NAME, durationInMinutes = 0, percentage = 100,
+                timeShiftInHours = 0, timestamp = dateUtil.now(), action = Action.PROFILE_SWITCH,
+                source = Sources.Aaps, listValues = emptyList(), iCfg = insulinManager.insulins.first()
+            )
+        }
+        checkNotNull(switch) { "Could not activate the profile" }
+    }
+
+    private fun status(reason: String): PumpEnactResult = runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.readStatus(reason) } }
+
+    private fun <T> awaitNotNull(timeoutMs: Long, supplier: () -> T?): T? {
+        val end = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < end) {
+            runCatching(supplier).getOrNull()?.let { return it }
+            SystemClock.sleep(POLL_MS)
+        }
+        return null
+    }
+
+    private fun awaitTrue(timeoutMs: Long, condition: () -> Boolean): Boolean {
+        val end = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < end) {
+            if (runCatching(condition).getOrDefault(false)) return true
+            SystemClock.sleep(POLL_MS)
+        }
+        return false
+    }
+
+    private fun clearAllSharedPrefs() {
+        val ctx = instrumentation.targetContext
+        File(ctx.applicationInfo.dataDir, "shared_prefs").listFiles()?.forEach { f ->
+            if (f.name.endsWith(".xml"))
+                ctx.getSharedPreferences(f.name.removeSuffix(".xml"), Context.MODE_PRIVATE).edit().clear().commit()
+        }
+    }
+
+    companion object {
+
+        private const val PKG = "info.nightscout.androidaps"
+        private const val SERIAL = "12345678"
+        private const val ADDRESS = "11:22:33:AA:BB:CC"
+        private const val PROFILE_NAME = "LocalProfile1"
+        private const val PROFILE_BASAL = 0.4
+        private const val PROFILE_STORE_TIMEOUT = 20_000L
+        private const val INIT_TIMEOUT = 60_000L
+        private const val STEP_TIMEOUT = 240_000L
+        private const val RECORD_TIMEOUT = 60_000L
+        private const val SWITCH_TIMEOUT = 120_000L
+        private const val POLL_MS = 250L
+        private const val RISE_MIN = 12
+        private const val FALL_MIN = 12
+    }
+}

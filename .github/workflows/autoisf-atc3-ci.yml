@@ -23,6 +23,10 @@ on:
         description: 'Run the app on an emulator: random taps, official end to end tests, screenshots'
         type: boolean
         default: false
+      vbench:
+        description: 'Emulator: only the virtual bench (closed loop + learner against the software pump)'
+        type: boolean
+        default: false
   push:
     branches:
       - autoisf-atc3
@@ -170,7 +174,7 @@ jobs:
   # and "not responding" are counted), then the official end to end tests of this base, one class at a
   # time so one failure does not hide the others. Screenshots, logcat and a summary are uploaded.
   emulator:
-    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.emulator || inputs.screens) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.emulator || inputs.screens || inputs.vbench) }}
     runs-on: ubuntu-latest
     timeout-minutes: 260
     env:
@@ -231,7 +235,7 @@ jobs:
           disk-size: 6G
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
-          script: SCREENS_ONLY=${{ inputs.screens && !inputs.emulator && '1' || '0' }} bash tools/atc3_emulator_check.sh
+          script: SCREENS_ONLY=${{ inputs.screens && !inputs.emulator && '1' || '0' }} ONLY_CLASS=${{ inputs.vbench && !inputs.emulator && 'app.aaps.e2e.VirtualBenchTest' || '' }} bash tools/atc3_emulator_check.sh
 
       - name: Upload what the emulator showed
         if: ${{ always() }}
