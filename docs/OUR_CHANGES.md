@@ -55,6 +55,7 @@ the tests named next to it.
 | `core/keys/.../IntKey.kt` | status light defaults: `statuslights_res_critical` 40 U (was 10); sensor age warning 360 h / critical 480 h (15 / 20 days, was 216 / 240 h) | - |
 | `pump/apex` (vendored, see pump/apex/UPSTREAM.md) + `settings.gradle` + `app/build.gradle.kts` + core `DoseStepSize`, `ManufacturerType`, `PumpCapability`, `PumpType`, `InterfaceIDs`, `PumpTypeExtension` | Apex v4 driver (russoturisto2026-create, 89d91d8) replaces our ATC3 in the app (user 21.11); its registration lines added next to the ATC3 ones; `:pump:atc3` stays only for its tests | `:pump:apex:testDebugUnitTest`, app build |
 | `pump/apex/.../link/ApexBLE.kt` + new `ApexRadioBindings.kt` (our edits in the vendored v4 driver) | ApexBLE open and made by a provider, so a device test can put our software pump in place of the radio (`ApexRadioSwap`); the app never sets it | VirtualBenchTest |
+| `pump/apex/.../manager/ApexManager.kt` (our edit in the vendored v4 driver) | basal profile and settings writes with a LOST answer read back instead of failing at once (our ATC3 findings 3 and 4, still in v4) | virtual pump scenarios (to port) |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules

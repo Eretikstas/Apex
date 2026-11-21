@@ -208,8 +208,13 @@ class ApexManager(
             }
         }
 
-        if (exchange.sendControlAndWait(ApexProtocol.ControlOpcode.WRITE_BASAL_PROFILE, ApexPayload.basalProfile(rates)) != ApexAnswer.ACCEPTED) {
-            return "pump did not acknowledge the basal profile"
+        // Our change (docs/OUR_CHANGES.md): a lost answer is not a "no". The pump may have stored the profile all the
+        // same; then a failure here leaves AAPS on the old profile and the pump on the new one. Only a refusal fails
+        // at once; with no answer the read back below decides.
+        when (exchange.sendControlAndWait(ApexProtocol.ControlOpcode.WRITE_BASAL_PROFILE, ApexPayload.basalProfile(rates))) {
+            ApexAnswer.REFUSED  -> return "pump refused the basal profile"
+            ApexAnswer.NONE     -> aapsLogger.warn(LTag.PUMP, "Apex: no answer to the basal profile, reading it back")
+            ApexAnswer.ACCEPTED -> Unit
         }
 
         // Read back, a few times: the stored profile follows the acknowledgement with a delay.
@@ -409,13 +414,15 @@ class ApexManager(
      * @return null on success, else what did not match
      */
     fun writeSettings(wanted: ApexSettings): ApexFailure? {
-        when (exchange.sendControlAndWait(ApexProtocol.ControlOpcode.WRITE_SETTINGS, wanted.toPayload())) {
+        // Our change (docs/OUR_CHANGES.md): with no answer the pump may have stored the settings; the read back
+        // below decides, as for an accepted write. Only a refusal fails at once.
+        val answered = when (exchange.sendControlAndWait(ApexProtocol.ControlOpcode.WRITE_SETTINGS, wanted.toPayload())) {
             ApexAnswer.REFUSED  -> return ApexFailure("the pump refused the settings")
-            ApexAnswer.NONE     -> return ApexFailure("the pump did not acknowledge the settings")
-            ApexAnswer.ACCEPTED -> Unit
+            ApexAnswer.NONE     -> false.also { aapsLogger.warn(LTag.PUMP, "Apex: no answer to the settings, reading them back") }
+            ApexAnswer.ACCEPTED -> true
         }
-        // Remembered only once accepted: a refused write sets nothing.
-        preferences.put(ApexIntNonKey.AlarmDuration, wanted.alarmDuration)
+        // Remembered only once accepted: a refused write sets nothing. Unanswered: only once read back, below.
+        if (answered) preferences.put(ApexIntNonKey.AlarmDuration, wanted.alarmDuration)
 
         var lastProblem = "the pump did not report its settings back"
         val awaited = AwaitResult.until(
@@ -430,6 +437,7 @@ class ApexManager(
                 }
             }
         )
+        if (awaited.took && !answered) preferences.put(ApexIntNonKey.AlarmDuration, wanted.alarmDuration)
         return if (awaited.took) null else ApexFailure(lastProblem)
     }
 
