@@ -40,6 +40,8 @@ import app.aaps.core.interfaces.overview.graph.TbrState
 import app.aaps.core.ui.compose.AapsTheme
 import app.aaps.core.ui.compose.LocalConfig
 import app.aaps.core.ui.compose.navigation.NavigationRequest
+import app.aaps.core.interfaces.navigation.ElementType
+import app.aaps.core.ui.compose.LocalClientRole
 import app.aaps.core.ui.compose.preference.PreferenceSubScreenDef
 import app.aaps.ui.compose.main.TempTargetChipState
 import app.aaps.ui.compose.manageSheet.ManageViewModel
@@ -210,19 +212,23 @@ fun OverviewScreenRing(
             modifier = Modifier.fillMaxWidth()
         )
 
+        val role = LocalClientRole.current
+        fun tileAction(shown: Boolean, element: ElementType): (() -> Unit)? =
+            if (shown && commandsAllowed && role.allows(element.role)) ({ onNavigate(NavigationRequest.Element(element)) }) else null
         // Cannula, insulin left and pump battery on the left of the ring, sensor, IOB and COB on the right.
         RingHero(
             bgInfo = bgInfoState.bgInfo,
             timeAgo = bgInfoState.timeAgoText,
             stats = ringState.stats,
             unitLabel = profileUtil.unitLabel,
+            // A tap opens the same action the status row had (fill, cannula change, battery change, sensor insert).
             left = {
-                StatusTile(statusState.insulinStatus)
-                StatusTile(statusState.cannulaStatus)
-                StatusTile(statusState.batteryStatus)
+                StatusTile(statusState.insulinStatus, onClick = tileAction(statusState.showFill, ElementType.FILL))
+                StatusTile(statusState.cannulaStatus, onClick = tileAction(statusState.showFill, ElementType.CANNULA_CHANGE))
+                StatusTile(statusState.batteryStatus, onClick = tileAction(statusState.showPumpBatteryChange, ElementType.BATTERY_CHANGE))
             },
             right = {
-                StatusTile(statusState.sensorStatus)
+                StatusTile(statusState.sensorStatus, onClick = tileAction(true, ElementType.SENSOR_INSERT))
                 RingTile(icon = null, title = stringResource(CoreUiStrings.iob), value = iobUiState.text.ifEmpty { "—" }, onClick = onIobChipClick)
                 RingTile(icon = null, title = stringResource(CoreUiStrings.cob), value = cobUiState.text.ifEmpty { "—" })
             }

@@ -76,9 +76,9 @@ internal fun RingTile(icon: ImageVector?, title: String, value: String, valueCol
 
 /** A status line (cannula, insulin, sensor, battery) as a tile: its level and age, colored by how close to a change. */
 @Composable
-internal fun StatusTile(item: StatusItem?, modifier: Modifier = Modifier) {
+internal fun StatusTile(item: StatusItem?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     if (item == null) return
     val worst = listOf(item.ageStatus, item.levelStatus).maxByOrNull { if (it == StatusLevel.UNSPECIFIED) -1 else it.ordinal } ?: StatusLevel.UNSPECIFIED
     val value = listOfNotNull(item.level?.takeIf { it.isNotBlank() }, item.age.takeIf { it.isNotBlank() }).joinToString(" · ").ifEmpty { "—" }
-    RingTile(icon = item.icon, title = item.label, value = value, valueColor = worst.color(), modifier = modifier)
+    RingTile(icon = item.icon, title = item.label, value = value, valueColor = worst.color(), modifier = modifier, onClick = onClick)
 }
