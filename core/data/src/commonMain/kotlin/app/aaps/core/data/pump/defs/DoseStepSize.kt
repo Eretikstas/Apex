@@ -49,6 +49,14 @@ enum class DoseStepSize(private val entries: Array<DoseStepSizeEntry>) {
             DoseStepSizeEntry(1.0, 2.0, 0.05),
             DoseStepSizeEntry(2.0, Double.MAX_VALUE, 0.1)
         )
+    ),
+    // Apex v4 driver (russoturisto2026-create/aaps-apex-driver, registration patch): the same steps as ATC3.
+    Apex(
+        arrayOf(
+            DoseStepSizeEntry(0.0, 1.0, 0.025),
+            DoseStepSizeEntry(1.0, 2.0, 0.05),
+            DoseStepSizeEntry(2.0, Double.MAX_VALUE, 0.1)
+        )
     );
 
     fun getStepSizeForAmount(amount: Double): Double {

@@ -259,7 +259,8 @@ dependencies {
     // verified by building an APK with comboctl un-excluded. Keeping
     // them out of this list would only be tidiness, and it is tidiness that has to be maintained by
     // hand every time a module is added.
-    val pumpExclusions = setOf(":pump:virtual", ":pump:atc3-emulator")
+    // Our ATC3 driver is replaced by the Apex v4 driver (:pump:apex, user 21.11); its module stays for its tests.
+    val pumpExclusions = setOf(":pump:virtual", ":pump:atc3-emulator", ":pump:atc3")
     rootProject.subprojects
         .filter { it.path.startsWith(":pump:") && it.path !in pumpExclusions && it.buildFile.exists() }
         .forEach {

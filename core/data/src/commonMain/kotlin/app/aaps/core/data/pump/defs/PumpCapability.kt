@@ -25,6 +25,7 @@ enum class PumpCapability {
     // Diaconn set without Refill and ReplaceBattery: the Equil wizard fills the reservoir and fits the charged battery
     EquilCapabilities(arrayOf(Capability.Bolus, Capability.ExtendedBolus, Capability.TempBasal, Capability.BasalProfileSet, Capability.TDD, Capability.ManualTDDLoad)),
     Atc3Capabilities(arrayOf(Capability.Bolus, Capability.TempBasal, Capability.BasalProfileSet, Capability.BasalRate30min, Capability.Refill, Capability.ReplaceBattery, Capability.TDD, Capability.ManualTDDLoad)), // 48 half hour basal slots; Refill shows the prime/fill button, ReplaceBattery the battery change button. No extended bolus offered: its history record carries no duration.
+    ApexCapabilities(arrayOf(Capability.Bolus, Capability.TempBasal, Capability.BasalProfileSet, Capability.BasalRate30min, Capability.Refill, Capability.ReplaceBattery)),
     ;
 
     var children: ArrayList<Capability> = ArrayList()

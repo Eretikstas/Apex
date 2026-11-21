@@ -45,6 +45,7 @@ fun InterfaceIDs.PumpType.fromDb(): PumpType =
         InterfaceIDs.PumpType.EQUIL                       -> PumpType.EQUIL
         InterfaceIDs.PumpType.CARELEVO                    -> PumpType.CAREMEDI_CARELEVO
         InterfaceIDs.PumpType.ATC3                        -> PumpType.ATC3
+        InterfaceIDs.PumpType.APEX                        -> PumpType.APEX
     }
 
 fun PumpType.toDb(): InterfaceIDs.PumpType =
@@ -89,5 +90,6 @@ fun PumpType.toDb(): InterfaceIDs.PumpType =
         PumpType.EQUIL                     -> InterfaceIDs.PumpType.EQUIL
         PumpType.CAREMEDI_CARELEVO         -> InterfaceIDs.PumpType.CARELEVO
         PumpType.ATC3                      -> InterfaceIDs.PumpType.ATC3
+        PumpType.APEX                      -> InterfaceIDs.PumpType.APEX
 
     }

@@ -541,6 +541,42 @@ enum class PumpType(
         // Atc3Const.
         supportBatteryLevel = true,
         source = Source.Atc3
+    ),
+
+    /**
+     * Apex TruCare III, protocol 4.10-4.12, the v4 driver (russoturisto2026-create/aaps-apex-driver).
+     *
+     * Dose and rate scale is 1 raw = 0.025 U / 0.025 U/h, and the basal profile consists of
+     * 48 half hour slots, hence [Capability.BasalRate30min].
+     */
+    APEX(
+        description = "Apex",
+        manufacturer = ManufacturerType.Apex,
+        model = "TruCare III",
+        bolusSize = 0.025,
+        // A bolus from 1 U goes in 0.05 U portions and from 2 U in 0.1 U ones: the pump delivers
+        // the nearest step itself.
+        specialBolusSize = DoseStepSize.Apex,
+        // The pump has extended and dual boluses; the driver does not offer them.
+        extendedBolusSettings = null,
+        // The pump takes both absolute and percent temporary basals; the loop orders absolute ones.
+        pumpTempBasalType = PumpTempBasalType.Absolute,
+        // The duration byte of a temporary basal counts quarter hours. The ceilings are outer
+        // bounds; the pump's own configured maximums constrain a dose.
+        tbrSettings = DoseSettings(0.025, 15, 24 * 60, 0.0, 25.0),
+        specialBasalDurations = arrayOf(
+            Capability.BasalRate_Duration15minAllowed,
+            Capability.BasalRate_Duration30minAllowed
+        ),
+        baseBasalMinValue = 0.025,
+        baseBasalMaxValue = 25.0,
+        baseBasalStep = 0.025,
+        baseBasalSpecialSteps = DoseStepSize.Apex,
+        pumpCapability = PumpCapability.ApexCapabilities,
+        // A 300 U cartridge.
+        maxReservoirReading = 300,
+        supportBatteryLevel = true,
+        source = Source.Apex
     );
 
     fun manufacturer() = parent?.manufacturer ?: manufacturer ?: throw IllegalStateException()
@@ -581,7 +617,8 @@ enum class PumpType(
         Unknown,
         EQuil,
         Carelevo,
-        Atc3
+        Atc3,
+        Apex
     }
 
     companion object {

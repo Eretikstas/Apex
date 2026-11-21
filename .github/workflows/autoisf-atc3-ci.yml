@@ -75,7 +75,12 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Apex v4 driver (the driver of the app now) and its tests
+        run: ./gradlew --console=plain :pump:apex:testDebugUnitTest --continue --stacktrace
+        if: ${{ !cancelled() }}
+
       - name: Compile the driver
+        if: ${{ !cancelled() }}
         run: ./gradlew --console=plain :pump:atc3:compileDebugKotlin --stacktrace
 
       - name: Compile the driver tests
@@ -154,6 +159,7 @@ jobs:
             database/impl/build/reports/tests
             plugins/sibionics/build/reports/tests
             plugins/learner/build/reports/tests
+            pump/apex/build/reports/tests
             ui/build/reports/tests
             app/build/reports/tests
             app/src/testFull/resources/prefs-schema.txt
