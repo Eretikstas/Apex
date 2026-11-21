@@ -9,8 +9,8 @@ on:
   workflow_dispatch:
     inputs:
       model:
-        description: 'LLM for Strix (LiteLLM name)'
-        default: 'anthropic/claude-sonnet-5-5'
+        description: 'LLM for Strix (LiteLLM name, e.g. gemini/gemini-2.5-pro)'
+        default: 'gemini/gemini-2.5-flash'
       budget:
         description: 'Spend limit, USD'
         default: '10'
