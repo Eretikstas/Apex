@@ -83,7 +83,8 @@ fun TbrChip(
                     tint = iconColor,
                     modifier = Modifier.size(AapsSpacing.chipIconSize)
                 )
-                if (rate > 0.0) {
+                // Our change (docs/OUR_CHANGES.md): a temp basal of 0 (basal off) shows "0" too, not the icon alone.
+                if (rate > 0.0 || state != TbrState.NONE) {
                     Text(
                         text = stringResource(CoreUiStrings.pump_base_basal_rate, rate),
                         style = MaterialTheme.typography.bodyMedium,

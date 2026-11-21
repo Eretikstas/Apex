@@ -50,6 +50,7 @@ the tests named next to it.
 | `core/keys/.../BooleanNonKey.kt` + `prefs-schema.txt` | `OverviewRingPredictionOffDone`: the ring screen switches the big graph's prediction overlay off once (user can turn it on, PRED) | `PreferenceKeySnapshotTest` |
 | `implementation/.../queue/CommandExecutor.kt` | taken from official AAPS dev 9221bf3385 (16.11): the connection limit counts from the last command, not from the start of the queue run (matters with a 3 min loop); drop when blaqone has it | queue tests in CI, ATC3 emulator scenarios |
 | `core/interfaces/.../calibration/AddEntryResult.kt` + `implementation/.../bolus/MasterRecordWriter.kt` + `ui/.../calibrationDialog/CalibrationDialogViewModel.kt` + `core/ui` `strings.xml` | new rejection `TooFarFromSensor` (finger value more than 8 mmol/L from the sensor: a typing error); used by the Sibionics calibration | `SibionicsCalibrationPluginTest` |
+| `ui/.../overview/chips/TbrChip.kt` | a temp basal of 0 (basal off) shows its rate "0,00" too, not only the down icon | ring screenshots |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules
