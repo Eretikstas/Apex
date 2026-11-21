@@ -16,9 +16,14 @@ data class DuraProposal(val from: Double, val to: Double, val madeAt: Long, val 
  */
 class LearnerStore(private val preferences: Preferences) {
 
-    private fun read(): JSONObject = runCatching { JSONObject(preferences.get(LearnerStringNonKey.State)) }.getOrElse { JSONObject() }
+    // One document: a read-modify-write from two threads (the card and a button) must not lose a field.
+    private val lock = Any()
 
-    private fun edit(block: JSONObject.() -> Unit) {
+    private fun read(): JSONObject = synchronized(lock) {
+        runCatching { JSONObject(preferences.get(LearnerStringNonKey.State)) }.getOrElse { JSONObject() }
+    }
+
+    private fun edit(block: JSONObject.() -> Unit) = synchronized(lock) {
         val o = read()
         o.block()
         preferences.put(LearnerStringNonKey.State, o.toString())
@@ -86,15 +91,20 @@ class LearnerStore(private val preferences: Preferences) {
 
     /** The last dura card, for the screen: "flat|low" in percent, empty before the first card. */
     var lastDura: Pair<Double, Double>?
-        get() = read().optString(KEY_LAST_DURA).ifEmpty { null }?.split('|')?.takeIf { it.size == 2 }?.let { Pair(it[0].toDouble(), it[1].toDouble()) }
+        get() = read().optString(KEY_LAST_DURA).ifEmpty { null }?.split('|')?.takeIf { it.size == 2 }?.let { p ->
+            val flat = p[0].toDoubleOrNull()
+            val low = p[1].toDoubleOrNull()
+            if (flat != null && low != null) Pair(flat, low) else null
+        }
         set(value) = edit { if (value == null) remove(KEY_LAST_DURA) else put(KEY_LAST_DURA, "${value.first}|${value.second}") }
 
     /** The hours of the last card, for the screen: "need|source|windows" per hour. */
     var lastHours: List<HourResult>
         get() = read().optString(KEY_HOURS).ifEmpty { null }?.split(';')?.mapNotNull { row ->
             val p = row.split('|')
+            // A broken row (an older format) is dropped, never a crash.
             if (p.size != 5) null
-            else HourResult(p[0].toInt(), p[1].toDouble(), p[2].toDoubleOrNull(), HourSource.valueOf(p[3]), p[4].toInt())
+            else runCatching { HourResult(p[0].toInt(), p[1].toDouble(), p[2].toDoubleOrNull(), HourSource.valueOf(p[3]), p[4].toInt()) }.getOrNull()
         } ?: emptyList()
         set(value) = edit {
             put(KEY_HOURS, value.joinToString(";") { "${it.hour}|${it.profile}|${it.need ?: ""}|${it.source}|${it.windows}" })

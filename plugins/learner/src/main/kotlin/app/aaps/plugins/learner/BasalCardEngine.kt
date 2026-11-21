@@ -125,9 +125,12 @@ class BasalCardEngine(
             val s = steps[k]
             val e = steps[k + 12]
             if (s.minute != 0 || since[k] < 300) continue
-            if ((s.cannulaAgeH ?: 0.0) > CANNULA_MAX_H || (e.cannulaAgeH ?: 0.0) > CANNULA_MAX_H) continue
+            // Unknown cannula age = no change in the history read, so older than 72 h.
+            if ((s.cannulaAgeH ?: Double.MAX_VALUE) > CANNULA_MAX_H || (e.cannulaAgeH ?: Double.MAX_VALUE) > CANNULA_MAX_H) continue
             val bg0 = s.bgMgdl ?: continue
             val bg1 = e.bgMgdl ?: continue
+            // A gap in the sensor can hide a low and its treatment: at most 2 readings of the hour may be missing.
+            if ((k..k + 12).count { steps[it].bgMgdl == null } > MAX_MISSING) continue
             if (bg0 !in 70.0..216.0) continue
             if ((k until k + 12).any { steps[it].mealG > 0 }) continue
             var a = 0.0
@@ -150,6 +153,7 @@ class BasalCardEngine(
         const val NEED_DAYS = 14
         const val LOW_DAYS = 7
         const val MIN_WINDOWS = 2
+        const val MAX_MISSING = 2
         const val LOW_MAX = 6
         const val CARDS_IN_A_ROW = 2
         const val MAX_STEP = 0.20

@@ -42,4 +42,5 @@
     <string name="learner_dura_seen">Последние 7 дней: ровные высокие — %1$.1f %%, ниже 3,9 — %2$.1f %%.</string>
     <string name="learner_dura_rule" formatted="false">Шаг вверх (+0,25, до 2,0), когда ровных высоких 2 % и больше, а низких 3 % и меньше; шаг вниз, когда низких больше 4 %.</string>
     <string name="learner_dura_change">dura %1$.2f → %2$.2f</string>
+    <string name="learner_wait_temporary">Сейчас идёт временный профиль. Внесите предложение после его окончания.</string>
 </resources>

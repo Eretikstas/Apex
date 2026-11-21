@@ -42,4 +42,5 @@
     <string name="learner_dura_seen" comment="%1$.1f=share of flat highs in percent, %2$.1f=share of readings under 3.9 in percent, last 7 days">Last 7 days: flat highs %1$.1f %%, under 3.9 %2$.1f %%.</string>
     <string name="learner_dura_rule" formatted="false">Up one step (+0.25, up to 2.0) when flat highs are 2 % or more and lows 3 % or less; down one step when lows are over 4 %.</string>
     <string name="learner_dura_change" comment="%1$.2f=dura now, %2$.2f=dura proposed">dura %1$.2f → %2$.2f</string>
+    <string name="learner_wait_temporary">A temporary profile runs now. Apply the proposal after it ends.</string>
 </resources>

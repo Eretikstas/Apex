@@ -77,6 +77,14 @@ class BasalCardEngineTest {
     }
 
     @Test
+    fun `hours with an unknown cannula age or a sensor gap are not used`() {
+        assertThat(engine.hourNeeds(history(cannula = null).takeLast(14 * 288)).all { it.isEmpty() }).isTrue()
+        // Every hour misses 3 readings: no hour is clean.
+        val gappy = history().takeLast(14 * 288).map { if (it.minute in 10..20) it.copy(bgMgdl = null) else it }
+        assertThat(engine.hourNeeds(gappy).all { it.isEmpty() }).isTrue()
+    }
+
+    @Test
     fun `hours with an old cannula are not used`() {
         val card = engine.card(history(cannula = 80.0), profile, BasalCardState())
         card.hours.forEach { assertThat(it.source).isEqualTo(HourSource.NONE) }

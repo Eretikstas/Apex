@@ -51,4 +51,18 @@ class DuraCardEngineTest {
         assertThat(DuraCardEngine.card(steps(7, cannulaH = 80.0, bg = day(3)), dura = 0.5).to).isNull()
         assertThat(DuraCardEngine.card(steps(7, bg = { null }), dura = 0.5).to).isNull()
     }
+
+    @Test
+    fun unknownCannulaAgeIsLeftOut() {
+        assertThat(DuraCardEngine.card(steps(7, cannulaH = null, bg = day(3)), dura = 0.5).to).isNull()
+    }
+
+    @Test
+    fun aWindowWithAMissingReadingIsNoFlatHigh() {
+        // The same highs, but every 4th reading of them is missing: no 30 minutes in a row are whole.
+        val gappy = { k: Int -> val s = k % 288; if (s in 140..175 && s % 4 == 0) null else day(3)(k) }
+        val card = DuraCardEngine.card(steps(7, bg = gappy), dura = 0.5)
+        assertThat(card.flatHighPct).isEqualTo(0.0)
+        assertThat(card.to).isNull()
+    }
 }

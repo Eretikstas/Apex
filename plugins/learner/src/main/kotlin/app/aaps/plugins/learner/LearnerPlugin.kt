@@ -29,6 +29,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.IntKey
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +42,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 
 /**
@@ -91,6 +93,7 @@ class LearnerPlugin(
     private val store = LearnerStore(prefs)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
+    private val applying = AtomicBoolean(false)
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
 
@@ -127,9 +130,12 @@ class LearnerPlugin(
         val name = profileFunction.getOriginalProfileName()
         val single = profileRepository.profiles.value.firstOrNull { it.name == name } ?: return
         val profileBasal = hourly(single.basal)
+        // The running profile has the switch percentage in it (ISF and IC divided by it); the card works on the
+        // profile at 100 %, the same as the basal it compares with.
+        val pct = (profileFunction.getRequestedProfile()?.percentage ?: 100).coerceAtLeast(1) / 100.0
         val engine = BasalCardEngine(
-            isfMgdl = profile.getIsfMgdl("Learner"),
-            icG = profile.getIc(),
+            isfMgdl = profile.getIsfMgdl("Learner") * pct,
+            icG = profile.getIc() * pct,
             peakMin = profile.iCfg.insulinPeakTime / 60_000.0,
             diaH = profile.iCfg.insulinEndTime / 3_600_000.0,
         )
@@ -155,6 +161,8 @@ class LearnerPlugin(
             }
 
             duraCard.to != null         -> {
+                // One proposal at a time.
+                store.proposal = null
                 store.duraProposal = DuraProposal(dura, duraCard.to, now, duraCard.flatHighPct, duraCard.lowPct)
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_dura), level = NotificationLevel.INFO)
             }
@@ -164,44 +172,60 @@ class LearnerPlugin(
         refresh()
     }
 
-    /** "Внести": the active profile gets the proposed hours (same profile, edited in place) and is switched to at 100 %. */
-    fun accept() = scope.launch {
-        val proposal = store.proposal ?: return@launch
+    /**
+     * "Внести": the profile of the proposal gets the proposed hours (same profile, edited in place) and is switched to
+     * with the percentage and time shift that run now (a 85 % set by the family stays 85 %). While a temporary switch
+     * runs nothing is changed: when it ends AAPS goes back to the switch under it, which holds the old basal.
+     */
+    fun accept() {
+        // A second tap while the first runs does nothing.
+        if (!applying.compareAndSet(false, true)) return
         setBusy(true)
-        val index = profileRepository.profiles.value.indexOfFirst { it.name == proposal.profileName }
-        val single = profileRepository.profiles.value.getOrNull(index)
-        if (single == null) {
-            finish(rh.gs(R.string.learner_profile_gone))
-            return@launch
+        scope.launch {
+            try {
+                applyProposal()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                aapsLogger.error(LTag.APS, "Learner: applying the proposal failed", e)
+                finish(rh.gs(R.string.learner_profile_invalid, e.message.orEmpty()))
+            } finally {
+                applying.set(false)
+            }
         }
+    }
+
+    private suspend fun applyProposal() {
+        val proposal = store.proposal ?: return finish("")
+        val running = profileFunction.getRequestedProfile()
+        if (running != null && running.duration > 0L) return finish(rh.gs(R.string.learner_wait_temporary))
+        val index = profileRepository.profiles.value.indexOfFirst { it.name == proposal.profileName }
+        val single = profileRepository.profiles.value.getOrNull(index) ?: return finish(rh.gs(R.string.learner_profile_gone))
         val hours = hourly(single.basal)
         // The profile was edited since the card: the proposal is no longer about the same numbers.
         if (proposal.changes.any { abs(hours[it.hour] - it.from) > 0.005 }) {
             store.proposal = null
-            finish(rh.gs(R.string.learner_profile_changed))
-            return@launch
+            return finish(rh.gs(R.string.learner_profile_changed))
         }
-        proposal.changes.forEach { hours[it.hour] = it.to }
-        val edited = single.copy(basal = (0 until 24).map { Block(HOUR_MS, hours[it]) })
-        val errors = profileRepository.validateStructured(edited) + profileRepository.validatePumpCompatibility(edited)
-        if (errors.isNotEmpty()) {
-            finish(rh.gs(R.string.learner_profile_invalid, errors.joinToString { it.toString() }))
-            return@launch
-        }
+        val edited = single.copy(basal = withHours(single.basal, proposal.changes.associate { it.hour to it.to }))
+        val percentage = running?.percentage ?: 100
+        val errors = profileRepository.validateStructured(edited) + profileRepository.validatePumpCompatibility(edited, percentage)
+        if (errors.isNotEmpty()) return finish(rh.gs(R.string.learner_profile_invalid, errors.joinToString { it.toString() }))
         val saved = profileRepository.replace(index, edited)
-        if (saved.isFailure) {
-            finish(rh.gs(R.string.learner_profile_invalid, saved.exceptionOrNull()?.message.orEmpty()))
-            return@launch
-        }
-        val switch = profileFunction.createProfileSwitch(
-            durationInMinutes = 0, percentage = 100, timeShiftInHours = 0,
+        if (saved.isFailure) return finish(rh.gs(R.string.learner_profile_invalid, saved.exceptionOrNull()?.message.orEmpty()))
+        val now = dateUtil.now()
+        val profileStore = profileRepository.profile.value
+        val iCfg = running?.iCfg ?: profileFunction.getProfile()?.iCfg
+        val switch = if (profileStore != null && iCfg != null) profileFunction.createProfileSwitch(
+            profileStore = profileStore, profileName = proposal.profileName, durationInMinutes = 0, percentage = percentage,
+            timeShiftInHours = ((running?.timeshift ?: 0L) / HOUR_MS).toInt(), timestamp = now,
             action = Action.PROFILE_SWITCH, source = Sources.Aaps, note = rh.gs(R.string.learner_switch_note),
-            listValues = emptyList(), timestamp = dateUtil.now()
-        )
+            listValues = emptyList(), iCfg = iCfg
+        ) else null
         store.proposal = null
-        store.lastAppliedAt = dateUtil.now()
-        note(rh.gs(R.string.learner_why_applied, proposal.changes.size), dateUtil.now(), NOTE_LONG_MS)
-        aapsLogger.debug(LTag.APS, "Learner: basal proposal applied to ${proposal.profileName}, switch=${switch != null}")
+        store.lastAppliedAt = now
+        note(rh.gs(R.string.learner_why_applied, proposal.changes.size), now, NOTE_LONG_MS)
+        aapsLogger.debug(LTag.APS, "Learner: basal proposal applied to ${proposal.profileName} at $percentage %, switch=${switch != null}")
         finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
     }
 
@@ -246,6 +270,10 @@ class LearnerPlugin(
 
     private fun refresh(message: String = "") {
         val last = store.lastCardAt
+        // A proposal not answered by the next card is old: the numbers it was made from have moved on.
+        val now = dateUtil.now()
+        store.proposal?.let { if (now - it.madeAt > PROPOSAL_MAX_AGE_MS) store.proposal = null }
+        store.duraProposal?.let { if (now - it.madeAt > PROPOSAL_MAX_AGE_MS) store.duraProposal = null }
         // A waiting proposal is always in the "why", also after a restart of the app.
         store.proposal?.let { note(rh.gs(R.string.learner_why_proposal, it.changes.size), it.madeAt, PROPOSAL_NOTE_MS) }
         store.duraProposal?.let { note(rh.gs(R.string.learner_why_dura_proposal, it.from, it.to), it.madeAt, PROPOSAL_NOTE_MS) }
@@ -296,5 +324,35 @@ class LearnerPlugin(
         const val NOTE_SHORT_MS = 12 * 3_600_000L
         const val NOTE_LONG_MS = 24 * 3_600_000L
         const val PROPOSAL_NOTE_MS = 7 * 86_400_000L
+        const val PROPOSAL_MAX_AGE_MS = CARD_EVERY_MS
     }
+}
+
+private const val LEARNER_HOUR_MS = 3_600_000L
+
+/**
+ * [blocks] with the whole hours of [newByHour] set to their new value. Blocks shorter than an hour in the other
+ * hours stay as they are (the profile is not flattened to hours); equal neighbours are joined.
+ */
+internal fun withHours(blocks: List<Block>, newByHour: Map<Int, Double>): List<Block> {
+    val pieces = ArrayList<Block>()
+    var t = 0L
+    for (b in blocks) {
+        var from = t
+        val end = t + b.duration
+        while (from < end) {
+            val hourEnd = (from / LEARNER_HOUR_MS + 1) * LEARNER_HOUR_MS
+            val to = minOf(end, hourEnd)
+            pieces += Block(to - from, newByHour[(from / LEARNER_HOUR_MS).toInt()] ?: b.amount)
+            from = to
+        }
+        t = end
+    }
+    val out = ArrayList<Block>()
+    for (p in pieces) {
+        val last = out.lastOrNull()
+        if (last != null && abs(last.amount - p.amount) < 1e-9) out[out.size - 1] = Block(last.duration + p.duration, last.amount)
+        else out += p
+    }
+    return out
 }
