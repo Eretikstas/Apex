@@ -67,7 +67,7 @@ import app.aaps.ui.compose.manageSheet.ManageViewModel
 import app.aaps.ui.compose.overview.EatReminderBanner
 import androidx.compose.runtime.collectAsState
 import app.aaps.core.keys.BooleanKey
-import app.aaps.core.ui.compose.AapsNightThemeIf
+import app.aaps.core.ui.compose.AapsRingThemeIf
 import app.aaps.core.ui.compose.LocalPreferences
 import app.aaps.ui.compose.overview.OverviewScreen
 import app.aaps.ui.compose.overview.chips.ChipsViewModel
@@ -182,9 +182,9 @@ fun MainScreen(
         }
     }
 
-    // Our change (docs/OUR_CHANGES.md): with the "Кольцо" overview the whole main screen has the night look (always dark).
+    // Our change (docs/OUR_CHANGES.md): with the "Кольцо" overview the whole main screen has the ring look (light by day, dark by night).
     val ringNight by LocalPreferences.current.observe(BooleanKey.OverviewRingLayout).collectAsState()
-    AapsNightThemeIf(ringNight) {
+    AapsRingThemeIf(ringNight) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {

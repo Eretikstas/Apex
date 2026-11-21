@@ -25,51 +25,54 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.aaps.core.ui.compose.NightColors
+import app.aaps.core.ui.compose.LocalRingLook
+import app.aaps.core.ui.compose.RingLook
 import app.aaps.core.ui.compose.StatusLevel
 import app.aaps.ui.compose.overview.statusLights.StatusItem
 
 private val CardShape = RoundedCornerShape(24.dp)
 private val TileShape = RoundedCornerShape(16.dp)
 
-/** A card of the night look: navy gradient, thin light border, round corners. */
+/** A card of the ring look: gradient, thin light border, round corners. */
 @Composable
 internal fun GlassCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val look = LocalRingLook.current
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(CardShape)
-            .background(Brush.verticalGradient(listOf(NightColors.cardTop, NightColors.cardBottom)))
-            .border(1.dp, NightColors.cardBorder, CardShape)
+            .background(Brush.verticalGradient(listOf(look.cardTop, look.cardBottom)))
+            .border(1.dp, look.cardBorder, CardShape)
             .padding(14.dp),
         content = content
     )
 }
 
-private fun StatusLevel.color(): Color = when (this) {
-    StatusLevel.WARNING  -> NightColors.warning
-    StatusLevel.CRITICAL -> NightColors.critical
-    else                 -> NightColors.text
+private fun StatusLevel.color(look: RingLook): Color = when (this) {
+    StatusLevel.WARNING  -> look.warning
+    StatusLevel.CRITICAL -> look.critical
+    else                 -> look.text
 }
 
 /** One small tile beside the ring: icon, name, value. */
 @Composable
-internal fun RingTile(icon: ImageVector?, title: String, value: String, valueColor: Color = NightColors.text, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+internal fun RingTile(icon: ImageVector?, title: String, value: String, valueColor: Color? = null, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val look = LocalRingLook.current
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(TileShape)
-            .background(NightColors.tile)
-            .border(1.dp, NightColors.tileBorder, TileShape)
+            .background(look.tile)
+            .border(1.dp, look.tileBorder, TileShape)
             .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (icon != null) Icon(icon, contentDescription = null, tint = NightColors.textDim, modifier = Modifier.size(16.dp))
+        if (icon != null) Icon(icon, contentDescription = null, tint = look.textDim, modifier = Modifier.size(16.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.labelSmall, color = NightColors.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.labelSmall, color = look.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = valueColor ?: look.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -80,5 +83,5 @@ internal fun StatusTile(item: StatusItem?, modifier: Modifier = Modifier, onClic
     if (item == null) return
     val worst = listOf(item.ageStatus, item.levelStatus).maxByOrNull { if (it == StatusLevel.UNSPECIFIED) -1 else it.ordinal } ?: StatusLevel.UNSPECIFIED
     val value = listOfNotNull(item.level?.takeIf { it.isNotBlank() }, item.age.takeIf { it.isNotBlank() }).joinToString(" · ").ifEmpty { "—" }
-    RingTile(icon = item.icon, title = item.label, value = value, valueColor = worst.color(), modifier = modifier, onClick = onClick)
+    RingTile(icon = item.icon, title = item.label, value = value, valueColor = worst.color(LocalRingLook.current), modifier = modifier, onClick = onClick)
 }

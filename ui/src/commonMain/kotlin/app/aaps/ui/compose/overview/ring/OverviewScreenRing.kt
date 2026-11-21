@@ -9,8 +9,8 @@ import kotlin.math.abs
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import app.aaps.core.ui.CoreUiStrings
-import app.aaps.core.ui.compose.AapsNightTheme
-import app.aaps.core.ui.compose.NightColors
+import app.aaps.core.ui.compose.AapsRingTheme
+import app.aaps.core.ui.compose.LocalRingLook
 import app.aaps.core.ui.compose.stringResource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -159,12 +159,12 @@ fun OverviewScreenRing(
         }
     }
 
-    // The night look (user 21.11, like the AIMI screen): always dark navy, glass cards, status tiles around the ring.
-    AapsNightTheme {
+    // The ring look (user 21.11, cards and tiles like the AIMI screen): light by day, dark navy by night.
+    AapsRingTheme {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(NightColors.background)
+            .background(LocalRingLook.current.background)
             .padding(paddingValues)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 8.dp),
