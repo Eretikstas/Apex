@@ -48,6 +48,7 @@ the tests named next to it.
 | `plugins/sync/.../nsclientV3/NsIncomingDataProcessor.kt` + `strings.xml` | a fresh record of the iPhone client (`AAPSClient-iOS`) that is not taken raises a notice (accept off / hardened mode), at most every 30 min | `IosClientNsRecordsTest` |
 | `core/keys/.../BooleanNonKey.kt` + `prefs-schema.txt` | `OverviewRingPredictionOffDone`: the ring screen switches the big graph's prediction overlay off once (user can turn it on, PRED) | `PreferenceKeySnapshotTest` |
 | `implementation/.../queue/CommandExecutor.kt` | taken from official AAPS dev 9221bf3385 (16.11): the connection limit counts from the last command, not from the start of the queue run (matters with a 3 min loop); drop when blaqone has it | queue tests in CI, ATC3 emulator scenarios |
+| `core/interfaces/.../calibration/AddEntryResult.kt` + `implementation/.../bolus/MasterRecordWriter.kt` + `ui/.../calibrationDialog/CalibrationDialogViewModel.kt` + `core/ui` `strings.xml` | new rejection `TooFarFromSensor` (finger value more than 2.5 mmol/L or 30 % from the sensor); used by the Sibionics calibration | `SibionicsCalibrationPluginTest` |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules

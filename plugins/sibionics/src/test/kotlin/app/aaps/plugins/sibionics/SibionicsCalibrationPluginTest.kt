@@ -109,6 +109,36 @@ class SibionicsCalibrationPluginTest {
     }
 
     @Test
+    fun `a finger value far from the sensor is not taken`() = runTest {
+        whenever(source.sessionStart()).thenReturn(now - 10 * hour)
+        steady()
+        // Stock 108 mg/dL (6.0 mmol/L), finger 200 (11.1): a typing error or a bad stick.
+        whenever(persistence.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(listOf(gv(now - 60_000L, 110.0, 108.0)))
+        assertThat(plugin.addEntry(200.0, now)).isEqualTo(AddEntryResult.Rejected.TooFarFromSensor(200.0, 108.0))
+        verify(persistence, never()).insertOrUpdateCalibrationEntry(any())
+    }
+
+    @Test
+    fun `the limit is 2,5 mmol per L or 30 percent, the larger`() {
+        assertThat(SibionicsCalibrationPlugin.isPlausible(108.0 + 45.0, 108.0)).isTrue()
+        assertThat(SibionicsCalibrationPlugin.isPlausible(108.0 + 46.0, 108.0)).isFalse()
+        assertThat(SibionicsCalibrationPlugin.isPlausible(60.0, 100.0)).isTrue()
+        assertThat(SibionicsCalibrationPlugin.isPlausible(380.0, 300.0)).isTrue()
+        assertThat(SibionicsCalibrationPlugin.isPlausible(400.0, 300.0)).isFalse()
+    }
+
+    @Test
+    fun `steadiness is judged at the stick time, not only now`() = runTest {
+        whenever(source.sessionStart()).thenReturn(now - 10 * hour)
+        // AAPS says steady now, but the sensor rose 30 mg/dL in the 10 min before the stick.
+        steady(delta = 1.0)
+        whenever(persistence.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(
+            listOf(gv(now - 60_000L, 130.0, 130.0), gv(now - 6 * 60_000L, 115.0, 115.0), gv(now - 11 * 60_000L, 100.0, 100.0))
+        )
+        assertThat(plugin.addEntry(130.0, now)).isInstanceOf(AddEntryResult.Rejected.DeltaTooHigh::class.java)
+    }
+
+    @Test
     fun `AAPS calibration step changes nothing, so a stick is never applied twice`() = runTest {
         val data = mutableListOf(InMemoryGlucoseValue(timestamp = now, value = 120.0, sourceSensor = SourceSensor.SIBIONICS_NATIVE))
         val out = plugin.calibrate(data, CalibrationContext.NONE)

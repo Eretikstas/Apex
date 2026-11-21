@@ -125,6 +125,11 @@ class SibionicsSessionTest {
 
         assertEquals(6, restarted.state().nextIndex)
         assertNotNull(restarted.state().lastGlucoseMgdl)
+        // The recent journal minutes are given again at start (the database may not have them if the app was
+        // stopped between the journal write and the database write); no sensor start with them.
+        assertEquals((0..5).toList(), listener.readings.map { it.index })
+        assertTrue(listener.readings.none { it.live })
+        listener.readings.clear()
         restarted.onReady()
         restarted.onNotification(handshake(0x01))
         restarted.onNotification(handshake(0x03))
@@ -194,6 +199,40 @@ class SibionicsSessionTest {
         assertEquals(listOf(now), listener.starts)
         assertEquals(1, s.state().nextIndex)
         assertEquals(1, store.samples.size)
+    }
+
+    @Test
+    fun `the same values come back after a restart as were given live`() {
+        val store = FakeStore()
+        val live = FakeListener()
+        FakeIo().let { firstIo -> runFirstLink(session(store, firstIo, live), firstIo) }
+        val again = FakeListener()
+        session(store, FakeIo(), again)
+        assertEquals(live.readings.map { it.timestamp to it.glucoseMgdl }, again.readings.map { it.timestamp to it.glucoseMgdl })
+    }
+
+    @Test
+    fun `minutes with a bad time get times from their index, not all the same time`() {
+        val io = FakeIo()
+        val listener = FakeListener()
+        val s = session(FakeStore(), io, listener)
+        s.onReady()
+        s.onNotification(handshake(0x01))
+        s.onNotification(handshake(0x07))
+        s.onNotification(handshake(0x03))
+        // The sensor clock says 1970: no session start known yet, so times come from the page (last minute = now).
+        s.onNotification(page(0, 0L, List(4) { 60 + it }))
+        assertEquals(listOf(now - 3 * 60_000L, now - 2 * 60_000L, now - 60_000L, now), listener.readings.map { it.timestamp })
+    }
+
+    @Test
+    fun `a calibration never pushes a value below what the sensor can show`() {
+        // A very low finger stick at a low Stock: offset -5 mmol/L.
+        val anchor = SibionicsCalibrationAnchor(sensorMmol = 6.0f, referenceMmol = 1.0f, timestampMs = now - 2 * 60_000L)
+        val io = FakeIo()
+        val listener = FakeListener()
+        runFirstLink(session(FakeStore(), io, listener, listOf(anchor)), io)
+        listener.readings.forEach { assertTrue(it.glucoseMgdl >= 39.0 - 0.0001, "value ${it.glucoseMgdl} below 39") }
     }
 
     @Test

@@ -398,6 +398,11 @@ class MasterRecordWriter(
         AddEntryResult.Rejected.NoSensorPair    -> rh.gs(CoreUiStrings.cal_reject_no_pair)
         is AddEntryResult.Rejected.InWarmUp     -> rh.gs(CoreUiStrings.cal_reject_warmup)
         AddEntryResult.Rejected.NoSession       -> rh.gs(CoreUiStrings.cal_reject_no_session)
+        is AddEntryResult.Rejected.TooFarFromSensor -> rh.gs(
+            CoreUiStrings.cal_reject_too_far,
+            profileUtil.fromMgdlToStringWithUnits(rejected.fingerMgdl),
+            profileUtil.fromMgdlToStringWithUnits(rejected.sensorMgdl)
+        )
     }
 
     // The delta is in mg/dL per 5 min; shown in the user's unit.

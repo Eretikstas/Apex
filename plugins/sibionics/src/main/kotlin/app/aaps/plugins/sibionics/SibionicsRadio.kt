@@ -52,6 +52,8 @@ internal class SibionicsRadio(
     private var pendingWrite: Pair<ByteArray, String>? = null
     private var pendingWriteAttempts = 0
     private var scanCallback: ScanCallback? = null
+    private var scanDone: (() -> Unit)? = null
+    private var scanTimeout: Runnable? = null
     private val timers = HashMap<SibionicsSession.Timer, Runnable>()
 
     /** Last link problem for the screen, empty when none. */
@@ -78,7 +80,7 @@ internal class SibionicsRadio(
 
     /** Look for Sibionics 2 transmitters around; each one is reported once. Stops by itself after [durationMs]. */
     fun scan(durationMs: Long, onFound: (SibionicsFoundDevice) -> Unit, onDone: () -> Unit) = handler.post {
-        stopScanOnThread()
+        finishScanOnThread()
         val scanner = adapter?.bluetoothLeScanner
         if (!hasPermissions() || scanner == null) {
             problem = if (!hasPermissions()) PROBLEM_PERMISSION else PROBLEM_BLUETOOTH_OFF
@@ -95,23 +97,34 @@ internal class SibionicsRadio(
             }
         }
         scanCallback = callback
-        runCatching {
+        scanDone = onDone
+        val started = runCatching {
             scanner.startScan(null, ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(), callback)
-        }.onFailure { aapsLogger.error(LTag.BGSOURCE, "Sibionics: scan failed", it) }
-        handler.postDelayed({
-            stopScanOnThread()
-            onDone()
-        }, durationMs)
+        }.onFailure { aapsLogger.error(LTag.BGSOURCE, "Sibionics: scan failed", it) }.isSuccess
+        if (!started) {
+            finishScanOnThread()
+            return@post
+        }
+        val timeout = Runnable { finishScanOnThread() }
+        scanTimeout = timeout
+        handler.postDelayed(timeout, durationMs)
     }
 
-    private fun stopScanOnThread() {
-        val callback = scanCallback ?: return
+    /** Stop the scan (if one runs) and tell its caller once. Safe to call more than once. */
+    private fun finishScanOnThread() {
+        scanTimeout?.let { handler.removeCallbacks(it) }
+        scanTimeout = null
+        scanCallback?.let { callback -> runCatching { adapter?.bluetoothLeScanner?.stopScan(callback) } }
         scanCallback = null
-        runCatching { adapter?.bluetoothLeScanner?.stopScan(callback) }
+        val done = scanDone
+        scanDone = null
+        done?.invoke()
     }
 
     private fun stopOnThread() {
         running = false
+        // Removing all callbacks also removes the scan timeout, so the scan is ended here; else it would run on.
+        finishScanOnThread()
         handler.removeCallbacksAndMessages(null)
         timers.clear()
         closeGatt()

@@ -265,9 +265,10 @@ internal class SibionicsSession(
         var newSessionStart: Long? = null
         val readings = mutableListOf<SibionicsReading>()
         val journal = mutableListOf<SibionicsSourceSample>()
+        val pageLastIndex = ordered.last().index
         for (entry in ordered) {
             val live = isLive(entry, now)
-            val time = sanitizeTime(entry.eventTimeMs, now)
+            val time = sanitizeTime(entry, now, pageLastIndex)
             if (entry.index < 0 || !entry.rawMmol.isFinite() || entry.rawMmol <= 0f) continue
             // Already processed: a repeated page or a repeated notification.
             if (entry.index < nextIndex) continue
@@ -300,9 +301,7 @@ internal class SibionicsSession(
                 io.log("invalid glucose idx=${entry.index} value=$stockMgdl raw=${entry.rawMgdl}")
                 continue
             }
-            val calibratedMgdl = calibrate(glucoseMmol, time) * SibionicsConstants.MGDL_PER_MMOLL
-            val glucoseMgdl = if (SibionicsConstants.isValidAlgorithmGlucoseMgdl(calibratedMgdl)) calibratedMgdl else stockMgdl
-            readings += SibionicsReading(time, glucoseMgdl.toDouble(), stockMgdl.toDouble(), entry.rawMgdl.toDouble(), entry.index, live)
+            readings += reading(entry.index, glucoseMmol, entry.rawMgdl.toDouble(), time, live)
         }
         // The raw minutes are stored before anything is reported: a restart then rebuilds the same state.
         if (journal.isNotEmpty()) store.appendJournal(journal)
@@ -376,6 +375,26 @@ internal class SibionicsSession(
         )
     }
 
+    /** The reading for one processed minute: Stock, and the value with the calibrations made up to [time]. */
+    private fun reading(index: Int, stockMmol: Float, rawMgdl: Double, time: Long, live: Boolean): SibionicsReading {
+        val stockMgdl = stockMmol * SibionicsConstants.MGDL_PER_MMOLL
+        val calibratedMgdl = calibrate(stockMmol, time) * SibionicsConstants.MGDL_PER_MMOLL
+        val glucoseMgdl = when {
+            !calibratedMgdl.isFinite() -> {
+                io.log("calibration gave no number idx=$index, Stock $stockMgdl used")
+                stockMgdl
+            }
+            // A calibration may not push a value out of what the sensor can show: it is held at the edge, not
+            // silently replaced by the uncalibrated value.
+            calibratedMgdl < MIN_CALIBRATED_MGDL || calibratedMgdl > SibionicsConstants.MAX_ALGORITHM_GLUCOSE_MGDL -> {
+                io.log("calibrated value $calibratedMgdl idx=$index out of range, held at the edge")
+                calibratedMgdl.coerceIn(MIN_CALIBRATED_MGDL, SibionicsConstants.MAX_ALGORITHM_GLUCOSE_MGDL)
+            }
+            else -> calibratedMgdl
+        }
+        return SibionicsReading(time, glucoseMgdl.toDouble(), stockMgdl.toDouble(), rawMgdl, index, live)
+    }
+
     /** Stock value [stockMmol] at [time] with the calibrations made up to then; Stock itself when there are none. */
     private fun calibrate(stockMmol: Float, time: Long): Float {
         val list = anchors().filter { it.timestampMs >= sessionStart }
@@ -403,20 +422,41 @@ internal class SibionicsSession(
             return
         }
         var last: Float? = null
+        val recent = mutableListOf<SibionicsReading>()
+        val reportFrom = clock() - RESTORE_REPORT_MS
         for (sample in samples) {
             val value = runAlgorithm(sample.index, sample.rawMmol, sample.temperatureC, sample.impedance, sample.timestampMs)
             if (value.isFinite()) last = value
+            val valueMgdl = value * SibionicsConstants.MGDL_PER_MMOLL
+            if (sample.timestampMs >= reportFrom && SibionicsConstants.isValidAlgorithmGlucoseMgdl(valueMgdl))
+                recent += reading(sample.index, value, (sample.rawMmol * SibionicsConstants.MGDL_PER_MMOLL).toDouble(), sample.timestampMs, live = false)
         }
         nextIndex = samples.last().index + 1
         lastGlucose = last?.let { (it * SibionicsConstants.MGDL_PER_MMOLL).toDouble() }
         io.log("algorithm rebuilt from ${samples.size} journal minutes, next idx=$nextIndex")
+        // The journal is written before the values reach the database. If the app was stopped in between, those
+        // values would be lost for good (the cursor is already past them). So the recent ones are given again:
+        // the database keeps one value per time, a value it has already is only updated.
+        if (recent.isNotEmpty()) listener.onReadings(recent, null)
     }
 
     private fun isLive(entry: SibionicsProtocol.V120Entry, now: Long): Boolean =
         entry.eventTimeMs in (now - LIVE_WINDOW_MS)..(now + MAX_FUTURE_DRIFT_MS)
 
-    private fun sanitizeTime(time: Long, now: Long): Long =
-        if (time < MIN_REASONABLE_TIME_MS || time > now + MAX_FUTURE_DRIFT_MS) now else time
+    /**
+     * The minute's time as the sensor gave it, when it is sane. Otherwise it is worked out from the minute index:
+     * from the session start when known, else from the page (its last minute is taken as now). Never plain "now"
+     * for every bad minute: that would put many values on one time.
+     */
+    private fun sanitizeTime(entry: SibionicsProtocol.V120Entry, now: Long, pageLastIndex: Int): Long {
+        val time = entry.eventTimeMs
+        if (time >= MIN_REASONABLE_TIME_MS && time <= now + MAX_FUTURE_DRIFT_MS) return time
+        val fromStart = sessionStart + entry.index * SibionicsConstants.READING_INTERVAL_MS
+        val worked = if (sessionStart > 0L && fromStart <= now + MAX_FUTURE_DRIFT_MS) fromStart
+        else now - (pageLastIndex - entry.index) * SibionicsConstants.READING_INTERVAL_MS
+        io.log("bad time $time idx=${entry.index}, $worked used")
+        return worked
+    }
 
     private fun publishState() = listener.onState(state())
 
@@ -432,5 +472,7 @@ internal class SibionicsSession(
         const val LIVE_WINDOW_MS = 90_000L
         const val MAX_FUTURE_DRIFT_MS = 10L * 60L * 1000L
         const val MIN_REASONABLE_TIME_MS = 946_684_800_000L
+        const val RESTORE_REPORT_MS = 6L * 60L * 60L * 1000L
+        const val MIN_CALIBRATED_MGDL = 39f
     }
 }

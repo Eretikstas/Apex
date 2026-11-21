@@ -15,6 +15,7 @@ kotlin {
 
 val module = "../src"
 val pure = listOf("SibionicsSession.kt", "SibionicsIdentity.kt")
+val pureTests = listOf("SibionicsSessionTest.kt", "SibionicsIdentityParserTest.kt", "SibionicsLinkScenarioTest.kt")
 
 sourceSets {
     main {
@@ -24,6 +25,8 @@ sourceSets {
     }
     test {
         kotlin.srcDir("$module/test/kotlin")
+        // Only the tests of the plain parts: the others need AAPS (mocks of its interfaces, Robolectric).
+        kotlin.exclude { element -> element.isDirectory.not() && element.name !in pureTests }
     }
 }
 

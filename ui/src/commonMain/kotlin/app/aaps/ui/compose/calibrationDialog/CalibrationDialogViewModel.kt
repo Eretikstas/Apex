@@ -216,6 +216,11 @@ class CalibrationDialogViewModel(
         )
 
         AddEntryResult.Rejected.NoSensorPair    -> rh.gs(UiStrings.cal_precheck_no_pair)
+        is AddEntryResult.Rejected.TooFarFromSensor -> rh.gs(
+            CoreUiStrings.cal_reject_too_far,
+            profileUtil.fromMgdlToStringWithUnits(rejected.fingerMgdl),
+            profileUtil.fromMgdlToStringWithUnits(rejected.sensorMgdl)
+        )
     }
 
     // Input is already in mg/dL per 5 min — just convert to the user's display unit.

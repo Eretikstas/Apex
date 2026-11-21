@@ -29,5 +29,14 @@ sealed interface AddEntryResult {
 
         /** No recorded sensor session, so the pairing cannot be scoped. */
         data object NoSession : Rejected
+
+        /**
+         * Our addition (docs/OUR_CHANGES.md). The finger value is too far from the sensor value to be a real
+         * calibration (probably a typing error or a bad finger stick).
+         *
+         * @param fingerMgdl the finger value in mg/dL
+         * @param sensorMgdl the sensor value it was paired with, in mg/dL
+         */
+        data class TooFarFromSensor(val fingerMgdl: Double, val sensorMgdl: Double) : Rejected
     }
 }

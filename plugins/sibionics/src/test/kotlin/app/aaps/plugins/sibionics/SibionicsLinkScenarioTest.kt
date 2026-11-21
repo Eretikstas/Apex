@@ -144,7 +144,17 @@ class SibionicsLinkScenarioTest {
 
         private val listener = object : SibionicsSessionListener {
             override fun onReadings(readings: List<SibionicsReading>, sensorStart: Long?) {
-                this@Link.readings += readings
+                // Like the AAPS database: one value per time; a value given again replaces the old one (and must be
+                // the same value, else AAPS would see it change).
+                for (r in readings) {
+                    val old = this@Link.readings.firstOrNull { it.timestamp == r.timestamp }
+                    if (old != null) {
+                        assertEquals(old.glucoseMgdl, r.glucoseMgdl, 0.0001, "value given again at idx ${r.index} changed")
+                        this@Link.readings.remove(old)
+                    }
+                    this@Link.readings += r
+                }
+                this@Link.readings.sortBy { it.timestamp }
                 sensorStart?.let { starts += it }
             }
 

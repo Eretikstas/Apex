@@ -33,6 +33,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.IntKey
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +42,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import tk.glucodata.drivers.sibionics.SibionicsCalibrationAnchor
 import tk.glucodata.drivers.sibionics.SibionicsConstants
 
@@ -227,19 +230,39 @@ class SibionicsPlugin(
 
     private val sessionListener = object : SibionicsSessionListener {
         override fun onReadings(readings: List<SibionicsReading>, sensorStart: Long?) {
-            val values = readings.map { it.toGv() }
-            scope.launch {
-                runCatching { persistenceLayer.insertCgmSourceData(Sources.SiBionic, values, emptyList(), sensorStart) }
-                    .onFailure { aapsLogger.error(LTag.BGSOURCE, "Sibionics: values not stored", it) }
-            }
+            scope.launch { store(readings.map { it.toGv() }, sensorStart) }
         }
 
         override fun onState(state: SibionicsSession.State) = refreshStatus(state)
     }
 
+    // Values the database did not take (an error). They are given again with the next values, so a failed write
+    // does not lose them: the sensor cursor is already past them and they would not be read again.
+    private val unstored = mutableListOf<GV>()
+    private var unstoredStart: Long? = null
+    private val storeLock = Mutex()
+
+    private suspend fun store(values: List<GV>, sensorStart: Long?) = storeLock.withLock {
+        val all = (unstored + values).distinctBy { it.timestamp }.sortedBy { it.timestamp }.takeLast(MAX_UNSTORED)
+        val start = sensorStart ?: unstoredStart
+        try {
+            persistenceLayer.insertCgmSourceData(Sources.SiBionic, all, emptyList(), start)
+            unstored.clear()
+            unstoredStart = null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            aapsLogger.error(LTag.BGSOURCE, "Sibionics: ${all.size} values not stored, kept for the next try", e)
+            unstored.clear()
+            unstored += all
+            unstoredStart = start
+        }
+    }
+
     private companion object {
 
         const val SCAN_MS = 20_000L
+        const val MAX_UNSTORED = 24 * 60
     }
 }
 
