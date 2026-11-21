@@ -674,7 +674,7 @@ class HistoryReplayTest {
         // NEEDDX_<x>: the true basal need of the day hours (10-21 h) times x (the encrypted values are night-based).
         val needDx = tok("NEEDDX", 1.0)
         val needBasal = (0 until 24).map { cfg.getJSONArray("needBasal").getDouble(it) * (if (it in 10..21) needDx else 1.0) }
-        val isfP = prof?.getDouble("isf") ?: cfg.getDouble("profIsf"); val icP = prof?.getDouble("ic") ?: cfg.getDouble("profIc")
+        var isfP = prof?.getDouble("isf") ?: cfg.getDouble("profIsf"); val icP = prof?.getDouble("ic") ?: cfg.getDouble("profIc")
         // LEARNCR_<k>: the meal CR follows the basal learner. When the learner has moved the whole basal by r (sum now /
         // sum at start), the CR becomes icP / (1 + k * (r - 1)), kept within 0.75-1.25 of icP; both ways.
         val basalStart = profBasal.sum(); var icNow = icP; val learnCr = tok("LEARNCR", 0.0)
@@ -752,7 +752,7 @@ class HistoryReplayTest {
         val chainP = tok("CHAIN", 0.0) / 100.0; var nChain = 0
         // LEARNCRM: the meal CR learns per meal block (05-11, 11-17, 17-05) from the last 7 days, like LEARNCR2 per block
         // (>= 4 meals in the block, lows >= 25 % -> 7 % weaker, highs >= 40 % with lows <= 10 % -> 7 % stronger, 0.75-1.25).
-        val learnCrm = prefsText.contains("LEARNCRM"); val crBlock = doubleArrayOf(1.0, 1.0, 1.0)
+        val learnCrm = prefsText.contains("LEARNCRM"); val learnCrm2 = prefsText.contains("LEARNCRM2"); val crBlock = doubleArrayOf(1.0, 1.0, 1.0)
         fun blockOf(hh: Int) = if (hh in 5..10) 0 else if (hh in 11..16) 1 else 2
         fun icAt(tm: Long) = icNow * crBlock[blockOf(hourOf(tm))]
         // SMARTL: the smart calculator's "food first" level learns (start 4.5 mmol/L, 4.5-6.5): a meal bolus given at once
@@ -764,6 +764,12 @@ class HistoryReplayTest {
         val mealWatch = ArrayList<MealWatch>()
         // GUARDCHAIN: two or more hypo treatments in 4 h = a swing; the rebound guard window is 1.5x longer then (max 240).
         val guardChain = prefsText.contains("GUARDCHAIN"); val treatTimes = ArrayList<Long>(); var nGuardChain = 0
+        // PCTCARD: the learner's profile percentage card, daily at 06:00, at least 2 days after its last change. Last 3 days:
+        // highs (>10) over 8 % with lows (<3.9) at most 3 % and (TDD 15 % over the 14 days before, or highs over 12 %) ->
+        // +10 % (max 130 %); lows over 4 % -> -10 % (min 80 %). A percentage scales basal up and ISF and CR down, as in AAPS.
+        val pctCard = prefsText.contains("PCTCARD"); var pctNow = 1.0; var lastPctDay = -99; var pctUp = 0; var pctDown = 0
+        // LBFAST: when the last two basal cards moved the basal the same way, the next one comes after 2 days, not LBEVERY.
+        val lbFast = prefsText.contains("LBFAST"); val basalDirs = ArrayList<Int>(); var nextBasalDay = tok("LBEVERY", 4.0).toInt()
         var lastLoopBg: Double? = null; var lastAct = 0.0
         var mealPtr = 0
         val out = JSONArray()
@@ -960,19 +966,48 @@ class HistoryReplayTest {
             for (b in 0..2) {
                 val mb = meals.filter { blockOf(hourOf(it.getLong("t"))) == b }
                 if (mb.size < 4) { sb.append(" b$b n=${mb.size}"); continue }
-                var highs = 0; var lows = 0
+                var highs = 0; var lows = 0; var used = 0
                 for (m in mb) {
                     val tm = m.getLong("t")
+                    // LEARNCRM2: a meal right after a hypo treatment (3 h) says nothing about the CR: left out. A high counts
+                    // only 2-4 h after the meal and with no low up to 6 h after it.
+                    if (learnCrm2 && rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optDouble("hypo", 0.0) > 0.0 }) continue
+                    used++
                     val w = rows.filter { it.getLong("t") in tm..(tm + 240 * minute) }
                     if (w.any { it.getDouble("bg") < 70.2 }) lows++
-                    else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
+                    else if (learnCrm2) {
+                        val after = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
+                        if (after.none { it.getDouble("bg") < 70.2 } && w.filter { it.getLong("t") >= tm + 120 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
+                    } else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
                 }
-                val hf = highs.toDouble() / mb.size; val lf = lows.toDouble() / mb.size
+                if (used < 4) { sb.append(" b$b used=$used"); continue }
+                val hf = highs.toDouble() / used; val lf = lows.toDouble() / used
                 if (lf >= 0.25) crBlock[b] = minOf(crBlock[b] * 1.07, 1.25)
                 else if (hf >= 0.40 && lf <= 0.10) crBlock[b] = maxOf(crBlock[b] / 1.07, 0.75)
                 sb.append(" b$b n=${mb.size} hi ${"%.0f".format(hf * 100)} lo ${"%.0f".format(lf * 100)} x${"%.2f".format(crBlock[b])}")
             }
             println("AIMI replay: learner CRM day $day:$sb")
+        }
+        fun pctCardRun(day: Int) {
+            val n = out.length()
+            if (n < 17 * 288) return
+            fun rowTdd(o: JSONObject) = o.optDouble("units", 0.0) + o.optDouble("man", 0.0) + o.optDouble("deliv", 0.0) * 5.0 / 60.0
+            val last = (n - 3 * 288 until n).map { out.getJSONObject(it) }
+            val before = (n - 17 * 288 until n - 3 * 288).map { out.getJSONObject(it) }
+            val bgs = last.mapNotNull { if (it.has("bg")) it.getDouble("bg") else null }
+            if (bgs.size < 600) return
+            val hi = bgs.count { it > 180.0 } * 100.0 / bgs.size; val lo = bgs.count { it < 70.0 } * 100.0 / bgs.size
+            val tddNow = last.sumOf { rowTdd(it) } / 3.0; val tddBefore = before.sumOf { rowTdd(it) } / 14.0
+            val rise = if (tddBefore > 0) tddNow / tddBefore - 1.0 else 0.0
+            val old = pctNow
+            if (lo > 4.0 && pctNow > 0.8001) { pctNow = maxOf(0.8, pctNow - 0.1); pctDown++ }
+            else if (hi > 8.0 && lo <= 3.0 && (rise >= 0.15 || hi > 12.0) && pctNow < 1.2999) { pctNow = minOf(1.3, pctNow + 0.1); pctUp++ }
+            if (pctNow != old) {
+                val f = pctNow / old
+                for (i in 0 until 24) profBasal[i] = Math.round(profBasal[i] * f * 100) / 100.0
+                isfP /= f; icNow /= f; lastPctDay = day
+            }
+            println("AIMI replay: learner PCT day $day: high ${"%.1f".format(hi)} % low ${"%.1f".format(lo)} % TDD ${"%.1f".format(tddNow)} vs ${"%.1f".format(tddBefore)} -> ${"%.0f".format(old * 100)} -> ${"%.0f".format(pctNow * 100)} %")
         }
         // LEARNDURA: the learner's dura card, every LBEVERY days at 06:00 with the basal card, last 7 days. "Flat high" =
         // a 5 min reading over 10 mmol/L that ends 30 min all over 10 and within 1 mmol/L (what dura acts on). Flat highs
@@ -1382,7 +1417,15 @@ class HistoryReplayTest {
                 out.put(row)
                 // LEARNB: the learner's basal card every LBEVERY_<d> days (default 4) at 06:00, accepted at once.
                 val lt = Instant.ofEpochMilli(t).atZone(tz)
-                if (learnB && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnBasal(day)
+                if (learnB && lt.hour == 6 && lt.minute == 0 && (if (lbFast) day >= nextBasalDay else day >= lbEvery && day % lbEvery == 0)) {
+                    val before = profBasal.sum()
+                    learnBasal(day)
+                    val d = profBasal.sum() - before
+                    basalDirs.add(if (d > 0.05) 1 else if (d < -0.05) -1 else 0)
+                    val k = basalDirs.size
+                    nextBasalDay = day + (if (lbFast && k >= 2 && basalDirs[k - 1] != 0 && basalDirs[k - 1] == basalDirs[k - 2]) 2 else lbEvery)
+                }
+                if (pctCard && day >= 17 && day - lastPctDay >= 2 && lt.hour == 6 && lt.minute == 0) pctCardRun(day)
                 if (learnCr2 && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrFromMeals(day)
                 if (learnCrm && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrBlocks(day)
                 if (learnDura && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnDuraCard(day)
@@ -1394,6 +1437,7 @@ class HistoryReplayTest {
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, unlogged meals $nUnlog, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
+        if (pctCard || lbFast) println("AIMI replay: PCT ended ${"%.0f".format(pctNow * 100)} % (up $pctUp down $pctDown), basal cards ${basalDirs.size} dirs $basalDirs")
         if (chainP > 0.0 || smartL || guardChain || learnCrm)
             println("AIMI replay: CHAIN meals $nChain, SMARTL level ${"%.1f".format(smartThr / 18.0)} (up $smartUp down $smartDown), GUARDCHAIN minutes $nGuardChain, CR blocks ${crBlock.joinToString { "%.2f".format(it) }}")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
