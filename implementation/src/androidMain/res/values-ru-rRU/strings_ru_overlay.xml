@@ -31,4 +31,5 @@
     <string name="notifications_channel_name">Уведомления AAPS</string>
     <string name="exported_to_cloud">Настройки экспортированы в облако</string>
     <string name="google_drive_token_refresh_failed">Не удалось обновить доступ к Google Drive</string>
+    <string name="bolus_with_volume">%1$s\u00a0ед (%2$.1f\u00a0мкл)</string>
 </resources>

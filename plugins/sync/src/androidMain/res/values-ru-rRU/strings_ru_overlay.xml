@@ -135,4 +135,5 @@
     <string name="permission_sms_description">Приложению нужно разрешение SMS для удалённого управления текстовыми сообщениями</string>
     <string name="ios_client_skipped_off">Запись с iPhone-клиента (AAPSClient-iOS) не принята: приём этих данных из Nightscout выключен. Включите его в настройках Nightscout (углеводы, переключения профиля).</string>
     <string name="ios_client_skipped_hardened">Запись с iPhone-клиента (AAPSClient-iOS) не принята: защищённый режим не берёт данные, записанные в Nightscout. Выключите «Простой режим» и управление с клиентов, затем включите приём углеводов и переключений профиля из Nightscout.</string>
+    <string name="profile_switches">Смены профиля</string>
 </resources>

@@ -6,4 +6,5 @@
     <string name="loop_notification_channel_name">Предложения цикла</string>
     <string name="loop_notification_channel_silent_name">Предложения цикла в режиме «Не беспокоить»</string>
     <string name="open_loop_suggestion_too_old">Это предложение устарело. На помпу ничего не отправлено. Дождитесь следующего.</string>
+    <string name="autotune_peak">Пик</string>
 </resources>

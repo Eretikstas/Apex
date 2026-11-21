@@ -46,4 +46,11 @@
     <string name="overview_autoisf_pin">Показывать это значение, когда плашка свёрнута</string>
     <string name="overview_autoisf_unpin">Не показывать это значение, когда плашка свёрнута</string>
     <string name="graph_inspect_raw_value">(сырое %1$s)</string>
+    <string name="status_age_short">%1$dд%2$dч</string>
+    <string name="status_age_short_hours">%1$dч</string>
+    <string name="agp_standard_deviation">СО</string>
+    <string name="tbr_type_flag_extended">П</string>
+    <string name="tbr_type_flag_suspended">О</string>
+    <string name="tbr_type_flag_emulated_suspended">ЭО</string>
+    <string name="tbr_type_flag_superbolus">СБ</string>
 </resources>

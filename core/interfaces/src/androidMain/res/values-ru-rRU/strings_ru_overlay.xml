@@ -16,4 +16,5 @@
     <string name="wizard_ecarbs">eCarbs %1$d г / %2$d ч (+%3$d мин)</string>
     <string name="plugin_start_failed">Плагин %1$s не запустился и может не работать. Перезапустите AAPS.</string>
     <string name="plugin_work_failed">В плагине %1$s ошибка, часть его остановлена. Перезапустите AAPS.</string>
+    <string name="time_frame_hours_minutes">%1$dч %2$d\'</string>
 </resources>
