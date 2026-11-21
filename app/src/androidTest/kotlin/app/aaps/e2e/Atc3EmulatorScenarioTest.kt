@@ -611,8 +611,14 @@ class Atc3EmulatorScenarioTest {
 
     private fun status(reason: String): PumpEnactResult = runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.readStatus(reason) } }
 
-    private fun bolus(units: Double): PumpEnactResult =
-        runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.bolus(DetailedBolusInfo().also { it.insulin = units; it.bolusType = BS.Type.NORMAL }) } }
+    /**
+     * The queue answers a bolus a moment before it clears its "a bolus runs" mark; a bolus asked in that moment is
+     * refused as "executing now". A person cannot tap that fast, a test can, so it waits for the queue first.
+     */
+    private fun bolus(units: Double): PumpEnactResult {
+        awaitTrue(RECORD_TIMEOUT) { commandQueue.performing() == null }
+        return runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.bolus(DetailedBolusInfo().also { it.insulin = units; it.bolusType = BS.Type.NORMAL }) } }
+    }
 
     private fun profile(): Profile = checkNotNull(runBlocking { profileFunction.getProfile() }) { "No profile runs" }
 
