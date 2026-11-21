@@ -774,6 +774,9 @@ class HistoryReplayTest {
         // PCTSTRICT: up only with lows at most 2 % and hypo treatment grams of the last 3 days not above the 14 days
         // before (the up step must not buy fewer highs with more hypo carbs); PCTSTEP_<pct> step size (default 10).
         val pctStrict = prefsText.contains("PCTSTRICT"); val pctStep = tok("PCTSTEP", 10.0) / 100.0
+        // PCTMAX_<pct>: the highest percentage (default 130). PCTMAX_100 = the card only lowers (on lows) and comes back
+        // up to 100 %, never above: a safety card, not an insulin booster.
+        val pctMax = tok("PCTMAX", 130.0) / 100.0
         // NOISEGUARD: a noisy sensor (mean jump between minutes over NGTHR_<mg/dL>, default 4, in the last 15 min): no SMB
         // and the temp basal at most the profile basal until it is quiet again. The loop does not chase noise.
         val noiseGuard = prefsText.contains("NOISEGUARD"); val noiseThr = tok("NGTHR", 4.0); var noisyMin = 0
@@ -1014,7 +1017,7 @@ class HistoryReplayTest {
             pctLowStreak = if (lo > 4.0) pctLowStreak + 1 else 0
             val downNow = if (pctHys) (lo > 6.0 || pctLowStreak >= 2) else lo > 4.0
             if (downNow && pctNow > 0.8001) { pctNow = maxOf(0.8, pctNow - pctStep); pctDown++; pctLowStreak = 0 }
-            else if (upOk && hi > 8.0 && lo <= 3.0 && (rise >= 0.15 || hi > 12.0) && pctNow < 1.2999) { pctNow = minOf(1.3, pctNow + pctStep); pctUp++ }
+            else if (upOk && hi > 8.0 && lo <= 3.0 && (rise >= 0.15 || hi > 12.0) && pctNow < pctMax - 0.0001) { pctNow = minOf(pctMax, pctNow + pctStep); pctUp++ }
             if (pctNow != old) {
                 val f = pctNow / old
                 for (i in 0 until 24) profBasal[i] = Math.round(profBasal[i] * f * 100) / 100.0
