@@ -71,7 +71,7 @@ internal fun RingTile(icon: ImageVector?, title: String, value: String, valueCol
     ) {
         if (icon != null) Icon(icon, contentDescription = null, tint = look.textDim, modifier = Modifier.size(16.dp))
         Column {
-            Text(title, style = MaterialTheme.typography.labelSmall, color = look.textDim, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.labelSmall, color = look.textDim, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = valueColor ?: look.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
