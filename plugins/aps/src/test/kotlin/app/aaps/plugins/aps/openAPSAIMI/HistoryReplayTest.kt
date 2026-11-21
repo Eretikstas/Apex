@@ -747,6 +747,23 @@ class HistoryReplayTest {
         var lastDev = 0.0; var devStreak = 0
         val splits = ArrayList<Split>(); var nSplit = 0; var nSplitGiven = 0; var nSplitDrop = 0
         var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
+        // CHAIN_<pct>: a meal within 3 h after a hypo treatment gets only <pct> % of its meal part now (default 50); the rest
+        // waits as a split part (seen rise, from SPLITMIN, dropped after 120 min). Breaks "low -> meal bolus -> low".
+        val chainP = tok("CHAIN", 0.0) / 100.0; var nChain = 0
+        // LEARNCRM: the meal CR learns per meal block (05-11, 11-17, 17-05) from the last 7 days, like LEARNCR2 per block
+        // (>= 4 meals in the block, lows >= 25 % -> 7 % weaker, highs >= 40 % with lows <= 10 % -> 7 % stronger, 0.75-1.25).
+        val learnCrm = prefsText.contains("LEARNCRM"); val crBlock = doubleArrayOf(1.0, 1.0, 1.0)
+        fun blockOf(hh: Int) = if (hh in 5..10) 0 else if (hh in 11..16) 1 else 2
+        fun icAt(tm: Long) = icNow * crBlock[blockOf(hourOf(tm))]
+        // SMARTL: the smart calculator's "food first" level learns (start 4.5 mmol/L, 4.5-6.5): a meal bolus given at once
+        // that is followed by a low within 150 min, when glucose at the bolus was under level + 1.5, raises the level by
+        // 0.25; a delayed meal that went over 10 within 3 h without a low lowers it by 0.1. Falling glucose (more than
+        // 0.5 mmol/L in 15 min) within level + 1 also waits.
+        val smartL = prefsText.contains("SMARTL"); var smartThr = 81.0; var smartUp = 0; var smartDown = 0
+        class MealWatch(val t: Long, val bg: Double, val delayed: Boolean) { var min = 999.0; var max = 0.0 }
+        val mealWatch = ArrayList<MealWatch>()
+        // GUARDCHAIN: two or more hypo treatments in 4 h = a swing; the rebound guard window is 1.5x longer then (max 240).
+        val guardChain = prefsText.contains("GUARDCHAIN"); val treatTimes = ArrayList<Long>(); var nGuardChain = 0
         var lastLoopBg: Double? = null; var lastAct = 0.0
         var mealPtr = 0
         val out = JSONArray()
@@ -935,6 +952,28 @@ class HistoryReplayTest {
             else if (hf >= 0.40 && lf <= 0.10) icNow = maxOf(icNow / 1.07, icP * 0.75)
             println("AIMI replay: learner CR2 day $day: ${meals.size} meals, high ${"%.0f".format(hf * 100)} %, low ${"%.0f".format(lf * 100)} % -> CR ${"%.1f".format(old)} -> ${"%.1f".format(icNow)}")
         }
+        fun learnCrBlocks(day: Int) {
+            val nowT = out.getJSONObject(out.length() - 1).getLong("t")
+            val rows = (0 until out.length()).map { out.getJSONObject(it) }.filter { it.getLong("t") >= nowT - 7 * 86_400_000L && it.has("bg") }
+            val meals = rows.filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 240 * minute }
+            val sb = StringBuilder()
+            for (b in 0..2) {
+                val mb = meals.filter { blockOf(hourOf(it.getLong("t"))) == b }
+                if (mb.size < 4) { sb.append(" b$b n=${mb.size}"); continue }
+                var highs = 0; var lows = 0
+                for (m in mb) {
+                    val tm = m.getLong("t")
+                    val w = rows.filter { it.getLong("t") in tm..(tm + 240 * minute) }
+                    if (w.any { it.getDouble("bg") < 70.2 }) lows++
+                    else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
+                }
+                val hf = highs.toDouble() / mb.size; val lf = lows.toDouble() / mb.size
+                if (lf >= 0.25) crBlock[b] = minOf(crBlock[b] * 1.07, 1.25)
+                else if (hf >= 0.40 && lf <= 0.10) crBlock[b] = maxOf(crBlock[b] / 1.07, 0.75)
+                sb.append(" b$b n=${mb.size} hi ${"%.0f".format(hf * 100)} lo ${"%.0f".format(lf * 100)} x${"%.2f".format(crBlock[b])}")
+            }
+            println("AIMI replay: learner CRM day $day:$sb")
+        }
         // LEARNDURA: the learner's dura card, every LBEVERY days at 06:00 with the basal card, last 7 days. "Flat high" =
         // a 5 min reading over 10 mmol/L that ends 30 min all over 10 and within 1 mmol/L (what dura acts on). Flat highs
         // >= 2 % of the time with lows (< 3.9) <= 3 % -> dura +0.25 (max 2.0); lows > 4 % -> dura -0.25 (min 0.25).
@@ -1086,7 +1125,7 @@ class HistoryReplayTest {
                 eatenList.add(Meal(t, tg, tg, 10.0, 30.0)); logged.add(Logged(t, tg, tg)); hypoThisTick += tg
                 val last = episodes.lastOrNull()
                 if (last == null || last.done || t - last.t0 > 45 * minute) episodes.add(Episode(t).also { it.treatBg = reading })
-                lastTreat = t; nTreat++; corrAsked = false; treatBg = reading
+                lastTreat = t; nTreat++; corrAsked = false; treatBg = reading; treatTimes.add(t)
             }
             // Family: meals with a wizard bolus.
             while (mealPtr < meals.size && meals[mealPtr].t <= t) {
@@ -1099,18 +1138,31 @@ class HistoryReplayTest {
                 for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                 val bIob = basalIob(t)
                 val bIobUsed = if (noIob && reading < noIobBg) maxOf(bIob, 0.0) else bIob
-                if (smartS && reading < 81.0) { pend = Pending(t, ml.logged, reading); nDelayed++ }
+                val fall15 = readV.size > 15 && reading - readV[readV.size - 16] < -9.0
+                val thrNow = if (smartL) smartThr else 81.0
+                val waitNow = reading < thrNow || (smartL && fall15 && reading < thrNow + 18.0)
+                if (smartS && waitNow) { pend = Pending(t, ml.logged, reading); nDelayed++; if (smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, true)) }
                 else {
-                    val wiz = ml.logged / icNow + (reading - targetP) / isfP - iobAll - bIobUsed
+                    if (smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, false))
+                    val icM = icAt(t)
+                    val wiz = ml.logged / icM + (reading - targetP) / isfP - iobAll - bIobUsed
+                    val afterHypo = chainP > 0.0 && ml.logged >= 13.0 && t - lastTreat < 180 * minute
                     // SPLITTYPE: the family marks the meal fast or slow in the calculator (right 85 % of the time);
                     // a fast meal gets the whole bolus now, only a slow one is split.
                     val markedFast = splitType && (if (markRnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0)
-                    if (splitP < 1.0 && ml.logged >= 13.0 && !(splitType && markedFast)) {
-                        // Split bolus: part now, the rest of the meal part waits for the rise.
-                        val now1 = maxOf(wiz - ml.logged / icNow * (1 - splitP), 0.0)
+                    if (afterHypo) {
+                        // CHAIN: after a recent hypo treatment only chainP of the meal part now, the rest on a seen rise.
+                        val nowP = minOf(chainP, splitP)
+                        val now1 = maxOf(wiz - ml.logged / icM * (1 - nowP), 0.0)
                         giveBolus(t, Math.round(now1 / 0.05) * 0.05)
                         val smbSoFar = chain.ownSmb.sumOf { it.second }
-                        splits.add(Split(t, ml.logged / icNow * (1 - splitP), smbSoFar, if (splitType) 180L else 90L)); nSplit++
+                        splits.add(Split(t, ml.logged / icM * (1 - nowP), smbSoFar, 120L)); nSplit++; nChain++
+                    } else if (splitP < 1.0 && ml.logged >= 13.0 && !(splitType && markedFast)) {
+                        // Split bolus: part now, the rest of the meal part waits for the rise.
+                        val now1 = maxOf(wiz - ml.logged / icM * (1 - splitP), 0.0)
+                        giveBolus(t, Math.round(now1 / 0.05) * 0.05)
+                        val smbSoFar = chain.ownSmb.sumOf { it.second }
+                        splits.add(Split(t, ml.logged / icM * (1 - splitP), smbSoFar, if (splitType) 180L else 90L)); nSplit++
                     } else giveBolus(t, (Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05))
                 }
             }
@@ -1139,10 +1191,21 @@ class HistoryReplayTest {
                 else if (check && reading >= 81.0 && rising && (reading >= 99.0 || reading >= pd.bg + 27.0)) {
                     var iobAll = basalIob(t)
                     for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
-                    val wiz = pd.g / icNow + (reading - targetP) / isfP - iobAll
+                    val wiz = pd.g / icAt(pd.t) + (reading - targetP) / isfP - iobAll
                     giveBolus(t, Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05)
                     pend = null; nFired++; delaySum += m
                 }
+            }
+            if (smartL) mealWatch.removeAll { w ->
+                w.min = minOf(w.min, reading); w.max = maxOf(w.max, reading)
+                val age = (t - w.t) / minute
+                if (!w.delayed && age <= 150 && w.min < 70.0) {
+                    if (w.bg < smartThr + 27.0) { smartThr = minOf(117.0, smartThr + 4.5); smartUp++ }
+                    true
+                } else if (w.delayed && age >= 180) {
+                    if (w.min >= 70.0 && w.max > 180.0) { smartThr = maxOf(81.0, smartThr - 1.8); smartDown++ }
+                    true
+                } else age > 180
             }
             // Family: sometimes a manual correction on a rebound after a low.
             if (!corrAsked && t - lastTreat in 10 * minute..120 * minute && reading > 160.0 && readV.size > 6 && reading > readV[readV.size - 6]) {
@@ -1190,7 +1253,7 @@ class HistoryReplayTest {
                         // LATECOB: also count the carbs AAPS still sees as not absorbed (COB) - the wizard way.
                         val cobU = if (lateCob) logged.sumOf { it.left } / icNow else 0.0
                         val want = ((gs.glucose - targetP) / isfP + cobU - iobAll) * latePct
-                        val u = Math.round(minOf(want, 0.3 * ml.second / icNow) / 0.05) * 0.05
+                        val u = Math.round(minOf(want, 0.3 * ml.second / icAt(ml.first)) / 0.05) * 0.05
                         lateDone.add(ml.first)
                         if (u >= 0.1) { giveBolus(t, u); nLate++; lateU += u }
                         break
@@ -1210,7 +1273,10 @@ class HistoryReplayTest {
                     if (gs.glucose < 75.6) { smbState = false; smbOffAt = t }
                     else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true
                     else if (!smbState && t - smbOffAt >= 90 * minute) smbState = true
-                    if (guardW > 0 && t - lastTreat < guardW * minute) {
+                    val swing = guardChain && treatTimes.count { t - it <= 240 * minute } >= 2
+                    val gwEff = if (swing) minOf(240.0, guardW * 1.5) else guardW
+                    if (swing && t - lastTreat < gwEff * minute && t - lastTreat >= guardW * minute) nGuardChain++
+                    if (gwEff > 0 && t - lastTreat < gwEff * minute) {
                         val meal = logged.any { it.g > 12.0 && it.t >= lastTreat - 30 * minute }
                         val strongRise = gs.glucose > 162.0 && gs.shortAvgDelta > 3.6
                         var release = false
@@ -1317,6 +1383,7 @@ class HistoryReplayTest {
                 val lt = Instant.ofEpochMilli(t).atZone(tz)
                 if (learnB && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnBasal(day)
                 if (learnCr2 && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrFromMeals(day)
+                if (learnCrm && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrBlocks(day)
                 if (learnDura && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnDuraCard(day)
                 if (out.length() % 500 == 0) clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
             }
@@ -1326,6 +1393,8 @@ class HistoryReplayTest {
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, unlogged meals $nUnlog, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
+        if (chainP > 0.0 || smartL || guardChain || learnCrm)
+            println("AIMI replay: CHAIN meals $nChain, SMARTL level ${"%.1f".format(smartThr / 18.0)} (up $smartUp down $smartDown), GUARDCHAIN minutes $nGuardChain, CR blocks ${crBlock.joinToString { "%.2f".format(it) }}")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
         println("AIMI replay: ${out.length()} ticks, $failed failed")
     }
