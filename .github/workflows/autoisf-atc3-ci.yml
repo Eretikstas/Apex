@@ -15,6 +15,10 @@ on:
         description: 'Also build the bench APKs (own package, installs next to AAPS)'
         type: boolean
         default: false
+      screens:
+        description: 'Emulator: only the real screenshots of the running app (Russian)'
+        type: boolean
+        default: false
       emulator:
         description: 'Run the app on an emulator: random taps, official end to end tests, screenshots'
         type: boolean
@@ -166,7 +170,7 @@ jobs:
   # and "not responding" are counted), then the official end to end tests of this base, one class at a
   # time so one failure does not hide the others. Screenshots, logcat and a summary are uploaded.
   emulator:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.emulator }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.emulator || inputs.screens) }}
     runs-on: ubuntu-latest
     timeout-minutes: 260
     env:
@@ -227,7 +231,7 @@ jobs:
           disk-size: 6G
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
-          script: bash tools/atc3_emulator_check.sh
+          script: SCREENS_ONLY=${{ inputs.screens && !inputs.emulator && '1' || '0' }} bash tools/atc3_emulator_check.sh
 
       - name: Upload what the emulator showed
         if: ${{ always() }}

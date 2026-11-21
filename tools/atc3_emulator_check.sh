@@ -11,6 +11,23 @@ echo "app: $APP" > $S; echo "test app: ${TEST:-none}" >> $S
 
 shot() { adb exec-out screencap -p > "$OUT/shots/$1.png"; }
 
+# Only the real screenshots (input screens): the app in Russian, our test drives it and takes the pictures.
+if [ "$SCREENS_ONLY" = "1" ] && [ -n "$TEST" ]; then
+  adb install -r -g "$APP" >> $S 2>&1
+  adb install -r -g "$TEST" >> $S 2>&1
+  adb shell cmd locale set-app-locales $PKG --locales ru-RU >> $S 2>&1
+  TPKG=$(adb shell pm list instrumentation | tr -d '\r' | grep "target=$PKG" | head -1 | sed -E 's#instrumentation:([^ ]+).*#\1#')
+  adb logcat -c
+  timeout 1800 adb shell am instrument -w -e class app.aaps.e2e.RealScreensTest $TPKG > $OUT/test_RealScreensTest.txt 2>&1
+  grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION" $OUT/test_RealScreensTest.txt >> $S
+  adb logcat -d > $OUT/logcat_RealScreensTest.txt
+  mkdir -p $OUT/realshots
+  adb pull /sdcard/Android/data/$PKG/files/realshots/. $OUT/realshots/ >> $S 2>&1
+  ls $OUT/realshots >> $S
+  cat $S
+  exit 0
+fi
+
 adb logcat -c
 adb install -r -g "$APP" >> $S 2>&1
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
