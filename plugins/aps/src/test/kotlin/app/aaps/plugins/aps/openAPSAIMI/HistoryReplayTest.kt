@@ -768,6 +768,12 @@ class HistoryReplayTest {
         // highs (>10) over 8 % with lows (<3.9) at most 3 % and (TDD 15 % over the 14 days before, or highs over 12 %) ->
         // +10 % (max 130 %); lows over 4 % -> -10 % (min 80 %). A percentage scales basal up and ISF and CR down, as in AAPS.
         val pctCard = prefsText.contains("PCTCARD"); var pctNow = 1.0; var lastPctDay = -99; var pctUp = 0; var pctDown = 0
+        // PCTHYS: the percentage goes down only after lows over 4 % at two checks in a row (or over 6 % at once); one bad
+        // day does not undo it. Stops the up-down swing seen with PCTCARD alone.
+        val pctHys = prefsText.contains("PCTHYS"); var pctLowStreak = 0
+        // NOISEGUARD: a noisy sensor (mean jump between minutes over NGTHR_<mg/dL>, default 4, in the last 15 min): no SMB
+        // and the temp basal at most the profile basal until it is quiet again. The loop does not chase noise.
+        val noiseGuard = prefsText.contains("NOISEGUARD"); val noiseThr = tok("NGTHR", 4.0); var noisyMin = 0
         // LBFAST: when the last two basal cards moved the basal the same way, the next one comes after 2 days, not LBEVERY.
         val lbFast = prefsText.contains("LBFAST"); val basalDirs = ArrayList<Int>(); var nextBasalDay = tok("LBEVERY", 4.0).toInt()
         var lastLoopBg: Double? = null; var lastAct = 0.0
@@ -1000,7 +1006,9 @@ class HistoryReplayTest {
             val tddNow = last.sumOf { rowTdd(it) } / 3.0; val tddBefore = before.sumOf { rowTdd(it) } / 14.0
             val rise = if (tddBefore > 0) tddNow / tddBefore - 1.0 else 0.0
             val old = pctNow
-            if (lo > 4.0 && pctNow > 0.8001) { pctNow = maxOf(0.8, pctNow - 0.1); pctDown++ }
+            pctLowStreak = if (lo > 4.0) pctLowStreak + 1 else 0
+            val downNow = if (pctHys) (lo > 6.0 || pctLowStreak >= 2) else lo > 4.0
+            if (downNow && pctNow > 0.8001) { pctNow = maxOf(0.8, pctNow - 0.1); pctDown++; pctLowStreak = 0 }
             else if (hi > 8.0 && lo <= 3.0 && (rise >= 0.15 || hi > 12.0) && pctNow < 1.2999) { pctNow = minOf(1.3, pctNow + 0.1); pctUp++ }
             if (pctNow != old) {
                 val f = pctNow / old
@@ -1326,7 +1334,9 @@ class HistoryReplayTest {
                         else if (release && !meal && !strongRise) episodes.lastOrNull()?.takeIf { !it.done && !it.released }?.let { it.released = true; releases++ }
                     }
                 }
-                val smbOk = smbState && !guardHold && pend == null
+                val noisy = noiseGuard && readV.size > 16 && (readV.size - 15 until readV.size).sumOf { Math.abs(readV[it] - 2 * readV[it - 1] + readV[it - 2]) } / 15.0 > noiseThr
+                if (noisy) noisyMin += 5
+                val smbOk = smbState && !guardHold && pend == null && !noisy
                 for (ep in episodes) {
                     if (ep.done) continue
                     if (reading >= 81.0) ep.rose = true
@@ -1380,6 +1390,7 @@ class HistoryReplayTest {
                     if (smb > 0.0) { chain.ownSmb.add(Pair(t, smb)); doses.add(Pair(t, smb)) }
                     val capRate = profBasal[h] * capMult
                     var rate = if (guardHold && capOn && (rt.rate ?: 0.0) > capRate) capRate else rt.rate
+                    if (noiseGuard && noisy && (rate ?: 0.0) > profBasal[h]) rate = profBasal[h]
                     var dur = rt.duration
                     // LATEB_<x>: in the late meal window (90-240 min after a meal >= 13 g, absorption seen in 2 cycles,
                     // glucose > 7.8 and rising) the temp basal is at least x times the profile basal (max basal respected).
@@ -1437,6 +1448,7 @@ class HistoryReplayTest {
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, unlogged meals $nUnlog, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
+        if (noiseGuard) println("AIMI replay: NOISEGUARD noisy ${noisyMin / 60} h")
         if (pctCard || lbFast) println("AIMI replay: PCT ended ${"%.0f".format(pctNow * 100)} % (up $pctUp down $pctDown), basal cards ${basalDirs.size} dirs $basalDirs")
         if (chainP > 0.0 || smartL || guardChain || learnCrm)
             println("AIMI replay: CHAIN meals $nChain, SMARTL level ${"%.1f".format(smartThr / 18.0)} (up $smartUp down $smartDown), GUARDCHAIN minutes $nGuardChain, CR blocks ${crBlock.joinToString { "%.2f".format(it) }}")
