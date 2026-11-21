@@ -187,7 +187,7 @@
     <string name="cal_reject_no_pair">Calibration not saved: no CGM reading found in the 10 minutes before now.</string>
     <string name="cal_reject_warmup">Calibration not saved: sensor is still in the 2-hour warm-up window.</string>
     <string name="cal_reject_no_session">Calibration not saved: no sensor session is active. Mark a sensor change first.</string>
-    <string name="cal_reject_too_far" comment="%1$s = finger value with unit, %2$s = sensor value with unit. Example: finger 12.0 mmol/L, sensor 5.5 mmol/L">Calibration not saved: the finger value %1$s is too far from the sensor value %2$s. Check the value and measure again.</string>
+    <string name="cal_reject_too_far" comment="%1$s = finger value with unit, %2$s = sensor value with unit. Example: finger 12.0 mmol/L, sensor 5.5 mmol/L">Calibration not saved: the finger value %1$s is more than 8 mmol/L (144 mg/dL) from the sensor value %2$s. Check the number you typed.</string>
     <string name="cgm">CGM</string>
     <string name="treatmentdeliveryerror">Bolus reported an error. Manually check real delivered insulin and carb amount</string>
     <string name="bolus_reminder">Remind for bolus when BG recovers</string>

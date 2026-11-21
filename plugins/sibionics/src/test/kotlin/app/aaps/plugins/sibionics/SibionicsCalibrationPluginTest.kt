@@ -114,9 +114,9 @@ class SibionicsCalibrationPluginTest {
     fun `a finger value far from the sensor is not taken`() = runTest {
         whenever(source.sessionStart()).thenReturn(now - 10 * hour)
         steady()
-        // Stock 108 mg/dL (6.0 mmol/L), finger 200 (11.1): a typing error or a bad stick.
+        // Stock 108 mg/dL (6.0 mmol/L), finger 300 (16.7): a typing error.
         whenever(persistence.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(listOf(gv(now - 60_000L, 110.0, 108.0)))
-        assertThat(plugin.addEntry(200.0, now)).isEqualTo(AddEntryResult.Rejected.TooFarFromSensor(200.0, 110.0))
+        assertThat(plugin.addEntry(300.0, now)).isEqualTo(AddEntryResult.Rejected.TooFarFromSensor(300.0, 110.0))
         verify(persistence, never()).insertOrUpdateCalibrationEntry(any())
     }
 
@@ -130,12 +130,11 @@ class SibionicsCalibrationPluginTest {
     }
 
     @Test
-    fun `the limit is 2,5 mmol per L or 30 percent, the larger`() {
-        assertThat(SibionicsCalibrationPlugin.isPlausible(108.0 + 45.0, 108.0)).isTrue()
-        assertThat(SibionicsCalibrationPlugin.isPlausible(108.0 + 46.0, 108.0)).isFalse()
-        assertThat(SibionicsCalibrationPlugin.isPlausible(60.0, 100.0)).isTrue()
-        assertThat(SibionicsCalibrationPlugin.isPlausible(380.0, 300.0)).isTrue()
-        assertThat(SibionicsCalibrationPlugin.isPlausible(400.0, 300.0)).isFalse()
+    fun `big real differences are taken, only a typing error is not`() {
+        // A false drop after a sensor change: sensor 2.5, finger 6.5 mmol/L.
+        assertThat(SibionicsCalibrationPlugin.isPlausible(117.0, 45.0)).isTrue()
+        assertThat(SibionicsCalibrationPlugin.isPlausible(108.0 + 144.0, 108.0)).isTrue()
+        assertThat(SibionicsCalibrationPlugin.isPlausible(108.0 + 145.0, 108.0)).isFalse()
     }
 
     @Test

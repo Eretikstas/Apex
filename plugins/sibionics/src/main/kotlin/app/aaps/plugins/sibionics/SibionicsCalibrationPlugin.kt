@@ -75,7 +75,7 @@ class SibionicsCalibrationPlugin(
     /**
      * Same rules as the AAPS linear calibration: a sensor session, 2 h warm-up, steady glucose, a value within 10 min.
      * Our extra rules: the steadiness is judged at the finger-stick time (not only now), and a finger value [bgMgdl]
-     * far from the sensor is not taken (a typing error or a bad stick would move every value after it).
+     * more than 8 mmol/L from the sensor is not taken (a typing error would move every value after it).
      */
     private suspend fun check(timestamp: Long, bgMgdl: Double?): Pair<AddEntryResult, Double?> {
         val sessionStart = sibionicsPlugin.sessionStart().takeIf { it > 0 } ?: return AddEntryResult.Rejected.NoSession to null
@@ -110,11 +110,12 @@ class SibionicsCalibrationPlugin(
         const val DELTA_LOOKBACK_MS = 15L * 60L * 1000L
         const val MIN_DELTA_SPAN_MS = 10L * 60L * 1000L
 
-        /** Finger and sensor may differ by up to 45 mg/dL (2.5 mmol/L) or 30 % of the sensor value, the larger. */
-        const val MAX_DIFF_MGDL = 45.0
-        const val MAX_DIFF_SHARE = 0.30
+        /**
+         * Big differences are real (a new sensor with false drops, a sensor that reads low at the bottom; user 21.11),
+         * so only a typing error is stopped: finger and sensor more than 144 mg/dL (8 mmol/L) apart.
+         */
+        const val MAX_DIFF_MGDL = 144.0
 
-        fun isPlausible(fingerMgdl: Double, sensorMgdl: Double): Boolean =
-            abs(fingerMgdl - sensorMgdl) <= maxOf(MAX_DIFF_MGDL, MAX_DIFF_SHARE * sensorMgdl)
+        fun isPlausible(fingerMgdl: Double, sensorMgdl: Double): Boolean = abs(fingerMgdl - sensorMgdl) <= MAX_DIFF_MGDL
     }
 }
