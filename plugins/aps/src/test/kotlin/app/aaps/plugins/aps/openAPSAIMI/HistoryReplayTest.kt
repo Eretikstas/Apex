@@ -1088,7 +1088,8 @@ class HistoryReplayTest {
             // insulin works half 14-20 h.
             val week = (t - t0) / (7 * 86_400_000.0)
             val driftF = 1.0 / (1.0 + stDrift / 100.0 * week)
-            val illF = if (stIll >= 0 && day in stIll..stIll + 2) 0.7 else 1.0
+            // ILL_<day>: illness from that day, ILLD_<n> days (default 3), insulin acts ILLF_<x> as strongly (default 0.7).
+            val illF = if (stIll >= 0 && day in stIll until stIll + tok("ILLD", 3.0).toInt()) tok("ILLF", 0.7) else 1.0
             val actDay = stAct >= 0 && day >= stAct && (day - stAct) % 7 == 0
             val actNight = stAct >= 0 && day > stAct && (day - 1 - stAct) % 7 == 0 && h < 6
             val actF = if (actDay && h in 10..21) 1.3 else if (actDay && h >= 22 || actNight) 1.2 else 1.0
