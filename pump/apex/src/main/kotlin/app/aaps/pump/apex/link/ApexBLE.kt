@@ -125,7 +125,7 @@ open class ApexBLE(
     /** When the link came up, milliseconds, 0 while there is none: what the settle wait before the first request is counted from. */
     @Volatile
     open var linkUpAtMs = 0L
-        private set
+        protected set
 
     private val backoff = ApexBackoff()
 

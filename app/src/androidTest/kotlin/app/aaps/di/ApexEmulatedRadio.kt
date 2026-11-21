@@ -36,7 +36,7 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
 
     override var linkUpAtMs: Long
         get() = if (emulator != null) upAt else super.linkUpAtMs
-        set(value) {
+        protected set(value) {
             upAt = value
             super.linkUpAtMs = value
         }
