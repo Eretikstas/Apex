@@ -173,8 +173,7 @@ enum class IntKey(
     ),
     OverviewResWarning(
         key = "statuslights_res_warning",
-        // Our change (docs/OUR_CHANGES.md): 20 U for a child's small daily dose (user 21.11), was 80.
-        defaultValue = 20,
+        defaultValue = 80,
         min = 0,
         max = 300,
         title = KeysStrings.pref_title_res_warning,
@@ -184,7 +183,8 @@ enum class IntKey(
     ),
     OverviewResCritical(
         key = "statuslights_res_critical",
-        defaultValue = 10,
+        // Our change (docs/OUR_CHANGES.md): 40 U (user 21.11), was 10.
+        defaultValue = 40,
         min = 0,
         max = 300,
         title = KeysStrings.pref_title_res_critical,

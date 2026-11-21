@@ -52,7 +52,7 @@ the tests named next to it.
 | `core/interfaces/.../calibration/AddEntryResult.kt` + `implementation/.../bolus/MasterRecordWriter.kt` + `ui/.../calibrationDialog/CalibrationDialogViewModel.kt` + `core/ui` `strings.xml` | new rejection `TooFarFromSensor` (finger value more than 8 mmol/L from the sensor: a typing error); used by the Sibionics calibration | `SibionicsCalibrationPluginTest` |
 | `ui/.../overview/chips/TbrChip.kt` | a temp basal of 0 (basal off) shows its rate "0,00" too, not only the down icon; the percent of the profile is always shown (100 % with no temp basal) | ring screenshots |
 | `core/ui/.../compose/AapsRingTheme.kt` (new) + `ui/.../main/MainScreen.kt` | look of the «Кольцо» overview (cards and tiles like AIMI; light by day, dark navy by night, user 21.11): MainScreen is wrapped in `AapsRingThemeIf(ringLayout)` | ring screenshots |
-| `core/keys/.../IntKey.kt` | status light defaults: `statuslights_res_warning` 20 U (was 80); sensor age warning 360 h / critical 480 h (15 / 20 days, was 216 / 240 h) | - |
+| `core/keys/.../IntKey.kt` | status light defaults: `statuslights_res_critical` 40 U (was 10); sensor age warning 360 h / critical 480 h (15 / 20 days, was 216 / 240 h) | - |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules
