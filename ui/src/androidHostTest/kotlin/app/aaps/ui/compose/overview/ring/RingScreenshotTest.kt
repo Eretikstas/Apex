@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import app.aaps.core.ui.compose.AapsNightTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.requiredSize
@@ -141,13 +142,14 @@ class RingScreenshotTest {
             ) {
                 Portrait(dark, if (phone) PHONE_HEIGHT_DP else HEIGHT_DP) {
                     screen.Content {
-                        Surface(Modifier.fillMaxSize()) {
+                        // The ring screen is always dark (night look, user 21.11), bars included, as in MainScreen.
+                        AapsNightTheme { Surface(Modifier.fillMaxSize()) {
                             if (phone) Column(Modifier.fillMaxSize()) {
                                 MainTopBar(SearchUiState(), onMenuClick = {}, onPreferencesClick = {}, onSearchQueryChange = {}, onSearchClear = {}, onSearchActiveChange = {})
                                 Box(Modifier.weight(1f)) { Overview(dark) }
                                 MainNavigationBar(onManageClick = {}, onTreatmentClick = {}, objectivesProgressText = "0/10", objectivesProgressDescription = "0 / 10")
                             } else Overview(dark)
-                        }
+                        } }
                     }
                 }
             }

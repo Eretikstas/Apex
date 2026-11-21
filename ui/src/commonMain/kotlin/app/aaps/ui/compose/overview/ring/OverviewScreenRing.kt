@@ -5,9 +5,13 @@ import app.aaps.core.interfaces.overview.graph.BgType
 import app.aaps.core.ui.compose.LocalProfileUtil
 import app.aaps.core.ui.compose.metroViewModel
 import app.aaps.ui.compose.overview.OverviewChipsColumn
-import app.aaps.ui.compose.overview.OverviewStatusSection
 import kotlin.math.abs
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import app.aaps.core.ui.CoreUiStrings
+import app.aaps.core.ui.compose.AapsNightTheme
+import app.aaps.core.ui.compose.NightColors
+import app.aaps.core.ui.compose.stringResource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -142,8 +146,6 @@ fun OverviewScreenRing(
     val forecastText = forecast?.let { profileUtil.fromMgdlToStringWithUnits(toMgdl(it.value)) }
     val eventualText = ringState.why?.eventualMgdl?.let { profileUtil.fromMgdlToStringWithUnits(it) }
 
-    var statusExpanded by rememberSaveable { mutableStateOf(false) }
-
     // Once: the big graph below drops its prediction overlay, the tile above shows the loop's prediction. The user can
     // turn it on again in the graph's pencil menu (PRED); this never runs a second time.
     val preferences = LocalPreferences.current
@@ -155,9 +157,12 @@ fun OverviewScreenRing(
         }
     }
 
+    // The night look (user 21.11, like the AIMI screen): always dark navy, glass cards, status tiles around the ring.
+    AapsNightTheme {
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(NightColors.background)
             .padding(paddingValues)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 8.dp),
@@ -205,28 +210,22 @@ fun OverviewScreenRing(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Cannula, insulin left, sensor and pump battery right under the chips, seen without scrolling.
-        OverviewStatusSection(
-            sensorStatus = statusState.sensorStatus,
-            insulinStatus = statusState.insulinStatus,
-            cannulaStatus = statusState.cannulaStatus,
-            batteryStatus = statusState.batteryStatus,
-            showFill = statusState.showFill,
-            showPumpBatteryChange = statusState.showPumpBatteryChange,
-            commandsAllowed = commandsAllowed,
-            onNavigate = onNavigate,
-            statusLightsDef = statusLightsDef,
-            expanded = statusExpanded,
-            onExpandedChange = { statusExpanded = it }
-        )
-
+        // Cannula, insulin left and pump battery on the left of the ring, sensor, IOB and COB on the right.
         RingHero(
             bgInfo = bgInfoState.bgInfo,
             timeAgo = bgInfoState.timeAgoText,
             stats = ringState.stats,
-            iobText = iobUiState.text,
-            cobText = cobUiState.text,
-            onIobClick = onIobChipClick
+            unitLabel = profileUtil.unitLabel,
+            left = {
+                StatusTile(statusState.insulinStatus)
+                StatusTile(statusState.cannulaStatus)
+                StatusTile(statusState.batteryStatus)
+            },
+            right = {
+                StatusTile(statusState.sensorStatus)
+                RingTile(icon = null, title = stringResource(CoreUiStrings.iob), value = iobUiState.text.ifEmpty { "—" }, onClick = onIobChipClick)
+                RingTile(icon = null, title = stringResource(CoreUiStrings.cob), value = cobUiState.text.ifEmpty { "—" })
+            }
         )
         RingPeriodRow(period = ringState.period, stats = ringState.stats, onPick = ringViewModel::selectPeriod)
         RingHourTile(
@@ -264,4 +263,5 @@ fun OverviewScreenRing(
             overlaidBarsHeight = overlaidBarsHeight
         )
     }
+}
 }

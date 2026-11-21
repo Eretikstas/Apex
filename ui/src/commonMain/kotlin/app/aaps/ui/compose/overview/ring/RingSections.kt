@@ -1,16 +1,15 @@
 package app.aaps.ui.compose.overview.ring
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,7 +22,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -43,8 +41,8 @@ import app.aaps.core.ui.compose.stringResource
 import app.aaps.ui.UiStrings
 import kotlin.math.roundToInt
 
-private val RING_SIZE = 200.dp
-private val RING_STROKE = 14.dp
+private val RING_SIZE = 140.dp
+private val RING_STROKE = 11.dp
 
 @Composable
 private fun BgRange.color(): Color = when (this) {
@@ -59,60 +57,65 @@ internal fun toMgdl(valueInUnits: Double): Double =
     if (LocalProfileUtil.current.units == GlucoseUnit.MMOL) valueInUnits * 18.0 else valueInUnits
 
 /**
- * The ring: its arc is the time in range of the chosen period (low part, in range, high part), glucose with arrow and
- * delta in the middle, IOB on the left and COB on the right.
+ * The ring card (night look, user 21.11): the ring in the middle - its arc is the time in range of the chosen period
+ * (low part, in range, high part), glucose with arrow, unit, delta and age inside - with status tiles on both sides.
  */
 @Composable
-internal fun RingHero(bgInfo: BgInfoData?, timeAgo: String, stats: RingStats?, iobText: String, cobText: String, onIobClick: (() -> Unit)? = null) {
+internal fun RingHero(
+    bgInfo: BgInfoData?,
+    timeAgo: String,
+    stats: RingStats?,
+    unitLabel: String,
+    left: @Composable ColumnScope.() -> Unit,
+    right: @Composable ColumnScope.() -> Unit
+) {
     val low = AapsTheme.generalColors.bgLow
     val inRange = AapsTheme.generalColors.bgInRange
     val high = AapsTheme.generalColors.bgHigh
     val track = MaterialTheme.colorScheme.surfaceVariant
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        SideValue(stringResource(CoreUiStrings.iob), iobText, Alignment.Start, Modifier.weight(1f), onClick = onIobClick)
-        Box(modifier = Modifier.size(RING_SIZE), contentAlignment = Alignment.Center) {
-            Canvas(modifier = Modifier.size(RING_SIZE)) {
-                val stroke = RING_STROKE.toPx()
-                val arcSize = Size(size.width - stroke, size.height - stroke)
-                val topLeft = Offset(stroke / 2, stroke / 2)
-                drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
-                if (stats != null) {
-                    var start = -90f
-                    for ((pct, c) in listOf(stats.lowPct to low, stats.inRangePct to inRange, stats.highPct to high)) {
-                        val sweep = (pct * 3.6).toFloat()
-                        if (sweep > 0.5f) drawArc(c, start, sweep - 0.5f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Butt))
-                        start += sweep
+    GlassCard {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), content = left)
+            Box(modifier = Modifier.size(RING_SIZE), contentAlignment = Alignment.Center) {
+                Canvas(modifier = Modifier.size(RING_SIZE)) {
+                    val stroke = RING_STROKE.toPx()
+                    val arcSize = Size(size.width - stroke, size.height - stroke)
+                    val topLeft = Offset(stroke / 2, stroke / 2)
+                    drawArc(track, -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
+                    if (stats != null) {
+                        var start = -90f
+                        for ((pct, c) in listOf(stats.lowPct to low, stats.inRangePct to inRange, stats.highPct to high)) {
+                            val sweep = (pct * 3.6).toFloat()
+                            if (sweep > 0.5f) drawArc(c, start, sweep - 0.5f, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Butt))
+                            start += sweep
+                        }
                     }
                 }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = bgInfo?.bgText ?: "—",
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = bgInfo?.bgRange?.color() ?: MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (bgInfo?.isOutdated == true) TextDecoration.LineThrough else null
+                        )
+                        bgInfo?.trendArrow?.symbol?.let { Text(it, style = MaterialTheme.typography.titleLarge, color = bgInfo.bgRange.color()) }
+                    }
+                    Text(unitLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    bgInfo?.deltaText?.let { Text(it, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold) }
+                    Text(timeAgo, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = bgInfo?.let { "${it.bgText} ${it.trendArrow?.symbol.orEmpty()}" } ?: "—",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = bgInfo?.bgRange?.color() ?: MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (bgInfo?.isOutdated == true) TextDecoration.LineThrough else null
-                )
-                bgInfo?.deltaText?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-                Text(timeAgo, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), content = right)
         }
-        SideValue(stringResource(CoreUiStrings.cob), cobText, Alignment.End, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun SideValue(title: String, value: String, align: Alignment.Horizontal, modifier: Modifier, onClick: (() -> Unit)? = null) {
-    // Tappable like the IOB chip of the usual screen: it opens the same details.
-    Column(modifier = if (onClick != null) modifier.clickable(role = Role.Button, onClick = onClick) else modifier, horizontalAlignment = align) {
-        Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value.ifEmpty { "—" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 
 /** The period chips and the numbers of the chosen period. */
 @Composable
 internal fun RingPeriodRow(period: RingPeriod, stats: RingStats?, onPick: (RingPeriod) -> Unit) {
+    GlassCard {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
             RingPeriod.entries.forEach { p ->
@@ -143,6 +146,7 @@ internal fun RingPeriodRow(period: RingPeriod, stats: RingStats?, onPick: (RingP
             )
         }
     }
+    }
 }
 
 /**
@@ -170,8 +174,8 @@ internal fun RingHourTile(
         RingHour.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val dateUtil = LocalDateUtil.current
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(AapsSpacing.large)) {
+    GlassCard {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(UiStrings.ring_hour_title), style = MaterialTheme.typography.labelLarge)
                 Text(
@@ -256,8 +260,8 @@ private fun HourGraph(readings: List<BgDataPoint>, prediction: List<BgDataPoint>
 @Composable
 internal fun RingWhyCard(why: RingWhy?, whyTime: Long, eventualText: String?, notes: List<LoopNote> = emptyList()) {
     if (why == null && notes.isEmpty()) return
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+    GlassCard {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
             Text(stringResource(UiStrings.ring_why_title), style = MaterialTheme.typography.labelLarge)
             if (why != null) RingWhyBody(why, whyTime, eventualText)
             notes.forEach { note ->

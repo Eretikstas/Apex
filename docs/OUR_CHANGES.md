@@ -51,6 +51,7 @@ the tests named next to it.
 | `implementation/.../queue/CommandExecutor.kt` | taken from official AAPS dev 9221bf3385 (16.11): the connection limit counts from the last command, not from the start of the queue run (matters with a 3 min loop); drop when blaqone has it | queue tests in CI, ATC3 emulator scenarios |
 | `core/interfaces/.../calibration/AddEntryResult.kt` + `implementation/.../bolus/MasterRecordWriter.kt` + `ui/.../calibrationDialog/CalibrationDialogViewModel.kt` + `core/ui` `strings.xml` | new rejection `TooFarFromSensor` (finger value more than 8 mmol/L from the sensor: a typing error); used by the Sibionics calibration | `SibionicsCalibrationPluginTest` |
 | `ui/.../overview/chips/TbrChip.kt` | a temp basal of 0 (basal off) shows its rate "0,00" too, not only the down icon; the percent of the profile is always shown (100 % with no temp basal) | ring screenshots |
+| `core/ui/.../compose/AapsNightTheme.kt` (new) + `ui/.../main/MainScreen.kt` | night look for the «Кольцо» overview (always dark navy, user 21.11): MainScreen is wrapped in `AapsNightThemeIf(ringLayout)` | ring screenshots |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules
