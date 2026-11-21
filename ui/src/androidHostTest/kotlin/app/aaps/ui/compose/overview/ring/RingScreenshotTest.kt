@@ -144,9 +144,9 @@ class RingScreenshotTest {
                         Surface(Modifier.fillMaxSize()) {
                             if (phone) Column(Modifier.fillMaxSize()) {
                                 MainTopBar(SearchUiState(), onMenuClick = {}, onPreferencesClick = {}, onSearchQueryChange = {}, onSearchClear = {}, onSearchActiveChange = {})
-                                Box(Modifier.weight(1f)) { Overview() }
+                                Box(Modifier.weight(1f)) { Overview(dark) }
                                 MainNavigationBar(onManageClick = {}, onTreatmentClick = {}, objectivesProgressText = "0/10", objectivesProgressDescription = "0 / 10")
-                            } else Overview()
+                            } else Overview(dark)
                         }
                     }
                 }
@@ -227,8 +227,9 @@ class RingScreenshotTest {
         whenever(viewModels.loop.lastRun).thenReturn(run)
     }
 
+    /** Day: the profile basal runs; night: a temp basal above it, with its percent. */
     @Composable
-    private fun Overview() {
+    private fun Overview(dark: Boolean = false) {
         OverviewScreen(
             ringLayout = true,
             profileName = "Профиль", isProfileModified = false, profileProgress = 0f,
@@ -236,7 +237,8 @@ class RingScreenshotTest {
             tempTargetProgress = 0f, tempTargetReason = null,
             runningMode = RM.Mode.CLOSED_LOOP, runningModeText = "Замкнутый цикл",
             runningModeRemaining = "", runningModeProgress = 0f,
-            tbrState = TbrState.NONE, smbEnabled = true, isSimpleMode = false, calcProgress = 100,
+            tbrState = if (dark) TbrState.HIGH else TbrState.NONE, tbrRate = if (dark) 0.54 else 0.45,
+            tbrPercent = if (dark) 120 else null, smbEnabled = true, isSimpleMode = false, calcProgress = 100,
             graphViewModel = viewModels.graphViewModel, chipsViewModel = viewModels.chipsViewModel,
             manageViewModel = viewModels.manageViewModel, statusViewModel = viewModels.awaitStatusItems(),
             statusLightsDef = PreferenceSubScreenDef(key = "statuslights", titleResId = CoreUiR.string.statuslights),
