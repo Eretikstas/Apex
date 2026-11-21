@@ -34,11 +34,15 @@ class SyncPumpTemporaryBasalTransaction(
                 // changes: a longer duration, or a later start with the same duration, would reopen it,
                 // and AAPS would count insulin of a rate that no longer runs.
                 val closedEnd = if (existing.interfaceIDs.endId != null) existing.end else null
-                existing.timestamp = temporaryBasal.timestamp
+                // A start at or after the cut cannot be placed before it: the record keeps its old start and
+                // length, so its end stays at the cut (moving only the start would push the end past it).
+                val startAfterCut = closedEnd != null && temporaryBasal.timestamp >= closedEnd
+                existing.timestamp = if (startAfterCut) old.timestamp else temporaryBasal.timestamp
                 existing.rate = temporaryBasal.rate
                 existing.duration =
                     if (closedEnd == null) temporaryBasal.duration
-                    else (closedEnd - temporaryBasal.timestamp).takeIf { it > 0L }?.let { minOf(temporaryBasal.duration, it) } ?: old.duration
+                    else if (startAfterCut) old.duration
+                    else minOf(temporaryBasal.duration, closedEnd - temporaryBasal.timestamp)
                 existing.type = type ?: existing.type
                 database.temporaryBasalDao.updateExistingEntry(existing)
                 result.updated.add(Pair(old, existing))

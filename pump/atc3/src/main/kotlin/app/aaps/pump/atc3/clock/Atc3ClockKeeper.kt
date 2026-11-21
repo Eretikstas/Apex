@@ -41,7 +41,7 @@ class Atc3ClockKeeper(
 ) {
 
     /** True from a phone timezone or daylight saving change until the pump's clock follows it. */
-    private var phoneMoved = false
+    @Volatile private var phoneMoved = false
 
     /** When the clock was last written, 0 since AAPS started, so the first tick writes it. */
     private var clockSyncedAtMs = 0L

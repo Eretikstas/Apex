@@ -35,6 +35,7 @@
     <string name="atc3_journal_fault_unknown">Pump journal failure: the pump did not write down a bolus given %1$s, and its amount is not known. Check the pump and enter the bolus by hand.</string>
     <string name="atc3_bolus_row_refused">AAPS did not accept the pump\'s record of a bolus of %1$.2f U at %2$s. The loop runs without this insulin. Enter the bolus by hand.</string>
     <string name="atc3_bolus_short">The pump delivered %1$.2f U of the %2$.2f U asked for</string>
+    <string name="atc3_bolus_may_still_run" comment="%1$.2f = units seen so far, %2$.2f = units asked for. Example: 0.40 U of 1.00 U">The pump stopped reporting at %1$.2f U of the %2$.2f U and has not written the bolus yet. It may still be delivering. Check the pump before you give another bolus.</string>
     <string name="atc3_confirm_stop">Stop the pump? It will deliver no basal and no bolus until it is resumed.</string>
     <string name="atc3_confirm_resume">Resume the pump and let it deliver again?</string>
     <string name="atc3_tdd_unavailable">The pump did not report usable daily totals</string>

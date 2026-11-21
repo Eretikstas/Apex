@@ -667,7 +667,7 @@ class Atc3PumpPlugin(
         // Only put on the queue: this bolus is the command the queue is running now.
         atc3Queue.readStatus(rh.gs(R.string.atc3_bolus_unconfirmed))
         trace.event(Atc3TraceCat.DRV, "bolus_unconfirmed", "asked" to requested, "seen" to outcome.reportedUnits)
-        val judged = judgeBolus(requested, outcome.reportedUnits, outcome.cancelled, fromRecord = false)
+        val judged = judgeBolus(requested, outcome.reportedUnits, outcome.cancelled, fromRecord = false, mayStillRun = !outcome.completed)
         return if (judged.success) judged.comment(rh.gs(R.string.atc3_bolus_unconfirmed)) else judged
     }
 
@@ -743,7 +743,8 @@ class Atc3PumpPlugin(
         requested: Double,
         delivered: Double,
         cancelled: Boolean,
-        fromRecord: Boolean = true
+        fromRecord: Boolean = true,
+        mayStillRun: Boolean = false
     ): PumpEnactResult {
         val short = requested - delivered >= pumpDescription.bolusStep
         if (!short || cancelled) {
@@ -755,8 +756,12 @@ class Atc3PumpPlugin(
             else "ATC3: the pump was last seen at $delivered U of the $requested U asked for and has not " +
                 "accounted for the bolus, reporting a failure"
         )
-        return pumpEnactResultProvider().success(false).enacted(true).bolusDelivered(delivered)
-            .comment(rh.gs(R.string.atc3_bolus_short, delivered, requested))
+        // Progress went quiet with no completion and no record: the pump may still be delivering (progress
+        // frames lost). Not "failed": the user must not give it again before looking at the pump.
+        val comment =
+            if (!fromRecord && mayStillRun) rh.gs(R.string.atc3_bolus_may_still_run, delivered, requested)
+            else rh.gs(R.string.atc3_bolus_short, delivered, requested)
+        return pumpEnactResultProvider().success(false).enacted(true).bolusDelivered(delivered).comment(comment)
     }
 
     /**

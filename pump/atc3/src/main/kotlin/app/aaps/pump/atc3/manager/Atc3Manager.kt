@@ -327,6 +327,7 @@ class Atc3Manager(
         val payload = Atc3Payload.absoluteTbr(rate, durationUnits)
         val wantedMinutes = durationUnits * Atc3Protocol.TbrPayload.DURATION_UNIT_MINUTES
         var acceptedAt = 0L
+        val firstSendAt = dateUtil.now()
         val failure = commandUntilConfirmed(
             what = "a temporary basal of $rate U/h for $wantedMinutes min",
             send = {
@@ -334,10 +335,13 @@ class Atc3Manager(
                 if (answer == Atc3Answer.ACCEPTED && acceptedAt == 0L) acceptedAt = dateUtil.now()
                 answer
             },
-            // The duration the status reports is the one it was started for, and does not count down.
+            // The duration the status reports is the one it was started for, and does not count down. So the
+            // same rate and duration can also be an OLDER temporary basal that still runs (the start was lost):
+            // the minutes it has run tell them apart, ours cannot have run longer than since our first send.
             confirmed = {
                 readStatus()?.let {
-                    it.tbrActive && Math.abs(it.tbrRate - rate) <= Atc3Protocol.DOSE_SCALE && it.tbrDurationMinutes == wantedMinutes
+                    it.tbrActive && Math.abs(it.tbrRate - rate) <= Atc3Protocol.DOSE_SCALE && it.tbrDurationMinutes == wantedMinutes &&
+                        isNewTbr(it.tbrElapsedMinutes, firstSendAt, dateUtil.now())
                 } == true
             }
         )
@@ -699,3 +703,10 @@ class Atc3Manager(
     companion object {
     }
 }
+
+/**
+ * A temporary basal that has run [elapsedMinutes] can be the one we started at [firstSendAt] only if it has not run
+ * longer than the time since then (+1 for the pump's whole minutes).
+ */
+internal fun isNewTbr(elapsedMinutes: Int, firstSendAt: Long, now: Long): Boolean =
+    elapsedMinutes <= (now - firstSendAt) / 60_000L + 1

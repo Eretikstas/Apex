@@ -39,6 +39,7 @@ import app.aaps.pump.atc3.link.Atc3Connection
 import app.aaps.pump.atc3.link.Atc3LinkKeeper
 import app.aaps.pump.atc3.link.Atc3LinkProtection
 import app.aaps.pump.atc3.manager.Atc3Manager
+import app.aaps.pump.atc3.manager.isNewTbr
 import app.aaps.pump.atc3.state.Atc3PumpState
 import app.aaps.pump.atc3.store.Atc3Store
 import app.aaps.pump.atc3.trace.Atc3Trace
@@ -367,6 +368,39 @@ class VirtualPumpScenariosTest : TestBaseWithProfile() {
         // The row starts when the pump began, which is not before the pump's minute of it and not after now.
         assertThat(start.lastValue).isAtLeast(before - before % 60_000L)
         assertThat(start.lastValue).isAtMost(dateUtil.now())
+    }
+
+    @Test
+    fun `an older temporary basal with the same rate and length does not confirm a start that never reached the pump`() {
+        status()
+        // The same 1.5 U/h for 30 min already runs for 10 minutes; our new start is lost on the way.
+        pump.tbr = VirtualAtc3Pump.Tbr(pump.pumpNow() - 10 * 60_000L, fromApp = true, absolute = true, durationSteps = 2, value = 60, delivered = 0)
+        synchronized(pump.loseCommands) { pump.loseCommands.add(VirtualAtc3Pump.FrameFault(0xA1, 0x02, 4)) }
+
+        val result = manager.setTempBasal(1.5, 30)
+
+        // Else AAPS would count 30 min from now, while the pump stops the old one in 20.
+        assertThat(result.failure).isNotNull()
+    }
+
+    @Test
+    fun `the same temporary basal started again is confirmed once the pump restarted it`() {
+        status()
+        pump.tbr = VirtualAtc3Pump.Tbr(pump.pumpNow() - 10 * 60_000L, fromApp = true, absolute = true, durationSteps = 2, value = 60, delivered = 0)
+
+        val result = manager.setTempBasal(1.5, 30)
+
+        assertThat(result.failure).isNull()
+        assertThat(checkNotNull(pump.tbr).startMs).isAtLeast(pump.pumpNow() - 60_000L)
+    }
+
+    @Test
+    fun `only a temporary basal that has not run longer than since our send is ours`() {
+        val t0 = 1_000_000_000L
+        assertThat(isNewTbr(0, t0, t0)).isTrue()
+        assertThat(isNewTbr(1, t0, t0 + 10_000L)).isTrue()
+        assertThat(isNewTbr(3, t0, t0 + 2 * 60_000L)).isTrue()
+        assertThat(isNewTbr(10, t0, t0 + 30_000L)).isFalse()
     }
 
     @Test

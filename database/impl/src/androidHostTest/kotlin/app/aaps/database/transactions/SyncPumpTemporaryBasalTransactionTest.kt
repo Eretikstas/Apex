@@ -133,6 +133,23 @@ class SyncPumpTemporaryBasalTransactionTest {
     }
 
     @Test
+    fun `a record already cut by an end event does not end later when its start moves past the cut`() = runTest {
+        // Cut at 21 000; the pump now names a start at 25 000. Moving only the start would end it at 45 000.
+        val tb = createTemporaryBasal(pumpId = 100L, timestamp = 25_000L, rate = 1.5, duration = 20_000L)
+        val existing = createTemporaryBasal(pumpId = 100L, timestamp = 1000L, rate = 1.5, duration = 20_000L)
+        existing.interfaceIDs.endId = 200L
+
+        whenever(temporaryBasalDao.findByPumpIds(100L, InterfaceIDs.PumpType.DANA_I, "ABC123")).thenReturn(existing)
+
+        val transaction = SyncPumpTemporaryBasalTransaction(tb, null)
+        transaction.database = database
+        transaction.run()
+
+        assertThat(existing.end).isAtMost(21_000L)
+        assertThat(existing.timestamp).isEqualTo(1000L)
+    }
+
+    @Test
     fun `an open record still takes the duration the pump sends`() = runTest {
         // Not cut by an end event: the pump may extend it, as before.
         val tb = createTemporaryBasal(pumpId = 100L, timestamp = 2000L, rate = 2.0, duration = 90_000L)
