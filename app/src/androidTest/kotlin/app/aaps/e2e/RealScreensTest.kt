@@ -125,6 +125,12 @@ class RealScreensTest {
         ActivityScenario.launch(ComposeMainActivity::class.java).use {
             SystemClock.sleep(8_000)
             dismissDialogs()
+            // The permissions sheet (folder, battery) covers the screen on a fresh install: take a picture, then close it.
+            if (device.hasObject(By.text(Pattern.compile("(?i)(Требуются разрешения|Permissions Required)")))) {
+                shot("00_permissions")
+                device.pressBack()
+                SystemClock.sleep(1_500)
+            }
             shot("01_main")
             step("scroll") {
                 device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 4, 30)
@@ -148,20 +154,20 @@ class RealScreensTest {
                 SystemClock.sleep(1_000)
             }
             step("menu") {
-                device.click(device.displayWidth * 7 / 100, device.displayHeight * 5 / 100)
+                tapDesc("Показать панель навигации|Open navigation")
                 SystemClock.sleep(2_000)
                 shot("05_menu")
                 device.pressBack()
                 SystemClock.sleep(1_000)
             }
-            for ((name, query) in listOf("06_atc3" to "ATC3", "07_learner" to "Ученик", "08_sibionics" to "Sibionics")) step(name) {
+            for ((name, query) in listOf("06_atc3" to "Apex", "07_learner" to "Ученик", "08_sibionics" to "Sibionics 2")) step(name) {
                 openBySearch(query)
                 SystemClock.sleep(3_000)
                 shot(name)
                 repeat(2) { device.pressBack(); SystemClock.sleep(800) }
             }
             step("settings") {
-                device.click(device.displayWidth * 93 / 100, device.displayHeight * 5 / 100)
+                tapDesc("Настройки|Settings")
                 SystemClock.sleep(2_500)
                 shot("09_settings")
                 device.pressBack()
@@ -176,16 +182,26 @@ class RealScreensTest {
         SystemClock.sleep(800)
         device.findObject(By.focused(true))?.text = query
         SystemClock.sleep(2_500)
+        // Hide the keyboard, then open the plugin by its name in the results (not the switch next to it).
+        device.pressBack()
+        SystemClock.sleep(800)
         shot("search_$query")
-        // The first result that names it, below the search field.
-        val hits = device.findObjects(By.text(Pattern.compile("(?i).*$query.*")))
-        hits.sortedBy { it.visibleBounds.top }.lastOrNull { it.visibleBounds.top > device.displayHeight / 10 }?.click()
+        val field = device.findObject(By.focused(true))?.visibleBounds?.bottom ?: (device.displayHeight / 8)
+        val hit = device.findObjects(By.text(Pattern.compile("(?i)$query.*")))
+            .filter { it.visibleBounds.top > field }
+            .minByOrNull { it.visibleBounds.top }
+        checkNotNull(hit) { "no result for $query" }.click()
     }
 
     private fun tapText(regex: String) {
         val o = device.wait(Until.findObject(By.text(Pattern.compile("(?i)($regex)"))), 5_000)
             ?: device.findObject(By.desc(Pattern.compile("(?i)($regex)")))
         checkNotNull(o) { "no '$regex' on screen" }.click()
+    }
+
+    private fun tapDesc(regex: String) {
+        val o = device.wait(Until.findObject(By.desc(Pattern.compile("(?i)($regex)"))), 5_000)
+        checkNotNull(o) { "no '$regex' button" }.click()
     }
 
     private fun dismissDialogs() {

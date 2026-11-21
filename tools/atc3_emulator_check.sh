@@ -16,6 +16,10 @@ if [ "$SCREENS_ONLY" = "1" ] && [ -n "$TEST" ]; then
   adb install -r -g "$APP" >> $S 2>&1
   adb install -r -g "$TEST" >> $S 2>&1
   adb shell cmd locale set-app-locales $PKG --locales ru-RU >> $S 2>&1
+  # A phone-sized screen, and what a user grants once: no battery optimization, exact alarms.
+  adb shell wm size 1080x2400; adb shell wm density 420
+  adb shell dumpsys deviceidle whitelist +$PKG >> $S 2>&1
+  adb shell appops set $PKG SCHEDULE_EXACT_ALARM allow >> $S 2>&1
   TPKG=$(adb shell pm list instrumentation | tr -d '\r' | grep "target=$PKG" | head -1 | sed -E 's#instrumentation:([^ ]+).*#\1#')
   adb logcat -c
   timeout 1800 adb shell am instrument -w -e class app.aaps.e2e.RealScreensTest $TPKG > $OUT/test_RealScreensTest.txt 2>&1
