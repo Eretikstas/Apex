@@ -771,6 +771,9 @@ class HistoryReplayTest {
         // PCTHYS: the percentage goes down only after lows over 4 % at two checks in a row (or over 6 % at once); one bad
         // day does not undo it. Stops the up-down swing seen with PCTCARD alone.
         val pctHys = prefsText.contains("PCTHYS"); var pctLowStreak = 0
+        // PCTSTRICT: up only with lows at most 2 % and hypo treatment grams of the last 3 days not above the 14 days
+        // before (the up step must not buy fewer highs with more hypo carbs); PCTSTEP_<pct> step size (default 10).
+        val pctStrict = prefsText.contains("PCTSTRICT"); val pctStep = tok("PCTSTEP", 10.0) / 100.0
         // NOISEGUARD: a noisy sensor (mean jump between minutes over NGTHR_<mg/dL>, default 4, in the last 15 min): no SMB
         // and the temp basal at most the profile basal until it is quiet again. The loop does not chase noise.
         val noiseGuard = prefsText.contains("NOISEGUARD"); val noiseThr = tok("NGTHR", 4.0); var noisyMin = 0
@@ -1005,11 +1008,13 @@ class HistoryReplayTest {
             val hi = bgs.count { it > 180.0 } * 100.0 / bgs.size; val lo = bgs.count { it < 70.0 } * 100.0 / bgs.size
             val tddNow = last.sumOf { rowTdd(it) } / 3.0; val tddBefore = before.sumOf { rowTdd(it) } / 14.0
             val rise = if (tddBefore > 0) tddNow / tddBefore - 1.0 else 0.0
+            val hypoNow = last.sumOf { it.optDouble("hypo", 0.0) } / 3.0; val hypoBefore = before.sumOf { it.optDouble("hypo", 0.0) } / 14.0
+            val upOk = !pctStrict || (lo <= 2.0 && hypoNow <= hypoBefore)
             val old = pctNow
             pctLowStreak = if (lo > 4.0) pctLowStreak + 1 else 0
             val downNow = if (pctHys) (lo > 6.0 || pctLowStreak >= 2) else lo > 4.0
-            if (downNow && pctNow > 0.8001) { pctNow = maxOf(0.8, pctNow - 0.1); pctDown++; pctLowStreak = 0 }
-            else if (hi > 8.0 && lo <= 3.0 && (rise >= 0.15 || hi > 12.0) && pctNow < 1.2999) { pctNow = minOf(1.3, pctNow + 0.1); pctUp++ }
+            if (downNow && pctNow > 0.8001) { pctNow = maxOf(0.8, pctNow - pctStep); pctDown++; pctLowStreak = 0 }
+            else if (upOk && hi > 8.0 && lo <= 3.0 && (rise >= 0.15 || hi > 12.0) && pctNow < 1.2999) { pctNow = minOf(1.3, pctNow + pctStep); pctUp++ }
             if (pctNow != old) {
                 val f = pctNow / old
                 for (i in 0 until 24) profBasal[i] = Math.round(profBasal[i] * f * 100) / 100.0
