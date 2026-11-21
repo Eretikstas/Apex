@@ -15,6 +15,7 @@ import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.resources.ResourceHelper
 import app.aaps.core.interfaces.utils.DateUtil
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -45,6 +46,7 @@ class SibionicsCalibrationPluginTest {
         source = mock()
         val dateUtil: DateUtil = mock()
         whenever(dateUtil.now()).thenReturn(now)
+        runBlocking { whenever(persistence.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(emptyList()) }
         plugin = SibionicsCalibrationPlugin(mock<AAPSLogger>(), mock<ResourceHelper>(), mock<NotificationManager>(), persistence, status, dateUtil, source)
     }
 

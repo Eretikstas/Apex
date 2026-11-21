@@ -1144,7 +1144,8 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
     fun `a bolus the pump could not be asked about is judged on what it reported while running`() = runTest {
         // No history could be read: the link cut the watching short. What went in is said as seen;
         // the row comes from the record on the next connection, whatever the pump went on to deliver.
-        whenever(rh.gs(eq(R.string.atc3_bolus_short), anyOrNull(), anyOrNull())).thenReturn("short")
+        // Not completed: it may still run, so the user is told to look before giving it again.
+        whenever(rh.gs(eq(R.string.atc3_bolus_may_still_run), anyOrNull(), anyOrNull())).thenReturn("may still run")
         whenever(bolusDelivery.bolus(any(), any(), any()))
             .thenReturn(Atc3BolusOutcome.Delivered(0.4, acceptedAtMs = now))
         whenever(atc3Manager.readBolusHistory()).thenReturn(null)
@@ -1153,7 +1154,7 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
 
         assertThat(result.success).isFalse()
         assertThat(result.bolusDelivered).isEqualTo(0.4)
-        assertThat(result.comment).isEqualTo("short")
+        assertThat(result.comment).isEqualTo("may still run")
     }
 
     @Test
@@ -1162,8 +1163,9 @@ class Atc3PumpPluginTest : TestBaseWithProfile() {
         // it. That one keeps the shortfall it always had.
         whenever(rh.gs(R.string.atc3_bolus_unconfirmed)).thenReturn("unconfirmed")
         whenever(rh.gs(eq(R.string.atc3_bolus_short), anyOrNull(), anyOrNull())).thenReturn("short")
+        // The pump said the bolus was over: what it gave is final.
         whenever(bolusDelivery.bolus(any(), any(), any()))
-            .thenReturn(Atc3BolusOutcome.Delivered(0.4, acceptedAtMs = now))
+            .thenReturn(Atc3BolusOutcome.Delivered(0.4, completed = true, acceptedAtMs = now))
 
         val result = plugin.deliverTreatment(manualBolus(1.0, lastKnownBolusTime = 0L))
 
