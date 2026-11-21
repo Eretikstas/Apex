@@ -107,6 +107,23 @@ enum class StringKey(
         defaultedBySM = true
     ),
 
+    // Our addition (docs/OUR_CHANGES.md): the look of the "Кольцо" overview. auto = dark from OverviewRingDarkFrom to
+    // OverviewRingDarkTo o'clock, light the rest of the day; app = as the AAPS color scheme above; light; dark.
+    OverviewRingTheme(
+        key = "overview_ring_theme",
+        defaultValue = "auto",
+        title = KeysStrings.pref_title_ring_theme,
+        summary = KeysStrings.pref_summary_ring_theme,
+        preferenceType = PreferenceType.LIST,
+        entriesRefs = mapOf(
+            "auto" to KeysStrings.ring_theme_auto,
+            "app" to KeysStrings.ring_theme_app,
+            "light" to KeysStrings.pref_light_theme,
+            "dark" to KeysStrings.pref_dark_theme
+        ),
+        dependency = BooleanKey.OverviewRingLayout
+    ),
+
     AapsDirectoryUri(key = "aaps_directory", defaultValue = "", title = KeysStrings.pref_title_aaps_directory),
 
     ProtectionMasterPassword(key = "master_password", defaultValue = "", title = KeysStrings.pref_title_master_password, isPassword = true, isHashed = true),

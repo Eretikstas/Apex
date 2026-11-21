@@ -2,18 +2,33 @@ package app.aaps.core.ui.compose
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import app.aaps.core.keys.IntKey
+import app.aaps.core.keys.StringKey
 import app.aaps.core.ui.compose.navigation.DarkElementColors
+import app.aaps.core.ui.compose.navigation.LightElementColors
 import app.aaps.core.ui.compose.navigation.LocalElementColors
+import kotlinx.coroutines.delay
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 /**
  * Our addition (docs/OUR_CHANGES.md): the look of the "Кольцо" overview (cards and tiles as on the AIMI screen).
- * User 21.11: light by day, dark by night - it follows the AAPS dark mode (phone setting or the AAPS choice).
+ * User 21.11: light by day, dark by night, with a choice (Appearance): auto by time (default 21-07 dark), as the AAPS
+ * color scheme, light, dark. Auto switches by itself on the hour.
  * Dark: a navy Material scheme and the dark AAPS colors. Light: the normal light theme with light cards.
  */
 @Immutable
@@ -58,12 +73,46 @@ val DayLook = RingLook(
 
 val LocalRingLook = staticCompositionLocalOf { DayLook }
 
-/** The ring look: dark navy when the AAPS theme around is dark, light cards when it is light. */
+/**
+ * Is the ring look dark at [hour] (0-23), for the choice [mode]: "dark", "light", "app" (as the AAPS theme around,
+ * [appDark]) or "auto" (dark from [from] o'clock until [to] o'clock, over midnight when [from] is later than [to]).
+ */
+fun ringLookIsDark(mode: String, appDark: Boolean, hour: Int, from: Int, to: Int): Boolean = when (mode) {
+    "dark"  -> true
+    "light" -> false
+    "app"   -> appDark
+    else    -> if (from == to) false else if (from < to) hour in from until to else hour >= from || hour < to
+}
+
+/** The hour of the day now; it changes by itself, so the auto look switches without a restart. */
+@Composable
+private fun hourNow(): Int {
+    fun now() = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).hour
+    var hour by remember { mutableIntStateOf(now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000L)
+            hour = now()
+        }
+    }
+    return hour
+}
+
+/** The ring look, light or dark navy by the user's choice (Appearance): auto by time, as AAPS, light or dark. */
 @Composable
 fun AapsRingTheme(content: @Composable () -> Unit) {
-    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val preferences = LocalPreferences.current
+    val mode by preferences.observe(StringKey.OverviewRingTheme).collectAsState()
+    val from by preferences.observe(IntKey.OverviewRingDarkFrom).collectAsState()
+    val to by preferences.observe(IntKey.OverviewRingDarkTo).collectAsState()
+    val appDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val dark = ringLookIsDark(mode, appDark, hourNow(), from, to)
     if (!dark) {
-        CompositionLocalProvider(LocalRingLook provides DayLook, content = content)
+        // Light: the light AAPS scheme even when the app theme around is dark (choice "light" or a day hour in "auto").
+        val scheme = if (appDark) lightColorScheme() else MaterialTheme.colorScheme
+        CompositionLocalProvider(LocalGeneralColors provides LightGeneralColors, LocalElementColors provides LightElementColors, LocalRingLook provides DayLook) {
+            MaterialTheme(colorScheme = scheme, typography = MaterialTheme.typography, content = content)
+        }
         return
     }
     val night = NightLook

@@ -40,6 +40,7 @@ import app.aaps.core.interfaces.overview.graph.TbrState
 import app.aaps.core.interfaces.overview.graph.TimeRange
 import app.aaps.core.interfaces.rx.events.Event
 import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.ui.compose.LocalMetroViewModelFactory
@@ -134,6 +135,10 @@ class RingScreenshotTest {
 
     private fun shoot(name: String, dark: Boolean, phone: Boolean = false) {
         whenever(screen.preferences.observe(StringKey.GeneralDarkMode)).thenReturn(MutableStateFlow(if (dark) "dark" else "light"))
+        // The ring look follows the AAPS scheme in the pictures (day = light, night = dark).
+        whenever(screen.preferences.observe(StringKey.OverviewRingTheme)).thenReturn(MutableStateFlow("app"))
+        whenever(screen.preferences.observe(IntKey.OverviewRingDarkFrom)).thenReturn(MutableStateFlow(21))
+        whenever(screen.preferences.observe(IntKey.OverviewRingDarkTo)).thenReturn(MutableStateFlow(7))
         val factory = ShotViewModelFactory(mapOf(RingViewModel::class to { ringViewModel() }))
         compose.setContent {
             CompositionLocalProvider(

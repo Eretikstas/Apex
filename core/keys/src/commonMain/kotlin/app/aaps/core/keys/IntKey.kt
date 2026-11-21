@@ -453,6 +453,15 @@ enum class IntKey(
         unitType = UnitType.HOURS,
         sync = SyncSpec(SyncChannel.Cold, SyncDirection.Bidirectional)
     ),
+    // Our addition (docs/OUR_CHANGES.md): the dark hours of the "Кольцо" overview in its "auto" look.
+    OverviewRingDarkFrom(
+        key = "overview_ring_dark_from", defaultValue = 21, min = 0, max = 23, title = KeysStrings.pref_title_ring_dark_from,
+        dependency = BooleanKey.OverviewRingLayout, unitType = UnitType.HOURS
+    ),
+    OverviewRingDarkTo(
+        key = "overview_ring_dark_to", defaultValue = 7, min = 0, max = 23, title = KeysStrings.pref_title_ring_dark_to,
+        dependency = BooleanKey.OverviewRingLayout, unitType = UnitType.HOURS
+    ),
     MaintenanceLogsAmount(key = "maintenance_logs_amount", defaultValue = 2, min = 1, max = 10, title = KeysStrings.pref_title_logs_amount, defaultedBySM = true),
     AlertsStaleDataThreshold(
         key = "missed_bg_readings_threshold",
