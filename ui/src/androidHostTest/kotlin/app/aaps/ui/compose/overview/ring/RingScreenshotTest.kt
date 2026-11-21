@@ -174,6 +174,7 @@ class RingScreenshotTest {
     /** The user's units: mmol/L with a comma, as on the phone. */
     private fun mmol() {
         whenever(screen.profileUtil.units).thenReturn(GlucoseUnit.MMOL)
+        whenever(screen.profileUtil.unitLabel).thenReturn("ммоль/л")
         whenever(screen.profileUtil.fromMgdlToStringWithUnits(anyOrNull())).thenAnswer { inv ->
             (inv.arguments[0] as Double?)?.let { String.format(Locale("ru"), "%.1f ммоль/л", it / 18.0) } ?: "—"
         }
