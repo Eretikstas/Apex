@@ -116,8 +116,17 @@ class SibionicsCalibrationPluginTest {
         steady()
         // Stock 108 mg/dL (6.0 mmol/L), finger 200 (11.1): a typing error or a bad stick.
         whenever(persistence.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(listOf(gv(now - 60_000L, 110.0, 108.0)))
-        assertThat(plugin.addEntry(200.0, now)).isEqualTo(AddEntryResult.Rejected.TooFarFromSensor(200.0, 108.0))
+        assertThat(plugin.addEntry(200.0, now)).isEqualTo(AddEntryResult.Rejected.TooFarFromSensor(200.0, 110.0))
         verify(persistence, never()).insertOrUpdateCalibrationEntry(any())
+    }
+
+    @Test
+    fun `a stick near the shown value is taken even when Stock drifted far`() = runTest {
+        whenever(source.sessionStart()).thenReturn(now - 10 * hour)
+        steady()
+        // Stock reads 60, earlier sticks already moved the shown value to 100; the finger says 110.
+        whenever(persistence.getBgReadingsDataFromTimeToTime(any(), any(), any())).thenReturn(listOf(gv(now - 60_000L, 100.0, 60.0)))
+        assertThat(plugin.addEntry(110.0, now)).isEqualTo(AddEntryResult.Accepted)
     }
 
     @Test

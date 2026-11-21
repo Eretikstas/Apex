@@ -21,6 +21,7 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,6 +113,8 @@ class RingViewModel(
             val values = runCatching {
                 persistenceLayer.getBgReadingsDataFromTimeToTime(now - period.hours * 3_600_000L, now, true).map { it.value }
             }.getOrDefault(emptyList())
+            // runCatching above also catches the cancel: a count that was cancelled must not land.
+            ensureActive()
             _uiState.update { if (it.period == period) it.copy(stats = RingLogic.stats(values)) else it }
         }
     }

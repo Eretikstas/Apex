@@ -88,7 +88,9 @@ class SibionicsCalibrationPlugin(
         if (delta != null && abs(delta) > DELTA_GATE_MGDL_PER_5MIN) return AddEntryResult.Rejected.DeltaTooHigh(delta, DELTA_GATE_MGDL_PER_5MIN) to null
         val pair = native.firstOrNull { it.timestamp >= timestamp - PAIR_LOOKBACK_MS } ?: return AddEntryResult.Rejected.NoSensorPair to null
         val stock = checkNotNull(pair.raw)
-        if (bgMgdl != null && !isPlausible(bgMgdl, stock)) return AddEntryResult.Rejected.TooFarFromSensor(bgMgdl, stock) to null
+        // Near the shown (already calibrated) value is also fine: a sensor whose Stock drifted far must stay correctable.
+        if (bgMgdl != null && !isPlausible(bgMgdl, stock) && !isPlausible(bgMgdl, pair.value))
+            return AddEntryResult.Rejected.TooFarFromSensor(bgMgdl, pair.value) to null
         return AddEntryResult.Accepted to stock
     }
 
