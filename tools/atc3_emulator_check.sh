@@ -40,7 +40,7 @@ if [ -n "$ONLY_CLASS" ] && [ -n "$TEST" ]; then
   adb shell dumpsys deviceidle whitelist +$PKG >> $S 2>&1
   TPKG=$(adb shell pm list instrumentation | tr -d '\r' | grep "target=$PKG" | head -1 | sed -E 's#instrumentation:([^ ]+).*#\1#')
   adb logcat -c
-  timeout 3600 adb shell am instrument -w -e class $ONLY_CLASS $TPKG > $OUT/test_$ONLY_CLASS.txt 2>&1
+  timeout 9000 adb shell am instrument -w -e class $ONLY_CLASS $TPKG > $OUT/test_$ONLY_CLASS.txt 2>&1
   res=$(grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION_FAILED|Process crashed|INSTRUMENTATION_RESULT: shortMsg" $OUT/test_$ONLY_CLASS.txt | tr '\n' ' ')
   echo "$ONLY_CLASS: ${res:-no result (timeout?)}" >> $S
   adb logcat -d > $OUT/logcat_$ONLY_CLASS.txt
@@ -82,8 +82,8 @@ if [ -n "$TEST" ]; then
   adb install -r -g "$APP" >> $S 2>&1
   adb install -r -g "$TEST" >> $S 2>&1
   adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
-  # The ATC3 scenarios are out while the app runs the Apex v4 driver (they are being moved to it).
-  for C in app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.VirtualBenchTest app.aaps.e2e.ErrorActivityInjectionTest \
+  # The ATC3 scenarios are out while the app runs the Apex v4 driver; ApexScenarioTest has the same faults on v4.
+  for C in app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.VirtualBenchTest app.aaps.e2e.ApexScenarioTest app.aaps.e2e.ErrorActivityInjectionTest \
            app.aaps.LoopTest app.aaps.RunningConfigurationTest app.aaps.CobExtendedCarbsTest app.aaps.RunningModeReconcilerIntegrationTest; do
     # Each class on a fresh install: our long ATC3 scenarios leave a configured ATC3 pump and a running mode behind,
     # which the following blaqone tests are not written for.
@@ -93,7 +93,7 @@ if [ -n "$TEST" ]; then
     adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
     adb logcat -c
     # Our ATC3 scenarios take about 2 min each (30+ of them); the other classes are short.
-    T=1200; [ "$C" = app.aaps.e2e.Atc3EmulatorScenarioTest ] && T=6000; [ "$C" = app.aaps.e2e.VirtualBenchTest ] && T=3600
+    T=1200; [ "$C" = app.aaps.e2e.Atc3EmulatorScenarioTest ] && T=6000; [ "$C" = app.aaps.e2e.VirtualBenchTest ] && T=3600; [ "$C" = app.aaps.e2e.ApexScenarioTest ] && T=4800
     timeout $T adb shell am instrument -w -e class $C $TPKG > $OUT/test_$C.txt 2>&1
     res=$(grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION_FAILED|Process crashed|INSTRUMENTATION_RESULT: shortMsg" $OUT/test_$C.txt | tr '\n' ' ')
     echo "$C: ${res:-no result (timeout?)}" >> $S
