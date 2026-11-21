@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import app.aaps.core.ui.compose.LocalPreferences
+import app.aaps.core.interfaces.overview.graph.SeriesType
+import app.aaps.core.keys.BooleanNonKey
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -132,6 +136,17 @@ fun OverviewScreenRing(
     val eventualText = ringState.why?.eventualMgdl?.let { profileUtil.fromMgdlToStringWithUnits(it) }
 
     var statusExpanded by rememberSaveable { mutableStateOf(false) }
+
+    // Once: the big graph below drops its prediction overlay, the tile above shows the loop's prediction. The user can
+    // turn it on again in the graph's pencil menu (PRED); this never runs a second time.
+    val preferences = LocalPreferences.current
+    LaunchedEffect(Unit) {
+        if (!preferences.get(BooleanNonKey.OverviewRingPredictionOffDone)) {
+            val config = graphViewModel.graphConfigFlow.value
+            if (SeriesType.PREDICTIONS in config.bgOverlays) graphViewModel.updateGraphConfig(config.copy(bgOverlays = config.bgOverlays - SeriesType.PREDICTIONS))
+            preferences.put(BooleanNonKey.OverviewRingPredictionOffDone, true)
+        }
+    }
 
     Column(
         modifier = modifier

@@ -46,6 +46,7 @@ the tests named next to it.
 | `plugins/sync/src/androidHostTest/.../IosClientNsRecordsTest.kt` (new) | the iOS client's real Nightscout records (carbs, profile switch) are taken when accepted, not when not | ring/sync test step |
 | `core/nssdk/.../mapper/TreatmentMapper.kt` | keeps the record's `app` (who wrote it) | `IosClientNsRecordsTest` |
 | `plugins/sync/.../nsclientV3/NsIncomingDataProcessor.kt` + `strings.xml` | a fresh record of the iPhone client (`AAPSClient-iOS`) that is not taken raises a notice (accept off / hardened mode), at most every 30 min | `IosClientNsRecordsTest` |
+| `core/keys/.../BooleanNonKey.kt` + `prefs-schema.txt` | `OverviewRingPredictionOffDone`: the ring screen switches the big graph's prediction overlay off once (user can turn it on, PRED) | `PreferenceKeySnapshotTest` |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules

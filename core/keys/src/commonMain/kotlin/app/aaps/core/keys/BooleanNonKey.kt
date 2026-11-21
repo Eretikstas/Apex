@@ -10,6 +10,9 @@ enum class BooleanNonKey(
 ) : BooleanNonPreferenceKey {
 
     GeneralSetupWizardProcessed("startupwizard_processed", false),
+    // Our addition (docs/OUR_CHANGES.md): the "Кольцо" screen has its own prediction tile, so the first time it shows,
+    // the prediction overlay of the big graph is switched off once. The user can turn it on again (graph pencil, PRED).
+    OverviewRingPredictionOffDone("overview_ring_prediction_off_done", false),
     SetupWizardIUnderstand("I_understand", false),
     ObjectivesLoopUsed("ObjectivesLoopUsed", false),
     ObjectivesScaleUsed("ObjectivesScaleUsed", false),
