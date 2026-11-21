@@ -109,7 +109,8 @@ enum class IntKey(
     ),
     OverviewSageWarning(
         key = "statuslights_sage_warning",
-        defaultValue = 216,
+        // Our change (docs/OUR_CHANGES.md): 15 days (user 21.11, Sibionics 2 worn about 28 days), was 216 h.
+        defaultValue = 360,
         min = 24,
         max = 720,
         title = KeysStrings.pref_title_sage_warning,
@@ -119,7 +120,8 @@ enum class IntKey(
     ),
     OverviewSageCritical(
         key = "statuslights_sage_critical",
-        defaultValue = 240,
+        // Our change: 20 days (user 21.11), was 240 h.
+        defaultValue = 480,
         min = 24,
         max = 720,
         title = KeysStrings.pref_title_sage_critical,
