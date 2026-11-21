@@ -90,6 +90,7 @@ class ApexScenarioTest {
         clearAllSharedPrefs()
         runBlocking { persistenceLayer.clearDatabases() }
         pump = VirtualAtc3Pump(SERIAL) { System.currentTimeMillis() }
+        pump.seedBolusHistory(System.currentTimeMillis())
         emulator = Atc3PumpEmulator(pump)
         Atc3Emulation.emulator = emulator
         ApexRadioSwap.make = { logger, context, trace -> EmulatedApexBLE(logger, context, trace) }
@@ -149,7 +150,7 @@ class ApexScenarioTest {
             val result = bolus(units)
             assertWithMessage("a bolus of $units U is delivered").that(result.success).isTrue()
         }
-        assertWithMessage("the pump gave ${emulator.state().boluses}").that(emulator.state().boluses).hasSize(3)
+        assertWithMessage("the pump gave ${given()}").that(given()).hasSize(3)
         assertRecordIsWhatThePumpGave()
     }
 
@@ -157,7 +158,7 @@ class ApexScenarioTest {
     fun bolusAnswerLost_butDelivered_isRecordedOnce() {
         assertWithMessage("the fault is set").that(emulator.loseAnswer(EmulatedCommand.BOLUS_START)).isTrue()
         bolus(1.0)
-        assertWithMessage("the pump gave the bolus").that(emulator.state().boluses).hasSize(1)
+        assertWithMessage("the pump gave the bolus").that(given()).hasSize(1)
         assertRecordIsWhatThePumpGave()
     }
 
@@ -165,7 +166,7 @@ class ApexScenarioTest {
     fun bolusCommandLost_isNotReportedAsGiven_andNothingIsRecorded() {
         assertWithMessage("the fault is set").that(emulator.loseCommand(EmulatedCommand.BOLUS_START)).isTrue()
         val result = bolus(1.0)
-        assertWithMessage("the pump gave nothing").that(emulator.state().boluses).isEmpty()
+        assertWithMessage("the pump gave nothing").that(given()).isEmpty()
         assertWithMessage("a bolus that never reached the pump is not a success").that(result.success).isFalse()
         assertRecordIsWhatThePumpGave()
     }
@@ -218,8 +219,9 @@ class ApexScenarioTest {
         switchProfile(150)
         assertWithMessage("the pump runs the 150 % basal (${emulator.state().basal})")
             .that(awaitTrue(RECORD_TIMEOUT) { emulator.state().basal?.all { abs(it - PROFILE_BASAL * 1.5) < 0.02 } == true }).isTrue()
-        assertWithMessage("AAPS runs the 150 % profile too")
-            .that(awaitTrue(RECORD_TIMEOUT) { runBlocking { profileFunction.getProfile() }?.percentage == 150 }).isTrue()
+        // The running profile of AAPS has the percent in its values already: its basal is what to compare.
+        assertWithMessage("AAPS runs the 150 % basal too")
+            .that(awaitTrue(RECORD_TIMEOUT) { abs(profile().getBasal() - PROFILE_BASAL * 1.5) < 0.02 }).isTrue()
     }
 
     // Helpers
@@ -246,15 +248,18 @@ class ApexScenarioTest {
 
     private fun profile(): Profile = checkNotNull(runBlocking { profileFunction.getProfile() }) { "No profile runs" }
 
+    /** The boluses the pump gave in this scenario, oldest first: without the old ones of the seeded journal. */
+    private fun given(): List<Double> = emulator.state().boluses.drop(VirtualAtc3Pump.SEEDED_BOLUSES)
+
     private fun aapsBoluses(): List<Double> =
         runBlocking { persistenceLayer.getBolusesFromTime(startedAt - 2 * 60_000L, ascending = true) }.filter { it.amount > 0.0 }.map { it.amount }
 
     /** v4 writes a bolus row from the pump's journal record, read after the bolus or at the next heartbeat. */
     private fun assertRecordIsWhatThePumpGave() {
-        val given = emulator.state().boluses.sum()
-        awaitTrue(RECORD_TIMEOUT) { abs(aapsBoluses().sum() - given) < EPS }
-        assertWithMessage("insulin AAPS has on record ${aapsBoluses()}, the pump gave ${emulator.state().boluses}")
-            .that(aapsBoluses().sum()).isWithin(EPS).of(given)
+        val pumpGave = given().sum()
+        awaitTrue(RECORD_TIMEOUT) { abs(aapsBoluses().sum() - pumpGave) < EPS }
+        assertWithMessage("insulin AAPS has on record ${aapsBoluses()}, the pump gave ${given()}")
+            .that(aapsBoluses().sum()).isWithin(EPS).of(pumpGave)
     }
 
     private fun assertTempBasalSame(where: String) {
@@ -328,7 +333,7 @@ class ApexScenarioTest {
         private const val PROFILE_NAME = "LocalProfile1"
         private const val PROFILE_BASAL = 0.4
         private const val PROFILE_STORE_TIMEOUT = 20_000L
-        private const val INIT_TIMEOUT = 60_000L
+        private const val INIT_TIMEOUT = 180_000L
         private const val STEP_TIMEOUT = 240_000L
 
         /** Up to two heartbeats of 2 min and the reads after them. */

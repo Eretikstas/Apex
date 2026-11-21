@@ -523,6 +523,15 @@ class VirtualAtc3Pump(
         } else suspended = false
     }
 
+    /**
+     * Fill the bolus journal with [count] old boluses of 1 U, one every 6 h before [nowMs], as on a pump in use.
+     * A new pump's cells are zeros, and the Apex v4 driver takes a zero cell for a broken record (no date, nothing
+     * asked): it then leaves the boluses to the heartbeat and writes none. Call it before the driver first reads.
+     */
+    fun seedBolusHistory(nowMs: Long, count: Int = SEEDED_BOLUSES) = synchronized(bolusLog) {
+        for (i in count downTo 1) bolusLog.add(0, Bolus(minuteOf(nowMs - i * SEED_STEP_MS), 59, SEED_RAW, SEED_RAW))
+    }
+
     /** §4.4: 59 for the newest record of the minute, 58, 57 for the earlier ones. */
     private fun addBolusRecord(atMs: Long, requested: Int, delivered: Int, extendedRequested: Int = 0, extendedDelivered: Int = 0) = synchronized(bolusLog) {
         val minute = minuteOf(atMs)
@@ -573,6 +582,11 @@ class VirtualAtc3Pump(
     companion object {
 
         const val CHUNK = 20
+
+        /** How many old boluses [seedBolusHistory] puts in the journal. */
+        const val SEEDED_BOLUSES = 30
+        private const val SEED_STEP_MS = 6 * 3_600_000L
+        private const val SEED_RAW = 40
 
         private fun calendar(ms: Long): Calendar = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = ms }
 
