@@ -125,7 +125,7 @@
     <string name="atc3_password_random">Случайный</string>
     <string name="atc3_driver_version_label">Версия драйвера</string>
     <string name="atc3_day_account_label">Подано за сутки: AAPS и помпа</string>
-    <string name="atc3_day_account_value">AAPS %1$.3f Ед · помпа %2$.3f Ед · отклонение %3$+.3f Ед</string>
+    <string name="atc3_day_account_value">AAPS %1$.3f ед · помпа %2$.3f ед · отклонение %3$+.3f ед</string>
     <string name="atc3_day_account_none">ещё не сверялось</string>
     <string name="atc3_password_change_hint">Задать помпе новый пароль Bluetooth. Чтобы ввести уже используемый, откройте экран выбора помпы.</string>
     <string name="atc3_scanner_has_password">У помпы есть пароль Bluetooth (B/P на экране помпы). Выключено: пароля нет, используется 000000</string>
@@ -159,7 +159,7 @@
     <string name="atc3_last_answer_label">Последний ответ</string>
     <string name="atc3_resume_pump">Запустить помпу</string>
     <string name="atc3_change_password">Сменить пароль Bluetooth</string>
-    <string name="atc3_reservoir_value">%1$s ЕД из %2$d ЕД</string>
+    <string name="atc3_reservoir_value">%1$s ед из %2$d ед</string>
     <string name="atc3_concentration_loop_blocked">Apex: цикл работает только с инсулином U100. Драйвер сравнивает AAPS и помпу единица в единицу.</string>
     <string name="atc3_battery_value">%1$d %% (%2$.2f В)</string>
 </resources>

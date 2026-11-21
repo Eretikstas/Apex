@@ -129,8 +129,8 @@
     <string name="sms_last_bg">Глюкоза:</string>
     <string name="sms_iob">IOB:</string>
     <string name="sms_basal">Базал:</string>
-    <string name="sms_tbr_percent_only">Эта помпа принимает временный базал только в процентах, не в ЕД/ч.</string>
-    <string name="sms_tbr_absolute_only">Эта помпа принимает временный базал только в ЕД/ч, не в процентах.</string>
+    <string name="sms_tbr_percent_only">Эта помпа принимает временный базал только в процентах, не в ед/ч.</string>
+    <string name="sms_tbr_absolute_only">Эта помпа принимает временный базал только в ед/ч, не в процентах.</string>
     <string name="permission_sms_title">SMS</string>
     <string name="permission_sms_description">Приложению нужно разрешение SMS для удалённого управления текстовыми сообщениями</string>
     <string name="ios_client_skipped_off">Запись с iPhone-клиента (AAPSClient-iOS) не принята: приём этих данных из Nightscout выключен. Включите его в настройках Nightscout (углеводы, переключения профиля).</string>

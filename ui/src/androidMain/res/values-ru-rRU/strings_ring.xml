@@ -24,12 +24,12 @@
     <string name="ring_why_rise">Сахар растёт без углеводов или закончится выше цели.</string>
     <string name="ring_why_in_range">Сахар в нужном диапазоне: базал без изменений.</string>
     <string name="ring_why_unknown">Причина не распознана. Полный текст — в деталях цикла.</string>
-    <string name="ring_act_smb">SMB %1$.2f ЕД</string>
-    <string name="ring_act_smb_tbr">SMB %1$.2f ЕД и временный базал %2$.2f ЕД/ч на %3$d мин</string>
+    <string name="ring_act_smb">SMB %1$.2f ед</string>
+    <string name="ring_act_smb_tbr">SMB %1$.2f ед и временный базал %2$.2f ед/ч на %3$d мин</string>
     <string name="ring_act_zero">Нулевой временный базал на %1$d мин</string>
-    <string name="ring_act_tbr">Временный базал %1$.2f ЕД/ч на %2$d мин</string>
+    <string name="ring_act_tbr">Временный базал %1$.2f ед/ч на %2$d мин</string>
     <string name="ring_act_none">Без изменений</string>
-    <string name="ring_limited">Ограничение уменьшило SMB с %1$.2f ЕД до %2$.2f ЕД.</string>
+    <string name="ring_limited">Ограничение уменьшило SMB с %1$.2f ед до %2$.2f ед.</string>
     <string name="ring_eventual">Ожидается в конце: %1$s</string>
     <string name="ring_decided_at">Решение в %1$s</string>
 </resources>

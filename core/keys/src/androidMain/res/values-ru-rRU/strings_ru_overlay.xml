@@ -285,7 +285,7 @@
     <string name="pref_title_fill_button_2">Кнопка заполнения 2</string>
     <string name="pref_title_fill_button_3">Кнопка заполнения 3</string>
     <string name="pref_title_ama_max_iob">Максимальный IOB для AMA</string>
-    <string name="openapsma_max_iob_summary">В OpenAPS это называется Max IOB.\nЭто максимум инсулина в ЕД, который APS может ввести за раз. Значение зависит и от типа пациента.</string>
+    <string name="openapsma_max_iob_summary">В OpenAPS это называется Max IOB.\nЭто максимум инсулина в ед, который APS может ввести за раз. Значение зависит и от типа пациента.</string>
     <string name="pref_title_current_basal_multiplier">Множитель безопасности от текущего базала</string>
     <string name="pref_title_bolus_snooze_divisor">Делитель DIA для паузы после болюса</string>
     <string name="pref_title_ama_min_5m_carbs_impact">AMA: мин. усвоение углеводов за 5 мин</string>

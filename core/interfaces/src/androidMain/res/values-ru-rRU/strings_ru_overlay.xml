@@ -8,8 +8,8 @@
     <string name="pref_show_complication3">Показывать усложнение 3</string>
     <string name="pref_show_complication4">Показывать усложнение 4</string>
     <string name="pref_show_complication5">Показывать усложнение 5</string>
-    <string name="profile_isf_units_mgdl">мг/дл/ЕД</string>
-    <string name="profile_isf_units_mmol">ммоль/л/ЕД</string>
+    <string name="profile_isf_units_mgdl">мг/дл/ед</string>
+    <string name="profile_isf_units_mmol">ммоль/л/ед</string>
     <string name="mins">%1$d мин</string>
     <string name="profile_low_target">Нижняя цель профиля</string>
     <string name="slowabsorptiondetected_plain">!!!!! Найдено медленное усвоение углеводов: %1$d%% времени. Перепроверьте расчёт. COB может быть завышен, и тогда инсулина будет введено больше !!!!!</string>

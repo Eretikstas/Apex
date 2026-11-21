@@ -8,7 +8,7 @@
     <string name="learner_next_card">Следующая проверка: %1$s</string>
     <string name="learner_proposal_title">Предложение по базалу: профиль «%1$s»</string>
     <string name="learner_proposal_why" formatted="false">Видно на двух проверках подряд; полшага к измеренной потребности, не больше 20 % за шаг.</string>
-    <string name="learner_change">%1$02d:00  %2$.2f → %3$.2f ЕД/ч</string>
+    <string name="learner_change">%1$02d:00  %2$.2f → %3$.2f ед/ч</string>
     <string name="learner_accept">Внести</string>
     <string name="learner_refuse">Отказаться</string>
     <string name="learner_cancel">Отмена</string>

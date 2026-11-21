@@ -175,6 +175,21 @@ fun OverviewScreenRing(
             modifier = Modifier.fillMaxWidth()
         )
 
+        // Cannula, insulin left, sensor and pump battery right under the chips, seen without scrolling.
+        OverviewStatusSection(
+            sensorStatus = statusState.sensorStatus,
+            insulinStatus = statusState.insulinStatus,
+            cannulaStatus = statusState.cannulaStatus,
+            batteryStatus = statusState.batteryStatus,
+            showFill = statusState.showFill,
+            showPumpBatteryChange = statusState.showPumpBatteryChange,
+            commandsAllowed = commandsAllowed,
+            onNavigate = onNavigate,
+            statusLightsDef = statusLightsDef,
+            expanded = statusExpanded,
+            onExpandedChange = { statusExpanded = it }
+        )
+
         RingHero(
             bgInfo = bgInfoState.bgInfo,
             timeAgo = bgInfoState.timeAgoText,
@@ -197,19 +212,6 @@ fun OverviewScreenRing(
             onTogglePin = chipsViewModel::toggleAutoIsfPin
         )
 
-        OverviewStatusSection(
-            sensorStatus = statusState.sensorStatus,
-            insulinStatus = statusState.insulinStatus,
-            cannulaStatus = statusState.cannulaStatus,
-            batteryStatus = statusState.batteryStatus,
-            showFill = statusState.showFill,
-            showPumpBatteryChange = statusState.showPumpBatteryChange,
-            commandsAllowed = commandsAllowed,
-            onNavigate = onNavigate,
-            statusLightsDef = statusLightsDef,
-            expanded = statusExpanded,
-            onExpandedChange = { statusExpanded = it }
-        )
 
         if (config.AAPSCLIENT) {
             val nsClientStatus by graphViewModel.nsClientStatusFlow.collectAsStateWithLifecycle()

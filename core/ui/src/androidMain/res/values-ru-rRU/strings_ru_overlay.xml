@@ -353,7 +353,7 @@
     <string name="bolusspeed">Скорость болюса</string>
     <string name="history">История</string>
     <string name="overview_reservoir_concentration_value_over">Осталось больше %1$s</string>
-    <string name="percent_rate_recalculated">Процент %1$d%% пересчитан в %2$s ЕД/ч при текущем базале %3$s ЕД/ч</string>
+    <string name="percent_rate_recalculated">Процент %1$d%% пересчитан в %2$s ед/ч при текущем базале %3$s ед/ч</string>
     <string name="dismiss">Закрыть</string>
     <string name="master_password_missing">Главный пароль не задан!\n\nСначала задайте главный пароль, потом повторите.</string>
     <string name="export_cloud_success">Экспорт в облако выполнен</string>
