@@ -106,7 +106,7 @@ class NsIncomingDataProcessor(
         lastIosClientNotice = now
         aapsLogger.warn(LTag.NSCLIENT, "Record from $IOS_CLIENT_APP not taken: ${treatment.eventType}, hardened=${preferences.hardenedMode}")
         notificationManager.post(
-            id = NotificationId.NS_MALFUNCTION,
+            id = NotificationId.NS_IOS_CLIENT_SKIPPED,
             textRef = if (preferences.hardenedMode) SyncStrings.ios_client_skipped_hardened else SyncStrings.ios_client_skipped_off,
             validMinutes = 120
         )

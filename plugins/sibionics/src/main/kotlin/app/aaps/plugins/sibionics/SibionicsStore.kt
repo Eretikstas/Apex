@@ -15,9 +15,14 @@ internal class SibionicsStore(context: Context, private val preferences: Prefere
 
     private val dir = File(context.filesDir, "sibionics")
 
-    private fun read(): JSONObject = runCatching { JSONObject(preferences.get(SibionicsStringNonKey.State)) }.getOrElse { JSONObject() }
+    // One document written from the radio thread and the screen: read-modify-write under one lock.
+    private val lock = Any()
 
-    private fun update(block: JSONObject.() -> Unit) {
+    private fun read(): JSONObject = synchronized(lock) {
+        runCatching { JSONObject(preferences.get(SibionicsStringNonKey.State)) }.getOrElse { JSONObject() }
+    }
+
+    private fun update(block: JSONObject.() -> Unit) = synchronized(lock) {
         val o = read()
         o.block()
         preferences.put(SibionicsStringNonKey.State, o.toString())

@@ -123,7 +123,7 @@ class IosClientNsRecordsTest : TestBaseWithProfile() {
         processor.processTreatments(listOf(carbs), doFullSync = false)
         // Twice the same minute: one notice only.
         verify(notificationManager, times(1)).post(
-            id = eq(NotificationId.NS_MALFUNCTION), textRef = eq(SyncStrings.ios_client_skipped_off), level = any(), validMinutes = eq(120),
+            id = eq(NotificationId.NS_IOS_CLIENT_SKIPPED), textRef = eq(SyncStrings.ios_client_skipped_off), level = any(), validMinutes = eq(120),
             date = any(), validTo = any(), sound = anyOrNull(), actions = any(), validityCheck = anyOrNull()
         )
     }
@@ -134,7 +134,7 @@ class IosClientNsRecordsTest : TestBaseWithProfile() {
         whenever(preferences.hardenedMode).thenReturn(true)
         processor.processTreatments(listOf(checkNotNull(profileSwitchJson.toNSTreatment())), doFullSync = false)
         verify(notificationManager).post(
-            id = eq(NotificationId.NS_MALFUNCTION), textRef = eq(SyncStrings.ios_client_skipped_hardened), level = any(), validMinutes = eq(120),
+            id = eq(NotificationId.NS_IOS_CLIENT_SKIPPED), textRef = eq(SyncStrings.ios_client_skipped_hardened), level = any(), validMinutes = eq(120),
             date = any(), validTo = any(), sound = anyOrNull(), actions = any(), validityCheck = anyOrNull()
         )
     }
@@ -144,7 +144,7 @@ class IosClientNsRecordsTest : TestBaseWithProfile() {
         whenever(preferences.get(BooleanKey.NsClientAcceptCarbs)).thenReturn(false)
         processor.processTreatments(listOf(checkNotNull(carbsJson.replace("AAPSClient-iOS", "AAPS").toNSTreatment())), doFullSync = false)
         verify(notificationManager, never()).post(
-            id = eq(NotificationId.NS_MALFUNCTION), textRef = any(), level = any(), validMinutes = any(),
+            id = eq(NotificationId.NS_IOS_CLIENT_SKIPPED), textRef = any(), level = any(), validMinutes = any(),
             date = any(), validTo = any(), sound = anyOrNull(), actions = any(), validityCheck = anyOrNull()
         )
     }

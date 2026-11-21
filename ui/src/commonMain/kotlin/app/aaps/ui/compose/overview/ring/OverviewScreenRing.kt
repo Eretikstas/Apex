@@ -22,6 +22,7 @@ import app.aaps.core.keys.BooleanNonKey
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -110,19 +111,24 @@ fun OverviewScreenRing(
     val now by graphViewModel.nowTimestamp.collectAsStateWithLifecycle()
     val profileUtil = LocalProfileUtil.current
 
-    val readings = bgReadings.filter { it.type == BgType.REGULAR }.ifEmpty { bgReadings.filter { it.type == BgType.BUCKETED } }
-        .sortedBy { it.timestamp }
+    // Lists are worked out again only when their data changes, not on every recomposition.
+    val readings = remember(bgReadings) {
+        bgReadings.filter { it.type == BgType.REGULAR }.ifEmpty { bgReadings.filter { it.type == BgType.BUCKETED } }.sortedBy { it.timestamp }
+    }
     // The state word keeps its tested rule: the lowest prediction of the next hour, all lines.
-    val future = predictions.filter { it.timestamp in (now + 1)..(now + 60 * 60_000L) }
-    val minPredMgdl = future.minOfOrNull { it.value }?.let { toMgdl(it) }
+    val minPredMgdl = remember(predictions, now) {
+        predictions.filter { it.timestamp in (now + 1)..(now + 60 * 60_000L) }.minOfOrNull { it.value }
+    }?.let { toMgdl(it) }
     // The graph and the value: one line of the loop's own prediction up to the chosen horizon, UAM first, then COB, then IOB.
     var horizon by rememberSaveable { mutableStateOf(RingHorizon.H1) }
     // One line for all horizons, chosen over the longest one (3 h): UAM first, then COB, then IOB.
-    val ahead = predictions.filter { it.timestamp in (now + 1)..(now + RingHorizon.H3.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS) }
-    val mainLine = ahead.filter { it.type == BgType.UAM_PREDICTION }.ifEmpty { ahead.filter { it.type == BgType.COB_PREDICTION } }
-        .ifEmpty { ahead.filter { it.type == BgType.IOB_PREDICTION } }
-    val mainPrediction = mainLine.filter { it.timestamp <= now + horizon.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS }
-    val linePoints = mainLine.map { it.timestamp to it.value }
+    val mainLine = remember(predictions, now) {
+        val ahead = predictions.filter { it.timestamp in (now + 1)..(now + RingHorizon.H3.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS) }
+        ahead.filter { it.type == BgType.UAM_PREDICTION }.ifEmpty { ahead.filter { it.type == BgType.COB_PREDICTION } }
+            .ifEmpty { ahead.filter { it.type == BgType.IOB_PREDICTION } }
+    }
+    val mainPrediction = remember(mainLine, now, horizon) { mainLine.filter { it.timestamp <= now + horizon.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS } }
+    val linePoints = remember(mainLine) { mainLine.map { it.timestamp to it.value } }
     val forecast = RingLogic.forecast(linePoints, now, horizon.hours * 3_600_000L)
     // The value at each full hour ahead, only where the loop's line reaches it.
     val perHour = RingHorizon.entries.map { h ->

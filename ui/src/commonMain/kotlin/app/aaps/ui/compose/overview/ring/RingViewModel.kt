@@ -19,6 +19,8 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,7 +64,7 @@ class RingViewModel(
     init {
         rxBus.toFlow(EventLoopUpdateGui::class).onEach { refreshWhy(); refreshNotes() }.launchIn(viewModelScope)
         rxBus.toFlow(EventRefreshOverview::class).onEach { refreshWhy() }.launchIn(viewModelScope)
-        persistenceLayer.observeChanges<GV>().onEach { refreshStats() }.launchIn(viewModelScope)
+        persistenceLayer.observeChanges<GV>().onEach { refreshStats(settle = true) }.launchIn(viewModelScope)
         loopNotes.notes.onEach { refreshNotes() }.launchIn(viewModelScope)
         refreshWhy()
         refreshStats()
@@ -97,8 +99,14 @@ class RingViewModel(
         }
     }
 
-    private fun refreshStats() {
-        viewModelScope.launch {
+    private var statsJob: Job? = null
+
+    // A new reading or a period tap cancels the count still running, so an older count can never land last;
+    // readings that come close together (1-minute sensor, a backfill) give one count.
+    private fun refreshStats(settle: Boolean = false) {
+        statsJob?.cancel()
+        statsJob = viewModelScope.launch {
+            if (settle) delay(STATS_SETTLE_MS)
             val period = _uiState.value.period
             val now = dateUtil.now()
             val values = runCatching {
@@ -106,5 +114,10 @@ class RingViewModel(
             }.getOrDefault(emptyList())
             _uiState.update { if (it.period == period) it.copy(stats = RingLogic.stats(values)) else it }
         }
+    }
+
+    private companion object {
+
+        const val STATS_SETTLE_MS = 500L
     }
 }

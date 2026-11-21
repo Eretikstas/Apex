@@ -45,6 +45,7 @@ the tests named next to it.
 | `*/res/values-ru-rRU/strings_ru_overlay.xml` (new files) | our Russian for strings that have no Russian yet (only names missing from the Crowdin `strings.xml`; if Crowdin adds the same name later, delete ours or the build fails with a duplicate) | app build |
 | `plugins/sync/src/androidHostTest/.../IosClientNsRecordsTest.kt` (new) | the iOS client's real Nightscout records (carbs, profile switch) are taken when accepted, not when not | ring/sync test step |
 | `core/nssdk/.../mapper/TreatmentMapper.kt` | keeps the record's `app` (who wrote it) | `IosClientNsRecordsTest` |
+| `core/interfaces/.../notifications/NotificationId.kt` | `NS_IOS_CLIENT_SKIPPED`: own notice for a skipped iPhone client record (was `NS_MALFUNCTION`) | `IosClientNsRecordsTest` |
 | `plugins/sync/.../nsclientV3/NsIncomingDataProcessor.kt` + `strings.xml` | a fresh record of the iPhone client (`AAPSClient-iOS`) that is not taken raises a notice (accept off / hardened mode), at most every 30 min | `IosClientNsRecordsTest` |
 | `core/keys/.../BooleanNonKey.kt` + `prefs-schema.txt` | `OverviewRingPredictionOffDone`: the ring screen switches the big graph's prediction overlay off once (user can turn it on, PRED) | `PreferenceKeySnapshotTest` |
 | `implementation/.../queue/CommandExecutor.kt` | taken from official AAPS dev 9221bf3385 (16.11): the connection limit counts from the last command, not from the start of the queue run (matters with a 3 min loop); drop when blaqone has it | queue tests in CI, ATC3 emulator scenarios |
