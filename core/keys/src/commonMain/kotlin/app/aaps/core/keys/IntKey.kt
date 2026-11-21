@@ -171,7 +171,8 @@ enum class IntKey(
     ),
     OverviewResWarning(
         key = "statuslights_res_warning",
-        defaultValue = 80,
+        // Our change (docs/OUR_CHANGES.md): 20 U for a child's small daily dose (user 21.11), was 80.
+        defaultValue = 20,
         min = 0,
         max = 300,
         title = KeysStrings.pref_title_res_warning,
