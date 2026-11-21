@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import app.aaps.core.ui.compose.LocalPreferences
 import app.aaps.core.interfaces.overview.graph.SeriesType
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.BooleanNonKey
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -249,7 +250,10 @@ fun OverviewScreenRing(
             )
         }
 
-        GraphsSection(
+        // The big AAPS graphs can be switched off (Appearance): the tile above keeps the loop's prediction either way,
+        // it is calculated by the loop (insulin and carbs on board) whether a graph is shown or not.
+        val showGraphs by preferences.observe(BooleanKey.OverviewRingShowGraphs).collectAsStateWithLifecycle()
+        if (showGraphs) GraphsSection(
             graphViewModel = graphViewModel, isSimpleMode = isSimpleMode, iobText = iobUiState.text, cobText = cobUiState.text,
             overlaidBarsHeight = overlaidBarsHeight
         )

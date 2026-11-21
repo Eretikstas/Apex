@@ -31,7 +31,7 @@ the tests named next to it.
 | `core/data/.../model/RawObservationSource.kt` | `SIBIONICS_NATIVE` in the one-minute set, like the other Sibionics | sibionics job |
 | `database/impl/.../entities/GlucoseValue.kt` | `SIBIONICS_NATIVE` (stored by name, no migration) | `ConvertersSourceSensorTest` |
 | `database/persistence/.../SourceSensorExtension.kt` | `SIBIONICS_NATIVE` both ways | `SourceSensorExtensionTest` |
-| `core/keys/.../BooleanKey.kt` + `core/keys/src/androidMain/res/values/strings.xml` | `OverviewRingLayout` (default on) and its title/summary; Russian in `values-ru-rRU/strings_ring.xml` | `PreferenceKeySnapshotTest` |
+| `core/keys/.../BooleanKey.kt` + `core/keys/src/androidMain/res/values/strings.xml` | `OverviewRingLayout` (default on), `OverviewRingShowGraphs` (default on: the big graphs under the ring) and their title/summary; Russian in `values-ru-rRU/strings_ring.xml` | `PreferenceKeySnapshotTest` |
 | `app/src/testFull/resources/prefs-schema.txt` | `overview_ring_layout` | `PreferenceKeySnapshotTest` |
 | `ui/.../search/BuiltInSearchables.kt` | the ring switch in Appearance | - |
 | `ui/.../main/MainScreen.kt`, `ui/.../overview/OverviewScreen.kt` | read the switch, phone portrait -> `OverviewScreenRing` | `OverviewSizeSweepTest` |

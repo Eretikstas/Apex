@@ -38,6 +38,7 @@ import app.aaps.core.interfaces.overview.graph.BgType
 import app.aaps.core.interfaces.overview.graph.TbrState
 import app.aaps.core.interfaces.overview.graph.TimeRange
 import app.aaps.core.interfaces.rx.events.Event
+import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.UnitDoubleKey
 import app.aaps.core.ui.compose.LocalMetroViewModelFactory
@@ -169,6 +170,7 @@ class RingScreenshotTest {
         whenever(screen.profileUtil.fromMgdlToStringWithUnits(anyOrNull())).thenAnswer { inv ->
             (inv.arguments[0] as Double?)?.let { String.format(Locale("ru"), "%.1f ммоль/л", it / 18.0) } ?: "—"
         }
+        whenever(screen.preferences.observe(BooleanKey.OverviewRingShowGraphs)).thenReturn(MutableStateFlow(true))
         whenever(screen.preferences.get(UnitDoubleKey.OverviewHighMark)).thenReturn(10.0)
         whenever(screen.preferences.get(UnitDoubleKey.OverviewLowMark)).thenReturn(3.9)
         whenever(screen.preferences.observe(UnitDoubleKey.OverviewHighMark)).thenReturn(MutableStateFlow(10.0))

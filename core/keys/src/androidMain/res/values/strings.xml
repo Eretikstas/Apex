@@ -465,4 +465,6 @@
 
     <string name="pref_title_ring_layout">Ring overview</string>
     <string name="pref_summary_ring_layout">On a phone in portrait: glucose in a ring with time in range, the next hour and why the loop did what it did.</string>
+    <string name="pref_title_ring_show_graphs">Graphs under the ring</string>
+    <string name="pref_summary_ring_show_graphs">Off: the ring screen shows only the ring, the prediction tile and why, no big graphs below. The prediction tile works the same.</string>
 </resources>

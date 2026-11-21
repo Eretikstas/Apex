@@ -3,4 +3,6 @@
 <resources>
     <string name="pref_title_ring_layout">Главный экран «Кольцо»</string>
     <string name="pref_summary_ring_layout">На телефоне в вертикальном положении: сахар в кольце со временем в диапазоне, ближайший час и почему цикл так решил.</string>
+    <string name="pref_title_ring_show_graphs">Графики под кольцом</string>
+    <string name="pref_summary_ring_show_graphs">Выкл.: на экране «Кольцо» только кольцо, плитка прогноза и «почему», без больших графиков ниже. Плитка прогноза работает так же.</string>
 </resources>

@@ -48,6 +48,10 @@ enum class BooleanKey(
     ),
     // Our addition (docs/OUR_CHANGES.md): the "Кольцо" overview on a phone in portrait.
     OverviewRingLayout(key = "overview_ring_layout", defaultValue = true, title = KeysStrings.pref_title_ring_layout, summary = KeysStrings.pref_summary_ring_layout),
+    OverviewRingShowGraphs(
+        key = "overview_ring_show_graphs", defaultValue = true, title = KeysStrings.pref_title_ring_show_graphs, summary = KeysStrings.pref_summary_ring_show_graphs,
+        dependency = OverviewRingLayout
+    ),
     OverviewShowTreatmentButton(key = "show_treatment_button", defaultValue = false, title = KeysStrings.pref_title_show_treatment_button, defaultedBySM = true),
     OverviewShowWizardButton(key = "show_wizard_button", defaultValue = true, title = KeysStrings.pref_title_show_wizard_button, defaultedBySM = true),
     OverviewShowInsulinButton(key = "show_insulin_button", defaultValue = true, title = KeysStrings.pref_title_show_insulin_button, defaultedBySM = true),
