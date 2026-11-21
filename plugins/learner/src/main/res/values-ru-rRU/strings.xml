@@ -6,13 +6,13 @@
     <string name="learner_last_card">Последняя проверка: %1$s</string>
     <string name="learner_no_card_yet">Проверок ещё не было. Первая — в 06:00.</string>
     <string name="learner_next_card">Следующая проверка: %1$s</string>
-    <string name="learner_proposal_title">Предложение по базалу для %1$s</string>
+    <string name="learner_proposal_title">Предложение по базалу: профиль «%1$s»</string>
     <string name="learner_proposal_why" formatted="false">Видно на двух проверках подряд; полшага к измеренной потребности, не больше 20 % за шаг.</string>
     <string name="learner_change">%1$02d:00  %2$.2f → %3$.2f ЕД/ч</string>
     <string name="learner_accept">Внести</string>
     <string name="learner_refuse">Отказаться</string>
     <string name="learner_cancel">Отмена</string>
-    <string name="learner_confirm_title">Изменить %1$s?</string>
+    <string name="learner_confirm_title">Изменить профиль «%1$s»?</string>
     <string name="learner_confirm_text" formatted="false">Профиль меняется на месте (то же имя) и включается на 100 %. Помпа получит новый базал.</string>
     <string name="learner_no_proposal">Предложений сейчас нет.</string>
     <string name="learner_hours_title">Что измерила последняя проверка (профиль / потребность)</string>
@@ -39,7 +39,7 @@
     <string name="learner_dura_changed">dura изменили после проверки. Предложение снято; следующая проверка сделает новое.</string>
     <string name="learner_dura_title">Вес AutoISF dura</string>
     <string name="learner_dura_now">dura сейчас: %1$.2f</string>
-    <string name="learner_dura_seen">Последние 7 дней: ровные высокие %1$.1f %%, ниже 3,9 %2$.1f %%.</string>
+    <string name="learner_dura_seen">Последние 7 дней: ровные высокие — %1$.1f %%, ниже 3,9 — %2$.1f %%.</string>
     <string name="learner_dura_rule" formatted="false">Шаг вверх (+0,25, до 2,0), когда ровных высоких 2 % и больше, а низких 3 % и меньше; шаг вниз, когда низких больше 4 %.</string>
     <string name="learner_dura_change">dura %1$.2f → %2$.2f</string>
 </resources>
