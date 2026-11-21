@@ -1,0 +1,79 @@
+name: Strix security scan
+
+# A security scan of OUR code (ATC3 driver, Sibionics source, learner, our sync and ring changes) with Strix
+# (usestrix/strix, AI pentest agents in a Docker sandbox). Started by hand only. It needs an LLM key as the
+# secret STRIX_LLM_API_KEY; the key's owner pays for the run, limited by the budget input.
+# Apex is public: the log shows only counts, the full report goes to the artifact.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'LLM for Strix (LiteLLM name)'
+        default: 'anthropic/claude-sonnet-5-5'
+      budget:
+        description: 'Spend limit, USD'
+        default: '10'
+      mode:
+        description: 'quick, standard or deep'
+        default: 'quick'
+
+concurrency:
+  group: strix-scan
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Strix (pinned)
+        run: python -m pip install -q strix-agent==1.7.0
+      - name: Collect our code
+        run: |
+          mkdir -p scan
+          for d in pump/atc3 pump/atc3-emulator plugins/sibionics plugins/learner \
+                   ui/src/commonMain/kotlin/app/aaps/ui/compose/overview/ring \
+                   plugins/sync/src/commonMain/kotlin/app/aaps/plugins/sync/nsclientV3; do
+            mkdir -p "scan/$d" && cp -r "$d/." "scan/$d/"
+          done
+          cp docs/OUR_CHANGES.md scan/
+          find scan -name build -type d -prune -exec rm -rf {} +
+          du -sh scan
+      - name: Scan
+        env:
+          STRIX_LLM: ${{ inputs.model }}
+          LLM_API_KEY: ${{ secrets.STRIX_LLM_API_KEY }}
+          BUDGET: ${{ inputs.budget }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          if [ -z "$LLM_API_KEY" ]; then echo "secret STRIX_LLM_API_KEY is not set"; exit 1; fi
+          set +e
+          strix -n -t ./scan -m "$MODE" --max-budget "$BUDGET" \
+            --instruction "Source code review only (white box). This is an Android insulin pump driver (BLE), a CGM sensor source, a basal advisor and Nightscout sync for a diabetes loop app. Look for bugs that can harm the patient or leak data: wrong insulin amounts, double delivery, unchecked input from Bluetooth or Nightscout, unsafe storage, crashes on bad data. docs/OUR_CHANGES.md lists our edits." \
+            > strix.log 2>&1
+          echo "strix exit code $?"
+          ls strix_runs 2>/dev/null | head
+          grep -ciE "critical|high" strix.log | sed 's/^/lines naming critical or high: /'
+          exit 0
+      - name: Upload report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: strix-report
+          path: |
+            strix_runs
+            strix.log
+          retention-days: 14
+          if-no-files-found: ignore
