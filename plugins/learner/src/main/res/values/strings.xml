@@ -55,4 +55,5 @@
     <string name="learner_why_pct_hint" comment="%1$.1f=share over 10 in percent, last 3 days">Learner: over 10 was %1$.1f %% in 3 days with few lows; 110 %% could be tried (your choice).</string>
     <string name="learner_pct_applied">Applied: the profile runs with the new percentage.</string>
     <string name="learner_pct_changed">The percentage was changed after the check. The proposal is dropped.</string>
+    <string name="learner_switch_note_pct">Learner: profile percentage</string>
 </resources>

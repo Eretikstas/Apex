@@ -306,7 +306,7 @@ class LearnerPlugin(
                 val switch = if (profileStore != null && iCfg != null) profileFunction.createProfileSwitch(
                     profileStore = profileStore, profileName = name, durationInMinutes = 0, percentage = p.to,
                     timeShiftInHours = ((running?.timeshift ?: 0L) / HOUR_MS).toInt(), timestamp = now,
-                    action = Action.PROFILE_SWITCH, source = Sources.Aaps, note = rh.gs(R.string.learner_switch_note),
+                    action = Action.PROFILE_SWITCH, source = Sources.Aaps, note = rh.gs(R.string.learner_switch_note_pct),
                     listValues = emptyList(), iCfg = iCfg
                 ) else null
                 store.pctProposal = null

@@ -61,12 +61,12 @@ import kotlin.math.abs
 
 /**
  * The virtual bench (user 21.11: "погоняй на стенде"; no test phone yet): the real app on an Android emulator, the ATC3
- * driver against the software pump, AutoISF closed loop, the learner. Glucose comes from a small virtual Eva-like body
+ * driver against the software pump, AutoISF closed loop, the learner. Glucose comes from a small virtual child body
  * (made-up child values, no personal data) and from scripted rises and falls.
  *
  * What it checks is what the real bench would: the loop's decisions reach the pump and AAPS keeps what the pump does;
  * the learner's percentage card proposes, "Внести" reaches the pump as a new basal; one change at a time is kept.
- * It cannot check how well Eva does: that is the body model's job (lab), and the real bench's after it.
+ * It cannot check how well the child does: that is the body model's job (lab), and the real bench's after it.
  */
 @RunWith(AndroidJUnit4::class)
 class VirtualBenchTest {
@@ -113,12 +113,14 @@ class VirtualBenchTest {
         preferences.put(Atc3StringKey.Atc3Address, ADDRESS)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_Atc3PumpPlugin", value = true)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
-        // AutoISF with SMB, as on Eva's phone; room for the loop to act (a child's caps).
+        // AutoISF with SMB, as on the real phone; room for the loop to act (a child's caps).
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "APS_OpenAPSSMBPlugin", value = false)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "APS_OpenAPSAutoISFPlugin", value = true)
         preferences.put(DoubleKey.ApsMaxBasal, 2.0)
         preferences.put(DoubleKey.ApsSmbMaxIob, 3.0)
         preferences.put(IntKey.ApsLoopInterval, 1)
+        // SMB at most every 10 min, as on the real phone (the AAPS default is 3).
+        preferences.put(IntKey.ApsMaxSmbFrequency, 10)
 
         pluginStore.plugins = pluginList
         configBuilder.initialize()
@@ -191,7 +193,7 @@ class VirtualBenchTest {
     }
 
     /**
-     * The learner on 17 days of virtual Eva with too many lows in the last 3 days: the percentage card proposes
+     * The learner on 17 days of a virtual child with too many lows in the last 3 days: the percentage card proposes
      * 100 -> 90 %, "Внести" makes a 90 % switch and the pump gets the 90 % basal. The basal card then does not
      * propose (one change at a time: the last change is still judged).
      */
@@ -214,7 +216,7 @@ class VirtualBenchTest {
         assertWithMessage("no basal proposal while the last change is judged").that(learner.status.value.proposal).isNull()
     }
 
-    // The virtual Eva: history and readings
+    // The virtual child: history and readings
 
     /** [days] of 5 minute readings: mostly 100-160, meals with a rise, and many lows in the last 3 days if asked. */
     private fun seedHistory(now: Long, days: Int, lowsLast3Days: Boolean) {

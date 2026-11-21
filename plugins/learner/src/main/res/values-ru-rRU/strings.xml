@@ -55,4 +55,5 @@
     <string name="learner_why_pct_hint">Ученик: выше 10 было %1$.1f %% за 3 дня при малом числе низких; можно попробовать 110 %% (решаете вы).</string>
     <string name="learner_pct_applied">Внесено: профиль работает с новым процентом.</string>
     <string name="learner_pct_changed">Процент меняли после проверки. Предложение снято.</string>
+    <string name="learner_switch_note_pct">Ученик: процент профиля</string>
 </resources>
