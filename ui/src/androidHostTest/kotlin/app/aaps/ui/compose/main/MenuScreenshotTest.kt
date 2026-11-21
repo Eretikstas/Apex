@@ -48,7 +48,7 @@ class MenuScreenshotTest {
     fun manage() = shoot("menu_manage") {
         ManageBottomSheetContent(
             showTempTarget = true, showTempBasal = true, showCancelTempBasal = false, showExtendedBolus = true,
-            showCancelExtendedBolus = false, showBatteryChange = true, showFill = true,
+            showCancelExtendedBolus = false, showBatteryChange = true, showFill = true, showAuthorizedClients = true,
             cancelTempBasalText = "", cancelExtendedBolusText = "", customActions = emptyList()
         )
     }
