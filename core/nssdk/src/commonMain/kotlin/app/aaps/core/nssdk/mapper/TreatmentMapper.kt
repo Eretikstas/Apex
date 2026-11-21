@@ -30,7 +30,10 @@ fun NSTreatment.convertToRemoteAndBack(): NSTreatment? =
 fun String.toNSTreatment(): NSTreatment? =
     nsSdkJson.decodeFromString(RemoteTreatment.serializer(), this).toTreatment()
 
-internal fun RemoteTreatment.toTreatment(): NSTreatment? {
+/** Our addition (docs/OUR_CHANGES.md): keeps the app that wrote the record, so a skipped record of a known sender can be reported. */
+internal fun RemoteTreatment.toTreatment(): NSTreatment? = toTreatmentWithoutApp()?.also { it.app = app }
+
+private fun RemoteTreatment.toTreatmentWithoutApp(): NSTreatment? {
     val treatmentTimestamp = timestamp()
     when {
         insulin != null && insulin > 0                                     ->

@@ -337,4 +337,6 @@
     <string name="permission_sms_title">SMS</string>
     <string name="permission_sms_description">Application needs SMS permission for remote control via text messages</string>
 
+    <string name="ios_client_skipped_off">A record from the iPhone client (AAPSClient-iOS) was not taken: accepting this data from Nightscout is off. Turn it on in the Nightscout settings (carbs, profile switches).</string>
+    <string name="ios_client_skipped_hardened">A record from the iPhone client (AAPSClient-iOS) was not taken: hardened mode ignores data written in Nightscout. Turn off Simple mode and client control, then turn on accepting carbs and profile switches from Nightscout.</string>
 </resources>

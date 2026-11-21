@@ -44,6 +44,8 @@ the tests named next to it.
 | `core/interfaces/.../aps/LoopNotes.kt` (new) + `core/objects/.../di/CoreObjectsGraph.kt` | one shared holder of plugin notes for the ring "why" (the learner writes, the ring reads) | `LoopNotesTest` |
 | `*/res/values-ru-rRU/strings_ru_overlay.xml` (new files) | our Russian for strings that have no Russian yet (only names missing from the Crowdin `strings.xml`; if Crowdin adds the same name later, delete ours or the build fails with a duplicate) | app build |
 | `plugins/sync/src/androidHostTest/.../IosClientNsRecordsTest.kt` (new) | the iOS client's real Nightscout records (carbs, profile switch) are taken when accepted, not when not | ring/sync test step |
+| `core/nssdk/.../mapper/TreatmentMapper.kt` | keeps the record's `app` (who wrote it) | `IosClientNsRecordsTest` |
+| `plugins/sync/.../nsclientV3/NsIncomingDataProcessor.kt` + `strings.xml` | a fresh record of the iPhone client (`AAPSClient-iOS`) that is not taken raises a notice (accept off / hardened mode), at most every 30 min | `IosClientNsRecordsTest` |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules

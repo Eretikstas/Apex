@@ -5,18 +5,23 @@ import app.aaps.core.interfaces.nsclient.StoreDataForDb
 import app.aaps.core.interfaces.source.NSClientSource
 import app.aaps.core.interfaces.sync.DataSyncSelector
 import app.aaps.core.interfaces.sync.NsClient
+import app.aaps.core.interfaces.notifications.NotificationId
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.nssdk.localmodel.treatment.NSCarbs
 import app.aaps.core.nssdk.localmodel.treatment.NSProfileSwitch
 import app.aaps.core.nssdk.mapper.toNSTreatment
+import app.aaps.plugins.sync.SyncStrings
 import app.aaps.shared.tests.TestBaseWithProfile
 import com.google.common.truth.Truth.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mock
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argThat
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -106,5 +111,41 @@ class IosClientNsRecordsTest : TestBaseWithProfile() {
         processor.processTreatments(listOf(checkNotNull(carbsJson.toNSTreatment()), checkNotNull(profileSwitchJson.toNSTreatment())), doFullSync = false)
         verify(storeDataForDb, never()).addToCarbs(any())
         verify(storeDataForDb, never()).addToProfileSwitches(any())
+    }
+
+    @Test
+    fun `a skipped record of the client raises one notice, telling which setting stops it`() {
+        whenever(preferences.get(BooleanKey.NsClientAcceptCarbs)).thenReturn(false)
+        whenever(preferences.hardenedMode).thenReturn(false)
+        val carbs = checkNotNull(carbsJson.toNSTreatment())
+        assertThat(carbs.app).isEqualTo("AAPSClient-iOS")
+        processor.processTreatments(listOf(carbs), doFullSync = false)
+        processor.processTreatments(listOf(carbs), doFullSync = false)
+        // Twice the same minute: one notice only.
+        verify(notificationManager, times(1)).post(
+            id = eq(NotificationId.NS_MALFUNCTION), textRef = eq(SyncStrings.ios_client_skipped_off), level = any(), validMinutes = eq(120),
+            date = any(), validTo = any(), sound = anyOrNull(), actions = any(), validityCheck = anyOrNull()
+        )
+    }
+
+    @Test
+    fun `in hardened mode the notice says so`() {
+        whenever(preferences.get(BooleanKey.NsClientAcceptProfileSwitch)).thenReturn(false)
+        whenever(preferences.hardenedMode).thenReturn(true)
+        processor.processTreatments(listOf(checkNotNull(profileSwitchJson.toNSTreatment())), doFullSync = false)
+        verify(notificationManager).post(
+            id = eq(NotificationId.NS_MALFUNCTION), textRef = eq(SyncStrings.ios_client_skipped_hardened), level = any(), validMinutes = eq(120),
+            date = any(), validTo = any(), sound = anyOrNull(), actions = any(), validityCheck = anyOrNull()
+        )
+    }
+
+    @Test
+    fun `a skipped record of another app raises no notice`() {
+        whenever(preferences.get(BooleanKey.NsClientAcceptCarbs)).thenReturn(false)
+        processor.processTreatments(listOf(checkNotNull(carbsJson.replace("AAPSClient-iOS", "AAPS").toNSTreatment())), doFullSync = false)
+        verify(notificationManager, never()).post(
+            id = eq(NotificationId.NS_MALFUNCTION), textRef = any(), level = any(), validMinutes = any(),
+            date = any(), validTo = any(), sound = anyOrNull(), actions = any(), validityCheck = anyOrNull()
+        )
     }
 }

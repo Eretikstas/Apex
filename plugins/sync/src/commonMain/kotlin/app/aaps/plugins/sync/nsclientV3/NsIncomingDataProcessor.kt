@@ -40,6 +40,7 @@ import app.aaps.core.nssdk.localmodel.treatment.NSTemporaryBasal
 import app.aaps.core.nssdk.localmodel.treatment.NSTemporaryTarget
 import app.aaps.core.nssdk.localmodel.treatment.NSTherapyEvent
 import app.aaps.core.nssdk.localmodel.treatment.NSTreatment
+import app.aaps.plugins.sync.SyncStrings
 import app.aaps.core.ui.CoreUiStrings
 import app.aaps.plugins.sync.nsclientV3.extensions.toBolus
 import app.aaps.plugins.sync.nsclientV3.extensions.toBolusCalculatorResult
@@ -89,6 +90,28 @@ class NsIncomingDataProcessor(
      * install seeds. Read per record, not hoisted, so records later in a batch pick up a profile switch that
      * landed earlier in it.
      */
+    /** When the last "record from the iPhone client not taken" notice was shown; one notice per half hour at most. */
+    private var lastIosClientNotice = 0L
+
+    /**
+     * Our addition (docs/OUR_CHANGES.md). The family's only remote control is the iOS client "AAPSClient-iOS",
+     * which writes carbs and profile switches to Nightscout. When such a fresh record is not taken (accepting from
+     * Nightscout is off, or hardened mode forces it off), say so at once instead of failing silently.
+     */
+    private fun reportSkippedFromIosClient(treatment: NSTreatment) {
+        if (treatment.app != IOS_CLIENT_APP) return
+        val now = dateUtil.now()
+        val date = treatment.date ?: return
+        if (now - date > IOS_NOTICE_MAX_AGE_MS || now - lastIosClientNotice < IOS_NOTICE_EVERY_MS) return
+        lastIosClientNotice = now
+        aapsLogger.warn(LTag.NSCLIENT, "Record from $IOS_CLIENT_APP not taken: ${treatment.eventType}, hardened=${preferences.hardenedMode}")
+        notificationManager.post(
+            id = NotificationId.NS_MALFUNCTION,
+            textRef = if (preferences.hardenedMode) SyncStrings.ios_client_skipped_hardened else SyncStrings.ios_client_skipped_off,
+            validMinutes = 120
+        )
+    }
+
     private fun fallbackICfg(): ICfg = profileFunction.runningICfg.value ?: InsulinType.OREF_RAPID_ACTING.iCfg
 
     /**
@@ -183,7 +206,8 @@ class NsIncomingDataProcessor(
                             storeDataForDb.addToBoluses(treatment.toBolus(fallbackICfg()))
 
                     is NSCarbs                  ->
-                        if (preferences.get(BooleanKey.NsClientAcceptCarbs) || config.AAPSCLIENT || doFullSync)
+                        if (!(preferences.get(BooleanKey.NsClientAcceptCarbs) || config.AAPSCLIENT || doFullSync)) reportSkippedFromIosClient(treatment)
+                        else
                             storeDataForDb.addToCarbs(treatment.toCarbs())
 
                     is NSTemporaryTarget        ->
@@ -213,7 +237,8 @@ class NsIncomingDataProcessor(
                         }
 
                     is NSProfileSwitch          ->
-                        if (preferences.get(BooleanKey.NsClientAcceptProfileSwitch) || config.AAPSCLIENT || doFullSync) {
+                        if (!(preferences.get(BooleanKey.NsClientAcceptProfileSwitch) || config.AAPSCLIENT || doFullSync)) reportSkippedFromIosClient(treatment)
+                        else {
                             treatment.toProfileSwitch(profileRepository, dateUtil, fallbackICfg())?.let { profileSwitch ->
                                 storeDataForDb.addToProfileSwitches(profileSwitch)
                             }
@@ -313,5 +338,13 @@ class NsIncomingDataProcessor(
                 aapsLogger.debug(LTag.PROFILE, "Received profileStore: $profileJson")
             }
         }
+    }
+
+    private companion object {
+
+        /** The `app` the family's iOS client writes into its Nightscout records. */
+        const val IOS_CLIENT_APP = "AAPSClient-iOS"
+        const val IOS_NOTICE_MAX_AGE_MS = 2 * 60 * 60 * 1000L
+        const val IOS_NOTICE_EVERY_MS = 30 * 60 * 1000L
     }
 }
