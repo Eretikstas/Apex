@@ -24,9 +24,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.SingleIn
 
 /**
  * The Bluetooth link to the pump: connects, sets the link up, presents the Bluetooth password and
@@ -51,9 +48,9 @@ import dev.zacsweers.metro.SingleIn
  * ([startLink]), while its watchdog is set ([armWatchdog]), and while its start is told.
  */
 @SuppressLint("MissingPermission")
-@SingleIn(AppScope::class)
-@Inject
-class ApexBLE(
+// Our change (docs/OUR_CHANGES.md): open, and made by ApexRadioBindings instead of @Inject, so a device test can put
+// a software pump in place of the radio (ApexRadioSwap). The app never sets the swap: there it is this class as it was.
+open class ApexBLE(
     private val aapsLogger: AAPSLogger,
     private val context: Context,
     private val trace: ApexTrace
@@ -127,7 +124,7 @@ class ApexBLE(
 
     /** When the link came up, milliseconds, 0 while there is none: what the settle wait before the first request is counted from. */
     @Volatile
-    var linkUpAtMs = 0L
+    open var linkUpAtMs = 0L
         private set
 
     private val backoff = ApexBackoff()
@@ -141,7 +138,7 @@ class ApexBLE(
      * How long connecting is held off, milliseconds, 0 when it is allowed: a failed stack fails again at once,
      * and a link the driver has just let go of is still up on the radio for a moment.
      */
-    val backoffRemainingMs: Long get() = backoff.remainingMs
+    open val backoffRemainingMs: Long get() = backoff.remainingMs
 
     /** The Bluetooth password to present, `000000` when none is entered. */
     @Volatile private var password: String = ApexBtPassword.NONE
@@ -154,11 +151,11 @@ class ApexBLE(
 
     @Volatile private var writeSucceeded: Boolean = false
 
-    val isConnected: Boolean get() = state == LinkState.READY
+    open val isConnected: Boolean get() = state == LinkState.READY
 
-    val isConnecting: Boolean get() = state != LinkState.IDLE && state != LinkState.READY
+    open val isConnecting: Boolean get() = state != LinkState.IDLE && state != LinkState.READY
 
-    fun setCallback(callback: ApexBleCallback?) {
+    open fun setCallback(callback: ApexBleCallback?) {
         this.callback = callback
     }
 
@@ -187,7 +184,7 @@ class ApexBLE(
     }
 
     /** The password to present on the next link; blank or malformed is none, and `000000` is presented. */
-    fun setPassword(password: String?) {
+    open fun setPassword(password: String?) {
         this.password = password?.trim()?.takeIf { ApexBtPassword.isValid(it) } ?: ApexBtPassword.NONE
     }
 
@@ -195,20 +192,20 @@ class ApexBLE(
      * Whether the phone's Bluetooth is on. Off, some phones still let a link to the pump come up, and
      * then fail it at the first write: the caller tries no link while it is off.
      */
-    val isBluetoothOn: Boolean get() = bluetoothAdapter()?.isEnabled == true
+    open val isBluetoothOn: Boolean get() = bluetoothAdapter()?.isEnabled == true
 
     /** Whether the phone has Bluetooth at all. */
-    val hasBluetooth: Boolean get() = bluetoothAdapter() != null
+    open val hasBluetooth: Boolean get() = bluetoothAdapter() != null
 
     /** Whether [address] is a Bluetooth address a link can be asked for. */
-    fun isValidAddress(address: String): Boolean = BluetoothAdapter.checkBluetoothAddress(address)
+    open fun isValidAddress(address: String): Boolean = BluetoothAdapter.checkBluetoothAddress(address)
 
     /**
      * Ask for a link. Whether to ask at all, and when, is decided by the caller, see [ApexConnection.connect].
      *
      * @return false when the address is unusable or Bluetooth is not available
      */
-    fun connect(address: String): Boolean {
+    open fun connect(address: String): Boolean {
         if (state != LinkState.IDLE) {
             aapsLogger.debug(LTag.PUMPBTCOMM, "Apex: connect ignored, already connected or connecting")
             trace.event(ApexTraceCat.BLE, "connect_skipped", "connected" to isConnected)
@@ -287,7 +284,7 @@ class ApexBLE(
         trace.event(ApexTraceCat.BLE, "backoff_set", "why" to reason, "answered" to true, "after" to backoff.failures, "ms" to wait)
     }
 
-    fun disconnect() {
+    open fun disconnect() {
         aapsLogger.debug(LTag.PUMPBTCOMM, "Apex: disconnect requested")
         trace.event(ApexTraceCat.BLE, "disconnect_requested", "connected" to isConnected)
         endConnection("requested")
@@ -375,7 +372,7 @@ class ApexBLE(
      * The pump's heartbeat; counted like any frame, and it starts [onHeartbeat]. It comes in the middle
      * of reading the frames: whatever goes wrong in [onHeartbeat] must not lose the frames after it.
      */
-    fun noteHeartbeat() {
+    open fun noteHeartbeat() {
         noteHeardFrom()
         try {
             onHeartbeat?.invoke()
@@ -384,12 +381,12 @@ class ApexBLE(
         }
     }
 
-    fun noteHeardFrom() {
+    open fun noteHeardFrom() {
         lastHeardFromAt = System.currentTimeMillis()
     }
 
     /** How long the pump has been silent, milliseconds, -1 when nothing has arrived yet. What to do about it is decided above. */
-    val quietForMs: Long get() = if (lastHeardFromAt == 0L) -1L else System.currentTimeMillis() - lastHeardFromAt
+    open val quietForMs: Long get() = if (lastHeardFromAt == 0L) -1L else System.currentTimeMillis() - lastHeardFromAt
 
     /**
      * Give up on a connection attempt that is going nowhere, long before the stack or the queue would.
@@ -438,7 +435,7 @@ class ApexBLE(
      *
      * @return false when there is no usable link, the write was refused, or it did not complete in time
      */
-    fun write(data: ByteArray): Boolean {
+    open fun write(data: ByteArray): Boolean {
         // The state first: a link seen ready has its client and characteristics set.
         val ready = state == LinkState.READY
         val link = current

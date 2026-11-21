@@ -280,6 +280,7 @@ dependencies {
     androidTestImplementation(project(":shared:tests"))
     androidTestImplementation(project(":pump:atc3-emulator"))
     androidTestImplementation(project(":pump:atc3"))
+    androidTestImplementation(project(":pump:apex"))
     androidTestImplementation(project(":plugins:learner"))
     androidTestImplementation(libs.androidx.test.rules)
     // UiAutomator for the in-process E2E UI test (app/src/androidTest/.../e2e). Drives the real

@@ -36,17 +36,17 @@ import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.di.Atc3Emulation
-import app.aaps.di.EmulatedAtc3BLE
+import app.aaps.di.EmulatedApexBLE
 import app.aaps.di.ResetGraphRule
 import app.aaps.di.testGraphs
 import app.aaps.implementation.plugin.PluginStore
 import app.aaps.plugins.constraints.objectives.ObjectivesPlugin
 import app.aaps.plugins.learner.LearnerPlugin
-import app.aaps.pump.atc3.Atc3PumpPlugin
+import app.aaps.pump.apex.ApexPumpPlugin
 import app.aaps.pump.atc3.emulator.Atc3PumpEmulator
 import app.aaps.pump.atc3.emulator.VirtualAtc3Pump
-import app.aaps.pump.atc3.keys.Atc3StringKey
-import app.aaps.pump.atc3.link.Atc3RadioSwap
+import app.aaps.pump.apex.keys.ApexStringKey
+import app.aaps.pump.apex.link.ApexRadioSwap
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -60,8 +60,8 @@ import java.io.File
 import kotlin.math.abs
 
 /**
- * The virtual bench (user 21.11: "погоняй на стенде"; no test phone yet): the real app on an Android emulator, the ATC3
- * driver against the software pump, AutoISF closed loop, the learner. Glucose comes from a small virtual child body
+ * The virtual bench (user 21.11: "погоняй на стенде"; no test phone yet): the real app on an Android emulator, the Apex
+ * v4 driver against our software pump (same TruCare III protocol), AutoISF closed loop, the learner. Glucose comes from a small virtual child body
  * (made-up child values, no personal data) and from scripted rises and falls.
  *
  * What it checks is what the real bench would: the loop's decisions reach the pump and AAPS keeps what the pump does;
@@ -77,7 +77,7 @@ class VirtualBenchTest {
     private val pluginStore: PluginStore get() = testGraphs.pluginStore
     private val commandQueue: CommandQueue get() = testGraphs.commandQueue
     private val pluginList: List<PluginBase> get() = testGraphs.allPlugins(testGraphs.aapsLogger)
-    private val atc3Plugin: Atc3PumpPlugin get() = pluginList.filterIsInstance<Atc3PumpPlugin>().single()
+    private val pumpPlugin: ApexPumpPlugin get() = pluginList.filterIsInstance<ApexPumpPlugin>().single()
     private val learner: LearnerPlugin get() = pluginList.filterIsInstance<LearnerPlugin>().single()
     private val configBuilder: ConfigBuilder get() = testGraphs.configBuilder
     private val config: Config get() = testGraphs.config
@@ -101,17 +101,17 @@ class VirtualBenchTest {
         pump = VirtualAtc3Pump(SERIAL) { System.currentTimeMillis() }
         emulator = Atc3PumpEmulator(pump)
         Atc3Emulation.emulator = emulator
-        Atc3RadioSwap.make = { logger, context, trace -> EmulatedAtc3BLE(logger, context, trace) }
+        ApexRadioSwap.make = { logger, context, trace -> EmulatedApexBLE(logger, context, trace) }
         instrumentation.uiAutomation.grantRuntimePermission(PKG, Manifest.permission.BLUETOOTH_CONNECT)
         runCatching { instrumentation.uiAutomation.grantRuntimePermission(PKG, Manifest.permission.BLUETOOTH_SCAN) }
         runCatching { instrumentation.uiAutomation.grantRuntimePermission(PKG, "android.permission.POST_NOTIFICATIONS") }
 
         preferences.put(BooleanNonKey.GeneralSetupWizardProcessed, true)
         preferences.put(StringKey.GeneralUnits, "mg/dl")
-        preferences.put(Atc3StringKey.Atc3SerialNumber, SERIAL)
-        preferences.put(Atc3StringKey.Atc3BtPassword, pump.btPassword)
-        preferences.put(Atc3StringKey.Atc3Address, ADDRESS)
-        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_Atc3PumpPlugin", value = true)
+        preferences.put(ApexStringKey.ApexSerialNumber, SERIAL)
+        preferences.put(ApexStringKey.ApexBtPassword, pump.btPassword)
+        preferences.put(ApexStringKey.ApexAddress, ADDRESS)
+        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_ApexPumpPlugin", value = true)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
         // AutoISF with SMB, as on the real phone; room for the loop to act (a child's caps).
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "APS_OpenAPSSMBPlugin", value = false)
@@ -136,7 +136,7 @@ class VirtualBenchTest {
             )
         }
         status("bench start")
-        assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { atc3Plugin.isInitialized() }).isTrue()
+        assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { pumpPlugin.isInitialized() }).isTrue()
         assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
         // A record of the same minute as the pump registration is refused by AAPS: start in the next minute.
         val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
@@ -148,11 +148,11 @@ class VirtualBenchTest {
     fun tearDown() {
         runCatching { commandQueue.clear() }
         runCatching { WorkManager.getInstance(instrumentation.targetContext).cancelAllWork() }
-        runCatching { atc3Plugin.disconnect("bench end") }
-        runCatching { atc3Plugin.setPluginEnabledBlocking(PluginType.PUMP, false) }
+        runCatching { pumpPlugin.disconnect("bench end") }
+        runCatching { pumpPlugin.setPluginEnabledBlocking(PluginType.PUMP, false) }
         objectivesPlugin.objectives.forEach { it.startedOn = 0; it.accomplishedOn = 0 }
         Atc3Emulation.emulator = null
-        Atc3RadioSwap.make = null
+        ApexRadioSwap.make = null
         runCatching { pump.shutdown() }
         clearAllSharedPrefs()
     }

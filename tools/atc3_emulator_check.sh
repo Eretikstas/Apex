@@ -82,7 +82,8 @@ if [ -n "$TEST" ]; then
   adb install -r -g "$APP" >> $S 2>&1
   adb install -r -g "$TEST" >> $S 2>&1
   adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
-  for C in app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.Atc3EmulatorScenarioTest app.aaps.e2e.VirtualBenchTest app.aaps.e2e.ErrorActivityInjectionTest \
+  # The ATC3 scenarios are out while the app runs the Apex v4 driver (they are being moved to it).
+  for C in app.aaps.e2e.SetupWizardE2ETest app.aaps.e2e.VirtualBenchTest app.aaps.e2e.ErrorActivityInjectionTest \
            app.aaps.LoopTest app.aaps.RunningConfigurationTest app.aaps.CobExtendedCarbsTest app.aaps.RunningModeReconcilerIntegrationTest; do
     # Each class on a fresh install: our long ATC3 scenarios leave a configured ATC3 pump and a running mode behind,
     # which the following blaqone tests are not written for.
