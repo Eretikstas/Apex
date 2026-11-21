@@ -43,4 +43,16 @@
     <string name="learner_dura_rule" formatted="false">Up one step (+0.25, up to 2.0) when flat highs are 2 % or more and lows 3 % or less; down one step when lows are over 4 %.</string>
     <string name="learner_dura_change" comment="%1$.2f=dura now, %2$.2f=dura proposed">dura %1$.2f → %2$.2f</string>
     <string name="learner_wait_temporary">A temporary profile runs now. Apply the proposal after it ends.</string>
+    <string name="learner_pct_title">Profile percentage (safety card)</string>
+    <string name="learner_pct_now" comment="%1$d=percentage now. Example: 100">Percentage now: %1$d %%</string>
+    <string name="learner_pct_seen" comment="%1$.1f=share over 10 in percent, %2$.1f=share under 3.9 in percent, last 3 days">Last 3 days: over 10 %1$.1f %%, under 3.9 %2$.1f %%.</string>
+    <string name="learner_pct_rule" formatted="false">Daily from 06:00. Lows over 4 % in 3 days -> 10 % lower (not under 80 %). Below 100 %, highs over 8 % with few lows -> back up, never above 100 %. More than 100 % is only a hint: you decide.</string>
+    <string name="learner_pct_change" comment="%1$d=percentage now, %2$d=percentage proposed. Example: 100 -> 90">Percentage %1$d %% → %2$d %%</string>
+    <string name="learner_pct_hint" formatted="false">Highs were over 8 % with few lows. You could try 110 % yourself; the learner does not go above 100 %.</string>
+    <string name="learner_notice_pct">Learner: a profile percentage proposal waits for your answer.</string>
+    <string name="learner_why_pct_proposal" comment="%1$d=percentage now, %2$d=percentage proposed">Learner: proposal %1$d %% → %2$d %% waits for your answer.</string>
+    <string name="learner_why_pct_applied" comment="%1$d=old percentage, %2$d=new percentage">Learner: profile %1$d %% → %2$d %%. It is judged over the next days.</string>
+    <string name="learner_why_pct_hint" comment="%1$.1f=share over 10 in percent, last 3 days">Learner: over 10 was %1$.1f %% in 3 days with few lows; 110 %% could be tried (your choice).</string>
+    <string name="learner_pct_applied">Applied: the profile runs with the new percentage.</string>
+    <string name="learner_pct_changed">The percentage was changed after the check. The proposal is dropped.</string>
 </resources>

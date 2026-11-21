@@ -88,6 +88,9 @@ class LearnerPlugin(
         val hours: List<HourResult> = emptyList(),
         val message: String = "",
         val busy: Boolean = false,
+        val pctProposal: PctProposal? = null,
+        /** The last percentage card: highs, lows (percent), hint to try more than 100 %. */
+        val lastPct: Triple<Double, Double, Boolean>? = null,
     )
 
     private val store = LearnerStore(prefs)
@@ -104,6 +107,7 @@ class LearnerPlugin(
         ticker = scope.launch {
             while (isActive) {
                 runCatching { maybeRunCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: card failed", it) }
+                runCatching { maybeRunPctCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: percentage card failed", it) }
                 delay(TICK_MS)
             }
         }
@@ -244,6 +248,83 @@ class LearnerPlugin(
         refresh(rh.gs(R.string.learner_dura_applied))
     }
 
+    /**
+     * The percentage card (a safety card, lab PCTCARD + PCTMAX_100): once a day from 06:00, over the last 3 days. Not
+     * while a temporary profile runs (tried again on the next tick), not while another proposal waits, not within 2 days
+     * of its own last change.
+     */
+    private suspend fun maybeRunPctCard() {
+        val now = dateUtil.now()
+        val local = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
+        if (local.hour < CARD_HOUR) return
+        val today = local.toLocalDate().toEpochDay()
+        if (store.lastPctDay == today) return
+        val running = profileFunction.getRequestedProfile()
+        if (running != null && running.duration > 0L) return
+        store.lastPctDay = today
+        if (store.proposal != null || store.duraProposal != null || store.pctProposal != null) return
+        if (now - store.lastPctAppliedAt < PCT_GAP_MS) return
+        val nowPct = running?.percentage ?: 100
+        val card = PctCardEngine.card(history.steps(now, PctCardEngine.DAYS), nowPct)
+        store.lastPct = Triple(card.highPct, card.lowPct, card.hintUp)
+        aapsLogger.debug(LTag.APS, "Learner: percentage card $card")
+        when {
+            card.to != null -> {
+                store.pctProposal = PctProposal(nowPct, card.to, now, card.highPct, card.lowPct)
+                notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_pct), level = NotificationLevel.INFO)
+            }
+            card.hintUp     -> note(rh.gs(R.string.learner_why_pct_hint, card.highPct), now, NOTE_LONG_MS)
+        }
+        refresh()
+    }
+
+    /** "Внести" for the percentage: a permanent switch of the running profile to the new percentage, time shift kept. */
+    fun acceptPct() {
+        if (!applying.compareAndSet(false, true)) return
+        setBusy(true)
+        scope.launch {
+            try {
+                val p = store.pctProposal ?: return@launch finish("")
+                val running = profileFunction.getRequestedProfile()
+                if (running != null && running.duration > 0L) return@launch finish(rh.gs(R.string.learner_wait_temporary))
+                if ((running?.percentage ?: 100) != p.from) {
+                    store.pctProposal = null
+                    return@launch finish(rh.gs(R.string.learner_pct_changed))
+                }
+                val profileStore = profileRepository.profile.value
+                val iCfg = running?.iCfg ?: profileFunction.getProfile()?.iCfg
+                val name = running?.profileName ?: profileFunction.getOriginalProfileName()
+                val now = dateUtil.now()
+                val switch = if (profileStore != null && iCfg != null) profileFunction.createProfileSwitch(
+                    profileStore = profileStore, profileName = name, durationInMinutes = 0, percentage = p.to,
+                    timeShiftInHours = ((running?.timeshift ?: 0L) / HOUR_MS).toInt(), timestamp = now,
+                    action = Action.PROFILE_SWITCH, source = Sources.Aaps, note = rh.gs(R.string.learner_switch_note),
+                    listValues = emptyList(), iCfg = iCfg
+                ) else null
+                store.pctProposal = null
+                if (switch != null) {
+                    store.lastPctAppliedAt = now
+                    note(rh.gs(R.string.learner_why_pct_applied, p.from, p.to), now, NOTE_LONG_MS)
+                }
+                aapsLogger.debug(LTag.APS, "Learner: percentage ${p.from} -> ${p.to}, switch=${switch != null}")
+                finish(rh.gs(if (switch != null) R.string.learner_pct_applied else R.string.learner_saved_no_switch))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                aapsLogger.error(LTag.APS, "Learner: applying the percentage failed", e)
+                finish(rh.gs(R.string.learner_profile_invalid, e.message.orEmpty()))
+            } finally {
+                applying.set(false)
+            }
+        }
+    }
+
+    fun refusePct() {
+        store.pctProposal = null
+        loopNotes.clear(NOTE_SOURCE)
+        refresh(rh.gs(R.string.learner_refused))
+    }
+
     fun refuseDura() {
         store.duraProposal = null
         loopNotes.clear(NOTE_SOURCE)
@@ -277,12 +358,16 @@ class LearnerPlugin(
         // A waiting proposal is always in the "why", also after a restart of the app.
         store.proposal?.let { note(rh.gs(R.string.learner_why_proposal, it.changes.size), it.madeAt, PROPOSAL_NOTE_MS) }
         store.duraProposal?.let { note(rh.gs(R.string.learner_why_dura_proposal, it.from, it.to), it.madeAt, PROPOSAL_NOTE_MS) }
+        store.pctProposal?.let { if (now - it.madeAt > PCT_MAX_AGE_MS) store.pctProposal = null }
+        store.pctProposal?.let { note(rh.gs(R.string.learner_why_pct_proposal, it.from, it.to), it.madeAt, PROPOSAL_NOTE_MS) }
         _status.value = Status(
             lastCardAt = last,
             nextCardAt = nextCardAt(last),
             proposal = store.proposal,
             duraProposal = store.duraProposal,
             lastDura = store.lastDura,
+            pctProposal = store.pctProposal,
+            lastPct = store.lastPct,
             dura = prefs.get(DoubleKey.ApsAutoIsfDuraWeight),
             hours = store.lastHours,
             message = message,
@@ -325,6 +410,8 @@ class LearnerPlugin(
         const val NOTE_LONG_MS = 24 * 3_600_000L
         const val PROPOSAL_NOTE_MS = 7 * 86_400_000L
         const val PROPOSAL_MAX_AGE_MS = CARD_EVERY_MS
+        const val PCT_GAP_MS = 2 * 86_400_000L
+        const val PCT_MAX_AGE_MS = 2 * 86_400_000L
     }
 }
 

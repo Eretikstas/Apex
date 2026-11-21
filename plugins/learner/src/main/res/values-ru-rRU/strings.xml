@@ -43,4 +43,16 @@
     <string name="learner_dura_rule" formatted="false">Шаг вверх (+0,25, до 2,0), когда ровных высоких 2 % и больше, а низких 3 % и меньше; шаг вниз, когда низких больше 4 %.</string>
     <string name="learner_dura_change">dura %1$.2f → %2$.2f</string>
     <string name="learner_wait_temporary">Сейчас идёт временный профиль. Внесите предложение после его окончания.</string>
+    <string name="learner_pct_title">Процент профиля (страховка)</string>
+    <string name="learner_pct_now">Сейчас: %1$d %%</string>
+    <string name="learner_pct_seen">За 3 дня: выше 10 — %1$.1f %%, ниже 3,9 — %2$.1f %%.</string>
+    <string name="learner_pct_rule" formatted="false">Каждый день с 06:00. Низких больше 4 % за 3 дня → на 10 % ниже (не меньше 80 %). Ниже 100 %, высоких больше 8 % при малом числе низких → обратно вверх, но не выше 100 %. Больше 100 % — только подсказка, решаете вы.</string>
+    <string name="learner_pct_change">Процент %1$d %% → %2$d %%</string>
+    <string name="learner_pct_hint" formatted="false">Высоких было больше 8 % при малом числе низких. Можно попробовать 110 % самостоятельно; ученик выше 100 % не поднимает.</string>
+    <string name="learner_notice_pct">Ученик: предложение по проценту профиля ждёт ответа.</string>
+    <string name="learner_why_pct_proposal">Ученик: предложение %1$d %% → %2$d %% ждёт ответа.</string>
+    <string name="learner_why_pct_applied">Ученик: профиль %1$d %% → %2$d %%. Оценка в ближайшие дни.</string>
+    <string name="learner_why_pct_hint">Ученик: выше 10 было %1$.1f %% за 3 дня при малом числе низких; можно попробовать 110 %% (решаете вы).</string>
+    <string name="learner_pct_applied">Внесено: профиль работает с новым процентом.</string>
+    <string name="learner_pct_changed">Процент меняли после проверки. Предложение снято.</string>
 </resources>

@@ -7,6 +7,9 @@ import org.json.JSONObject
 /** A basal proposal waiting for the user: the profile it is for, when it was made, and the hours that change. */
 data class BasalProposal(val profileName: String, val madeAt: Long, val changes: List<BasalChange>)
 
+/** A proposal of the percentage card: the profile percentage now, the one proposed, and what the card saw. */
+data class PctProposal(val from: Int, val to: Int, val madeAt: Long, val highPct: Double, val lowPct: Double)
+
 /** A proposal for the AutoISF weight dura: the weight now, the weight proposed, and what the card saw. */
 data class DuraProposal(val from: Double, val to: Double, val madeAt: Long, val flatHighPct: Double, val lowPct: Double)
 
@@ -110,6 +113,34 @@ class LearnerStore(private val preferences: Preferences) {
             put(KEY_HOURS, value.joinToString(";") { "${it.hour}|${it.profile}|${it.need ?: ""}|${it.source}|${it.windows}" })
         }
 
+    var pctProposal: PctProposal?
+        get() = read().optJSONObject(KEY_PCT)?.let { o ->
+            runCatching { PctProposal(o.getInt("from"), o.getInt("to"), o.getLong("madeAt"), o.getDouble("high"), o.getDouble("low")) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_PCT)
+            else put(KEY_PCT, JSONObject().put("from", value.from).put("to", value.to).put("madeAt", value.madeAt).put("high", value.highPct).put("low", value.lowPct))
+        }
+
+    /** The last percentage card: highs, lows (percent) and whether it hinted at trying more than 100 %. */
+    var lastPct: Triple<Double, Double, Boolean>?
+        get() = read().optJSONObject(KEY_LAST_PCT)?.let { o ->
+            runCatching { Triple(o.getDouble("high"), o.getDouble("low"), o.getBoolean("hint")) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_LAST_PCT)
+            else put(KEY_LAST_PCT, JSONObject().put("high", value.first).put("low", value.second).put("hint", value.third))
+        }
+
+    /** The day (epoch day, local) the percentage card last ran, and when a percentage from it was last applied. */
+    var lastPctDay: Long
+        get() = read().optLong(KEY_PCT_DAY, -1L)
+        set(value) = edit { put(KEY_PCT_DAY, value) }
+
+    var lastPctAppliedAt: Long
+        get() = read().optLong(KEY_PCT_APPLIED, 0L)
+        set(value) = edit { put(KEY_PCT_APPLIED, value) }
+
     private companion object {
 
         const val KEY_LAST_CARD = "last_card_at"
@@ -120,5 +151,9 @@ class LearnerStore(private val preferences: Preferences) {
         const val KEY_LAST_APPLIED = "last_applied_at"
         const val KEY_DURA = "dura_proposal"
         const val KEY_LAST_DURA = "last_dura"
+        const val KEY_PCT = "pct_proposal"
+        const val KEY_LAST_PCT = "last_pct"
+        const val KEY_PCT_DAY = "pct_day"
+        const val KEY_PCT_APPLIED = "pct_applied_at"
     }
 }

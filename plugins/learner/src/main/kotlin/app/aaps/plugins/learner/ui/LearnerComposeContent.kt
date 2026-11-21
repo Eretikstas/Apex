@@ -66,7 +66,9 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onAccept = { plugin.accept() },
         onRefuse = plugin::refuse,
         onAcceptDura = plugin::acceptDura,
-        onRefuseDura = plugin::refuseDura
+        onRefuseDura = plugin::refuseDura,
+        onAcceptPct = plugin::acceptPct,
+        onRefusePct = plugin::refusePct
     )
 }
 
@@ -77,7 +79,9 @@ internal fun LearnerScreenContent(
     onAccept: () -> Unit,
     onRefuse: () -> Unit,
     onAcceptDura: () -> Unit,
-    onRefuseDura: () -> Unit
+    onRefuseDura: () -> Unit,
+    onAcceptPct: () -> Unit = {},
+    onRefusePct: () -> Unit = {}
 ) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
@@ -127,6 +131,7 @@ internal fun LearnerScreenContent(
             )
         } ?: Text(stringResource(R.string.learner_no_proposal), style = MaterialTheme.typography.bodyMedium)
 
+        PctSection(status, onAcceptPct, onRefusePct)
         DuraSection(status, onAcceptDura, onRefuseDura)
 
         if (status.hours.isNotEmpty()) {
@@ -185,6 +190,40 @@ private fun DuraSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Un
                     },
                     dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
                 )
+            }
+        }
+    }
+}
+
+/** The percentage card (safety): what it saw, its rule, a proposal with "Внести" / "Отказаться", or the hint. */
+@Composable
+private fun PctSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Text(stringResource(R.string.learner_pct_title), style = MaterialTheme.typography.titleMedium)
+            status.lastPct?.let { Text(stringResource(R.string.learner_pct_seen, it.first, it.second), style = MaterialTheme.typography.bodyMedium) }
+            Text(stringResource(R.string.learner_pct_rule), style = MaterialTheme.typography.bodySmall)
+            status.pctProposal?.let { p ->
+                Text(stringResource(R.string.learner_pct_change, p.from, p.to), fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
+                    Button(onClick = { confirm = true }, enabled = !status.busy) { Text(stringResource(R.string.learner_accept)) }
+                    OutlinedButton(onClick = onRefuse, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
+                }
+                if (confirm) AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text(stringResource(R.string.learner_pct_title)) },
+                    text = { Text(stringResource(R.string.learner_pct_change, p.from, p.to), fontWeight = FontWeight.SemiBold) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirm = false
+                            onAccept()
+                        }) { Text(stringResource(R.string.learner_accept)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
+                )
+            } ?: run {
+                if (status.lastPct?.third == true) Text(stringResource(R.string.learner_pct_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

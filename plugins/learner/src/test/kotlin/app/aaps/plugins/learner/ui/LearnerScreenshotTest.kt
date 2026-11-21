@@ -31,6 +31,7 @@ import app.aaps.core.ui.compose.LocalProfileUtil
 import app.aaps.plugins.learner.BasalChange
 import app.aaps.plugins.learner.BasalProposal
 import app.aaps.plugins.learner.DuraProposal
+import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin.Status
@@ -101,6 +102,13 @@ class LearnerScreenshotTest {
         compose.waitForIdle()
         save("learner_basal_confirm") { compose.onNode(isDialog()).captureToImage().asAndroidBitmap() }
     }
+
+    @Test
+    fun pctProposal() = shoot(
+        "learner_pct_proposal",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            pctProposal = PctProposal(100, 90, NOW - HOUR, 3.0, 5.2), lastPct = Triple(3.0, 5.2, false))
+    )
 
     @Test
     fun duraProposal() = shoot(
