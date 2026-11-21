@@ -164,7 +164,7 @@ class RealScreensTest {
                 openBySearch(query)
                 SystemClock.sleep(3_000)
                 shot(name)
-                repeat(2) { device.pressBack(); SystemClock.sleep(800) }
+                backToMain()
             }
             step("settings") {
                 tapDesc("Настройки|Settings")
@@ -197,6 +197,15 @@ class RealScreensTest {
         val o = device.wait(Until.findObject(By.text(Pattern.compile("(?i)($regex)"))), 5_000)
             ?: device.findObject(By.desc(Pattern.compile("(?i)($regex)")))
         checkNotNull(o) { "no '$regex' on screen" }.click()
+    }
+
+    /** Back until the main screen (its search field) shows again, at most 4 steps. */
+    private fun backToMain() {
+        repeat(4) {
+            if (device.hasObject(By.text(Pattern.compile("(?i)(Поиск|Search)")))) return
+            device.pressBack()
+            SystemClock.sleep(1_000)
+        }
     }
 
     private fun tapDesc(regex: String) {
