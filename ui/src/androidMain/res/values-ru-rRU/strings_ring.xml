@@ -16,6 +16,8 @@
     <string name="ring_pred_in">Через %1$d ч: %2$s</string>
     <string name="ring_pred_until">Прогноз цикла до %1$s: %2$s</string>
     <string name="ring_pred_none">Прогноза цикла пока нет</string>
+    <string name="ring_pred_hour_item">%1$d ч: %2$s</string>
+    <string name="ring_pred_hour_none">%1$d ч: —</string>
     <string name="ring_why_title">Почему</string>
     <string name="ring_why_no_data">Нет пригодных данных сенсора: цикл ждёт.</string>
     <string name="ring_why_low">Сахар низкий или будет низким: инсулин придержан.</string>

@@ -112,10 +112,18 @@ fun OverviewScreenRing(
     val minPredMgdl = future.minOfOrNull { it.value }?.let { toMgdl(it) }
     // The graph and the value: one line of the loop's own prediction up to the chosen horizon, UAM first, then COB, then IOB.
     var horizon by rememberSaveable { mutableStateOf(RingHorizon.H1) }
-    val ahead = predictions.filter { it.timestamp in (now + 1)..(now + horizon.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS) }
-    val mainPrediction = ahead.filter { it.type == BgType.UAM_PREDICTION }.ifEmpty { ahead.filter { it.type == BgType.COB_PREDICTION } }
+    // One line for all horizons, chosen over the longest one (3 h): UAM first, then COB, then IOB.
+    val ahead = predictions.filter { it.timestamp in (now + 1)..(now + RingHorizon.H3.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS) }
+    val mainLine = ahead.filter { it.type == BgType.UAM_PREDICTION }.ifEmpty { ahead.filter { it.type == BgType.COB_PREDICTION } }
         .ifEmpty { ahead.filter { it.type == BgType.IOB_PREDICTION } }
-    val forecast = RingLogic.forecast(mainPrediction.map { it.timestamp to it.value }, now, horizon.hours * 3_600_000L)
+    val mainPrediction = mainLine.filter { it.timestamp <= now + horizon.hours * 3_600_000L + RingLogic.POINT_TOLERANCE_MS }
+    val linePoints = mainLine.map { it.timestamp to it.value }
+    val forecast = RingLogic.forecast(linePoints, now, horizon.hours * 3_600_000L)
+    // The value at each full hour ahead, only where the loop's line reaches it.
+    val perHour = RingHorizon.entries.map { h ->
+        h.hours to RingLogic.forecast(linePoints, now, h.hours * 3_600_000L)?.takeIf { it.reachesHorizon }
+            ?.let { profileUtil.fromMgdlToStringWithUnits(toMgdl(it.value)) }
+    }
     val bgMgdl = bgInfoState.bgInfo?.let { if (it.isOutdated) null else toMgdl(it.bgValue) }
     val deltaMgdl = if (readings.size >= 2 && abs(readings.last().timestamp - readings[readings.size - 2].timestamp) <= 6 * 60_000L)
         toMgdl(readings.last().value - readings[readings.size - 2].value) else null
@@ -201,7 +209,7 @@ fun OverviewScreenRing(
         RingPeriodRow(period = ringState.period, stats = ringState.stats, onPick = ringViewModel::selectPeriod)
         RingHourTile(
             hour = hour, readings = readings, prediction = mainPrediction, now = now, horizon = horizon, onHorizon = { horizon = it },
-            forecast = forecast, forecastText = forecastText
+            forecast = forecast, forecastText = forecastText, perHour = perHour
         )
         RingWhyCard(why = ringState.why, whyTime = ringState.whyTime, eventualText = eventualText, notes = ringState.notes)
 

@@ -408,6 +408,8 @@
     <string name="ring_pred_in" comment="%1$d=hours ahead, %2$s=glucose the loop predicts then, with unit. Example: In 2 h: 6.1 mmol/L">In %1$d h: %2$s</string>
     <string name="ring_pred_until" comment="%1$s=clock time where the loop's prediction ends, %2$s=its last glucose with unit. Example: Loop prediction ends at 21:40: 6.1 mmol/L">Loop prediction ends at %1$s: %2$s</string>
     <string name="ring_pred_none">No loop prediction yet</string>
+    <string name="ring_pred_hour_item" comment="%1$d=hours ahead, %2$s=glucose the loop predicts then, with unit. Example: 2 h: 6.1 mmol/L">%1$d h: %2$s</string>
+    <string name="ring_pred_hour_none" comment="%1$d=hours ahead where the loop's prediction does not reach. Example: 3 h: —">%1$d h: —</string>
     <string name="ring_why_title">Why</string>
     <string name="ring_why_no_data">No usable sensor data: the loop waits.</string>
     <string name="ring_why_low">Glucose is or will be low: insulin is held back.</string>

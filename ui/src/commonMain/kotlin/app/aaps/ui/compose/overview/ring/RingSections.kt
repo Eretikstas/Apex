@@ -24,7 +24,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import app.aaps.core.data.model.GlucoseUnit
@@ -157,7 +159,9 @@ internal fun RingHourTile(
     horizon: RingHorizon,
     onHorizon: (RingHorizon) -> Unit,
     forecast: RingForecast?,
-    forecastText: String?
+    forecastText: String?,
+    /** Hours ahead and the loop's value then (null where its line does not reach). */
+    perHour: List<Pair<Int, String?>> = emptyList()
 ) {
     val accent = when (hour) {
         RingHour.FALLING -> AapsTheme.generalColors.bgLow
@@ -194,6 +198,17 @@ internal fun RingHourTile(
                 style = MaterialTheme.typography.bodyMedium
             )
             else Text(stringResource(UiStrings.ring_pred_none), style = MaterialTheme.typography.bodyMedium)
+            if (forecast != null && perHour.isNotEmpty()) Row(
+                modifier = Modifier.fillMaxWidth().padding(top = AapsSpacing.small),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                perHour.forEach { (h, text) ->
+                    Text(
+                        if (text != null) stringResource(UiStrings.ring_pred_hour_item, h, text) else stringResource(UiStrings.ring_pred_hour_none, h),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 }
@@ -213,13 +228,27 @@ private fun HourGraph(readings: List<BgDataPoint>, prediction: List<BgDataPoint>
     val maxV = maxOf(all.maxOf { it.value }, highLine) * 1.05
     val t0 = now - 3 * 3_600_000L
     val t1 = now + aheadMs
-    Canvas(modifier = Modifier.fillMaxWidth().height(96.dp).padding(vertical = AapsSpacing.small)) {
+    // Full clock hours in the window, with their labels, so the graph reads by the hour.
+    val dateUtil = LocalDateUtil.current
+    val hours = generateSequence((t0 / 3_600_000L + 1) * 3_600_000L) { it + 3_600_000L }.takeWhile { it < t1 }.toList()
+    val labels = hours.map { dateUtil.timeString(it) }
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Canvas(modifier = Modifier.fillMaxWidth().height(112.dp).padding(vertical = AapsSpacing.small)) {
+        val labelHeight = 16.dp.toPx()
+        val plot = size.height - labelHeight
         fun x(t: Long) = ((t - t0).toFloat() / (t1 - t0)) * size.width
-        fun y(v: Double) = (size.height - ((v - minV) / (maxV - minV)).toFloat() * size.height)
+        fun y(v: Double) = (plot - ((v - minV) / (maxV - minV)).toFloat() * plot)
         drawRect(band, Offset(0f, y(highLine)), Size(size.width, y(lowLine) - y(highLine)))
+        hours.forEachIndexed { i, h ->
+            drawLine(line.copy(alpha = 0.15f), Offset(x(h), 0f), Offset(x(h), plot))
+            val measured = textMeasurer.measure(labels[i], labelStyle)
+            val left = (x(h) - measured.size.width / 2f).coerceIn(0f, size.width - measured.size.width)
+            drawText(measured, topLeft = Offset(left, plot + 2f))
+        }
         past.forEach { drawCircle(line, 2.5f, Offset(x(it.timestamp), y(it.value))) }
         future.forEach { drawCircle(accent, 2.5f, Offset(x(it.timestamp), y(it.value))) }
-        drawLine(line.copy(alpha = 0.4f), Offset(x(now), 0f), Offset(x(now), size.height), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
+        drawLine(line.copy(alpha = 0.4f), Offset(x(now), 0f), Offset(x(now), plot), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
     }
 }
 

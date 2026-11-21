@@ -74,6 +74,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
+import java.time.Instant
+import java.time.ZoneOffset
 import java.util.Locale
 import kotlin.math.sin
 import kotlin.reflect.KClass
@@ -172,7 +174,10 @@ class RingScreenshotTest {
         whenever(screen.preferences.observe(UnitDoubleKey.OverviewHighMark)).thenReturn(MutableStateFlow(10.0))
         whenever(screen.preferences.observe(UnitDoubleKey.OverviewLowMark)).thenReturn(MutableStateFlow(3.9))
         whenever(screen.dateUtil.now()).thenReturn(NOW)
-        whenever(screen.dateUtil.timeString(any<Long>())).thenReturn("21:30")
+        whenever(screen.dateUtil.timeString(any<Long>())).thenAnswer { inv ->
+            val z = Instant.ofEpochMilli(inv.arguments[0] as Long).atZone(ZoneOffset.ofHours(3))
+            String.format(Locale.ROOT, "%02d:%02d", z.hour, z.minute)
+        }
         whenever(screen.dateUtil.dateAndTimeString(any<Long>())).thenReturn("20.11 21:30")
     }
 
