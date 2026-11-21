@@ -92,9 +92,12 @@ fun TbrChip(
                         maxLines = 1
                     )
                 }
-                if (percent != null && state != TbrState.NONE) {
+                // Our change (docs/OUR_CHANGES.md): the percent of the profile basal is always shown, day and night;
+                // with no temp basal it is 100 %, so the chip always says what runs now and how it compares.
+                val shownPercent = percent ?: if (state == TbrState.NONE && rate > 0.0) 100 else null
+                if (shownPercent != null) {
                     Text(
-                        text = stringResource(CoreUiStrings.units_format_percent, percent),
+                        text = stringResource(CoreUiStrings.units_format_percent, shownPercent),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
