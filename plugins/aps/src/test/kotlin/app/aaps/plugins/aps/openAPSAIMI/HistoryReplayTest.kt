@@ -1150,8 +1150,7 @@ class HistoryReplayTest {
                 val clean = (k - 48 until k + 36).all { j ->
                     val r = rows[j]
                     !bg[j].isNaN() && cleanDuraRow(r) &&
-                        !r.optBoolean("afterMeal") && !r.optBoolean("afterHypo") &&
-                        !r.optBoolean("afterSmb") && !r.optBoolean("oldCannula") &&
+                        !r.optBoolean("afterHypo") && !r.optBoolean("afterSmb") && !r.optBoolean("oldCannula") &&
                         !r.optBoolean("sensorGap") && !r.optBoolean("activity") &&
                         !r.optBoolean("illness") && !r.optBoolean("falseLow") &&
                         (j == k || num(r, "man") <= 0.0) &&
