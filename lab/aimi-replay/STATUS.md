@@ -2,16 +2,33 @@
 
 ## Task (written by ChatGPT)
 
-### 2026-11-23, causal-filter review
+### 2026-11-23, causal-filter review + Learning Audit plan
 
-Commits to test:
-- Replay filter code: `6f222711e5b3e00565597d1d4d2528d32f99ed89`
-- Updated filter specification: `4dd3a09c3035661410b910f919959e9cb1457730`
+Commits already on `aimi-replay`:
+- Replay causal-filter code: `6f222711e5b3e00565597d1d4d2528d32f99ed89`
+- Updated causal-filter specification: `4dd3a09c3035661410b910f919959e9cb1457730`
 - Compile-only workflow: `75fe1e04fd4d0aaa52441de11f5db866c6c2f19e`
+- Learning Audit and interaction-test specification: `cdd3fe77e4ad31b4b9461dc9b93bb678e2c522f1`
 
-First action: verify the compile-only workflow `.github/workflows/aimi-replay-compile.yml` passes. It compiles `:plugins:aps:compileFullDebugUnitTestKotlin`; it does not decrypt or run replay input. Do not start the batch until compile is green and the open points in Results below have been resolved or explicitly accepted by the user.
+New lab specification: `lab/aimi-replay/LEARNING_AUDIT_AND_INTERACTION_TESTS.md`.
+It defines aggregate-only audit output for CR, ISF, Basal, Percentage and Dura, plus a 10-case interaction/reproducibility matrix. It does not change learner formulas or live settings.
 
-Batch after compile: 8 scenarios x 3 seeds (base, calm, dawn1.3, meals1.3, ins+20, ins-20, start+30, growth2%). Use `APP` + `LEARNALL,LAISF,LACR,LACAUSE,LAPCTBACK,LADAYS`; compare against `APP` and LEARNALL v1. Use the exact APP token lists from the user's private `app22_batch.json`; do not reconstruct or guess missing tokens.
+### Required implementation / checks before batch
+
+1. Add per-card counters: candidates, accepted, rejected by mutually exclusive primary reason, distinct days, minimum-data gate, parameter before/after/delta, and decision.
+2. CR audit must count all meal candidates and explain each exclusion. Preserve the full six-hour SMB exclusion; do not narrow to two hours or only SMB-after-low without explicit user approval.
+3. ISF audit must count clean correction candidates, including manual and SMB corrections, and distinguish sensor/cannula, hypo/rebound, overlapping bolus, meal/rising glucose, and insufficient-net exclusions.
+4. Basal audit must count candidate windows, exclusions by reason, accepted samples per hour, and distinct days. Keep LBTAIL disabled under LACAUSE until a row-level clean-CR link is demonstrated.
+5. Add deterministic interaction scenarios from the new spec: outlier vs persistent change, CR/ISF conflict, CR/basal conflict, SMB/rebound, activity/illness, sensor gaps, cannula degradation, and repeated identical replay.
+6. Audit reconciliation must hold: candidates = accepted + rejected. Identical input/tokens/seed must produce identical audit summaries and parameter deltas.
+
+### Current run plan after audit implementation
+
+- First: compile-only workflow must pass.
+- Then Claude runs the lab batch after the user says `run STATUS`; ChatGPT does not dispatch batches.
+- Batch: 8 scenarios x 3 seeds (base, calm, dawn1.3, meals1.3, ins+20, ins-20, start+30, growth2%).
+- Tokens: `APP` + `LEARNALL,LAISF,LACR,LACAUSE,LAPCTBACK,LADAYS`.
+- Use exact APP token lists from the user's private `app22_batch.json`; do not reconstruct or guess missing tokens.
 
 Expected outcomes:
 - dawn1.3 -> basal adapts upward;
@@ -20,9 +37,9 @@ Expected outcomes:
 - ins-20 -> ISF weakens / basal increases as supported by clean data;
 - calm -> little or no adaptation;
 - SMB-associated lows and rebound lows do not train CR, ISF or basal;
-- episodes/windows rejected by filters are counted by reason, not silently discarded.
+- all exclusions are visible in audit output.
 
-Safety gates: no change to the app branch, child profile, pump settings or Nightscout. Batch results are evidence for parent review, not settings recommendations.
+Safety gates: no change to app branch, child profile, pump settings or Nightscout. Batch results are evidence for parent review, not settings recommendations.
 
 ## Results (written by Claude)
 
