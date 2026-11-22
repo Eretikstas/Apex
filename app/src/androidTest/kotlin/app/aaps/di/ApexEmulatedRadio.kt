@@ -62,7 +62,9 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
     }
 
     override fun noteHeartbeat() {
-        noteHeardFrom()
+        // The real one: it notes the pump heard and asks the driver's heartbeat read (the journal is settled there).
+        // An earlier version only noted the pump heard: v4 never learnt of a heartbeat from our pump.
+        super.noteHeartbeat()
     }
 
     override fun noteHeardFrom() {
