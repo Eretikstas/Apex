@@ -550,13 +550,36 @@ class VirtualAtc3Pump(
 
     private fun send(frame: ByteArray) {
         if (mutedThread === Thread.currentThread()) return
-        // Long frames arrive in several notifications (§2.2): split at 20 bytes to test reassembly.
-        var at = 0
-        while (at < frame.size) {
-            val end = min(frame.size, at + CHUNK)
-            sink?.invoke(frame.copyOfRange(at, end))
-            at = end
+        // One frame at a time: a heartbeat from the timer must not land between the pieces of an answer.
+        synchronized(sendLock) {
+            // Long frames arrive in several notifications (§2.2): split at 20 bytes to test reassembly.
+            var at = 0
+            while (at < frame.size) {
+                val end = min(frame.size, at + CHUNK)
+                sink?.invoke(frame.copyOfRange(at, end))
+                at = end
+            }
         }
+    }
+
+    private val sendLock = Any()
+
+    @Volatile private var lastHeartbeatAt = 0L
+
+    /**
+     * Send the heartbeat every [heartbeatMinutes] on its own, as the real pump does while a link is up. The Apex v4
+     * driver holds the link and settles its journal at each heartbeat; our ATC3 driver did not need it, so it is
+     * started by the test that wants it. A heartbeat is lost while there is no link, as on the real pump.
+     */
+    fun startHeartbeats() {
+        lastHeartbeatAt = phoneNow()
+        timer.scheduleWithFixedDelay({
+            val now = phoneNow()
+            if (now - lastHeartbeatAt >= heartbeatMinutes * 60_000L) {
+                lastHeartbeatAt = now
+                heartbeat()
+            }
+        }, 1, 1, TimeUnit.SECONDS)
     }
 
     private fun response(cls: Int, code: Int, index: Int, field2: Int, data: ByteArray): ByteArray {

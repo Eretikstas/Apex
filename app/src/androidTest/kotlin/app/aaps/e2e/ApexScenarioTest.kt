@@ -91,6 +91,7 @@ class ApexScenarioTest {
         runBlocking { persistenceLayer.clearDatabases() }
         pump = VirtualAtc3Pump(SERIAL) { System.currentTimeMillis() }
         pump.seedBolusHistory(System.currentTimeMillis())
+        pump.startHeartbeats()
         emulator = Atc3PumpEmulator(pump)
         Atc3Emulation.emulator = emulator
         ApexRadioSwap.make = { logger, context, trace -> EmulatedApexBLE(logger, context, trace) }
