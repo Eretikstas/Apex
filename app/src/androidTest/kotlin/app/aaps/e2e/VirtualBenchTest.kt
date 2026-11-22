@@ -43,10 +43,11 @@ import app.aaps.implementation.plugin.PluginStore
 import app.aaps.plugins.constraints.objectives.ObjectivesPlugin
 import app.aaps.plugins.learner.LearnerPlugin
 import app.aaps.pump.apex.ApexPumpPlugin
-import app.aaps.pump.atc3.emulator.Atc3PumpEmulator
-import app.aaps.pump.atc3.emulator.VirtualAtc3Pump
+import app.aaps.pump.apex.keys.ApexIntKey
 import app.aaps.pump.apex.keys.ApexStringKey
 import app.aaps.pump.apex.link.ApexRadioSwap
+import app.aaps.pump.atc3.emulator.Atc3PumpEmulator
+import app.aaps.pump.atc3.emulator.VirtualAtc3Pump
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -98,7 +99,12 @@ class VirtualBenchTest {
     fun setUp() {
         clearAllSharedPrefs()
         runBlocking { persistenceLayer.clearDatabases() }
+        // As in ApexScenarioTest: v4's own database removed (a fresh install), a used bolus journal, and the pump's
+        // heartbeat, at which v4 settles its journal. Without them the SMBs reached the pump but never AAPS.
+        instrumentation.targetContext.deleteDatabase(APEX_DATABASE)
         pump = VirtualAtc3Pump(SERIAL) { System.currentTimeMillis() }
+        pump.seedBolusHistory(System.currentTimeMillis())
+        pump.startHeartbeats()
         emulator = Atc3PumpEmulator(pump)
         Atc3Emulation.emulator = emulator
         ApexRadioSwap.make = { logger, context, trace -> EmulatedApexBLE(logger, context, trace) }
@@ -111,6 +117,8 @@ class VirtualBenchTest {
         preferences.put(ApexStringKey.ApexSerialNumber, SERIAL)
         preferences.put(ApexStringKey.ApexBtPassword, pump.btPassword)
         preferences.put(ApexStringKey.ApexAddress, ADDRESS)
+        // The shortest heartbeat v4 allows: it settles its journal (the SMB rows) at the heartbeat.
+        preferences.put(ApexIntKey.HeartbeatPeriod, 2)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_ApexPumpPlugin", value = true)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
         // AutoISF with SMB, as on the real phone; room for the loop to act (a child's caps).
@@ -173,12 +181,13 @@ class VirtualBenchTest {
             waitAMinute()
         }
         val onRise = emulator.state()
-        val givenOnRise = (onRise.tempBasal?.absolute ?: 0.0) > PROFILE_BASAL + 0.01 || onRise.boluses.isNotEmpty()
-        assertWithMessage("on a fast rise the loop gave more insulin and the pump has it (temp ${onRise.tempBasal}, boluses ${onRise.boluses})")
+        val smbOnRise = newBoluses(start)
+        val givenOnRise = (onRise.tempBasal?.absolute ?: 0.0) > PROFILE_BASAL + 0.01 || smbOnRise.isNotEmpty()
+        assertWithMessage("on a fast rise the loop gave more insulin and the pump has it (temp ${onRise.tempBasal}, boluses $smbOnRise)")
             .that(givenOnRise).isTrue()
         assertTempBasalSame("after the rise")
 
-        val bolusesBeforeFall = onRise.boluses.size
+        val bolusesBeforeFall = smbOnRise.size
         // Fall: 140 -> 70 mg/dL over 12 minutes.
         for (i in 0 until FALL_MIN) {
             reading(140.0 - i * 6.0)
@@ -187,10 +196,23 @@ class VirtualBenchTest {
         val onFall = emulator.state()
         assertWithMessage("on a fast fall the pump runs a temp basal under the profile (${onFall.tempBasal})")
             .that((onFall.tempBasal?.absolute ?: PROFILE_BASAL) < PROFILE_BASAL - 0.01).isTrue()
-        assertWithMessage("no SMB on the fall (${onFall.boluses})").that(onFall.boluses.size).isEqualTo(bolusesBeforeFall)
+        assertWithMessage("no SMB on the fall (${newBoluses(start)})").that(newBoluses(start).size).isEqualTo(bolusesBeforeFall)
         assertTempBasalSame("after the fall")
         assertWithMessage("the loop ran").that(loop.lastRun).isNotNull()
+        // The insulin the loop counts is the insulin the pump gave: every SMB is in AAPS, once.
+        val pumpGave = newBoluses(start).sum()
+        awaitTrue(SMB_RECORD_TIMEOUT) { abs(aapsBoluses(start).sum() - pumpGave) < 1e-6 }
+        assertWithMessage("SMBs AAPS has on record ${aapsBoluses(start)}, the pump gave ${newBoluses(start)}")
+            .that(aapsBoluses(start).sum()).isWithin(1e-6).of(pumpGave)
     }
+
+    /** The boluses the pump gave since [sinceMs], oldest first, U: the journal also holds the old seeded ones. */
+    private fun newBoluses(sinceMs: Long): List<Double> =
+        synchronized(pump.bolusLog) { pump.bolusLog.filter { it.atMs >= sinceMs - 2 * 60_000L }.reversed().map { it.delivered * RAW_UNIT } }
+
+    /** The boluses AAPS has on record since [sinceMs], U. */
+    private fun aapsBoluses(sinceMs: Long): List<Double> =
+        runBlocking { persistenceLayer.getBolusesFromTime(sinceMs - 2 * 60_000L, ascending = true) }.filter { it.amount > 0.0 }.map { it.amount }
 
     /**
      * The learner on 17 days of a virtual child with too many lows in the last 3 days: the percentage card proposes
@@ -334,6 +356,15 @@ class VirtualBenchTest {
         private const val INIT_TIMEOUT = 60_000L
         private const val STEP_TIMEOUT = 240_000L
         private const val RECORD_TIMEOUT = 60_000L
+
+        /** v4 writes an SMB from the journal right after it, or at the next heartbeat (2 min) and the reads after it. */
+        private const val SMB_RECORD_TIMEOUT = 300_000L
+
+        /** The pump's dose step, U. */
+        private const val RAW_UNIT = 0.025
+
+        /** The file of v4's own database, see `ApexDatabase.build`. */
+        private const val APEX_DATABASE = "apex_database.db"
         private const val SWITCH_TIMEOUT = 120_000L
         private const val POLL_MS = 250L
         private const val RISE_MIN = 12
