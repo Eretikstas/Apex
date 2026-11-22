@@ -47,6 +47,31 @@ Do not let a rejected window silently disappear. Keep the current safety rule th
 ### Percentage and Dura audit
 Report eligible low count/rate versus total low count/rate, exclusions by cause, distinct days, hypo-treatment carbohydrate totals (aggregate only), parameter before/after, and why the card did or did not act.
 
+## Proposed learner robustness mechanisms — for Claude review only
+
+These are design proposals, not approved learner behavior. First assess feasibility, interactions with existing cards, testability, and risk. Do not implement or alter formulas until the user reviews Claude's assessment.
+
+### 1. Confidence score
+Calculate a per-card evidence-quality score from independent clean days, episode count, dispersion/consistency, missing-data rate, and exclusion rate. Show the component values and a categorical confidence (low / medium / high); do not let a single opaque score hide a failed minimum-data gate. Confidence must never override hard eligibility or safety gates. Initially report-only in replay.
+
+### 2. Drift detection
+Distinguish isolated outliers, temporary shifts, and persistent directional changes. Require repeated evidence across independent days and compare recent and baseline windows. Report detected direction, magnitude, persistence, and evidence count. Do not automatically adapt parameters in the first implementation.
+
+### 3. Outlier protection
+Use robust summaries (e.g. median and a documented robust spread measure) and sensitivity tests with/without the most influential day. A single unusual day must not dominate a learning block. Do not discard clinically meaningful repeated events merely because they are extreme.
+
+### 4. Parameter interaction guard
+Detect when CR, ISF, Basal, Percentage, or Dura evidence overlaps or could explain the same glucose excursion. Emit a conflict record identifying evidence overlap, competing card proposals, the reason one is deferred, and unresolved ambiguity. Do not invent a global priority order before replay evidence and user review. Never let one parameter silently compensate for another card's contaminated evidence.
+
+### 5. Recovery detection and data ageing
+Detect return toward the individual's stable baseline after a temporary disturbance. Compare recent clean evidence with older evidence using a documented time-decay rule, while preserving minimum sample/day gates. Report when old evidence is down-weighted and why. No automatic reset or parameter rollback.
+
+### 6. Learning explainability
+For every proposed change, produce a concise deterministic explanation: evidence used, evidence excluded, minimum-data gate, confidence components, interaction conflicts, proposed delta, and reason for change/no-change. Aggregate-only output; no personal traces.
+
+### 7. Shadow comparison
+Run APP baseline, current learner, and experimental report-only mechanisms on identical replay inputs and seeds. Keep the new mechanisms observational until separately approved. Compare audit determinism, parameter proposals, and glucose safety outcomes; never apply experimental values to live AAPS.
+
 ## Interaction / conflict replay matrix
 
 Run identical inputs and seeds with APP baseline and LEARNALL. For each scenario record all card decisions and audit lines.
