@@ -34,6 +34,7 @@ import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
+import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.di.Atc3Emulation
 import app.aaps.di.EmulatedApexBLE
@@ -147,6 +148,9 @@ class VirtualBenchTest {
         assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { pumpPlugin.isInitialized() }).isTrue()
         assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
         // A record of the same minute as the pump registration is refused by AAPS: start in the next minute.
+        // v4 registers the pump with AAPS at its first heartbeat read; AAPS refuses a row dated before that moment, so a
+        // bolus given earlier would never get its row. Wait for it, as a real pump is registered long before.
+        assertWithMessage("AAPS registered the pump").that(awaitTrue(REGISTER_TIMEOUT) { preferences.get(StringNonKey.ActivePumpSerialNumber) == SERIAL }).isTrue()
         val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
         val wait = (ready / 60_000L + 1) * 60_000L + 2_000L - System.currentTimeMillis()
         if (wait > 0) SystemClock.sleep(wait)
@@ -367,6 +371,9 @@ class VirtualBenchTest {
         private const val APEX_DATABASE = "apex_database.db"
         private const val SWITCH_TIMEOUT = 120_000L
         private const val POLL_MS = 250L
+
+        /** Up to a heartbeat (2 min) and its read. */
+        private const val REGISTER_TIMEOUT = 200_000L
         private const val RISE_MIN = 12
         private const val FALL_MIN = 12
     }

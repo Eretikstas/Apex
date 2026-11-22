@@ -33,6 +33,7 @@ import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
+import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.di.Atc3Emulation
 import app.aaps.di.EmulatedApexBLE
@@ -126,6 +127,9 @@ class ApexScenarioTest {
         status("scenario start")
         assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { pumpPlugin.isInitialized() }).isTrue()
         assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
+        // v4 registers the pump with AAPS at its first heartbeat read; AAPS refuses a row dated before that moment, so a
+        // bolus given earlier would never get its row. Wait for it, as a real pump is registered long before.
+        assertWithMessage("AAPS registered the pump").that(awaitTrue(REGISTER_TIMEOUT) { preferences.get(StringNonKey.ActivePumpSerialNumber) == SERIAL }).isTrue()
         val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
         val wait = (ready / 60_000L + 1) * 60_000L + 2_000L - System.currentTimeMillis()
         if (wait > 0) SystemClock.sleep(wait)
@@ -434,6 +438,9 @@ class ApexScenarioTest {
         /** Up to two heartbeats of 2 min and the reads after them. */
         private const val RECORD_TIMEOUT = 300_000L
         private const val POLL_MS = 250L
+
+        /** Up to a heartbeat (2 min) and its read. */
+        private const val REGISTER_TIMEOUT = 200_000L
 
         /** How long the driver may take to see a broken link. */
         private const val LINK_TIMEOUT = 30_000L
