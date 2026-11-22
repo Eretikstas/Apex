@@ -50,7 +50,7 @@ if [ -n "$ONLY_CLASS" ] && [ -n "$TEST" ]; then
   adb shell dumpsys deviceidle whitelist +$PKG >> $S 2>&1
   TPKG=$(adb shell pm list instrumentation | tr -d '\r' | grep "target=$PKG" | head -1 | sed -E 's#instrumentation:([^ ]+).*#\1#')
   adb logcat -c
-  timeout 12000 adb shell am instrument -w -e class $ONLY_CLASS $TPKG > $OUT/test_$ONLY_CLASS.txt 2>&1
+  timeout 19000 adb shell am instrument -w -e class $ONLY_CLASS $TPKG > $OUT/test_$ONLY_CLASS.txt 2>&1
   res=$(grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION_FAILED|Process crashed|INSTRUMENTATION_RESULT: shortMsg" $OUT/test_$ONLY_CLASS.txt | tr '\n' ' ')
   echo "$ONLY_CLASS: ${res:-no result (timeout?)}" >> $S
   adb logcat -d > $OUT/logcat_$ONLY_CLASS.txt
@@ -102,7 +102,7 @@ if [ -n "$TEST" ]; then
     adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS 2>/dev/null
     adb logcat -c
     # Our ATC3 scenarios take about 2 min each (30+ of them); the other classes are short.
-    T=1200; [ "$C" = app.aaps.e2e.Atc3EmulatorScenarioTest ] && T=6000; [ "$C" = app.aaps.e2e.VirtualBenchTest ] && T=3600; [ "$C" = app.aaps.e2e.ApexScenarioTest ] && T=4800
+    T=1200; [ "$C" = app.aaps.e2e.Atc3EmulatorScenarioTest ] && T=6000; [ "$C" = app.aaps.e2e.VirtualBenchTest ] && T=3600; [ "$C" = app.aaps.e2e.ApexScenarioTest ] && T=12000
     timeout $T adb shell am instrument -w -e class $C $TPKG > $OUT/test_$C.txt 2>&1
     res=$(grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION_FAILED|Process crashed|INSTRUMENTATION_RESULT: shortMsg" $OUT/test_$C.txt | tr '\n' ' ')
     echo "$C: ${res:-no result (timeout?)}" >> $S

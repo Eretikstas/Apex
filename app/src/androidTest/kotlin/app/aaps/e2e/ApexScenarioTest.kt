@@ -3,6 +3,7 @@ package app.aaps.e2e
 import android.Manifest
 import android.content.Context
 import android.os.SystemClock
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkManager
@@ -37,8 +38,10 @@ import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.di.Atc3Emulation
+import app.aaps.di.BaseTestApp
 import app.aaps.di.EmulatedApexBLE
 import app.aaps.di.ResetGraphRule
+import app.aaps.di.TestDatabase
 import app.aaps.di.testGraphs
 import app.aaps.implementation.plugin.PluginStore
 import app.aaps.pump.apex.ApexPumpPlugin
@@ -56,6 +59,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
+import org.junit.rules.TestName
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.math.abs
@@ -71,6 +75,7 @@ import kotlin.math.roundToInt
 class ApexScenarioTest {
 
     @get:Rule val rules: RuleChain = RuleChain.outerRule(RetryRule()).around(ResetGraphRule())
+    @get:Rule val name = TestName()
 
     private val preferences: Preferences get() = testGraphs.preferences
     private val pluginStore: PluginStore get() = testGraphs.pluginStore
@@ -93,6 +98,9 @@ class ApexScenarioTest {
 
     @Before
     fun setUp() {
+        // The restart scenarios keep AAPS's records in a file, as on a phone; the others in memory. Set before the
+        // first graph of the test is built (the first read of testGraphs below).
+        TestDatabase.file = if (name.methodName.startsWith("restart")) RESTART_DB.also { instrumentation.targetContext.deleteDatabase(it) } else null
         clearAllSharedPrefs()
         runBlocking { persistenceLayer.clearDatabases() }
         // v4 keeps its own copy of the pump's journal in its own database, which clearDatabases does not touch: each
@@ -125,15 +133,12 @@ class ApexScenarioTest {
         preferences.put(LongNonKey.ActivePumpChangeTimestamp, System.currentTimeMillis() - 24 * 3_600_000L)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
 
-        pluginStore.plugins = pluginList
-        configBuilder.initialize()
-        config.initCompleted()
+        startAaps()
         seedProfile()
         activateProfile()
 
         status("scenario start")
-        assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { pumpPlugin.isInitialized() }).isTrue()
-        assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
+        assertStarted()
         val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
         val wait = (ready / 60_000L + 1) * 60_000L + 2_000L - System.currentTimeMillis()
         if (wait > 0) SystemClock.sleep(wait)
@@ -150,6 +155,7 @@ class ApexScenarioTest {
         ApexRadioSwap.make = null
         runCatching { pump.shutdown() }
         clearAllSharedPrefs()
+        TestDatabase.file = null
     }
 
     // Boluses
@@ -177,6 +183,10 @@ class ApexScenarioTest {
         bolus(1.0)
         assertWithMessage("the pump gave the bolus").that(given()).hasSize(1)
         assertRecordIsWhatThePumpGave()
+        // Nothing asks for it again later: no second bolus, no second row (an ambiguous answer is not retried).
+        SystemClock.sleep(NO_RETRY_WAIT_MS)
+        assertWithMessage("no second bolus after the lost answer (${given()})").that(given()).hasSize(1)
+        assertRecordIsWhatThePumpGave()
     }
 
     @Test
@@ -186,6 +196,62 @@ class ApexScenarioTest {
         assertWithMessage("the pump gave nothing").that(given()).isEmpty()
         assertWithMessage("a bolus that never reached the pump is not a success").that(result.success).isFalse()
         assertRecordIsWhatThePumpGave()
+        // It is not sent again on its own either: a person decides about a failed bolus.
+        SystemClock.sleep(NO_RETRY_WAIT_MS)
+        assertWithMessage("no bolus later on its own (${given()})").that(given()).isEmpty()
+        assertRecordIsWhatThePumpGave()
+    }
+
+    // Restarts of AAPS over the same pump (a file database: the records live through it, as on a phone)
+
+    @Test
+    fun restartAfterBolus_noRowLostOrDoubled() {
+        assertWithMessage("a bolus of 1 U is delivered").that(bolus(1.0).success).isTrue()
+        assertRecordIsWhatThePumpGave()
+        restartAaps(crash = false)
+        assertRecordIsWhatThePumpGave()
+        // After a restart v4 reads the journal again at its heartbeats: what it finds is known, not written twice.
+        SystemClock.sleep(HEARTBEATS_WAIT_MS)
+        assertRecordIsWhatThePumpGave()
+    }
+
+    @Test
+    fun restartCrashDuringBolus_rowIsWhatThePumpGave() {
+        val asking = Thread { runCatching { bolus(2.0) } }.apply { start() }
+        assertWithMessage("the bolus runs").that(awaitTrue(STEP_TIMEOUT) { emulator.state().bolusRunning }).isTrue()
+        SystemClock.sleep(3_000)
+        restartAaps(crash = true)
+        assertWithMessage("the pump ends the bolus on its own").that(awaitTrue(STEP_TIMEOUT) { !emulator.state().bolusRunning }).isTrue()
+        asking.join(STEP_TIMEOUT)
+        assertRecordIsWhatThePumpGave()
+        SystemClock.sleep(HEARTBEATS_WAIT_MS)
+        assertRecordIsWhatThePumpGave()
+    }
+
+    @Test
+    fun restartCrashDuringTempBasal_aapsAndPumpAgree() {
+        tempBasal(0.0)
+        assertTempBasalSame("before the crash")
+        restartAaps(crash = true)
+        assertTempBasalSame("after the app came back")
+        SystemClock.sleep(HEARTBEATS_WAIT_MS)
+        assertTempBasalSame("a few heartbeats later")
+    }
+
+    @Test
+    fun linkLostLongDuringTempBasal_endIsKnown() {
+        val start = System.currentTimeMillis()
+        tempBasal(0.0)
+        assertTempBasalSame("at the start")
+        assertWithMessage("the pump goes out of range").that(emulator.setOutOfRange(true)).isTrue()
+        SystemClock.sleep(LONG_AWAY_MS)
+        assertWithMessage("the pump is back").that(emulator.setOutOfRange(false)).isTrue()
+        assertWithMessage("the pump ended the 30 min temp basal itself").that(emulator.state().tempBasal).isNull()
+        assertTempBasalSame("after the pump came back")
+        val at20 = runBlocking { persistenceLayer.getTemporaryBasalActiveAt(start + 20 * 60_000L) }
+        assertWithMessage("AAPS has the temp basal of 0 running 20 min after its start ($at20)").that(at20?.rate).isEqualTo(0.0)
+        val at35 = runBlocking { persistenceLayer.getTemporaryBasalActiveAt(start + 35 * 60_000L) }
+        assertWithMessage("AAPS has no temp basal 35 min after its start, the pump had ended it ($at35)").that(at35).isNull()
     }
 
     @Test
@@ -322,6 +388,32 @@ class ApexScenarioTest {
 
     // Helpers
 
+    /** The plugins of the current graph started, as the app does at its start. */
+    private fun startAaps() {
+        pluginStore.plugins = pluginList
+        configBuilder.initialize()
+        config.initCompleted()
+    }
+
+    private fun assertStarted() {
+        assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { pumpPlugin.isInitialized() }).isTrue()
+        assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
+    }
+
+    /**
+     * AAPS starts again over the same pump: a new graph, the same database file, preferences and v4 database. [crash]:
+     * the app dies without a word - its link breaks at once (the pump goes on alone) and nothing is closed first;
+     * the old graph is only stopped so it cannot talk to the pump any more. Without [crash] the driver lets go first.
+     */
+    private fun restartAaps(crash: Boolean) {
+        if (crash) emulator.breakLink() else runCatching { pumpPlugin.disconnect("restart") }
+        runCatching { commandQueue.clear() }
+        runCatching { pumpPlugin.setPluginEnabledBlocking(PluginType.PUMP, false) }
+        ApplicationProvider.getApplicationContext<BaseTestApp>().resetGraph()
+        startAaps()
+        assertStarted()
+    }
+
     private fun bolus(units: Double): PumpEnactResult {
         awaitTrue(RECORD_TIMEOUT) { commandQueue.performing() == null }
         return runBlocking { withTimeout(STEP_TIMEOUT) { commandQueue.bolus(DetailedBolusInfo().also { it.insulin = units; it.bolusType = BS.Type.NORMAL }) } }
@@ -442,6 +534,18 @@ class ApexScenarioTest {
         /** Up to two heartbeats of 2 min and the reads after them. */
         private const val RECORD_TIMEOUT = 300_000L
         private const val POLL_MS = 250L
+
+        /** The database file of the restart scenarios. */
+        private const val RESTART_DB = "restart_test.db"
+
+        /** Long enough for anything that would ask again on its own: a few loop runs and heartbeats. */
+        private const val NO_RETRY_WAIT_MS = 8 * 60_000L
+
+        /** Three heartbeats of 2 min and their reads. */
+        private const val HEARTBEATS_WAIT_MS = 7 * 60_000L
+
+        /** Longer than the 30 min temp basal: it ends on the pump while the pump is away. */
+        private const val LONG_AWAY_MS = 40 * 60_000L
 
         /** How long the driver may take to see a broken link. */
         private const val LINK_TIMEOUT = 30_000L

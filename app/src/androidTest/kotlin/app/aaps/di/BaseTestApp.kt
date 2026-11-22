@@ -39,7 +39,7 @@ open class BaseTestApp : Application(), MetroMemberInjector, MetroViewModelFacto
     private fun newGraph() = MetroGraphs(
         context = this,
         memberInjector = this,
-        databaseConfig = DatabaseConfig.IN_MEMORY,
+        databaseConfig = TestDatabase.file?.let { DatabaseConfig(inMemory = false, fileName = it) } ?: DatabaseConfig.IN_MEMORY,
         externalOptionsOverride = ExternalOptionsOverride { EmulatedOptions.enabled }
     )
 

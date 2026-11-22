@@ -182,7 +182,7 @@ jobs:
   emulator:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.emulator || inputs.screens || inputs.vbench) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 260
+    timeout-minutes: 355
     env:
       GRADLE_OPTS: >-
         -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"

@@ -40,6 +40,7 @@ the tests named next to it.
 | `settings.gradle` | include `:pump:atc3`, `:pump:atc3-emulator`, `:plugins:sibionics`, `:plugins:learner` | build |
 | `app/build.gradle.kts` | `:pump:atc3-emulator` in `pumpExclusions`; full flavor depends on `:plugins:sibionics` and `:plugins:learner`; androidTest depends on `:pump:atc3` and `:pump:atc3-emulator`; `-PbenchApk` gives the full flavor the package suffix `.bench` and the name "AAPS bench" | build |
 | `app/src/androidTest/.../di/Atc3EmulatedRadio.kt`, `.../e2e/Atc3EmulatorScenarioTest.kt` | our files in the app's device tests (radio swap through `Atc3RadioSwap`) | emulator job |
+| `app/src/androidTest/.../di/BaseTestApp.kt` (+ our `TestDatabase.kt`) | the graph opens a database file when `TestDatabase.file` is set (else in memory, as before): the restart scenarios keep AAPS's records through a restart | emulator job (ApexScenarioTest restart_*) |
 | `app/src/androidTest/.../ReplayApsResultsTest.kt` | blaqone bug: `activity_consoleLog = ""` added to the AutoISF call, or device tests do not compile | emulator job |
 | `core/interfaces/.../aps/LoopNotes.kt` (new) + `core/objects/.../di/CoreObjectsGraph.kt` | one shared holder of plugin notes for the ring "why" (the learner writes, the ring reads) | `LoopNotesTest` |
 | `*/res/values-ru-rRU/strings_ru_overlay.xml` (new files) | our Russian for strings that have no Russian yet (only names missing from the Crowdin `strings.xml`; if Crowdin adds the same name later, delete ours or the build fails with a duplicate) | app build |
