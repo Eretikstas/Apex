@@ -1154,7 +1154,7 @@ class HistoryReplayTest {
                         !r.optBoolean("sensorGap") && !r.optBoolean("activity") &&
                         !r.optBoolean("illness") && !r.optBoolean("falseLow") &&
                         (j == k || num(r, "man") <= 0.0) &&
-                        (j == k || num(r, "units") <= 0.0)
+                        num(r, "units") <= 0.0
                 }
                 val ok = correction && clean && !bg[k].isNaN() && !bg[k + 36].isNaN() &&
                     !bg[k - 3].isNaN() && bg[k] > 180.0 && bg[k] - bg[k - 3] < 18.0 &&
