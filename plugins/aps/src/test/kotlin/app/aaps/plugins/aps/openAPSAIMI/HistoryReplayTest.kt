@@ -802,7 +802,7 @@ class HistoryReplayTest {
             return false
         }
         fun cleanBasalRow(r: JSONObject): Boolean = !causalFilter ||
-            !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") || r.optBoolean("afterInsulin") ||
+            !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") ||
                 r.optBoolean("oldCannula") || r.optBoolean("sensorGap") || r.optBoolean("activity") ||
                 r.optBoolean("illness") || r.optBoolean("falseLow"))
         fun cleanDuraRow(r: JSONObject): Boolean = !causalFilter ||
@@ -1146,19 +1146,19 @@ class HistoryReplayTest {
             val act = DoubleArray(w) { k -> var a = 0.0; for (j in 0..minOf(60, k)) a += ins[k - j] * kern5[j]; a }
             val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); var k = 48
             while (k < w - 36) {
-                val correction = rows[k].optBoolean("manualCorrection")
+                // A correction may be a manual bolus or an SMB; the SMB at k is the event being measured.
+                val correction = (rows[k].optBoolean("manualCorrection") || num(rows[k], "units") > 0.0) &&
+                    !bg[k].isNaN() && bg[k] > 180.0
                 val clean = (k - 48..k + 36).all { j ->
                     val r = rows[j]
-                    !bg[j].isNaN() && cleanDuraRow(r) &&
-                        !r.optBoolean("afterHypo") && !r.optBoolean("afterSmb") && !r.optBoolean("oldCannula") &&
-                        !r.optBoolean("sensorGap") && !r.optBoolean("activity") &&
-                        !r.optBoolean("illness") && !r.optBoolean("falseLow") &&
-                        (j == k || num(r, "man") <= 0.0) &&
-                        num(r, "units") <= 0.0
+                    !bg[j].isNaN() &&
+                        !r.optBoolean("oldCannula") && !r.optBoolean("sensorGap") &&
+                        !r.optBoolean("afterHypo") && num(r, "hypo") <= 0.0 &&
+                        (j == k || (num(r, "man") <= 0.0 && num(r, "units") <= 0.0))
                 }
-                val ok = correction && clean && !bg[k].isNaN() && !bg[k + 36].isNaN() &&
-                    !bg[k - 3].isNaN() && bg[k] > 180.0 && bg[k] - bg[k - 3] < 18.0 &&
-                    (k - 48..k + 36).none { meal[it] > 0.0 || hypo[it] > 0.0 }
+                val ok = correction && clean && !bg[k + 36].isNaN() &&
+                    !bg[k - 3].isNaN() && bg[k] - bg[k - 3] < 18.0 &&
+                    (k - 48..k + 36).none { meal[it] > 0.0 }
                 if (!ok) { k++; continue }
                 var net = 0.0
                 for (j in k until k + 36) net += act[j] - profBasal[hr[j]] / 12.0
@@ -1191,8 +1191,9 @@ class HistoryReplayTest {
                     if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
                         (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) continue
                     if (causalFilter && rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) continue
-                    if (causalFilter && window.any { it.getLong("t") < tm + 180 * minute &&
-                        (it.optDouble("units", 0.0) > 0.0 || it.optBoolean("manualCorrection")) }) continue
+                    // Any SMB in the complete post-meal observation window invalidates the episode,
+                    // for both low and high outcomes; otherwise highs can bias CR stronger.
+                    if (causalFilter && window.any { it.optDouble("units", 0.0) > 0.0 }) continue
                     if (causalFilter && !m.optBoolean("mealBolus")) continue
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
