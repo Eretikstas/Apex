@@ -1147,7 +1147,7 @@ class HistoryReplayTest {
             val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); var k = 48
             while (k < w - 36) {
                 val correction = rows[k].optBoolean("manualCorrection")
-                val clean = (k - 48 until k + 36).all { j ->
+                val clean = (k - 48..k + 36).all { j ->
                     val r = rows[j]
                     !bg[j].isNaN() && cleanDuraRow(r) &&
                         !r.optBoolean("afterHypo") && !r.optBoolean("afterSmb") && !r.optBoolean("oldCannula") &&
@@ -1158,7 +1158,7 @@ class HistoryReplayTest {
                 }
                 val ok = correction && clean && !bg[k].isNaN() && !bg[k + 36].isNaN() &&
                     !bg[k - 3].isNaN() && bg[k] > 180.0 && bg[k] - bg[k - 3] < 18.0 &&
-                    (k - 48 until k + 36).none { meal[it] > 0.0 || hypo[it] > 0.0 }
+                    (k - 48..k + 36).none { meal[it] > 0.0 || hypo[it] > 0.0 }
                 if (!ok) { k++; continue }
                 var net = 0.0
                 for (j in k until k + 36) net += act[j] - profBasal[hr[j]] / 12.0
