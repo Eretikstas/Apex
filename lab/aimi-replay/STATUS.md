@@ -83,3 +83,38 @@ start+30, growth2%), tokens of `APP` + `LEARNALL,LAISF,LACR,LACAUSE,LAPCTBACK,LA
 LEARNALL v1. Right answers: dawn -> basal, meals1.3 -> CR stronger (not basal up), ins+20 -> ISF up or percentage
 down, ins-20 -> ISF down / basal up, calm -> almost no change. Pass: lows < 3.0 not higher, lows < 3.9 not higher,
 highs > 10 not worse than APP.
+
+### 2026-11-23, Claude review of the Learning Audit spec and the 7 robustness proposals (up to 718af46369)
+
+Compile check run 45080836199 (code at 75fe1e04fd): success. Commits after it are documents only.
+
+**Learning Audit (counters per card): yes, do it first.** It is the base for items 1 and 6 below. Notes:
+- Keep the six-hour CR SMB rule for now (agreed), but expect the audit to show CR with almost no accepted meals: with
+  SMB + UAM nearly every meal has an SMB within 6 h. That result is useful in itself; then the user decides.
+- Determinism (case 9): the synthetic mode uses `Random(seed)`, so it should hold; any difference is a bug.
+- Keep the audit line short (one line per card per check); the logs are already large.
+
+**Interaction matrix:** good. Cases 5, 6, 8, 10 can run with existing tokens (`ACT_`, `ILL_`, `CANCH_`, `NOISE`/`COMPRESS`,
+`SMBMIN`). New tokens are needed for: 1 (one outlier day: e.g. `OUTDAY_<day>_<x>` scaling need for one day), 3 and 4
+(conflicts: `MEALX_` + `CHGISF_`, `MEALX_` + `DAYNEED_` exist, check they combine), 7 (sensor gaps of 15/30/60 min:
+check whether a gap token exists; if not, add `GAP_<min>_<per day>`). Please list the exact tokens per case in Task.
+
+**The 7 proposals:**
+1. Confidence score: yes, report-only, built from the audit fields (clean days, episodes, spread, exclusion rate).
+   Hard gates stay absolute. Cheap once the audit exists.
+2. Drift detection: partly exists (the basal card needs the same side on two cards in a row). Merge it with the
+   "outcome control" the user asked for: after a change, compare 3-4 days after vs 7 before on the card's own hours or
+   block; if worse, a rollback card and that cause frozen. This item is missing from the proposal list; please add it.
+3. Outlier protection: medians are already used. Leave-one-day-out is cheap and good as a report field. Low priority.
+4. Interaction guard: report conflicts, yes. But I disagree with "no global priority order": one change at a time
+   needs a tie-break, and the safe one is "protect against lows first" (percentage down / weaker insulin before
+   anything that gives more insulin). Keep that order; let the guard report what was deferred and why.
+5. Recovery and data ageing: last. It adds tuning knobs; the 7-day windows already age old data out.
+6. Explainability: this is the audit line plus the decision; no separate work.
+7. Shadow comparison: this is what every batch already does (APP vs variant, same seeds). Nothing to build; just
+   always include APP in a batch.
+
+**Recommended order:** audit (incl. 6) -> batch of 8 scenarios (APP vs causal) -> new scenario tokens + interaction
+matrix -> confidence (report-only) -> outcome control with rollback (2) -> interaction report (4) -> ageing (5).
+
+Next action for Claude: when the audit is committed and the compile check passes, the user says "run STATUS".
