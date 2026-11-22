@@ -797,7 +797,7 @@ class HistoryReplayTest {
             for (i in out.length() - 1 downTo 0) {
                 val r = out.getJSONObject(i)
                 if ((now - r.getLong("t")) / minute > minutes) break
-                if (r.optDouble(key, 0.0) > 0.0) return true
+                if (r.optDouble(key, 0.0) > 0.0 || r.optBoolean(key)) return true
             }
             return false
         }
@@ -807,7 +807,7 @@ class HistoryReplayTest {
                 r.optBoolean("illness") || r.optBoolean("falseLow"))
         fun cleanDuraRow(r: JSONObject): Boolean = !causalFilter ||
             !(r.optBoolean("afterHypo") || r.optBoolean("oldCannula") || r.optBoolean("sensorGap") ||
-                r.optBoolean("falseLow") || r.optBoolean("illness"))
+                r.optBoolean("falseLow") || r.optBoolean("illness") || r.optBoolean("activity"))
         var failed = 0
         val end = t0 + days * 86_400_000L
         var t = t0
@@ -1185,13 +1185,15 @@ class HistoryReplayTest {
                 for (m in meals.filter { blockOf(hourOf(it.getLong("t"))) == b }) {
                     val tm = m.getLong("t")
                     val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
-                    if (window.size < 60 || (causalFilter && window.any {
+                    if (window.size < 72 || (causalFilter && window.any {
                         it.optBoolean("oldCannula") || it.optBoolean("sensorGap") ||
                             it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow")
                     })) continue
                     if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
                         (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) continue
                     if (causalFilter && rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) continue
+                    if (causalFilter && window.any { it.getLong("t") < tm + 180 * minute && it.optDouble("units", 0.0) > 0.0 }) continue
+                    if (causalFilter && !m.optBoolean("mealBolus")) continue
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
                     // SMB-caused, rebound or ambiguous lows are not evidence against the meal CR.
@@ -1216,7 +1218,9 @@ class HistoryReplayTest {
             val last3 = last3Rows.filter { it.has("bg") }
             val lo3 = if (last3.isEmpty()) 0.0 else last3.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
             val eligibleLows = if (!causalFilter) last3 else last3.filter {
-                it.optString("hypoCause") == "fasting" || it.optString("hypoCause") == "meal_bolus"
+                (it.optString("hypoCause") == "fasting" || it.optString("hypoCause") == "meal_bolus") &&
+                    !it.optBoolean("falseLow") && !it.optBoolean("sensorGap") && !it.optBoolean("oldCannula") &&
+                    !it.optBoolean("activity") && !it.optBoolean("illness")
             }
             val lo3Eligible = if (last3.isEmpty()) 0.0 else eligibleLows.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
             fun setPct(np: Double) {
