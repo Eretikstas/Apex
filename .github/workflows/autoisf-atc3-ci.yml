@@ -241,7 +241,7 @@ jobs:
           disk-size: 6G
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
-          script: SCREENS_ONLY=${{ inputs.screens && !inputs.emulator && '1' || '0' }} ONLY_CLASS=${{ inputs.vbench && !inputs.emulator && 'app.aaps.e2e.VirtualBenchTest,app.aaps.e2e.ApexScenarioTest' || '' }} bash tools/atc3_emulator_check.sh
+          script: SCREENS_ONLY=${{ inputs.screens && !inputs.emulator && '1' || '0' }} ONLY_CLASS=${{ inputs.vbench && !inputs.emulator && 'app.aaps.e2e.ApexScenarioTest#bolus_isDelivered_andRecordedOnce' || '' }} bash tools/atc3_emulator_check.sh
 
       - name: Upload what the emulator showed
         if: ${{ always() }}

@@ -574,10 +574,17 @@ class VirtualAtc3Pump(
     fun startHeartbeats() {
         lastHeartbeatAt = phoneNow()
         timer.scheduleWithFixedDelay({
-            val now = phoneNow()
-            if (now - lastHeartbeatAt >= heartbeatMinutes * 60_000L) {
-                lastHeartbeatAt = now
-                heartbeat()
+            // A throw would end the repeats without a word: it is caught and printed, the next second tries again.
+            try {
+                val now = phoneNow()
+                if (now - lastHeartbeatAt >= heartbeatMinutes * 60_000L) {
+                    lastHeartbeatAt = now
+                    heartbeat()
+                    println("VirtualAtc3Pump: heartbeat sent, period $heartbeatMinutes min, to ${if (sink == null) "no one" else "the link"}")
+                }
+            } catch (e: Throwable) {
+                println("VirtualAtc3Pump: heartbeat failed: $e")
+                e.printStackTrace()
             }
         }, 1, 1, TimeUnit.SECONDS)
     }
