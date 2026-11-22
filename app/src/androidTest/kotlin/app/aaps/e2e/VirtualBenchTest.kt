@@ -54,6 +54,7 @@ import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -61,6 +62,7 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.math.abs
+import kotlin.random.Random
 
 /**
  * The virtual bench (user 21.11: "погоняй на стенде"; no test phone yet): the real app on an Android emulator, the Apex
@@ -212,6 +214,42 @@ class VirtualBenchTest {
         awaitTrue(SMB_RECORD_TIMEOUT) { abs(aapsBoluses(start).sum() - pumpGave) < 1e-6 }
         assertWithMessage("SMBs AAPS has on record ${aapsBoluses(start)}, the pump gave ${newBoluses(start)}")
             .that(aapsBoluses(start).sum()).isWithin(1e-6).of(pumpGave)
+    }
+
+    /**
+     * Two hours of the closed loop on an unsteady sensor, run only with the instrumentation argument `longbench 1`
+     * (input longbench of the CI; the usual bench skips it). Glucose rises 150 -> 250 with noise, the sensor shows a
+     * false drop (pressed on, 70 for 12 min), then gives nothing for 15 min, then glucose falls slowly to 110. Checks:
+     * no SMB on the false drop nor late in the gap (no fresh reading), every SMB the pump gave is in AAPS once, and AAPS
+     * and the pump agree on the temp basal at each phase.
+     */
+    @Test
+    fun closedLoop_longNoisySensor_everySmbCounted() {
+        assumeTrue("long bench only on request", InstrumentationRegistry.getArguments().getString("longbench") == "1")
+        val start = System.currentTimeMillis()
+        val rnd = Random(7)
+        fun noisy(v: Double) = v + (rnd.nextDouble() - 0.5) * 20.0
+        backfill(start, minutes = 30, value = 140.0)
+        for (i in 0 until 40) { reading(noisy(150.0 + i * 2.5)); waitAMinute() }
+        assertTempBasalSame("after the noisy rise")
+        val dropStart = System.currentTimeMillis()
+        for (i in 0 until 12) { reading(noisy(70.0)); waitAMinute() }
+        val dropEnd = System.currentTimeMillis()
+        reading(noisy(235.0)); waitAMinute()
+        val gapStart = System.currentTimeMillis()
+        repeat(15) { waitAMinute() }
+        val gapEnd = System.currentTimeMillis()
+        for (i in 0 until 50) { reading(noisy(235.0 - i * 2.5)); waitAMinute() }
+        for (i in 0 until 10) { reading(noisy(110.0)); waitAMinute() }
+        assertTempBasalSame("at the end")
+        val times = synchronized(pump.bolusLog) { pump.bolusLog.filter { it.atMs >= start - 2 * 60_000L }.map { it.atMs } }
+        assertWithMessage("no SMB on the false drop ($times)").that(times.none { it in dropStart..dropEnd }).isTrue()
+        assertWithMessage("no SMB late in the gap, with no fresh reading ($times)").that(times.none { it in (gapStart + 8 * 60_000L)..gapEnd }).isTrue()
+        val pumpGave = newBoluses(start).sum()
+        awaitTrue(SMB_RECORD_TIMEOUT) { abs(aapsBoluses(start).sum() - pumpGave) < 1e-6 }
+        assertWithMessage("SMBs AAPS has on record ${aapsBoluses(start)}, the pump gave ${newBoluses(start)}")
+            .that(aapsBoluses(start).sum()).isWithin(1e-6).of(pumpGave)
+        assertWithMessage("the loop ran").that(loop.lastRun).isNotNull()
     }
 
     /** The boluses the pump gave since [sinceMs], oldest first, U: the journal also holds the old seeded ones. */
