@@ -52,8 +52,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: Make gradlew executable
         run: chmod +x gradlew
-      - name: Driver tests
+      - name: Driver tests (Apex v4, the driver of the app)
+        run: ./gradlew --console=plain :pump:apex:testDebugUnitTest --continue
+      - name: Old ATC3 driver tests (module kept, not in the app)
+        if: ${{ !cancelled() }}
         run: ./gradlew --console=plain :pump:atc3:testDebugUnitTest --continue
+      - name: Preference key list (catches a driver key lost in a merge)
+        if: ${{ !cancelled() }}
+        run: ./gradlew --console=plain :app:testFullDebugUnitTest --tests '*PreferenceKeySnapshotTest*'
       - name: Temp basal safeguard tests
         if: ${{ !cancelled() }}
         run: ./gradlew --console=plain :database:impl:testAndroidHostTest --tests '*SyncPumpTemporaryBasalTransactionTest*'

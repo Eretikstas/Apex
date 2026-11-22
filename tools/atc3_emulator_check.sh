@@ -1,6 +1,7 @@
 #!/bin/bash
 # Runs on the emulator (see autoisf-atc3-ci.yml). Never stops at the first failure: it writes what
-# happened to emu-out/summary.txt and keeps going.
+# happened to emu-out/summary.txt and keeps going. At the end it fails (exit 1) when a test class did not
+# pass or gave no result, so a red test is a red CI job; the workflow uploads emu-out in any case.
 set +e
 OUT=emu-out; mkdir -p $OUT/shots
 PKG=info.nightscout.androidaps
@@ -10,6 +11,15 @@ S=$OUT/summary.txt
 echo "app: $APP" > $S; echo "test app: ${TEST:-none}" >> $S
 
 shot() { adb exec-out screencap -p > "$OUT/shots/$1.png"; }
+
+# The summary, then the verdict: every "<class>: ..." line must say "OK (".
+finish() {
+  cat $S
+  if [ -z "$TEST" ]; then echo "No test app was built: no test ran."; exit 1; fi
+  bad=$(grep -E "^app\.aaps\.[^ ]*: " $S | grep -v ": OK (")
+  if [ -n "$bad" ]; then echo "Test classes that did not pass:"; echo "$bad"; exit 1; fi
+  exit 0
+}
 
 # Only the real screenshots (input screens): the app in Russian, our test drives it and takes the pictures.
 if [ "$SCREENS_ONLY" = "1" ] && [ -n "$TEST" ]; then
@@ -44,8 +54,7 @@ if [ -n "$ONLY_CLASS" ] && [ -n "$TEST" ]; then
   res=$(grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION_FAILED|Process crashed|INSTRUMENTATION_RESULT: shortMsg" $OUT/test_$ONLY_CLASS.txt | tr '\n' ' ')
   echo "$ONLY_CLASS: ${res:-no result (timeout?)}" >> $S
   adb logcat -d > $OUT/logcat_$ONLY_CLASS.txt
-  cat $S
-  exit 0
+  finish
 fi
 
 adb logcat -c
@@ -101,5 +110,4 @@ if [ -n "$TEST" ]; then
     shot "04_after_${C##*.}"
   done
 fi
-cat $S
-exit 0
+finish
