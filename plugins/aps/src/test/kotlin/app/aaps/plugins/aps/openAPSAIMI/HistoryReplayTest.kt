@@ -730,6 +730,8 @@ class HistoryReplayTest {
         val mealLog = ArrayList<Pair<Long, Double>>(); val lateDone = HashSet<Long>(); var nLate = 0; var lateU = 0.0
         val canEvery = tok("CANCH", 0.0)
         val stDrift = tok("DRIFT", 0.0); val stIll = tok("ILL", -1.0).toInt(); val stDawn = tok("DAWN", 1.0)
+        // DAYNEED_<x>: the body's basal need 10-18 h times x (a day basal the profile has wrong; the meals are there too).
+        val stDay = tok("DAYNEED", 1.0)
         val stAct = tok("ACT", -1.0).toInt(); val stFail = tok("CANFAIL", 0.0).toInt(); val stComp = tok("COMPRESS", 0.0)
         val stUnlog = tok("UNLOG", 0.0); val compRnd = Random(tok("SEED", 1.0).toLong() + 11); val unRnd = Random(tok("SEED", 1.0).toLong() + 13)
         var compUntil = 0L; var nUnlog = 0
@@ -806,14 +808,21 @@ class HistoryReplayTest {
         val lastDir = IntArray(24); var lastShift = 0; val upCount = IntArray(24)
         val lb3 = prefsText.contains("LEARNB3"); val lb5 = prefsText.contains("LEARNB5"); val lbFill = prefsText.contains("LBFILL"); val lbFill2 = prefsText.contains("LBFILL2"); val lbMin = tok("LBMIN", 0.0).toInt()
         val lbLowMax = tok("LBLOWMAX", 0.0).toInt()
+        // LBTAIL: the basal card also uses meal tails - an hour that starts 3 h or more after a meal with no carbs on board
+        // (the loop's COB is 0), only in a meal block whose CR the CR card does not want changed (LACR), else a missed
+        // meal bolus would read as missing basal. An hour with tails needs LBTAILMIN_<n> windows (default 5). Hours with
+        // no window at all still take the value between the nearest measured hours (LBFILL2).
+        val lbTail = prefsText.contains("LBTAIL"); val lbTailMin = tok("LBTAILMIN", 5.0).toInt()
+        var tailBlockOk = booleanArrayOf(true, true, true)
+        val tailHours = BooleanArray(24)
         fun hourNeeds(w: Int): Array<ArrayList<Double>> {
             val n = out.length(); val s0 = n - w
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
-            val hr = IntArray(w); val mn = IntArray(w); val canOld = BooleanArray(w)
+            val hr = IntArray(w); val mn = IntArray(w); val canOld = BooleanArray(w); val cob = DoubleArray(w)
             fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
             for (i in 0 until w) {
                 val r = out.getJSONObject(s0 + i)
-                bg[i] = r.optDouble("bg", Double.NaN); meal[i] = num(r, "meal"); hypo[i] = num(r, "hypo")
+                bg[i] = r.optDouble("bg", Double.NaN); meal[i] = num(r, "meal"); hypo[i] = num(r, "hypo"); cob[i] = num(r, "cob")
                 val z = Instant.ofEpochMilli(r.getLong("t")).atZone(tz); hr[i] = z.hour; mn[i] = z.minute
                 canOld[i] = lb5 && r.optDouble("can", 0.0) > 72.0
                 val nx = if (i + 1 < w) out.getJSONObject(s0 + i + 1) else r
@@ -823,10 +832,13 @@ class HistoryReplayTest {
             val since = IntArray(w); var last = -100000
             for (k in 0 until w) { if (meal[k] > 0) last = k; since[k] = (k - last) * 5 }
             val needs = Array(24) { ArrayList<Double>() }
+            java.util.Arrays.fill(tailHours, false)
             for (k in 60 until w - 12) {
                 // LEARNB5: hours with a cannula older than 72 h are not used (user rule 19.11).
                 if (canOld[k] || canOld[k + 12]) continue
-                if (mn[k] != 0 || since[k] < 300 || bg[k].isNaN() || bg[k + 12].isNaN() || bg[k] !in 70.0..216.0) continue
+                val tail = lbTail && since[k] in 180 until 300 && cob[k] < 0.5 && tailBlockOk[blockOf(hr[k])]
+                if (mn[k] != 0 || (since[k] < 300 && !tail) || bg[k].isNaN() || bg[k + 12].isNaN() || bg[k] !in 70.0..216.0) continue
+                if (tail) tailHours[hr[k]] = true
                 if ((k until k + 12).any { meal[it] > 0 }) continue
                 var a = 0.0; for (j in k until k + 12) a += act[j]
                 var hy = 0.0; for (j in maxOf(0, k - 6) until k + 12) hy += hypo[j]
@@ -889,7 +901,7 @@ class HistoryReplayTest {
                 lastShift = dirS
                 // LBMIN_<n>: clean hour windows needed to call an hour "measured" (user 19.11: 2).
                 val minN = if (lbMin > 0) lbMin else if (lb5 && !lbFill) 4 else 3
-                val own = DoubleArray(24) { if (needs[it].size >= minN) med(needs[it]) else Double.NaN }
+                val own = DoubleArray(24) { if (needs[it].size >= (if (tailHours[it]) maxOf(minN, lbTailMin) else minN)) med(needs[it]) else Double.NaN }
                 // LBFILL: hours with no data follow the measured hours - the median ratio estimate/profile of the measured
                 // hours, half of it per step, with the same 2-card rule ("estimate" hours in the app).
                 val measuredRatios = (0 until 24).filter { !own[it].isNaN() }.map { own[it] / profBasal[it] }
@@ -1160,6 +1172,7 @@ class HistoryReplayTest {
                 isf != null && isf.first > isfP * 1.10 && isfP < isfStart * 1.25 -> { isfP = minOf(isfStart * 1.25, isfP * 1.07); card = "isf+" }
                 cr.any { it == 1 } -> { val b = cr.indexOfFirst { it == 1 }; crBlock[b] = minOf(1.25, crBlock[b] * 1.07); card = "cr+$b" }
                 else -> {
+                    tailBlockOk = BooleanArray(3) { cr[it] == 0 }
                     if (learnB) { learnBasal(day); if (!profBasal.contentEquals(basalBefore)) card = "basal" }
                     if (card == "") when {
                         cr.any { it == -1 } -> { val b = cr.indexOfFirst { it == -1 }; crBlock[b] = maxOf(0.75, crBlock[b] / 1.07); card = "cr-$b" }
@@ -1241,7 +1254,7 @@ class HistoryReplayTest {
             val actF = if (actDay && h in 10..21) 1.3 else if (actDay && h >= 22 || actNight) 1.2 else 1.0
             val failF = if (stFail > 0 && day > 0 && day % stFail == 0 && h in 14..19) 0.5 else 1.0
             val stressF = driftF * illF * actF * failF
-            val needNow = needBasal[h] * (if (h in 4..7) stDawn else 1.0)
+            val needNow = needBasal[h] * (if (h in 4..7) stDawn else 1.0) * (if (h in 10..17) stDay else 1.0)
             g += isfT * needNow / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * canF * stressF * acting + csfT * carbsAbs + z + e
             g = g.coerceIn(30.0, 450.0)
             // Sensor.
