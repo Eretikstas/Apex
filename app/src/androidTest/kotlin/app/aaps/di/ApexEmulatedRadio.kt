@@ -11,12 +11,21 @@ import java.util.concurrent.TimeUnit
 
 /**
  * [ApexBLE] (the Apex v4 driver's radio) with our software pump [Atc3PumpEmulator] in its place: the same TruCare III
- * protocol. Everything above it is the real v4 driver. The pump to talk to is [Atc3Emulation.emulator]; while it is
+ * protocol. Everything above it is the real v4 driver. The pump to talk to is [Atc3Emulation.emulator] when this radio is made; while it is
  * null this behaves as the real class.
  */
 class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace) : ApexBLE(aapsLogger, context, trace) {
 
-    private val emulator: Atc3PumpEmulator? get() = Atc3Emulation.emulator
+    /**
+     * The pump of the test that made this radio, taken once: a radio of an earlier test's graph, not quite stopped,
+     * must not reach the next test's pump. It did, by reading [Atc3Emulation.emulator] anew each time: it linked
+     * first, took the answers, and the new driver heard nothing.
+     */
+    private val emulator: Atc3PumpEmulator?
+        get() = pinned ?: Atc3Emulation.emulator?.also { pinned = it }
+
+    /** Set by the first pump seen (normally at construction, which comes after the test set its pump). */
+    @Volatile private var pinned: Atc3PumpEmulator? = Atc3Emulation.emulator
 
     /** The link's start and end are told from a thread of their own, as the Bluetooth stack does. */
     private val events = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "EmulatedApexBLE").apply { isDaemon = true } }
