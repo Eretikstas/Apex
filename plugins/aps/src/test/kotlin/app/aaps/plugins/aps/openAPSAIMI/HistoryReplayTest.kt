@@ -787,6 +787,27 @@ class HistoryReplayTest {
         var lastLoopBg: Double? = null; var lastAct = 0.0
         var mealPtr = 0
         val out = JSONArray()
+        val causalFilter = prefsText.contains("LACAUSE")
+        val require3Days = prefsText.contains("LADAYS")
+        val pctBack = prefsText.contains("LAPCTBACK")
+        fun rowDay(r: JSONObject) = ((r.getLong("t") - t0) / 86_400_000L).toInt()
+        fun distinctDays(rows: List<JSONObject>) = rows.map { rowDay(it) }.distinct().size
+        fun enoughDays(rows: List<JSONObject>, minimum: Int = 3) = !require3Days || distinctDays(rows) >= minimum
+        fun priorEvent(now: Long, minutes: Long, key: String): Boolean {
+            for (i in out.length() - 1 downTo 0) {
+                val r = out.getJSONObject(i)
+                if ((now - r.getLong("t")) / minute > minutes) break
+                if (r.optDouble(key, 0.0) > 0.0) return true
+            }
+            return false
+        }
+        fun cleanBasalRow(r: JSONObject): Boolean = !causalFilter ||
+            !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") || r.optBoolean("afterInsulin") ||
+                r.optBoolean("oldCannula") || r.optBoolean("sensorGap") || r.optBoolean("activity") ||
+                r.optBoolean("illness") || r.optBoolean("falseLow"))
+        fun cleanDuraRow(r: JSONObject): Boolean = !causalFilter ||
+            !(r.optBoolean("afterHypo") || r.optBoolean("oldCannula") || r.optBoolean("sensorGap") ||
+                r.optBoolean("falseLow") || r.optBoolean("illness"))
         var failed = 0
         val end = t0 + days * 86_400_000L
         var t = t0
@@ -833,9 +854,11 @@ class HistoryReplayTest {
             for (k in 0 until w) { if (meal[k] > 0) last = k; since[k] = (k - last) * 5 }
             val needs = Array(24) { ArrayList<Double>() }
             java.util.Arrays.fill(tailHours, false)
+            if (require3Days && distinctDays((s0 until n).map { out.getJSONObject(it) }.takeLast(minOf(w, 7 * 288))) < 3) return needs
             for (k in 60 until w - 12) {
                 // LEARNB5: hours with a cannula older than 72 h are not used (user rule 19.11).
                 if (canOld[k] || canOld[k + 12]) continue
+                if (causalFilter && (k - 60 until k + 13).any { !cleanBasalRow(out.getJSONObject(s0 + it)) }) continue
                 val tail = lbTail && since[k] in 180 until 300 && cob[k] < 0.5 && tailBlockOk[blockOf(hr[k])]
                 if (mn[k] != 0 || (since[k] < 300 && !tail) || bg[k].isNaN() || bg[k + 12].isNaN() || bg[k] !in 70.0..216.0) continue
                 if (tail) tailHours[hr[k]] = true
@@ -1043,23 +1066,32 @@ class HistoryReplayTest {
         val learnDura = prefsText.contains("LEARNDURA")
         fun learnDuraCard(day: Int) {
             val n = out.length()
-            val bgs = (maxOf(0, n - 7 * 288) until n).map { out.getJSONObject(it).optDouble("bg", Double.NaN) }.filter { !it.isNaN() }
-            if (bgs.size < 288) return
-            var flat = 0
-            for (i in 6 until bgs.size) {
-                val w = bgs.subList(i - 6, i + 1)
-                if (w.all { it > 180.0 } && w.max() - w.min() < 18.0) flat++
+            val rows = (maxOf(0, n - 7 * 288) until n).map { out.getJSONObject(it) }
+            val valid = rows.filter { it.has("bg") && cleanDuraRow(it) }
+            // Require at least five distinct days; never stitch filtered gaps into a flat run.
+            if (valid.size < 5 * 12 || valid.map { rowDay(it) }.distinct().size < 5) return
+            var flat = 0; var flatDenom = 0
+            for (i in 6 until rows.size) {
+                val w = rows.subList(i - 6, i + 1)
+                if (w.all { it.has("bg") && cleanDuraRow(it) }) {
+                    val values = w.map { it.getDouble("bg") }
+                    flatDenom++
+                    if (values.all { it > 180.0 } && values.max() - values.min() < 18.0) flat++
+                }
             }
-            val flatPct = flat * 100.0 / bgs.size
-            val lowPct = bgs.count { it < 70.0 } * 100.0 / bgs.size
+            if (flatDenom == 0) return
+            val flatPct = flat * 100.0 / flatDenom
+            val lowPct = valid.count { it.getDouble("bg") < 70.0 } * 100.0 / valid.size
             val old = aw.dura
             if (flatPct >= 2.0 && lowPct <= 3.0) aw = aw.copy(dura = minOf(2.0, aw.dura + 0.25))
             else if (lowPct > 4.0) aw = aw.copy(dura = maxOf(0.25, aw.dura - 0.25))
-            println("AIMI replay: learner DURA day $day: flat high ${"%.1f".format(flatPct)} %, low ${"%.1f".format(lowPct)} % -> dura ${"%.2f".format(old)} -> ${"%.2f".format(aw.dura)}")
+            println("AIMI replay: learner DURA day $day: valid days ${valid.map { rowDay(it) }.distinct().size}/7, flat high ${"%.1f".format(flatPct)} %, low ${"%.1f".format(lowPct)} % -> dura ${"%.2f".format(old)} -> ${"%.2f".format(aw.dura)}")
         }
         fun learnBasal(day: Int) {
             if (lb2 || lb3 || lb5) { learnBasal2(day); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
+            val windowRows = (s0 until n).map { out.getJSONObject(it) }
+            if (require3Days && distinctDays(windowRows.takeLast(minOf(windowRows.size, 7 * 288))) < 3) return
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
             val hr = IntArray(w); val mn = IntArray(w)
             fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
@@ -1077,6 +1109,7 @@ class HistoryReplayTest {
             for (k in 60 until w - 12) {
                 if (mn[k] != 0 || since[k] < 300 || bg[k].isNaN() || bg[k + 12].isNaN() || bg[k] !in 70.0..216.0) continue
                 if ((k until k + 12).any { meal[it] > 0 }) continue
+                if (causalFilter && (k - 60 until k + 13).any { !cleanBasalRow(out.getJSONObject(s0 + it)) }) continue
                 var a = 0.0; for (j in k until k + 12) a += act[j]
                 var hy = 0.0; for (j in maxOf(0, k - 6) until k + 12) hy += hypo[j]
                 needs[hr[k]].add(a + (bg[k + 12] - bg[k]) / isfP - hy / icP)
@@ -1496,6 +1529,39 @@ class HistoryReplayTest {
                     .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
                 row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h]).put("lbg", gs?.glucose ?: JSONObject.NULL)
                 if (canEvery > 0) row.put("can", ((t - t0) / 3_600_000.0) % canEvery)
+                if (causalFilter) {
+                    val canAgeNow = if (canEvery > 0) ((t - t0) / 3_600_000.0) % canEvery else 0.0
+                    val afterMeal = mealThisTick > 0.0 || priorEvent(t, 300, "meal")
+                    val afterHypo = hypoThisTick > 0.0 || priorEvent(t, 180, "hypo")
+                    val afterSmb = priorEvent(t, 180, "units")
+                    val afterManual = manThisTick > 0.0 || priorEvent(t, 180, "man")
+                    val activityNow = (stAct >= 0 && day >= stAct && (day - stAct) % 7 == 0 && h in 10..21) ||
+                        (stAct >= 0 && day > stAct && (day - 1 - stAct) % 7 == 0 && h < 6)
+                    val illnessNow = stIll >= 0 && day in stIll until stIll + tok("ILLD", 3.0).toInt()
+                    val mealBolusNow = manThisTick > 0.0 && mealThisTick > 0.0
+                    val manualCorrectionNow = manThisTick > 0.0 && mealThisTick <= 0.0
+                    row.put("afterMeal", afterMeal).put("afterHypo", afterHypo)
+                        .put("afterSmb", afterSmb).put("afterManual", afterManual)
+                        .put("afterInsulin", afterSmb || afterManual)
+                        .put("oldCannula", canAgeNow > 72.0)
+                        .put("sensorGap", gs == null)
+                        .put("activity", activityNow).put("illness", illnessNow)
+                        .put("falseLow", reading < 70.0 && t < compUntil)
+                        .put("mealBolus", mealBolusNow).put("manualCorrection", manualCorrectionNow)
+                    if (reading < 70.0) {
+                        val causes = ArrayList<String>()
+                        if (priorEvent(t, 120, "units")) causes.add("smb")
+                        if (priorEvent(t, 180, "mealBolus")) causes.add("meal_bolus")
+                        if (priorEvent(t, 180, "hypo")) causes.add("rebound")
+                        val cause = when {
+                            causes.size > 1 -> "ambiguous"
+                            causes.size == 1 -> causes.first()
+                            !afterMeal && !afterManual && !afterSmb && !afterHypo -> "fasting"
+                            else -> "other"
+                        }
+                        row.put("hypoCause", cause)
+                    }
+                }
                 manThisTick = 0.0; mealThisTick = 0.0; hypoThisTick = 0.0
                 try {
                     if (gs == null) throw IllegalStateException("no glucose")
