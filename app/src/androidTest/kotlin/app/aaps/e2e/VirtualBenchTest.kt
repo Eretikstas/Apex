@@ -13,6 +13,7 @@ import app.aaps.core.data.model.TrendArrow
 import app.aaps.core.data.model.data.Block
 import app.aaps.core.data.model.data.TargetBlock
 import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.data.time.T
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
@@ -121,6 +122,12 @@ class VirtualBenchTest {
         // The shortest heartbeat v4 allows: it settles its journal (the SMB rows) at the heartbeat.
         preferences.put(ApexIntKey.HeartbeatPeriod, 2)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_ApexPumpPlugin", value = true)
+        // The pump is known to AAPS since yesterday, as on a phone in use. Otherwise AAPS registers it at the first
+        // row the driver writes and refuses rows dated more than a minute before that: a bolus given before the
+        // first row (v4 writes it at a heartbeat) lost its row.
+        preferences.put(StringNonKey.ActivePumpType, PumpType.APEX.description)
+        preferences.put(StringNonKey.ActivePumpSerialNumber, SERIAL)
+        preferences.put(LongNonKey.ActivePumpChangeTimestamp, System.currentTimeMillis() - 24 * 3_600_000L)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
         // AutoISF with SMB, as on the real phone; room for the loop to act (a child's caps).
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "APS_OpenAPSSMBPlugin", value = false)
@@ -148,9 +155,6 @@ class VirtualBenchTest {
         assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { pumpPlugin.isInitialized() }).isTrue()
         assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
         // A record of the same minute as the pump registration is refused by AAPS: start in the next minute.
-        // v4 registers the pump with AAPS at its first heartbeat read; AAPS refuses a row dated before that moment, so a
-        // bolus given earlier would never get its row. Wait for it, as a real pump is registered long before.
-        assertWithMessage("AAPS registered the pump").that(awaitTrue(REGISTER_TIMEOUT) { preferences.get(StringNonKey.ActivePumpSerialNumber) == SERIAL }).isTrue()
         val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
         val wait = (ready / 60_000L + 1) * 60_000L + 2_000L - System.currentTimeMillis()
         if (wait > 0) SystemClock.sleep(wait)
@@ -371,9 +375,6 @@ class VirtualBenchTest {
         private const val APEX_DATABASE = "apex_database.db"
         private const val SWITCH_TIMEOUT = 120_000L
         private const val POLL_MS = 250L
-
-        /** Up to a heartbeat (2 min) and its read. */
-        private const val REGISTER_TIMEOUT = 200_000L
         private const val RISE_MIN = 12
         private const val FALL_MIN = 12
     }

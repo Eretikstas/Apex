@@ -10,6 +10,7 @@ import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.data.Block
 import app.aaps.core.data.model.data.TargetBlock
 import app.aaps.core.data.plugin.PluginType
+import app.aaps.core.data.pump.defs.PumpType
 import app.aaps.core.data.time.T
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
@@ -116,6 +117,12 @@ class ApexScenarioTest {
         // The shortest heartbeat v4 allows: its accounting runs at the heartbeat.
         preferences.put(ApexIntKey.HeartbeatPeriod, 2)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_ApexPumpPlugin", value = true)
+        // The pump is known to AAPS since yesterday, as on a phone in use. Otherwise AAPS registers it at the first
+        // row the driver writes and refuses rows dated more than a minute before that: a bolus given before the
+        // first row (v4 writes it at a heartbeat) lost its row.
+        preferences.put(StringNonKey.ActivePumpType, PumpType.APEX.description)
+        preferences.put(StringNonKey.ActivePumpSerialNumber, SERIAL)
+        preferences.put(LongNonKey.ActivePumpChangeTimestamp, System.currentTimeMillis() - 24 * 3_600_000L)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
 
         pluginStore.plugins = pluginList
@@ -127,9 +134,6 @@ class ApexScenarioTest {
         status("scenario start")
         assertWithMessage("the driver is initialized").that(awaitTrue(INIT_TIMEOUT) { pumpPlugin.isInitialized() }).isTrue()
         assertWithMessage("a profile runs").that(awaitTrue(INIT_TIMEOUT) { runBlocking { profileFunction.getProfile() } != null }).isTrue()
-        // v4 registers the pump with AAPS at its first heartbeat read; AAPS refuses a row dated before that moment, so a
-        // bolus given earlier would never get its row. Wait for it, as a real pump is registered long before.
-        assertWithMessage("AAPS registered the pump").that(awaitTrue(REGISTER_TIMEOUT) { preferences.get(StringNonKey.ActivePumpSerialNumber) == SERIAL }).isTrue()
         val ready = maxOf(System.currentTimeMillis(), preferences.get(LongNonKey.ActivePumpChangeTimestamp))
         val wait = (ready / 60_000L + 1) * 60_000L + 2_000L - System.currentTimeMillis()
         if (wait > 0) SystemClock.sleep(wait)
@@ -438,9 +442,6 @@ class ApexScenarioTest {
         /** Up to two heartbeats of 2 min and the reads after them. */
         private const val RECORD_TIMEOUT = 300_000L
         private const val POLL_MS = 250L
-
-        /** Up to a heartbeat (2 min) and its read. */
-        private const val REGISTER_TIMEOUT = 200_000L
 
         /** How long the driver may take to see a broken link. */
         private const val LINK_TIMEOUT = 30_000L
