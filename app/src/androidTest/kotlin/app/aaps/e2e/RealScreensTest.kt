@@ -7,6 +7,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import androidx.work.WorkManager
@@ -25,14 +26,14 @@ import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.BooleanNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.di.Atc3Emulation
-import app.aaps.di.EmulatedAtc3BLE
+import app.aaps.di.EmulatedApexBLE
 import app.aaps.di.ResetGraphRule
 import app.aaps.di.testGraphs
-import app.aaps.pump.atc3.Atc3PumpPlugin
+import app.aaps.pump.apex.ApexPumpPlugin
+import app.aaps.pump.apex.keys.ApexStringKey
+import app.aaps.pump.apex.link.ApexRadioSwap
 import app.aaps.pump.atc3.emulator.Atc3PumpEmulator
 import app.aaps.pump.atc3.emulator.VirtualAtc3Pump
-import app.aaps.pump.atc3.keys.Atc3StringKey
-import app.aaps.pump.atc3.link.Atc3RadioSwap
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -47,7 +48,7 @@ import kotlin.math.sin
 
 /**
  * Real screenshots of the running app for a person to look at (not a check: a step that cannot be reached is
- * skipped, the rest still runs). The app runs as installed: our ATC3 driver against the software pump (only the
+ * skipped, the rest still runs). The app runs as installed: the Apex v4 driver against our software pump (only the
  * radio is replaced), 6 hours of glucose in the database, a profile in mmol/L, the loop run once. The language is
  * set by the CI script (per-app locale). Pictures go to the app's external files, folder `realshots`, and the
  * script pulls them.
@@ -77,19 +78,23 @@ class RealScreensTest {
     @Before
     fun setUp() {
         clearAllSharedPrefs()
+        // As in VirtualBenchTest: a fresh v4 database, a used bolus journal and the pump's heartbeat.
+        instrumentation.targetContext.deleteDatabase("apex_database.db")
         pump = VirtualAtc3Pump(SERIAL) { System.currentTimeMillis() }
+        pump.seedBolusHistory(System.currentTimeMillis())
+        pump.startHeartbeats()
         Atc3Emulation.emulator = Atc3PumpEmulator(pump)
-        Atc3RadioSwap.make = { logger, context, trace -> EmulatedAtc3BLE(logger, context, trace) }
+        ApexRadioSwap.make = { logger, context, trace -> EmulatedApexBLE(logger, context, trace) }
         for (p in listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN, "android.permission.POST_NOTIFICATIONS"))
             runCatching { instrumentation.uiAutomation.grantRuntimePermission(PKG, p) }
 
         preferences.put(BooleanNonKey.GeneralSetupWizardProcessed, true)
         preferences.put(StringKey.GeneralUnits, "mmol")
         preferences.put(BooleanKey.GeneralSimpleMode, false)
-        preferences.put(Atc3StringKey.Atc3SerialNumber, SERIAL)
-        preferences.put(Atc3StringKey.Atc3BtPassword, pump.btPassword)
-        preferences.put(Atc3StringKey.Atc3Address, ADDRESS)
-        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_Atc3PumpPlugin", value = true)
+        preferences.put(ApexStringKey.ApexSerialNumber, SERIAL)
+        preferences.put(ApexStringKey.ApexBtPassword, pump.btPassword)
+        preferences.put(ApexStringKey.ApexAddress, ADDRESS)
+        preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_ApexPumpPlugin", value = true)
         preferences.put(BooleanComposedKey.ConfigBuilderEnabled, "PUMP_VirtualPumpPlugin", value = false)
 
         testGraphs.pluginStore.plugins = pluginList
@@ -114,9 +119,9 @@ class RealScreensTest {
     fun tearDown() {
         runCatching { commandQueue.clear() }
         runCatching { WorkManager.getInstance(instrumentation.targetContext).cancelAllWork() }
-        runCatching { pluginList.filterIsInstance<Atc3PumpPlugin>().single().disconnect("screens end") }
+        runCatching { pluginList.filterIsInstance<ApexPumpPlugin>().single().disconnect("screens end") }
         Atc3Emulation.emulator = null
-        Atc3RadioSwap.make = null
+        ApexRadioSwap.make = null
         runCatching { pump.shutdown() }
     }
 
@@ -160,8 +165,12 @@ class RealScreensTest {
                 device.pressBack()
                 SystemClock.sleep(1_000)
             }
-            for ((name, query) in listOf("06_atc3" to "Apex", "07_learner" to "Ученик", "08_sibionics" to "Sibionics 2")) step(name) {
-                openBySearch(query)
+            for ((name, query) in listOf("06_apex" to "Apex", "07_learner" to "Ученик", "08_sibionics" to "Sibionics 2")) step(name) {
+                // The search does not always list a plugin: then it is opened from the config builder.
+                runCatching { openBySearch(query) }.getOrElse {
+                    backToMain()
+                    openViaConfigBuilder(query)
+                }
                 SystemClock.sleep(3_000)
                 shot(name)
                 backToMain()
@@ -191,6 +200,18 @@ class RealScreensTest {
             .filter { it.visibleBounds.top > field }
             .minByOrNull { it.visibleBounds.top }
         checkNotNull(hit) { "no result for $query" }.click()
+    }
+
+    /** The plugin opened from «Конфигурация»: the menu, the config builder, its row scrolled to and tapped. */
+    private fun openViaConfigBuilder(name: String) {
+        tapDesc("Показать панель навигации|Open navigation")
+        SystemClock.sleep(1_500)
+        tapText("Конфигурация|Config builder")
+        SystemClock.sleep(2_500)
+        val byName = By.text(Pattern.compile("(?i)$name.*"))
+        val hit = device.findObject(byName)
+            ?: device.findObject(By.scrollable(true))?.scrollUntil(Direction.DOWN, Until.findObject(byName))
+        checkNotNull(hit) { "no $name in the config builder" }.click()
     }
 
     private fun tapText(regex: String) {
