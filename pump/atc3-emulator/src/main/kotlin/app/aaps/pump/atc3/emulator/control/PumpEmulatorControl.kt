@@ -99,6 +99,9 @@ enum class EmulatedCommand {
     EXTENDED_BOLUS_STOP,
     BASAL_PROFILE,
 
+    /** A write of the pump's settings (its max bolus and max basal among them). */
+    SETTINGS,
+
     /** A read of what the pump runs now: its status, or its temp basal. Not a read of its history. */
     STATUS
 }

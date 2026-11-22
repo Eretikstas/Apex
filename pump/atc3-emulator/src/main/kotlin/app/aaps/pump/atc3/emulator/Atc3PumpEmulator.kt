@@ -81,6 +81,7 @@ class Atc3PumpEmulator(val pump: VirtualAtc3Pump) : PumpEmulatorControl {
         EmulatedCommand.TEMP_BASAL_START     -> VirtualAtc3Pump.FrameFault(CONTROL, 0x02, 4)
         EmulatedCommand.TEMP_BASAL_STOP      -> VirtualAtc3Pump.FrameFault(CONTROL, 0x05)
         EmulatedCommand.BASAL_PROFILE        -> VirtualAtc3Pump.FrameFault(CONTROL, 0x00)
+        EmulatedCommand.SETTINGS             -> VirtualAtc3Pump.FrameFault(CONTROL, 0x32)
         // Every read of what the pump runs now: status v1 and v2, and the running temp basal. Not its history.
         EmulatedCommand.STATUS               -> VirtualAtc3Pump.FrameFault(READ, 0x00, alsoCodes = setOf(0x0A, 0x0C))
         EmulatedCommand.EXTENDED_BOLUS_START,

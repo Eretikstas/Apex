@@ -17,6 +17,8 @@ import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.insulin.InsulinManager
+import app.aaps.core.interfaces.notifications.NotificationId
+import app.aaps.core.interfaces.notifications.NotificationLevel
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
@@ -28,6 +30,7 @@ import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.utils.DateUtil
 import app.aaps.core.keys.BooleanComposedKey
 import app.aaps.core.keys.BooleanNonKey
+import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.LongNonKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
@@ -54,6 +57,7 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * The Apex v4 driver (the driver of our build) against our software pump, through the real command queue and the real
@@ -286,6 +290,27 @@ class ApexScenarioTest {
         assertWithMessage("AAPS runs the 150 % basal too")
             .that(awaitTrue(RECORD_TIMEOUT) { abs(profile().getBasal() - PROFILE_BASAL * 1.5) < 0.02 }).isTrue()
     }
+
+    // Pump settings: our fix in v4
+
+    @Test
+    fun settingsAnswerLost_areReadBack_notAFailure() {
+        // At a heartbeat v4 makes the pump hold AAPS's max bolus; the answer to that write is lost.
+        assertWithMessage("the fault is set").that(emulator.loseAnswer(EmulatedCommand.SETTINGS)).isTrue()
+        val maxBolus = preferences.get(DoubleKey.SafetyMaxBolus) - 0.5
+        preferences.put(DoubleKey.SafetyMaxBolus, maxBolus)
+        val raw = (maxBolus / RAW_UNIT).roundToInt()
+        assertWithMessage("the pump holds the new max bolus $maxBolus U")
+            .that(awaitTrue(RECORD_TIMEOUT) { pumpMaxBolusRaw() == raw }).isTrue()
+        val settingsNotes = { testGraphs.notificationManager.notifications.value.filter { it.id == NotificationId.PUMP_SETTINGS_FAILED } }
+        assertWithMessage("v4 tells the limits are written (${settingsNotes()})")
+            .that(awaitTrue(STEP_TIMEOUT) { settingsNotes().any { it.level == NotificationLevel.INFO } }).isTrue()
+        assertWithMessage("no alarm that the settings failed (${settingsNotes()})")
+            .that(settingsNotes().none { it.level == NotificationLevel.URGENT }).isTrue()
+    }
+
+    /** The max bolus the pump holds, in its steps: bytes 14..15 of its settings block. */
+    private fun pumpMaxBolusRaw(): Int = (pump.settings[14].toInt() and 0xFF) or ((pump.settings[15].toInt() and 0xFF) shl 8)
 
     // Helpers
 
