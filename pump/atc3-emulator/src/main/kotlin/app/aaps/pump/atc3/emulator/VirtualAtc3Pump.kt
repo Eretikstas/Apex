@@ -524,7 +524,7 @@ class VirtualAtc3Pump(
     }
 
     /**
-     * Fill the bolus journal with [count] old boluses of 1 U, one every 6 h before [nowMs], as on a pump in use.
+     * Fill the whole bolus journal (128 cells) with old boluses of 1 U, one every 4 h before [nowMs], as on a pump in use.
      * A new pump's cells are zeros, and the Apex v4 driver takes a zero cell for a broken record (no date, nothing
      * asked): it then leaves the boluses to the heartbeat and writes none. Call it before the driver first reads.
      */
@@ -584,8 +584,8 @@ class VirtualAtc3Pump(
         const val CHUNK = 20
 
         /** How many old boluses [seedBolusHistory] puts in the journal. */
-        const val SEEDED_BOLUSES = 30
-        private const val SEED_STEP_MS = 6 * 3_600_000L
+        const val SEEDED_BOLUSES = 128
+        private const val SEED_STEP_MS = 4 * 3_600_000L
         private const val SEED_RAW = 40
 
         private fun calendar(ms: Long): Calendar = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = ms }

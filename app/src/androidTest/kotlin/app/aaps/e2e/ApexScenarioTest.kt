@@ -248,8 +248,12 @@ class ApexScenarioTest {
 
     private fun profile(): Profile = checkNotNull(runBlocking { profileFunction.getProfile() }) { "No profile runs" }
 
-    /** The boluses the pump gave in this scenario, oldest first: without the old ones of the seeded journal. */
-    private fun given(): List<Double> = emulator.state().boluses.drop(VirtualAtc3Pump.SEEDED_BOLUSES)
+    /**
+     * The boluses the pump gave in this scenario, oldest first, U: the journal is full of old ones (seeded hours and
+     * days back) and drops its oldest on each new bolus, so the new ones are told by their time, not by their count.
+     */
+    private fun given(): List<Double> =
+        synchronized(pump.bolusLog) { pump.bolusLog.filter { it.atMs >= startedAt - 2 * 60_000L }.reversed().map { it.delivered * RAW_UNIT } }
 
     private fun aapsBoluses(): List<Double> =
         runBlocking { persistenceLayer.getBolusesFromTime(startedAt - 2 * 60_000L, ascending = true) }.filter { it.amount > 0.0 }.map { it.amount }
@@ -340,5 +344,8 @@ class ApexScenarioTest {
         private const val RECORD_TIMEOUT = 300_000L
         private const val POLL_MS = 250L
         private const val EPS = 1e-6
+
+        /** The pump's dose step, U. */
+        private const val RAW_UNIT = 0.025
     }
 }
