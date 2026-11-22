@@ -1079,6 +1079,101 @@ class HistoryReplayTest {
             lbCards++
             println("AIMI replay: learner basal card day $day: $changed hours changed, total ${"%.2f".format(profBasal.sum())} U/day;$sb")
         }
+        // LEARNALL: one learner with every card and one change at a time. A check daily at 06:00 from day 7, only when the
+        // last change of any card is at least LAGAP_<d> days old (default 3). The first card that wants a change makes it,
+        // in this order: (1) percentage down on lows > 4 % (last 3 days); (2) ISF up (insulin stronger than the profile
+        // says); (3) a CR block weaker (lows after its meals); (4) basal by hours (quiet windows, LEARNB5 rules); (5) a CR
+        // block stronger; (6) ISF down (insulin weaker); (7) dura; (8) percentage back up toward 100 %.
+        // LAISF: the ISF card. Clean corrections of the last 7 days: glucose over 10 mmol/L, no meal 4 h before and 3 h
+        // after, no hypo treatment, not rising fast (< +1 mmol/L in the 15 min before). The drop over 3 h against the
+        // insulin acting above the profile basal in those 3 h (at least 0.3 U) gives the ISF seen; the median of at
+        // least 5 such corrections, not overlapping, against the profile ISF: over 10 % higher -> ISF +7 %, over 10 %
+        // lower with lows <= 3 % -> ISF -7 %, within 75-125 % of the start.
+        // LACR: the CR card, per meal block (05-11, 11-17, 17-05), last 7 days. A meal within 3 h after a hypo treatment
+        // is left out. At least 5 meals: lows within 4 h after >= 30 % -> CR +7 % (weaker); highs 2-4 h after with no
+        // low up to 6 h after >= 40 % and lows <= 10 % -> CR -7 % (stronger); within 75-125 %.
+        val learnAll = prefsText.contains("LEARNALL"); val laGap = tok("LAGAP", 3.0).toInt(); var laLast = -99
+        val laIsf = prefsText.contains("LAISF"); val laCr = prefsText.contains("LACR"); val isfStart = isfP
+        val laCount = HashMap<String, Int>()
+        fun laNote(card: String) { laCount[card] = (laCount[card] ?: 0) + 1 }
+        fun isfSeen(): Pair<Double, Int>? {
+            val n = out.length(); val w = minOf(n, 7 * 288); val s0 = n - w
+            val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w); val hr = IntArray(w)
+            fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
+            for (i in 0 until w) {
+                val r = out.getJSONObject(s0 + i)
+                bg[i] = r.optDouble("bg", Double.NaN); meal[i] = num(r, "meal"); hypo[i] = num(r, "hypo")
+                hr[i] = hourOf(r.getLong("t"))
+                val nx = if (i + 1 < w) out.getJSONObject(s0 + i + 1) else r
+                ins[i] = num(nx, "deliv") * 5 / 60 + num(r, "units") + num(r, "man")
+            }
+            val act = DoubleArray(w) { k -> var a = 0.0; for (j in 0..minOf(60, k)) a += ins[k - j] * kern5[j]; a }
+            val seen = ArrayList<Double>(); var k = 48
+            while (k < w - 36) {
+                val ok = !bg[k].isNaN() && !bg[k + 36].isNaN() && !bg[k - 3].isNaN() && bg[k] > 180.0 && bg[k] - bg[k - 3] < 18.0 &&
+                    (k - 48 until k + 36).none { meal[it] > 0.0 } && (k - 12 until k + 36).none { hypo[it] > 0.0 }
+                if (!ok) { k++; continue }
+                var net = 0.0; for (j in k until k + 36) net += act[j] - profBasal[hr[j]] / 12.0
+                if (net >= 0.3) { seen.add((bg[k] - bg[k + 36]) / net); k += 36 } else k++
+            }
+            if (seen.size < 5) return null
+            return Pair(seen.sorted()[seen.size / 2], seen.size)
+        }
+        fun crBlockVerdict(): IntArray {
+            val res = IntArray(3)
+            val nowT = out.getJSONObject(out.length() - 1).getLong("t")
+            val rows = (maxOf(0, out.length() - 8 * 288) until out.length()).map { out.getJSONObject(it) }.filter { it.getLong("t") >= nowT - 7 * 86_400_000L && it.has("bg") }
+            val meals = rows.filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 360 * minute }
+            for (b in 0..2) {
+                var highs = 0; var lows = 0; var used = 0
+                for (m in meals.filter { blockOf(hourOf(it.getLong("t"))) == b }) {
+                    val tm = m.getLong("t")
+                    if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optDouble("hypo", 0.0) > 0.0 }) continue
+                    used++
+                    val w4 = rows.filter { it.getLong("t") in tm..(tm + 240 * minute) }
+                    if (w4.any { it.getDouble("bg") < 70.2 }) { lows++; continue }
+                    val w6 = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
+                    if (w6.none { it.getDouble("bg") < 70.2 } && w4.filter { it.getLong("t") >= tm + 120 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
+                }
+                if (used < 5) continue
+                val lf = lows.toDouble() / used; val hf = highs.toDouble() / used
+                res[b] = if (lf >= 0.30) 1 else if (hf >= 0.40 && lf <= 0.10) -1 else 0
+            }
+            return res
+        }
+        fun learnAllCheck(day: Int) {
+            if (day < 7 || day - laLast < laGap) return
+            val n = out.length()
+            val last3 = (maxOf(0, n - 3 * 288) until n).mapNotNull { out.getJSONObject(it).let { r -> if (r.has("bg")) r.getDouble("bg") else null } }
+            val lo3 = if (last3.isEmpty()) 0.0 else last3.count { it < 70.0 } * 100.0 / last3.size
+            fun setPct(np: Double) {
+                val f = np / pctNow; pctNow = np
+                for (i in 0 until 24) profBasal[i] = Math.round(profBasal[i] * f * 100) / 100.0
+                isfP /= f; icNow /= f
+            }
+            var card = ""
+            val isf = if (laIsf) isfSeen() else null
+            val cr = if (laCr) crBlockVerdict() else IntArray(3)
+            val duraBefore = aw.dura; val basalBefore = profBasal.copyOf()
+            when {
+                lo3 > 4.0 && pctNow > 0.8001 -> { setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
+                isf != null && isf.first > isfP * 1.10 && isfP < isfStart * 1.25 -> { isfP = minOf(isfStart * 1.25, isfP * 1.07); card = "isf+" }
+                cr.any { it == 1 } -> { val b = cr.indexOfFirst { it == 1 }; crBlock[b] = minOf(1.25, crBlock[b] * 1.07); card = "cr+$b" }
+                else -> {
+                    if (learnB) { learnBasal(day); if (!profBasal.contentEquals(basalBefore)) card = "basal" }
+                    if (card == "") when {
+                        cr.any { it == -1 } -> { val b = cr.indexOfFirst { it == -1 }; crBlock[b] = maxOf(0.75, crBlock[b] / 1.07); card = "cr-$b" }
+                        isf != null && isf.first < isfP * 0.90 && lo3 <= 3.0 && isfP > isfStart * 0.75 -> { isfP = maxOf(isfStart * 0.75, isfP / 1.07); card = "isf-" }
+                        else -> {
+                            if (learnDura) { learnDuraCard(day); if (aw.dura != duraBefore) card = "dura" }
+                            if (card == "" && pctCard && pctNow < 0.9999 && lo3 <= 2.0) { setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
+                        }
+                    }
+                }
+            }
+            if (card != "") { laLast = day; laNote(card) }
+            println("AIMI replay: learner ALL day $day: lows3 ${"%.1f".format(lo3)} % isf seen ${isf?.let { "%.0f (n=%d)".format(it.first, it.second) } ?: "-"} profile ${"%.0f".format(isfP)} cr ${cr.joinToString("/")} x${crBlock.joinToString("/") { "%.2f".format(it) }} -> ${if (card == "") "no change" else card}")
+        }
         fun basalIob(now: Long): Double {
             var sum = 0.0
             for (tb in chain.ownTemps) {
@@ -1436,7 +1531,7 @@ class HistoryReplayTest {
                 out.put(row)
                 // LEARNB: the learner's basal card every LBEVERY_<d> days (default 4) at 06:00, accepted at once.
                 val lt = Instant.ofEpochMilli(t).atZone(tz)
-                if (learnB && lt.hour == 6 && lt.minute == 0 && (if (lbFast) day >= nextBasalDay else day >= lbEvery && day % lbEvery == 0)) {
+                if (!learnAll && learnB && lt.hour == 6 && lt.minute == 0 && (if (lbFast) day >= nextBasalDay else day >= lbEvery && day % lbEvery == 0)) {
                     val before = profBasal.sum()
                     learnBasal(day)
                     val d = profBasal.sum() - before
@@ -1444,10 +1539,11 @@ class HistoryReplayTest {
                     val k = basalDirs.size
                     nextBasalDay = day + (if (lbFast && k >= 2 && basalDirs[k - 1] != 0 && basalDirs[k - 1] == basalDirs[k - 2]) 2 else lbEvery)
                 }
-                if (pctCard && day >= 17 && day - lastPctDay >= 2 && lt.hour == 6 && lt.minute == 0) pctCardRun(day)
+                if (!learnAll && pctCard && day >= 17 && day - lastPctDay >= 2 && lt.hour == 6 && lt.minute == 0) pctCardRun(day)
                 if (learnCr2 && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrFromMeals(day)
                 if (learnCrm && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnCrBlocks(day)
-                if (learnDura && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnDuraCard(day)
+                if (!learnAll && learnDura && day >= lbEvery && day % lbEvery == 0 && lt.hour == 6 && lt.minute == 0) learnDuraCard(day)
+                if (learnAll && lt.hour == 6 && lt.minute == 0) learnAllCheck(day)
                 if (out.length() % 500 == 0) clearAllMocks(answers = false, recordedCalls = true, childMocks = false)
             }
             t += minute
@@ -1457,6 +1553,7 @@ class HistoryReplayTest {
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (noiseGuard) println("AIMI replay: NOISEGUARD noisy ${noisyMin / 60} h")
+        if (learnAll) println("AIMI replay: learner ALL cards $laCount, ISF ${"%.0f".format(isfStart)} -> ${"%.0f".format(isfP)}, CR blocks ${crBlock.joinToString("/") { "%.2f".format(it) }}, dura ${"%.2f".format(aw.dura)}, pct ${"%.0f".format(pctNow * 100)}")
         if (pctCard || lbFast) println("AIMI replay: PCT ended ${"%.0f".format(pctNow * 100)} % (up $pctUp down $pctDown), basal cards ${basalDirs.size} dirs $basalDirs")
         if (chainP > 0.0 || smartL || guardChain || learnCrm)
             println("AIMI replay: CHAIN meals $nChain, SMARTL level ${"%.1f".format(smartThr / 18.0)} (up $smartUp down $smartDown), GUARDCHAIN minutes $nGuardChain, CR blocks ${crBlock.joinToString { "%.2f".format(it) }}")
