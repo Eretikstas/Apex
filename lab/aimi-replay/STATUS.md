@@ -2,7 +2,27 @@
 
 ## Task (written by ChatGPT)
 
-_ChatGPT: put here the commit to test, the tokens and scenarios, and the expected right answers._
+### 2026-11-23, causal-filter review
+
+Commits to test:
+- Replay filter code: `6f222711e5b3e00565597d1d4d2528d32f99ed89`
+- Updated filter specification: `4dd3a09c3035661410b910f919959e9cb1457730`
+- Compile-only workflow: `75fe1e04fd4d0aaa52441de11f5db866c6c2f19e`
+
+First action: verify the compile-only workflow `.github/workflows/aimi-replay-compile.yml` passes. It compiles `:plugins:aps:compileFullDebugUnitTestKotlin`; it does not decrypt or run replay input. Do not start the batch until compile is green and the open points in Results below have been resolved or explicitly accepted by the user.
+
+Batch after compile: 8 scenarios x 3 seeds (base, calm, dawn1.3, meals1.3, ins+20, ins-20, start+30, growth2%). Use `APP` + `LEARNALL,LAISF,LACR,LACAUSE,LAPCTBACK,LADAYS`; compare against `APP` and LEARNALL v1. Use the exact APP token lists from the user's private `app22_batch.json`; do not reconstruct or guess missing tokens.
+
+Expected outcomes:
+- dawn1.3 -> basal adapts upward;
+- meals1.3 -> CR strengthens, without an inappropriate basal increase;
+- ins+20 -> ISF strengthens or percentage decreases;
+- ins-20 -> ISF weakens / basal increases as supported by clean data;
+- calm -> little or no adaptation;
+- SMB-associated lows and rebound lows do not train CR, ISF or basal;
+- episodes/windows rejected by filters are counted by reason, not silently discarded.
+
+Safety gates: no change to the app branch, child profile, pump settings or Nightscout. Batch results are evidence for parent review, not settings recommendations.
 
 ## Results (written by Claude)
 
