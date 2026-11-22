@@ -40,7 +40,7 @@ if [ -n "$ONLY_CLASS" ] && [ -n "$TEST" ]; then
   adb shell dumpsys deviceidle whitelist +$PKG >> $S 2>&1
   TPKG=$(adb shell pm list instrumentation | tr -d '\r' | grep "target=$PKG" | head -1 | sed -E 's#instrumentation:([^ ]+).*#\1#')
   adb logcat -c
-  timeout 9000 adb shell am instrument -w -e class $ONLY_CLASS $TPKG > $OUT/test_$ONLY_CLASS.txt 2>&1
+  timeout 12000 adb shell am instrument -w -e class $ONLY_CLASS $TPKG > $OUT/test_$ONLY_CLASS.txt 2>&1
   res=$(grep -E "^OK \(|^FAILURES|Tests run:|INSTRUMENTATION_FAILED|Process crashed|INSTRUMENTATION_RESULT: shortMsg" $OUT/test_$ONLY_CLASS.txt | tr '\n' ' ')
   echo "$ONLY_CLASS: ${res:-no result (timeout?)}" >> $S
   adb logcat -d > $OUT/logcat_$ONLY_CLASS.txt

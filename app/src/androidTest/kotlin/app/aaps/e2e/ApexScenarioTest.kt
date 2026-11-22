@@ -216,6 +216,64 @@ class ApexScenarioTest {
         assertTempBasalSame("after a lost command")
     }
 
+    // The link: lost and found again
+
+    @Test
+    fun linkLostWhileIdle_reconnects_andCommandsWork() {
+        assertWithMessage("the link breaks").that(emulator.breakLink()).isTrue()
+        assertWithMessage("the link is down").that(awaitTrue(LINK_TIMEOUT) { !emulator.state().linkUp }).isTrue()
+        assertWithMessage("a bolus after the break is delivered").that(bolus(0.5).success).isTrue()
+        assertWithMessage("the link is up again").that(emulator.state().linkUp).isTrue()
+        assertRecordIsWhatThePumpGave()
+        tempBasal(0.6)
+        assertTempBasalSame("after the link came back")
+    }
+
+    @Test
+    fun linkLostDuringTempBasal_aapsAndPumpAgree() {
+        // The answer is lost and the link breaks as soon as the pump runs the temp basal: the driver learns the
+        // outcome only from a new link.
+        assertWithMessage("the fault is set").that(emulator.loseAnswer(EmulatedCommand.TEMP_BASAL_START)).isTrue()
+        val breaker = Thread {
+            awaitTrue(STEP_TIMEOUT) { emulator.state().tempBasal != null }
+            emulator.breakLink()
+        }.apply { start() }
+        runCatching { tempBasal(0.8) }
+        breaker.join(STEP_TIMEOUT)
+        assertTempBasalSame("after the link broke during the temp basal")
+    }
+
+    @Test
+    fun linkLostThreeTimes_everyBolusIsRecordedOnce() {
+        repeat(3) { round ->
+            assertWithMessage("break ${round + 1}").that(emulator.breakLink()).isTrue()
+            awaitTrue(LINK_TIMEOUT) { !emulator.state().linkUp }
+            SystemClock.sleep(BREAK_PAUSE_MS)
+            assertWithMessage("bolus ${round + 1} after break ${round + 1}").that(bolus(0.2).success).isTrue()
+        }
+        assertWithMessage("the pump gave ${given()}").that(given()).hasSize(3)
+        assertRecordIsWhatThePumpGave()
+    }
+
+    @Test
+    fun outOfRangeForMinutes_thenBack_nothingLate_andCommandsWork() {
+        assertWithMessage("the pump goes out of range").that(emulator.setOutOfRange(true)).isTrue()
+        SystemClock.sleep(OUT_OF_RANGE_MS)
+        // A bolus asked while the pump cannot be reached: it must not be given, now or later when the pump is back.
+        val whileAway = runCatching { bolus(0.5) }.getOrNull()
+        assertWithMessage("a bolus while out of range is not a success").that(whileAway?.success == true).isFalse()
+        assertWithMessage("the pump gave nothing while away").that(given()).isEmpty()
+        assertWithMessage("the pump is back").that(emulator.setOutOfRange(false)).isTrue()
+        // The queue's late commands would run on the first new link: give them the time to show.
+        SystemClock.sleep(LATE_WINDOW_MS)
+        assertWithMessage("no bolus asked while away is given late (${given()})").that(given()).isEmpty()
+        assertWithMessage("a bolus after the return is delivered").that(bolus(0.5).success).isTrue()
+        assertWithMessage("only the bolus after the return was given").that(given()).hasSize(1)
+        assertRecordIsWhatThePumpGave()
+        tempBasal(0.6)
+        assertTempBasalSame("after the pump came back")
+    }
+
     // Basal profile: our fix in v4
 
     @Test
@@ -351,6 +409,18 @@ class ApexScenarioTest {
         /** Up to two heartbeats of 2 min and the reads after them. */
         private const val RECORD_TIMEOUT = 300_000L
         private const val POLL_MS = 250L
+
+        /** How long the driver may take to see a broken link. */
+        private const val LINK_TIMEOUT = 30_000L
+
+        /** A pause between breaks, as between two loop runs cut short. */
+        private const val BREAK_PAUSE_MS = 20_000L
+
+        /** Out of range for longer than three heartbeat periods of 2 min: v4 takes the pump as not reachable. */
+        private const val OUT_OF_RANGE_MS = 7 * 60_000L
+
+        /** After the pump is back: one heartbeat and more, for anything still waiting in the queue to show. */
+        private const val LATE_WINDOW_MS = 3 * 60_000L
         private const val EPS = 1e-6
 
         /** The pump's dose step, U. */
