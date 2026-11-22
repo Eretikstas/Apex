@@ -54,7 +54,6 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import java.io.File
 import kotlin.math.abs
-import kotlin.random.Random
 
 /**
  * The Apex v4 driver (the driver of our build) against our software pump, through the real command queue and the real
@@ -85,16 +84,16 @@ class ApexScenarioTest {
     private lateinit var pump: VirtualAtc3Pump
     private lateinit var emulator: Atc3PumpEmulator
     private var startedAt = 0L
-    private var serial = ""
 
     @Before
     fun setUp() {
         clearAllSharedPrefs()
         runBlocking { persistenceLayer.clearDatabases() }
-        // A new pump for each scenario: v4 keeps its own copy of each pump's journal in its own database, which the
-        // test does not clear; a new serial is a pump v4 never saw, as after a pump change.
-        serial = "%08d".format(Random.nextInt(10_000_000, 100_000_000))
-        pump = VirtualAtc3Pump(serial) { System.currentTimeMillis() }
+        // v4 keeps its own copy of the pump's journal in its own database, which clearDatabases does not touch: each
+        // scenario's pump has a new journal, so the database is removed, as on a fresh install. (A new serial for each
+        // scenario was tried: AAPS takes it as a pump change and the scenarios broke in other ways.)
+        instrumentation.targetContext.deleteDatabase(APEX_DATABASE)
+        pump = VirtualAtc3Pump(SERIAL) { System.currentTimeMillis() }
         pump.seedBolusHistory(System.currentTimeMillis())
         pump.startHeartbeats()
         emulator = Atc3PumpEmulator(pump)
@@ -106,7 +105,7 @@ class ApexScenarioTest {
 
         preferences.put(BooleanNonKey.GeneralSetupWizardProcessed, true)
         preferences.put(StringKey.GeneralUnits, "mg/dl")
-        preferences.put(ApexStringKey.ApexSerialNumber, serial)
+        preferences.put(ApexStringKey.ApexSerialNumber, SERIAL)
         preferences.put(ApexStringKey.ApexBtPassword, pump.btPassword)
         preferences.put(ApexStringKey.ApexAddress, ADDRESS)
         // The shortest heartbeat v4 allows: its accounting runs at the heartbeat.
@@ -338,6 +337,10 @@ class ApexScenarioTest {
     companion object {
 
         private const val PKG = "info.nightscout.androidaps"
+        private const val SERIAL = "12345678"
+
+        /** The file of v4's own database, see `ApexDatabase.build`. */
+        private const val APEX_DATABASE = "apex_database.db"
         private const val ADDRESS = "11:22:33:AA:BB:CC"
         private const val PROFILE_NAME = "LocalProfile1"
         private const val PROFILE_BASAL = 0.4
