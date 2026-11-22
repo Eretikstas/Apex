@@ -59,6 +59,64 @@ Requested Claude response for each item: feasibility, relevant code locations, d
 
 Constraints: proposals are report-only until separately approved; no learner formula changes, no live AAPS/profile/pump/Nightscout changes, no app-branch edits. Preserve current causal filters and six-hour CR SMB exclusion. Keep role split: ChatGPT owns Task section/lab branch; Claude owns Results section and replay execution.
 
+
+### 2026-11-23, next validation sequence: journal, baseline, new scenarios and order comparison
+
+**Do not change the sequence or start the expanded tests early.** No replay batch is run by ChatGPT. Claude owns replay execution and writes only the Results section.
+
+#### Phase 1 — Learning Audit journal
+1. Implement the previously specified aggregate-only Learning Audit counters and deterministic one-line-per-card output.
+2. Preserve all causal filters, including the complete six-hour post-meal SMB exclusion for CR.
+3. Compile the replay test sources. Do not alter learner formulas or live AAPS settings.
+
+#### Phase 2 — baseline replay on the existing 8 situations
+After the journal is implemented and compile passes, run the existing 8-situation x 3-seed batch exactly as already specified above, with APP baseline and the causal learner tokens. Record audit reconciliation, card decisions, parameter before/after/delta, and safety outcomes. Do not add OUTDAY/GAP or pair combinations to this baseline batch.
+
+#### Phase 3 — short compatibility checks for existing scenario tokens
+The generator already has these controls:
+- `MEALX_<x>`: scales generated meal carbohydrate amount/meal load by factor x.
+- `CHGISF_<x>`: scales insulin action after the change day selected by `CHG_<day>`.
+- `DAYNEED_<x>`: scales the body's basal need during 10:00–18:00 (generator hours 10..17).
+
+First run one isolated short check for each pair below, using the same seed and a matched no-pair control. Keep the third factor at 1.0. Example test values are synthetic stress inputs, not clinical settings:
+1. **MEALX + CHGISF:** `MEALX_1.2 CHG_4 CHGISF_1.2`.
+2. **MEALX + DAYNEED:** `MEALX_1.2 DAYNEED_1.2`.
+3. **CHGISF + DAYNEED:** `CHG_4 CHGISF_1.2 DAYNEED_1.2`.
+
+For each short check, report whether the intended underlying need changed, whether the expected learner card(s) responded, whether an unrelated card changed, and whether the audit identifies the evidence correctly. Do not put these pair combinations into a larger matrix until all three short checks pass. If a token's implementation or expected effect is unclear, inspect/fix the synthetic generator and compile before proceeding.
+
+#### Phase 4 — add two new deterministic synthetic situations
+
+**OUTDAY — one isolated outlier day**
+- Add token `OUTDAY_<day>_<x>`, with a 1-based synthetic day index and a positive multiplier x.
+- Apply x to the body's insulin-need factor on that one day only; all other days remain unchanged. Do not alter meal sizes, insulin action, sensor noise, or other day factors.
+- Use a deterministic example such as `OUTDAY_4_1.3`; also test a low-need outlier (x below 1) if the implementation can support it without adding another token.
+- Expected: the journal identifies one-day concentration of evidence; a single outlier day must not cause an abrupt persistent parameter change. Report leave-one-day-out sensitivity if available.
+
+**GAP — sensor blackout**
+- Add `GAP_<minutes>`, supporting exactly `GAP_15`, `GAP_30`, and `GAP_60`.
+- Each run creates one deterministic sensor-data blackout of the requested duration at the same fixed point in the synthetic timeline (day 4, 02:00 local synthetic time). Remove readings during the interval; do not fill or interpolate them.
+- Preserve the underlying glucose/body trajectory. Resume sensor readings after the blackout and make the recovery transition testable.
+- Expected: gap and recovery-transition windows are rejected from causal learning; no parameter update is attributed to missing/interpolated sensor data. Audit must count the exclusions and distinguish gap from insufficient data.
+
+#### Phase 5 — compare the two learning orders
+Add mutually exclusive replay tokens:
+- `LAORDER_SAFE`: safety-first conflict resolution. When eligible card proposals conflict, prioritize the proposal that reduces insulin exposure / protects against lows; defer proposals that would increase insulin effect or delivery. Record both proposals, selected order, and deferred reason.
+- `LAORDER_EVID`: evidence-first conflict resolution. Prioritize the eligible proposal with stronger clean independent evidence (distinct days, accepted episodes, lower dispersion/exclusion burden); use the safety-first rule as the tie-breaker. Record both proposals, selected order, and deferred reason.
+
+The tokens must be mutually exclusive; missing/invalid order token must fail clearly rather than silently choose one. These are replay-only comparison modes, not approved live behavior. Do not change card formulas or hard eligibility/safety gates.
+
+Run SAFE and EVID on identical inputs, scenario tokens, and seeds. Compare card order, selected/deferred proposals, parameter deltas, audit determinism, and glucose safety outcomes. Keep APP baseline in each matched comparison. Do not infer that either order is preferable from a single seed.
+
+#### Required sequence and stop conditions
+1. Learning Audit journal + compile.
+2. Existing 8 situations x 3 seeds.
+3. Three short pair-compatibility checks above — one pair at a time.
+4. Only if all three pass: OUTDAY, GAP_15/30/60, expanded pair checks, and matched SAFE vs EVID order comparison.
+5. Report failures and stop before the next phase if a scenario does not produce its intended underlying change, if a pair causes an unexplained unrelated-card response, or if audit totals do not reconcile.
+
+No app-branch changes, no profile/pump/Nightscout changes, no live learner activation. All outputs remain aggregate-only and for parent review.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
