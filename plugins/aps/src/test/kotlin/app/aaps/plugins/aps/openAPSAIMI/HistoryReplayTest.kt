@@ -1191,12 +1191,13 @@ class HistoryReplayTest {
                     if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
                         (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) continue
                     if (causalFilter && rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) continue
-                    if (causalFilter && window.any { it.getLong("t") < tm + 180 * minute && it.optDouble("units", 0.0) > 0.0 }) continue
+                    if (causalFilter && window.any { it.getLong("t") < tm + 180 * minute &&
+                        (it.optDouble("units", 0.0) > 0.0 || it.optBoolean("manualCorrection")) }) continue
                     if (causalFilter && !m.optBoolean("mealBolus")) continue
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
                     // SMB-caused, rebound or ambiguous lows are not evidence against the meal CR.
-                    if (causalFilter && lowRows.any { it.optString("hypoCause") in setOf("smb", "rebound", "ambiguous") }) continue
+                    if (causalFilter && lowRows.any { it.optString("hypoCause") != "meal_bolus" }) continue
                     if (causalFilter && window.any { it.optDouble("units", 0.0) > 0.0 } && lowRows.isNotEmpty()) continue
                     used++; usedDays.add(rowDay(m))
                     if (lowRows.isNotEmpty()) { lows++; continue }
@@ -1566,7 +1567,7 @@ class HistoryReplayTest {
                     val afterHypo = hypoThisTick > 0.0 || priorEvent(t, 180, "hypo")
                     val afterSmb = priorEvent(t, 180, "units")
                     val afterManual = manThisTick > 0.0 || priorEvent(t, 180, "man")
-                    val activityNow = (stAct >= 0 && day >= stAct && (day - stAct) % 7 == 0 && h in 10..21) ||
+                    val activityNow = (stAct >= 0 && day >= stAct && (day - stAct) % 7 == 0 && h in 10..23) ||
                         (stAct >= 0 && day > stAct && (day - 1 - stAct) % 7 == 0 && h < 6)
                     val illnessNow = stIll >= 0 && day in stIll until stIll + tok("ILLD", 3.0).toInt()
                     val mealBolusNow = manThisTick > 0.0 && mealThisTick > 0.0
