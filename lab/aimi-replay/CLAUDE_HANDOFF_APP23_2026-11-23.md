@@ -264,3 +264,15 @@ Important interpretation:
 - These aggregates mix different stress profiles (noise, dawn, meal sensitivity, drift, profile/ISF perturbations, etc.). Do not interpret the 56-day and 84-day groups as a controlled duration comparison.
 - There is no paired APP baseline for these exact 24 scenarios in run 45270000264. Therefore these values describe this learner-enabled replay only and cannot establish improvement or regression.
 - ISF and CR accepted counts remain zero in the audited learner. No ISF/CR learned parameter changes should be claimed from the final summaries.
+
+
+## CR prior-hypo causal-window correction — 2026-11-23
+
+- Commit: `64f4502df72bf83986e966440014de19100b5cc1`.
+- Audit finding: CR rejected a meal if any row in the prior 2 h carried `afterHypo`. That is a rolling 180-minute flag, so it could mark a meal as contaminated even when no actual low or hypo treatment occurred inside the 2 h causal window.
+- Change: retain the 2 h lookback, but require direct evidence within that interval: either measured BG <70 mg/dL or hypo-treatment carbohydrates >0. The stale rolling `afterHypo` flag is no longer sufficient by itself. Sensor gaps, missing BG, old cannula, activity/illness/false-low, recent insulin, post-meal SMB/manual correction, and ambiguous low causes remain excluded.
+- Added helper tests for measured low, hypo treatment, clean data and missing BG.
+- Compile/helper-test run for exact commit: 45273029777 (in progress at time of writing).
+- Previous compile run 45272322156 (commit 2c660b1) remained in progress without step progress; it does not validate commit 64f4502.
+- No replay against the corrected ISF/CR/percentage logic has been run yet. After compile/helper tests pass, run the full 24-scenario APP23 batch.
+- No clinical efficacy claim; all changes remain confined to `aimi-replay`.
