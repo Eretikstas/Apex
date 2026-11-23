@@ -1473,7 +1473,7 @@ class HistoryReplayTest {
             val extra = ArrayList<Triple<Long, Double, Boolean>>()   // insulin above profile: time, units, from a temp basal
             val held = ArrayList<Pair<Long, Double>>()               // insulin AutoISF wanted but the guard held back
             var nadir = 999.0; var nadirT = 0L; var peak = 0.0; var peakT = 0L
-            var treatBg = 0.0; var released = false; var meal = false
+            var treatBg = 0.0; var released = false; var meal = false; var sensorGap = false
         }
         fun effectAt(doses: List<Pair<Long, Double>>, at: Long) = doses.filter { it.first <= at }.sumOf { (dt, u) -> u * isfP * (1 - iobLeft((at - dt) / 60_000.0).first) }
         val episodes = ArrayList<Episode>()
@@ -1722,14 +1722,17 @@ class HistoryReplayTest {
                 val smbOk = smbState && !guardHold && pend == null && !noisy
                 for (ep in episodes) {
                     if (ep.done) continue
-                    if (reading >= 81.0) ep.rose = true
-                    else if (ep.rose && reading < 70.0) ep.newLow = true
-                    if (ep.rose && reading < ep.nadir) { ep.nadir = reading; ep.nadirT = t }
-                    if (reading > ep.peak) { ep.peak = reading; ep.peakT = t }
-                    if (reading > 180.0) ep.highMin += 5
+                    if (sensorGapAffected) ep.sensorGap = true
+                    if (!sensorGapActive) {
+                        if (reading >= 81.0) ep.rose = true
+                        else if (ep.rose && reading < 70.0) ep.newLow = true
+                        if (ep.rose && reading < ep.nadir) { ep.nadir = reading; ep.nadirT = t }
+                        if (reading > ep.peak) { ep.peak = reading; ep.peakT = t }
+                        if (reading > 180.0) ep.highMin += 5
+                    }
                     if (t - ep.t0 >= 180 * minute) {
                         ep.done = true
-                        if (learnG2) {
+                        if (!ep.sensorGap && learnG2) {
                             val smbEff = effectAt(ep.extra.filter { !it.third }.map { Pair(it.first, it.second) }, ep.nadirT)
                             val tempEff = effectAt(ep.extra.filter { it.third }.map { Pair(it.first, it.second) }, ep.nadirT)
                             val heldEff = effectAt(ep.held, ep.peakT)
@@ -1746,7 +1749,7 @@ class HistoryReplayTest {
                                 overAvoidable++; loosenScore++
                                 if (loosenScore >= 3) { guardW = maxOf(0.0, guardW - 10.0); capMult = minOf(2.0, capMult + 0.05); loosenScore = 0; loosen++ }
                             }
-                        } else if (learnG) {
+                        } else if (!ep.sensorGap && learnG) {
                             if (ep.newLow && (ep.smb > 0.05 || ep.highTemp)) {
                                 guardW = minOf(180.0, maxOf(guardW, 60.0) + 20.0)
                                 if (ep.highTemp) capMult = maxOf(1.0, capMult - 0.2)
