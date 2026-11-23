@@ -158,6 +158,26 @@ Changes are confined to replay test audit/reporting logic:
 
 No learner formula, clinical parameter, live profile, pump or Nightscout setting was changed. No replay batch was started. Compile-only run `45093582395` was queued for commit `2ae8f59079da1ab32358a867c555248addc00556`; confirm its result before treating this audit pass as compile-validated. Claude review remains required before any replay batch.
 
+### 2026-11-23, Learning Audit gate corrections and CR gap robustness
+
+Source review and audit-only corrections on `aimi-replay`:
+
+- `7ea198b818faff1584bd1cc937a3f38ce0a4eb92`: basal audit now scans and accounts for candidates even when the clean-day gate fails; reports per-hour sample thresholds and eligible/estimated hours instead of an aggregate accepted-window PASS. Classic basal also reports its denominator and per-hour eligibility before returning on insufficient days. ISF pre-scan reports available correction candidates rather than false zeros.
+- `15be0e85244ff677176853017fbbe895b7726b03`: advanced basal `LBFILL2` audit now uses the same per-hour measured predicate (including LBTAIL threshold) as the learner when counting interpolated hours. CR audit retains raw rows for the full episode, detects flagged or timestamp-visible sensor gaps before short-window rejection, and sees BG-less rows for missing-BG and SMB checks.
+- `b991f93032c7bc46f4dde115a70e0642c2cf0fcc`: explicitly preserve the non-causal CR candidate/window path; the additional raw-row checks apply only under `LACAUSE`, so the non-causal comparison is not changed by audit hardening.
+
+No learner formulas or live AAPS settings were intentionally changed. No replay was run. The latest source still requires compile-only verification.
+
+Open review for Claude:
+1. Confirm the advanced basal `eligibleHours/estimatedHours` gate matches `LBMIN`, `LBTAILMIN`, `LBFILL`, and `LBFILL2` behavior exactly.
+2. Confirm CR raw-row gap/missing-BG handling and that the full six-hour SMB exclusion remains intact.
+3. Confirm the audit-only changes leave learner input sets/formulas unchanged, including the non-causal baseline path.
+4. Confirm candidates = accepted + rejected for each CR block, ISF scan, and both basal implementations.
+
+Stop before replay batches until Claude approves these semantics and the compile-only check passes.
+
+
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
