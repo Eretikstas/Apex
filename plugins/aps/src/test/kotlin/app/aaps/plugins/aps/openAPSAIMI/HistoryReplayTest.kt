@@ -1563,14 +1563,14 @@ class HistoryReplayTest {
                 var iobAll = 0.0
                 for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                 val bIob = basalIob(t)
-                val bIobUsed = if (noIob && reading < noIobBg) maxOf(bIob, 0.0) else bIob
                 val wizardBg = if (sensorGapActive) targetP else reading
+                val bIobUsed = if (noIob && wizardBg < noIobBg) maxOf(bIob, 0.0) else bIob
                 val fall15 = !sensorGapActive && readV.size > 15 && t - readT[readT.size - 16] <= 20 * minute && reading - readV[readV.size - 16] < -9.0
                 val thrNow = if (smartL) smartThr else 81.0
                 val waitNow = !sensorGapActive && (reading < thrNow || (smartL && fall15 && reading < thrNow + 18.0))
-                if (smartS && waitNow) { pend = Pending(t, ml.logged, reading); nDelayed++; if (smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, true)) }
+                if (smartS && waitNow) { pend = Pending(t, ml.logged, reading); nDelayed++; if (!sensorGapActive && smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, true)) }
                 else {
-                    if (smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, false))
+                    if (!sensorGapActive && smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, false))
                     val icM = icAt(t)
                     val wiz = ml.logged / icM + (wizardBg - targetP) / isfP - iobAll - bIobUsed
                     val afterHypo = chainP > 0.0 && ml.logged >= 13.0 && t - lastTreat < 180 * minute
@@ -1601,7 +1601,7 @@ class HistoryReplayTest {
             // and not falling, minus the SMB the loop gave since the meal. Dropped after 90 min or if glucose < 4.5.
             if (!sensorGapActive) splits.removeAll { sp ->
                 val m = (t - sp.t) / minute
-                val rising = readV.size > 5 && reading >= readV[readV.size - 6]
+                val rising = readV.size > 5 && t - readT[readT.size - 6] <= 15 * minute && reading >= readV[readV.size - 6]
                 val ready = if (splitAbs) devStreak >= 2 && reading >= 90.0 else reading >= 99.0
                 if (m > sp.maxMin || (m >= splitMin && reading < 81.0)) { nSplitDrop++; true }
                 else if (m >= splitMin && ready && rising) {
@@ -1613,7 +1613,7 @@ class HistoryReplayTest {
             if (!sensorGapActive) pend?.let { pd ->
                 val m = (t - pd.t) / minute
                 val check = m == 10L || m >= 15L
-                val rising = readV.size > 5 && reading > readV[readV.size - 6]
+                val rising = readV.size > 5 && t - readT[readT.size - 6] <= 15 * minute && reading > readV[readV.size - 6]
                 if (m > 45) { pend = null; nCancel++ }
                 else if (check && reading >= 81.0 && rising && (reading >= 99.0 || reading >= pd.bg + 27.0)) {
                     var iobAll = basalIob(t)
@@ -1717,7 +1717,7 @@ class HistoryReplayTest {
                         else if (release && !meal && !strongRise) episodes.lastOrNull()?.takeIf { !it.done && !it.released }?.let { it.released = true; releases++ }
                     }
                 }
-                val noisy = noiseGuard && readV.size > 16 && (readV.size - 15 until readV.size).sumOf { Math.abs(readV[it] - 2 * readV[it - 1] + readV[it - 2]) } / 15.0 > noiseThr
+                val noisy = noiseGuard && readV.size > 16 && t - readT[readT.size - 16] <= 20 * minute && (readV.size - 15 until readV.size).sumOf { Math.abs(readV[it] - 2 * readV[it - 1] + readV[it - 2]) } / 15.0 > noiseThr
                 if (noisy) noisyMin += 5
                 val smbOk = smbState && !guardHold && pend == null && !noisy
                 for (ep in episodes) {
