@@ -132,6 +132,16 @@ Findings from source inspection:
 
 Required before batch: Claude to review these points, correct/approve the audit semantics, and confirm both compile-only runs. Do not start replay batches until the audit counters and gates are trustworthy. Claude remains owner of Results and replay execution; this note is in Task only.
 
+
+
+### 2026-11-23, compile failure and follow-up syntax fix
+
+- Compile-only run `45089660052` for commit `ed92b3fb41a63958010f3df98004a95b946c23aa` completed with failure after 7m11s.
+- The prior syntax repairs exposed one remaining concatenated declaration at `HistoryReplayTest.kt:2075`: `val px = ... )        val py = ...`. The main Kotlin modules compiled; the unit-test Kotlin source compilation failed on this syntax error.
+- A full-file scan found this as the only remaining same-line concatenation matching the checked declaration/control-flow patterns.
+- Fixed by separating `px` and `py` declarations on separate lines. Commit: `faa3c7cf5498059a810bebf24020188cd00b659f`.
+- Compile-only should be rechecked on this commit. No replay batch was run. Audit-semantic findings above remain open and require Claude review; a passing compile alone does not close them.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
