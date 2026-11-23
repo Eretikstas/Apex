@@ -9,6 +9,7 @@ on:
       - 'plugins/aps/build.gradle'
       - 'plugins/aps/build.gradle.kts'
       - '.github/workflows/aimi-replay-compile.yml'
+      - '.github/workflows/aimi-replay.yml'
   workflow_dispatch:
 
 permissions:
