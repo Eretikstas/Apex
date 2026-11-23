@@ -195,7 +195,7 @@ Changes are limited to replay test/audit logic:
 1. ISF now counts correction candidates independently; CR and both Basal paths also assert `candidates = accepted + rejected` using fail-fast guards.
 2. Causal audit windows detect explicit sensor-gap flags and timestamp gaps over 5 minutes. The non-causal ISF path remains unchanged.
 3. Added `OUTDAY_<1-based-day>_<positive-factor>` and `GAP_15/GAP_30/GAP_60`. GAP removes sensor samples on day 4 at 02:00 synthetic UTC+3, writes no BG for blackout rows, performs no interpolation, and marks the following 60-minute recovery as contaminated.
-4. Added parser/reconciliation unit tests. Workflow commit `c5db9c996396f1a17a463c875a757064a4945092` adds an isolated JUnit step with replay input/output paths explicitly empty; the replay test is skipped by its assumption gate while the two pure helper tests execute. Run `45096342199` is queued; no test result is claimed yet.
+4. Added parser/reconciliation unit tests. Workflow commit `c5db9c996396f1a17a463c875a757064a4945092` adds an isolated JUnit step with replay input/output paths explicitly empty; the replay test is skipped by its assumption gate while the two pure helper tests execute. Run `45096342199` is in progress; compile is still running and the isolated helper-test step has not started.
 5. Source-level deterministic review: all synthetic random streams are seeded from `SEED` and fixed offsets. Same-seed replay equivalence remains untested.
 
 APK static inspection is documented in the linked report. The supplied APK filename says 4.1, but its manifest reports versionName 4.0.0/versionCode 2000; embedded VCS metadata says `NO_VALID_GIT_FOUND`, so source provenance is not established.
