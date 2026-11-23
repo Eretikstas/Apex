@@ -117,3 +117,10 @@ On `aimi-replay`, in `HistoryReplayTest.kt`:
 
 ### Interpretation guard
 The narrower evidence interval is a hypothesis about the replay harness's over-filtering, not proof that more basal samples are clinically valid. The 5 h meal rule, LBTAIL COB/CR checks, hypo and insulin exclusions, cannula/sensor/activity/illness guards remain in force. Do not integrate until the rerun demonstrates acceptable data quality and independent safety/clinical review.
+
+
+### CI run identifiers and live status
+- Replay rerun: `45255929153` (commit `4ddb436843b355f7675015723df3a35d9e8ca5dc`): plan succeeded; 24 replay jobs created; at last poll 18 in progress, 6 queued, no failed jobs.
+- Compile checks: `45255870246` (first filter patch) and `45255915278` (final filter + audit-reason patch) were both observed in progress at last poll.
+- Early log download attempts for the new replay jobs returned BlobNotFound while jobs were still running; no result is inferred from that.
+- Next gate: wait for the current jobs to complete, then inspect each job's basal audit line and verify that accepted candidates and eligible hours are nonzero in at least some eligible days, without relaxing the meal/COB or hypo/insulin safeguards.
