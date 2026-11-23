@@ -233,6 +233,28 @@ Design and test gates are documented in `TECHNICAL_AUDIT_2026-11-23.md`. Impleme
 - For every run, Claude records intended synthetic change, expected card response, unrelated-card response and audit evidence in Results. Stop on unreconciled counters, unexplained card response, or incorrect synthetic effect.
 - ChatGPT has not dispatched replay. No live AAPS/profile/pump/Nightscout changes.
 
+
+### 2026-11-23, Task 7 — aggregate-only public summary for synthetic replays
+
+Workflow changes on `aimi-replay`:
+- `91b995a3b570475520992f3883ba8d6d7144a0e1` — split replay from result encryption and add the conditional synthetic summary step.
+- `8404e352fdfd2408980881f0d555f22bcc162af1` — remove a redundant validation loop from the summary script.
+- `2cdc7315c7aea6eb975581a44efbc866e501e5cd` — make the compile-check workflow run when `aimi-replay.yml` changes.
+
+The new step runs only when `matrix.prefs` contains `SYNTH_`. It reads that job's `out.json.gz`, selects the second half of synthetic days, and publishes one table to both `GITHUB_STEP_SUMMARY` and the job log:
+- BG below 70 mg/dL, BG below 54 mg/dL, and BG above 180 mg/dL — percentages of valid BG samples in the selected half;
+- CV — population standard deviation divided by mean BG;
+- hypo-treatment carbohydrates — grams/day;
+- delivered insulin — U/day, calculated from basal rate per minute plus SMB and manual boluses.
+
+The task label is the first three whitespace-separated prefs tokens. The only copied Gradle detail lines are the last `AIMI replay: learner ALL cards` line and the `AIMI audit` lines. No timestamps, raw glucose series, or per-meal carbohydrate amounts are emitted. The encrypted archive path, artifact name, AES-256-CBC/PBKDF2 encryption command, and retention are unchanged.
+
+Validation:
+- Compile-check run `45100552307` for commit `2cdc7315c7aea6eb975581a44efbc866e501e5cd` was **in progress** at the time of this report; do not mark the build green until its conclusion is checked.
+- Existing synthetic batch `45099362646` was still **in progress**. No second `aimi-replay.yml` run can start until it finishes.
+- The exact APP prefs string from private `app22_batch.json` is not present in the available files/context. It was not guessed, so the requested base/seed-1/APP one-job run has not been started. Supply that exact prefs string (or the file) before dispatch.
+- Once a SYNTH-only run completes, ChatGPT can read the public aggregate summary from the Actions run. The encrypted artifact remains unreadable here; Claude's role is to review the learner decisions, not extract the numeric summary.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
