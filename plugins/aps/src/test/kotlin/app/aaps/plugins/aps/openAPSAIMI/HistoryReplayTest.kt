@@ -1451,7 +1451,7 @@ class HistoryReplayTest {
                 val window = k - 48..k + 36
                 val windowRows = window.map { rows[it] }
                 val rejection = when {
-                    causalFilter && hasSensorGap(evidenceRows) -> "sensor-gap"
+                    causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
                     window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
                     window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
