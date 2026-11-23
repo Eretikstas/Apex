@@ -53,6 +53,41 @@ on:
         description: 'Many runs at once: prefs lists separated by | (each one is its own job; prefs above is ignored)'
         type: string
         default: ''
+  workflow_call:
+    inputs:
+      learn:
+        type: boolean
+        default: true
+      prefs:
+        type: string
+        default: ''
+      pretrained:
+        type: boolean
+        default: false
+      react_floor:
+        type: string
+        default: ''
+      oref_prediction:
+        type: boolean
+        default: false
+      no_booster:
+        type: boolean
+        default: false
+      booster_iob:
+        type: boolean
+        default: false
+      sim:
+        type: boolean
+        default: false
+      algo:
+        type: string
+        default: aimi
+      isf:
+        type: string
+        default: ''
+      batch:
+        type: string
+        default: ''
   # A push only makes the workflow known to GitHub (so it can be started by hand); it runs nothing.
   push:
     branches:
@@ -95,8 +130,10 @@ jobs:
         -Dkotlin.compiler.execution.strategy=in-process
         -Dorg.gradle.workers.max=2
     steps:
-      - name: Checkout
+      - name: Checkout replay branch
         uses: actions/checkout@v5
+        with:
+          ref: aimi-replay
 
       - name: Check the key is there
         env:
