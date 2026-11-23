@@ -112,3 +112,38 @@ Update this report after the latest compile run finishes. A compile pass validat
 7. Implement and compare `LAORDER_SAFE` / `LAORDER_EVID` only at the planned later phase; neither token is implemented here.
 
 No replay, live settings change, profile change, pump action, or Nightscout write was performed.
+
+
+## 2026-11-23 — LAORDER_EVID proposal/apply design (user-directed)
+
+The user rejected the initial "calculate then restore globals" approach as the primary design and specified a pure proposal/apply split for Basal and Dura. This is the accepted implementation direction; it is not yet implemented or compile-validated.
+
+### Required architecture
+
+- `proposeBasal(state, inputs): BasalProposal` computes a candidate using a deep/copied state value. It must not mutate globals, the live profile, or the caller's state. The proposal carries the candidate profile/value changes and the complete next Basal state.
+- `applyBasal(proposal)` is the only path that writes the selected Basal result and its next state to the replay's active state.
+- `proposeDura(state, inputs): DuraProposal` follows the same pure contract. Dura proposal calculation must not write `aw.dura` or any global state.
+- `applyDura(proposal)` commits the Dura value and its next state only when the Dura card is selected.
+- EVID must calculate all competing proposals from the same immutable pre-selection snapshot. Selection/priority is decided only after proposals exist; unselected proposals are discarded without rollback.
+
+### Basal state inventory to capture
+
+Source inspection found the Basal replay learner currently uses at least: `profBasal[24]`, `lastDir[24]`, `upCount[24]`, `lastShift`, `lastTrendDay`, `lastTrendF`, `lbCards`, and trend-related state (including `lastTrendDay`/trend confirmation). Any other mutable value read or written by `learnBasal2`, `learnBasal`, `hourNeeds`, or its proposal helpers must be included or made immutable input. Arrays must be copied, not aliased. Do not assume the inventory above is exhaustive until the complete call graph is audited.
+
+### Dura state inventory
+
+Dura currently reads/writes `aw.dura`; its proposal must carry the candidate dura and any future confirmation/counter state. The rolling output rows and thresholds are immutable inputs to proposal calculation.
+
+### Required tests
+
+1. With no `LAORDER_EVID` token, the replay output must be byte-for-byte identical to the pre-refactor baseline for identical input, seed, and tokens. Capture the baseline before changing call order or formatting.
+2. Calling each `propose...` twice with the same state and inputs must return equal proposals and leave all global/live state unchanged after each call.
+3. Applying a proposal must update exactly the selected card's values and state; discarding it must leave the active state unchanged.
+4. EVID must compute both Basal and Dura proposals from the same pre-apply snapshot; no proposal may observe another proposal's changes.
+5. Include defensive tests for array aliasing: mutating the proposal's next-state arrays must not mutate the source state.
+
+### Scope and status
+
+- Preferred approach: proposal/apply separation. Snapshot/restore is only a fallback if the refactor is demonstrably too large; if used, it must be a single complete `snapshot()/restore()` abstraction covering every mutable field and pass the same non-mutation tests.
+- No live learner, formulas, thresholds, clinical gates, pump/profile/Nightscout settings are to be changed.
+- No replay batch is authorized. No source implementation change has been made in this step; this entry records the approved design and exact verification gates for Claude review.
