@@ -204,6 +204,18 @@ Latest source commit: `70b796b71e1df3925742bf379a4e5f6de7e5e788`; compile-only r
 
 No learner formula, live profile, pump or Nightscout setting was changed. Claude review and replay ownership remain unchanged. Do not proceed to baseline/pair/OUTDAY/GAP batches until Claude approves the outstanding audit semantics and compile validation is complete.
 
+### 2026-11-23, LAORDER_EVID proposal/apply design
+
+User-directed design decision: use pure `propose…(state)` plus selected-only `apply…(proposal)` for Basal and Dura. Do not use calculate-then-restore as the primary design.
+
+- Basal proposal must carry the complete next state, including copied arrays and every mutable trend/confirmation/counter field; current source inventory includes `profBasal`, `lastDir`, `upCount`, `lastShift`, `lastTrendDay`, `lastTrendF`, and `lbCards`, subject to full call-graph audit.
+- Dura proposal carries the candidate value/state without mutating `aw.dura`.
+- EVID computes all proposals from one immutable pre-selection snapshot. Only the selected proposal is applied; unselected proposals are discarded.
+- Required tests: no-token byte-for-byte baseline equivalence; repeated propose calls return identical proposals and leave globals unchanged; apply changes only selected card; discarded proposal has no effect; array aliasing is prevented.
+- Snapshot/restore is fallback only, through one complete `snapshot()/restore()` abstraction and the same non-mutation tests.
+
+Design and test gates are documented in `TECHNICAL_AUDIT_2026-11-23.md`. Implementation has not yet been committed or compile-validated. No replay batch or live AAPS change was made.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
