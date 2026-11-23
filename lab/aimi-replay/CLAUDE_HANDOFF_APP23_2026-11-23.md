@@ -361,3 +361,41 @@ For CR, prior-insulin remains the dominant rejection. Candidate-level review mus
 - Run 45284611426: plan PASS; 24 replay jobs created. At report update, several replay jobs are in progress and the remainder queued. This is the matched comparator for APP23 run 45278182666.
 - The paired comparison will use the public second-half synthetic summaries (BG<70, BG<54, BG>180, CV, hypo-treatment grams/day and insulin U/day), grouped by matching scenario/seed. It will not establish clinical safety; it is a controlled synthetic comparison only.
 - Do not alter the production branch or deploy.
+
+
+## APP24 matched APP baseline — completed 2026-11-24
+
+- Run: https://github.com/Eretikstas/Apex/actions/runs/45284611426
+- Plan job PASS; all 24/24 replay jobs PASS; no replay failures.
+- APP24 is the matched baseline (legacy APP percentage card, no APP23 LEARNALL/ISF/CR/causal-label/protection switches). APP23 is the experimental learner batch. Scenario indices 0–23 and their stress tokens/seeds match exactly.
+- Extracted all 24 public second-half summaries from job logs. Each row summarizes the latter half of its synthetic horizon (28 days for SYNTH_56, 42 days for SYNTH_84); these are synthetic outputs, not patient data or clinical validation.
+
+### Matched cohort means (24 paired scenario/seed rows)
+
+| Metric | APP23 learner | APP24 baseline | Baseline minus learner |
+|---|---:|---:|---:|
+| BG <70 (%) | 2.70 | 2.26 | -0.45 pp |
+| BG <54 (%) | 0.013 | 0.000 | -0.013 pp |
+| BG >180 (%) | 8.92 | 7.58 | -1.34 pp |
+| CV (%) | 29.15 | 27.78 | -1.37 pp |
+| Hypo treatment (g/day) | 27.26 | 23.67 | -3.59 |
+| Insulin (U/day) | 15.29 | 15.11 | -0.17 |
+
+- APP24 baseline had lower BG<70 in 19/24 paired rows; lower BG>180 in 18/24; lower CV in 20/24; lower hypo-treatment grams/day in 19/24. No APP24 row had BG<54, whereas APP23 had three nonzero rows (0.1% each).
+- Baseline therefore outperformed this APP23 learner batch on the cohort means for all reported glycemic and hypo-treatment metrics, with nearly unchanged daily insulin. This is a negative result for the current APP23 learner configuration; do not present the learner changes as an improvement.
+- The group mean is unweighted across 24 scenario/seed rows, not weighted by number of samples or days. Different synthetic horizons are mixed; interpret as paired scenario-level mean, not a population estimate. TIR can be derived as 100 - BG<70 - BG>180; BG<54 is a subset and must not be subtracted twice.
+- APP24 public baseline metrics were read from completed workflow job summaries. Encrypted raw replay artifacts remain encrypted; no decryption key was accessed or exposed.
+
+### Consequences / next work
+
+1. Keep APP23 learner changes laboratory-only. Do not merge or deploy. The paired comparator shows no benefit in this matched synthetic set.
+2. Before any retest, isolate APP23 components instead of testing LEARNALL as one bundle: percentage card/hysteresis, basal, ISF and CR should each be evaluated separately against the same APP baseline.
+3. ISF and CR remain nonfunctional as learners in APP23: ISF accepted 0/50,719 candidate scans; CR accepted 12/16,651 scans but 0/2,001 block gates passed. Do not relax safeguards without timestamp-level causal review.
+4. Basal passed 534/534 gates but accepted only 27,392/2,049,612 scans (~1.34%); verify coverage by hour and day before considering it useful.
+5. Percentage event totals (74 decreases / 59 restores) need timeline-level analysis; this run's paired metrics do not isolate percentage card effects because APP23 bundled multiple learner features.
+6. UI empty-card audit is still separate and unresolved. Trace production card models, mappers, visibility rules and fallback rendering; replay summaries are not proof that production UI cards render populated payloads.
+7. The app23-auto.yml workflow file was temporarily repurposed to carry the baseline batch while triggering the run; inspect and restore its canonical APP23 definition only after verifying the dedicated APP24 workflow. Avoid triggering another replay unnecessarily.
+
+- APP23 learner run: https://github.com/Eretikstas/Apex/actions/runs/45278182666
+- APP24 matched baseline run: https://github.com/Eretikstas/Apex/actions/runs/45284611426
+- No changes to autoisf-atc3; no deployment, install, pump/profile mutation, or Nightscout write access.
