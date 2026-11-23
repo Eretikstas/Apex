@@ -2072,7 +2072,8 @@ class HistoryReplayTest {
     }
 
     private fun aisfInterpolate(x: Double): Double {
-        val px = doubleArrayOf(50.0, 60.0, 80.0, 90.0, 100.0, 110.0, 150.0, 180.0, 200.0)        val py = doubleArrayOf(-0.5, -0.5, -0.3, -0.2, 0.0, 0.0, 0.5, 0.7, 0.7)
+        val px = doubleArrayOf(50.0, 60.0, 80.0, 90.0, 100.0, 110.0, 150.0, 180.0, 200.0)
+        val py = doubleArrayOf(-0.5, -0.5, -0.3, -0.2, 0.0, 0.0, 0.5, 0.7, 0.7)
         val v = when {
             x < px[0] -> py[0] + (py[1] - py[0]) / (px[1] - px[0]) * (x - px[0])
             x > px.last() -> py[7] + (py[8] - py[7]) / (px[8] - px[7]) * (x - px[7])
