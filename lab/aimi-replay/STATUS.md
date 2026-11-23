@@ -492,3 +492,11 @@ No replay was run. Compile-only validation is required before the single base AP
 - verify that every insulin-increasing path is gated and protective decreases are not blocked;
 - verify no-token behavior remains unchanged;
 - verify the Dura seven-day protection count and per-hour basal handling.
+
+
+### 2026-11-23, LAPROTECT scope guard and insulin accounting across GAP
+
+- Commit `251520148b7141047b5acbd6bdc628d7472a44f9` adds two safeguards:
+  1. `LAPROTECT` now requires both `LEARNALL` and `LACAUSE`. This prevents the protection token from running without the complete learner interlock or with unfiltered Dura flat-high evidence.
+  2. Synthetic output now records delivered basal rate and manual bolus units even on sensor-blackout rows. BG/COB remain absent during the blackout. This lets the aggregate TDD summary count insulin delivered during GAP instead of silently dropping it.
+- No replay was run. Compile-only validation remains pending for the current source head.
