@@ -10,6 +10,7 @@ on:
       - 'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAIMI/orchestration/AimiAdaptationStatusBuilder.kt'
       - 'plugins/main/src/main/kotlin/app/aaps/plugins/main/general/dashboard/viewmodel/AimiAdaptationStatusViewModel.kt'
       - 'plugins/main/src/main/kotlin/app/aaps/plugins/main/general/dashboard/compose/AimiAdaptationStatusScreen.kt'
+      - 'implementation/src/test/kotlin/app/aaps/implementation/aps/DetermineBasalResultTest.kt'
       - 'plugins/aps/build.gradle'
       - 'plugins/aps/build.gradle.kts'
       - '.github/workflows/aimi-replay-compile.yml'
@@ -55,6 +56,9 @@ jobs:
         run: |
           ./gradlew :plugins:aps:testFullDebugUnitTest --tests 'app.aaps.plugins.aps.openAPSAIMI.orchestration.AimiAdaptationStatusBuilderTest' --console=plain
           ./gradlew :plugins:main:testFullDebugUnitTest --tests 'app.aaps.plugins.main.general.dashboard.viewmodel.AimiAdaptationStatusViewModelTest' --console=plain
+
+      - name: Test in-memory AIMI status through APSResult wrapper
+        run: ./gradlew :implementation:testFullDebugUnitTest --tests 'app.aaps.implementation.aps.DetermineBasalResultTest' --console=plain
 
       - name: Assemble laboratory FullDebug APK
         run: ./gradlew :app:assembleFullDebug --console=plain
