@@ -1331,6 +1331,7 @@ class HistoryReplayTest {
         // ambiguous lows and events contaminated by SMB, rebound, sensor, activity or cannula issues do not teach CR/ISF.
         val learnAll = prefsText.contains("LEARNALL"); val laGap = tok("LAGAP", 3.0).toInt(); var laLast = -99
         require(!laProtect || learnAll) { "LAPROTECT requires LEARNALL so every learner proposal passes the protection interlock" }
+        require(!laProtect || causalFilter) { "LAPROTECT requires LACAUSE so Dura flat-high evidence keeps its causal exclusions" }
         val laIsf = prefsText.contains("LAISF"); val laCr = prefsText.contains("LACR"); val isfStart = isfP
         val laCount = HashMap<String, Int>()
         fun laNote(card: String) { laCount[card] = (laCount[card] ?: 0) + 1 }
@@ -1822,7 +1823,9 @@ class HistoryReplayTest {
                 episodes.removeAll { it.done && t - it.t0 > 6 * 3_600_000L }
                 val row = JSONObject().put("t", t).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
                     .put("ntreat", nTreat)
-                if (!sensorGapActive) row.put("bg", reading).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
+                if (!sensorGapActive) row.put("bg", reading).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("cob", logged.sumOf { it.left })
+                // Insulin delivery and manual boluses remain reportable during a sensor blackout.
+                row.put("man", manThisTick).put("deliv", rateNow)
                 row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h]).put("lbg", gs?.glucose ?: JSONObject.NULL)
                 if (canEvery > 0) row.put("can", ((t - t0) / 3_600_000.0) % canEvery)
                 if (causalFilter || laProtect) {
