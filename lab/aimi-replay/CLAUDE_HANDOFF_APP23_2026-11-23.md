@@ -42,3 +42,27 @@ Earlier push-triggered runs, if GitHub accepted them, may have used incomplete 2
 
 ### Run visibility limitation
 The connected GitHub workflow-run listing wrapper filters to pull-request-triggered runs, so it returned no runs for this push-triggered commit. A GET-only fetch is also not exposing the Actions run collection in this connector. Thus execution has been configured to trigger on push, but a matching run ID/status and its artifacts are not yet independently confirmed from this connection. Do not claim completion until the run tied to the latest commit is verified in GitHub Actions.
+
+
+## Update at 2026-11-23 20:43 CET — reusable workflow secret fix and APP23 started
+This update supersedes the earlier statement that push-trigger execution was unconfirmed/unavailable.
+
+### Root cause of previous startup failures
+- Runs tied to commits `4522085...`, `e84daca...`, and `6237bff...` ended with `startup_failure` and zero jobs.
+- The caller used `secrets: inherit` while the repository is owned by an individual account. The called reusable workflow also did not declare `AIMI_REPLAY_KEY` under `on.workflow_call.secrets`.
+- Fixed on `aimi-replay` in two commits:
+  - `142385ae79bfc81b0b4aa932da2923510a3d3c81`: declare `AIMI_REPLAY_KEY: required: true` under reusable workflow_call secrets.
+  - `2325a131e0eed62e65742ed702808966a9bd09f7`: pass `AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}` explicitly from app23-auto caller.
+
+### Confirmed execution
+- APP23 run: `45251769895`
+- Commit: `2325a131e0eed62e65742ed702808966a9bd09f7`
+- Event: push; workflow: `.github/workflows/app23-auto.yml`
+- Plan job completed successfully and generated the matrix.
+- Exactly 24 replay matrix jobs were created (indices 0–23), each currently queued at the last inspection.
+- This is a real run; it is no longer a startup failure. No replay result is available yet. Do not report any clinical metrics until all jobs finish and summaries/artifacts are inspected.
+- Separate compile workflow run `45251757109` was also in progress at last inspection.
+
+### Safety scope unchanged
+- Only `aimi-replay` was modified.
+- No changes to `autoisf-atc3`, no app installation, and no live pump/profile changes.
