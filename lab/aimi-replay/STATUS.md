@@ -178,6 +178,29 @@ Stop before replay batches until Claude approves these semantics and the compile
 
 
 
+### 2026-11-23, independent technical audit and OUTDAY/GAP preparation
+
+ChatGPT source-level audit and replay-only test-harness changes are recorded in [TECHNICAL_AUDIT_2026-11-23.md](TECHNICAL_AUDIT_2026-11-23.md).
+
+Source commits:
+- `3e7792f5d2e345ff82af335e886f20caf834d5be`: independent Learning Audit reconciliation guards; strict OUTDAY/GAP parser; scenario generation.
+- `b40050a4e7591908598e08189332a32d06993493`: sensor-gap/recovery timeline hardening.
+- `8fb7ae73561ec8bc193be34f8d24413d78711dde`: preserve non-causal ISF behavior; expand boundary checks.
+- `037cca0c148eec99b470ee30e0df4a61a8d9b4d5`: avoid stale sensor values during synthetic GAP.
+
+Changes are limited to replay test/audit logic:
+1. ISF now counts correction candidates independently; CR and both Basal paths also assert `candidates = accepted + rejected` using fail-fast guards.
+2. Causal audit windows detect explicit sensor-gap flags and timestamp gaps over 5 minutes. The non-causal ISF path remains unchanged.
+3. Added `OUTDAY_<1-based-day>_<positive-factor>` and `GAP_15/GAP_30/GAP_60`. GAP removes sensor samples on day 4 at 02:00 synthetic UTC+3, writes no BG for blackout rows, performs no interpolation, and marks the following 60-minute recovery as contaminated.
+4. Added parser/reconciliation unit tests. Current CI workflow compiles test sources only; these tests have not yet been executed.
+5. Source-level deterministic review: all synthetic random streams are seeded from `SEED` and fixed offsets. Same-seed replay equivalence remains untested.
+
+APK static inspection is documented in the linked report. The supplied APK filename says 4.1, but its manifest reports versionName 4.0.0/versionCode 2000; embedded VCS metadata says `NO_VALID_GIT_FOUND`, so source provenance is not established.
+
+Latest source commit: `037cca0c148eec99b470ee30e0df4a61a8d9b4d5`. Compile-only run `45095656854` was in progress when this note was written. Replay workflow was skipped; no replay batch was started.
+
+No learner formula, live profile, pump or Nightscout setting was changed. Claude review and replay ownership remain unchanged. Do not proceed to baseline/pair/OUTDAY/GAP batches until Claude approves the outstanding audit semantics and compile validation is complete.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
