@@ -107,8 +107,11 @@ class HistoryReplayTest {
     private fun isPercentageLearningRow(row: JSONObject): Boolean {
         if (!row.has("bg") || row.optBoolean("falseLow") || row.optBoolean("sensorGap") ||
             row.optBoolean("oldCannula") || row.optBoolean("activity") || row.optBoolean("illness")) return false
-        return row.getDouble("bg") >= 70.0 ||
-            row.optString("hypoCause") == "fasting" || row.optString("hypoCause") == "meal_bolus"
+        if (row.getDouble("bg") < 70.0)
+            return row.optString("hypoCause") == "fasting" || row.optString("hypoCause") == "meal_bolus"
+        // Do not let rebound or correction-only time dilute the low-rate denominator.
+        return !row.optBoolean("afterHypo") && !row.optBoolean("afterSmb") &&
+            (!row.optBoolean("afterManual") || row.optBoolean("afterMeal"))
     }
 
     private fun classifyHypoCause(
@@ -217,6 +220,10 @@ class HistoryReplayTest {
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "ambiguous")))
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting").put("activity", true)))
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("activity", false)))
+        assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("afterHypo", true)))
+        assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("afterSmb", true)))
+        assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("afterManual", true)))
+        assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("afterManual", true).put("afterMeal", true)))
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("sensorGap", true)))
         assertEquals("fasting", classifyHypoCause(false, false, false, false, false, false, false))
         assertEquals("smb", classifyHypoCause(true, false, false, true, false, true, false))
