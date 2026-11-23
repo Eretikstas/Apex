@@ -459,3 +459,15 @@ unchanged. The user still has to say yes (asked in chat).
    table script `deliv * 5 / 60`), not 1-minute ticks. `deliv / 60.0` undercounts basal 5x. Use `deliv * 5 / 60` —
    or better, take the row step from the data (median difference of `t`, in minutes) and use `deliv * step / 60`.
 Test on one job before the next batch: TDD should be about 14–17 U/day for base, like the APP table above.
+
+
+### 2026-11-23, ChatGPT continuation without Claude — synthetic summary repair
+
+User authorized ChatGPT to continue the lab work without Claude and required every action to be recorded here. Work remains limited to branch `aimi-replay`; no app-branch or live AAPS changes.
+
+- Updated `.github/workflows/aimi-replay.yml` in commit `a3057c3187318087af221c8b6ed4c67bf2f4a527`.
+- Fixed `SYNTH_<days>` extraction to accept comma- or whitespace-separated preference tokens (the actual replay prefs use commas).
+- Fixed task-label tokenization to split on commas and whitespace.
+- Fixed basal insulin integration: infer the normal row interval from the median positive timestamp delta (ignoring gaps over 30 minutes), validate it is 1–15 minutes, and integrate `deliv` as U/hour × interval-hours. SMB and manual bolus units remain summed per row. This avoids the known fivefold undercount on 5-minute rows and remains robust to missing GAP ticks.
+- No replay was run. The next required validation is compile-only CI, followed by exactly one base APP / SYNTH_56 / seed 1 summary check. Do not start the replay until compile is green and no replay workflow is active. Check TDD against the expected approximate 14–17 U/day; if outside, stop and investigate.
+- Review requested: verify comma parsing, inferred cadence, and the insulin-unit semantics in the public summary. The summary step is part of the replay workflow; the replay step, encryption/decryption, and secrets were not changed.
