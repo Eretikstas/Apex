@@ -262,6 +262,14 @@ Task 7 follow-up:
 - GitHub accepted the updated `aimi-replay.yml` workflow on push (push-triggered replay runs were skipped as intended); this is a YAML registration check, not an execution test of the summary step.
 - The requested one-job APP replay remains pending: run `45099362646` is still in progress, and the exact APP prefs from `app22_batch.json` are unavailable. Do not dispatch a second replay while the first is active or substitute guessed APP tokens.
 
+
+Task 7 correction / supplied test prefs:
+- `6052ac4ab87ae6d76fcbe8d3d916c1bbe7c8940f` fixes 17 escaped GitHub Actions expressions (`\\${{` → `${{`) introduced in the new Replay/summary/encryption steps. This is a required workflow correction; validation is still pending.
+- The synthetic output schema was checked in `HistoryReplayTest.kt`: rows are a JSON array; `t` is epoch milliseconds; `bg` is measured glucose; `hypo` is hypo-treatment grams; `deliv` is basal rate in U/hour on one-minute ticks; `units` and `man` are SMB/manual bolus units. Daily insulin therefore integrates `deliv / 60` plus `units` and `man` per tick.
+- User supplied exact synthetic prefs for the one-job test: `SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,SBIAS_0.15,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,TREATL,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100`.
+- This is a `SYNTH_56` synthetic prefs string, not a separate literal `APP` token. It is retained as supplied, without adding or guessing tokens.
+- At the last status check, replay run `45099362646` and compile check `45100729376` were both still in progress. The GitHub integration exposes no workflow-dispatch action, so the requested one-job run has not been started. Do not start another replay until `45099362646` completes and the latest compile check is green.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
