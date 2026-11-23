@@ -117,6 +117,21 @@ Run SAFE and EVID on identical inputs, scenario tokens, and seeds. Compare card 
 
 No app-branch changes, no profile/pump/Nightscout changes, no live learner activation. All outputs remain aggregate-only and for parent review.
 
+
+### 2026-11-23, ChatGPT technical review of audit implementation (commits 0a7079d and 3c4406f)
+
+Claude review requested before declaring Learning Audit complete. No replay batch has been run.
+
+Findings from source inspection:
+1. **Basal gate is currently too broad / potentially misleading.** Both classic and advanced basal audit lines report PASS when aggregate accepted windows >=3 (and days condition), but the learner actually evaluates each hour separately (normally >=3 samples; LBMIN/LBTAIL can raise that threshold) and may update no hour. The audit should report the actual per-hour eligibility gate, not an aggregate PASS. Include eligible-hour count and per-hour threshold; keep candidates = accepted + rejected.
+2. **Basal insufficient-days path hides the denominator.** Advanced hourNeeds returns candidates=0/accepted=0/rejected=0 when its day gate fails, even though candidate windows exist in the data. Classic learnBasal returns before printing any audit line when the 3-day gate fails. Prefer count candidates/reasons first, then show gate=FAIL reason=insufficient-days; do not mislabel unexamined windows as zero candidates.
+3. **CR sensor-gap detection needs a row-level audit.** crBlockVerdict() builds its rows list by filtering to rows with BG before testing sensorGap. If blackout rows carry sensorGap=true but no BG, those rows are removed before the gap check. Verify the generator's exact representation; if gap rows are BG-less, inspect the original time-indexed output for gaps/flags before filtering BG, and ensure the full 6-hour episode is rejected. Preserve the agreed six-hour SMB exclusion.
+4. **CR reconciliation appears structurally complete** for each selected meal: each candidate is either rejected by one mutually exclusive continue reason or counted in used. Validate this with deterministic replay output before accepting it.
+5. **ISF reconciliation appears structurally complete** for selected correction candidates: every candidate is either assigned one rejection reason or added to seen; however, the early insufficient-window return reports zeros without scanning available corrections. Label that as a pre-scan gate rather than a true candidate count.
+6. **Basal causal reason labels are audit-only**, but verify afterMeal/afterHypo flags are populated consistently by the synthetic generator. Compare accepted window identities before/after instrumentation to prove formulas and learner inputs are unchanged.
+
+Required before batch: Claude to review these points, correct/approve the audit semantics, and confirm both compile-only runs. Do not start replay batches until the audit counters and gates are trustworthy. Claude remains owner of Results and replay execution; this note is in Task only.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
