@@ -95,7 +95,7 @@ class HistoryReplayTest {
         row.optLong("t", Long.MIN_VALUE) < t0 + 24 * 60 * minute -> "sensor-start"
         row.optBoolean("falseLow") -> "false-low"
         row.optBoolean("sensorGap") -> "sensor-gap"
-        row.optBoolean("afterHypo") -> "post-hypo-180m"
+        // LAPROTECT is deliberately all-cause: post-treatment/rebound lows still count as safety evidence.
         else -> null
     }
 
@@ -106,7 +106,9 @@ class HistoryReplayTest {
     // Meal exclusion is handled separately by the 5 h meal window / explicit LBTAIL rule;
     // scanning the preceding 5 h for afterMeal made LBTAIL impossible and rejected nearly every hour.
     private fun isBasalEvidenceRow(row: JSONObject): Boolean =
-        !(row.optBoolean("afterHypo") || row.optBoolean("afterInsulin") ||
+        // Delivered insulin is represented in the activity convolution used by hourNeeds().
+        // Excluding every row within 3 h of any bolus made usable basal windows vanish under SMB.
+        !(row.optBoolean("afterHypo") ||
             row.optBoolean("oldCannula") || row.optBoolean("sensorGap") ||
             row.optBoolean("activity") || row.optBoolean("illness") || row.optBoolean("falseLow"))
 
@@ -219,14 +221,14 @@ class HistoryReplayTest {
         assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
         assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
         val reboundLow = JSONObject().put("t", start + 24 * 60 * minute).put("afterHypo", true).put("bg", 65.0)
-        assertEquals(false, isProtectionRow(reboundLow, start))
-        assertEquals("post-hypo-180m", protectionExclusionReason(reboundLow, start))
+        assertEquals(true, isProtectionRow(reboundLow, start))
+        assertEquals(null, protectionExclusionReason(reboundLow, start))
 
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting")))
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "meal_bolus")))
         assertEquals(true, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("afterMeal", true)))
         assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("afterHypo", true)))
-        assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("afterInsulin", true)))
+        assertEquals(true, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("afterInsulin", true)))
         assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("activity", true)))
         assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("illness", true)))
         assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("falseLow", true)))
@@ -1458,8 +1460,10 @@ class HistoryReplayTest {
                     window.any { rows[it].optBoolean("activity") } -> "activity"
                     window.any { rows[it].optBoolean("illness") } -> "illness"
                     window.any { rows[it].optBoolean("falseLow") } -> "false-low"
-                    window.any { rows[it].optBoolean("afterMeal") || meal[it] > 0.0 } -> "meal"
-                    (k - 48 until k).any { rows[it].optBoolean("afterInsulin") } -> "prior-insulin"
+                    // Restrict meal contamination to the relevant 3 h pre / 2 h post window.
+                    (k - 36..k + 24).any { meal[it] > 0.0 } -> "meal"
+                    // The correction's own insulin is modeled in act[]; reject only a separate close bolus.
+                    (k - 12 until k).any { num(rows[it], "man") > 0.0 || num(rows[it], "units") > 0.0 } -> "prior-insulin"
                     window.any { it != k && (num(rows[it], "man") > 0.0 || num(rows[it], "units") > 0.0) } -> "overlapping-bolus"
                     bg[k] - bg[k - 3] >= 18.0 -> "rising-glucose"
                     else -> null
@@ -1514,12 +1518,13 @@ class HistoryReplayTest {
                     if (causalFilter && allWindow.any { it.optBoolean("oldCannula") }) { reject("old-cannula"); continue }
                     if (causalFilter && allWindow.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
                     val priorRows = if (causalFilter) allRows else rows
-                    if (priorRows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
+                    if (priorRows.any { it.getLong("t") in (tm - 120 * minute) until tm &&
                         (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) { reject("prior-hypo-rebound"); continue }
-                    if (causalFilter && allRows.any { it.getLong("t") in (tm - 180 * minute) until tm && (it.optBoolean("afterSmb") || it.optBoolean("afterManual")) }) { reject("prior-insulin"); continue }
-                    // Any SMB in the complete post-meal observation window invalidates the episode.
-                    if (causalFilter && allWindow.any { it.optDouble("units", 0.0) > 0.0 }) { reject("post-meal-smb-6h"); continue }
-                    if (causalFilter && allWindow.any { it.optBoolean("manualCorrection") }) { reject("post-meal-correction"); continue }
+                    if (causalFilter && allRows.any { it.getLong("t") in (tm - 120 * minute) until tm &&
+                        (it.optDouble("units", 0.0) > 0.0 || it.optDouble("man", 0.0) > 0.0) }) { reject("prior-insulin"); continue }
+                    // Later boluses invalidate only the first 2 h, not the entire 6 h meal tail.
+                    if (causalFilter && allWindow.any { it.getLong("t") in tm..(tm + 120 * minute) && it.optDouble("units", 0.0) > 0.0 }) { reject("post-meal-smb-2h"); continue }
+                    if (causalFilter && allWindow.any { it.getLong("t") in tm..(tm + 120 * minute) && it.optBoolean("manualCorrection") }) { reject("post-meal-correction-2h"); continue }
                     if (causalFilter && !m.optBoolean("mealBolus")) { reject("missing-meal-bolus"); continue }
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
