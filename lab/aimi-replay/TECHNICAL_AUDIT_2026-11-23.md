@@ -17,6 +17,7 @@ Source commits:
 - `8fb7ae73561ec8bc193be34f8d24413d78711dde` — preserve the non-causal ISF path and extend token boundary tests.
 - `037cca0c148eec99b470ee30e0df4a61a8d9b4d5` — prevent synthetic family logic from using stale sensor values after a gap.
 - `76828a294ba8fa4f0c309cba20d24d3789c5f727` — count intentional no-glucose GAP ticks separately from genuine replay exceptions.
+- `e3c5e6f9d66a467887d1898ae8c5b1fd72e56524` — exclude outcome-learning episodes that overlap the blackout or its 60-minute recovery window.
 
 ### Learning Audit counters
 
@@ -34,7 +35,7 @@ Source commits:
 - During GAP, sensor samples are omitted from the sensor history; replay rows omit BG rather than filling or interpolating it. The underlying body/noise simulation continues. The loop receives no glucose status during the blackout. Sensor-dependent hypo treatments and manual corrections are suppressed; meal bolus calculation uses target BG (no unavailable sensor correction) while retaining IOB accounting.
 - The gap and the following 60-minute recovery period are marked as sensor-contaminated for causal audit. This allows CR, ISF, Basal and Dura filters to reject blackout/recovery windows.
 - Reading/noise generation still consumes the same seeded random stream during a blackout; only the sample insertion is omitted.
-- Intentional `no glucose` skips during the blackout are counted as `sensor-gap ticks intentionally skipped`, not as replay exceptions.
+- Intentional `no glucose` skips during the blackout are counted as `sensor-gap ticks intentionally skipped`, not as replay exceptions. Episodes used by the separate rebound/outcome learner are also marked contaminated if they overlap the blackout or 60-minute recovery and cannot update that learner.
 
 ### Unit-test coverage added
 
@@ -95,7 +96,7 @@ This was static archive/manifest inspection only. The APK was not installed, exe
 
 ## Validation status
 
-At report update, latest source commit is `76828a294ba8fa4f0c309cba20d24d3789c5f727`. Compile-only run `45095656854` for the immediately preceding source commit `037cca0c148eec99b470ee30e0df4a61a8d9b4d5` remained in progress; a run for `76828a2` had not yet appeared in the Actions listing. Older intermediate compile runs were also still in progress. The history-replay workflow was skipped; no replay batch ran.
+At report update, latest source commit is `e3c5e6f9d66a467887d1898ae8c5b1fd72e56524`. Compile-only run `45095912758` for the immediately preceding source commit `76828a294ba8fa4f0c309cba20d24d3789c5f727` was in progress; a run for `e3c5e6f` had not yet appeared in the Actions listing. Older intermediate compile runs were also still in progress. The history-replay workflow was skipped; no replay batch ran.
 
 Update this report after the latest compile run finishes. A compile pass validates Kotlin test-source compilation only; it does not validate replay outputs or learning behavior.
 
