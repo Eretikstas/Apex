@@ -88,6 +88,9 @@ on:
       batch:
         type: string
         default: ''
+    secrets:
+      AIMI_REPLAY_KEY:
+        required: true
   # A push only makes the workflow known to GitHub (so it can be started by hand); it runs nothing.
   push:
     branches:
