@@ -400,6 +400,17 @@ Run state:
 - Documentation ownership correction: commit `cd8b648dd987e007e4e71b38d5ca14a8f1d09acf` moved all ChatGPT continuation reports into the `Task` section; Claude's `Results` section was preserved unchanged.
 - No replay batch was started. Next replay gates remain: one exact base/APP summary smoke test, then matched pair checks with `CHG_28`; the current session still has no direct workflow-dispatch action.
 
+
+### 2026-11-23, single base APP / SYNTH_56 / seed 1 control run
+
+- Dispatcher run: [45149628280](https://github.com/Eretikstas/Apex/actions/runs/45149628280), triggered from `main`; reusable replay workflow checked out `aimi-replay` at source commit `304b3c49917786e8a5d483eb98dc2f772c0e2b64`.
+- Exact prefs matched the approved control string: `SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,SBIAS_0.15,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,TREATL,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100`. Workflow inputs: `learn=true`, `pretrained=false`, `sim=false`, `algo=aimi`, `batch` empty; `react_floor` and `isf` empty; `oref_prediction`, `no_booster`, `booster_iob` false. Exactly one replay job was planned and executed.
+- Result: dispatcher and replay job completed successfully. Replay step: **16,128 ticks, 0 failed, 0 sensor-gap ticks intentionally skipped**; learner pass 1 of 1; Gradle BUILD SUCCESSFUL.
+- Public synthetic summary: BG <70 = 2.7%; BG <54 = 0.0%; BG >180 = 8.2%; CV = 28.4%; hypo treatment = 27.64 g/day; daily insulin = **14.83 U/day**. TDD is within the predeclared 14–17 U/day smoke-test range.
+- Limitation: the public summary contains only aggregate metrics. It does not show a `learner ALL cards` or `AIMI audit` line, so this run validates replay execution and summary/TDD accounting, but does not validate individual learner-card decisions, LAPROTECT interlock behavior, or the matched-pair scenarios.
+- A post-job cleanup warning reported `fatal: No url found for submodule path '.tmp-juggluco' in .gitmodules`; it occurred during Git post-action cleanup after the replay, summary, encryption and artifact upload steps had succeeded. Overall GitHub job conclusion is success. The warning is recorded separately from replay correctness.
+- Artifact `aimi-replay-result-0` was uploaded encrypted (1,020,337 bytes); no decryption or inspection of private replay output was performed in this check. No further replay was launched.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
