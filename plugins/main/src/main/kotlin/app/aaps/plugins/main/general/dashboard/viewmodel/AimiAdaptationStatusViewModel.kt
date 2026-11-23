@@ -11,6 +11,7 @@ import app.aaps.core.interfaces.aps.AimiAdaptationStatus
 import app.aaps.core.interfaces.aps.Loop
 import app.aaps.core.interfaces.aps.RT
 import app.aaps.core.interfaces.rx.bus.RxBus
+import app.aaps.core.interfaces.rx.events.EventLoopUpdateGui
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.interfaces.Preferences
 import app.aaps.plugins.aps.events.EventOpenAPSUpdateGui
@@ -61,6 +62,13 @@ class AimiAdaptationStatusViewModel(
 
     init {
         rxBus.toFlow(EventOpenAPSUpdateGui::class.java)
+            .onEach { refresh() }
+            .launchIn(viewModelScope)
+
+        // EventOpenAPSUpdateGui is emitted inside APS.invoke(), before LoopPlugin assigns
+        // lastRun.request. Refresh again on the post-assignment loop event so the new RT snapshot
+        // is visible immediately instead of waiting for the minute freshness poll.
+        rxBus.toFlow(EventLoopUpdateGui::class.java)
             .onEach { refresh() }
             .launchIn(viewModelScope)
 
