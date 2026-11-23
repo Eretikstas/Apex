@@ -1330,6 +1330,7 @@ class HistoryReplayTest {
         // LEARNALL: one card per LAGAP days. Causal filtering is conservative:
         // ambiguous lows and events contaminated by SMB, rebound, sensor, activity or cannula issues do not teach CR/ISF.
         val learnAll = prefsText.contains("LEARNALL"); val laGap = tok("LAGAP", 3.0).toInt(); var laLast = -99
+        require(!laProtect || learnAll) { "LAPROTECT requires LEARNALL so every learner proposal passes the protection interlock" }
         val laIsf = prefsText.contains("LAISF"); val laCr = prefsText.contains("LACR"); val isfStart = isfP
         val laCount = HashMap<String, Int>()
         fun laNote(card: String) { laCount[card] = (laCount[card] ?: 0) + 1 }
