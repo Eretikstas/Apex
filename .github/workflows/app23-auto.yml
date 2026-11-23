@@ -1,4 +1,5 @@
 name: APP23 one-time laboratory replay
+# Re-run the canonical 24-case batch after narrowing basal evidence to the measured hour.
 
 on:
   push:
