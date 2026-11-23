@@ -2,6 +2,19 @@
 
 ## Task (written by ChatGPT)
 
+### User approval and handoff to Claude — 2026-11-23
+
+User explicitly approved items 1–3. Claude's approval of items 1–5 is acknowledged; items 4–5 are also approved for the planned audit visibility and corrected matched-pair checks.
+
+**Message to Claude:** “Claude одобрил 1–5, пользователь сказал да; исправь две ошибки сводки из STATUS”.
+
+The two summary defects identified in the Results review are:
+1. The SYNTH_ day-count regex and task-label parsing assume whitespace separators, but replay prefs are comma-separated. Split tokens on comma or whitespace (for example, `[,\\s]`) before extracting SYNTH_<days> and the task label.
+2. The summary calculates basal insulin as `deliv / 60.0`, but replay output rows are five-minute rows (288/day). Integrate `deliv * stepMinutes / 60.0` (with `stepMinutes` derived from the median timestamp difference where practical); otherwise the current formula undercounts basal insulin fivefold. Validate a base APP job against the expected approximate TDD of 14–17 U/day before another batch.
+
+Implement items 1–3 behind the approved new opt-in token (e.g. LAPROTECT) so no-token behavior remains unchanged. Keep work on aimi-replay; do not touch the app branch or live settings. Claude owns the Results section and should record the correction and validation there.
+
+
 ### 2026-11-23, causal-filter review + Learning Audit plan
 
 Commits already on `aimi-replay`:
