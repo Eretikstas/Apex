@@ -1275,7 +1275,7 @@ class HistoryReplayTest {
             val allRows = (maxOf(0, out.length() - 8 * 288) until out.length()).map { out.getJSONObject(it) }
                 .filter { it.getLong("t") >= nowT - 7 * 86_400_000L }
             val rows = allRows.filter { it.has("bg") }
-            val meals = allRows.filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 360 * minute }
+            val meals = (if (causalFilter) allRows else rows).filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 360 * minute }
             for (b in 0..2) {
                 var highs = 0; var lows = 0; var used = 0
                 val usedDays = HashSet<Int>()
@@ -1290,11 +1290,14 @@ class HistoryReplayTest {
                         allWindow.zipWithNext().any { (x, y) -> y.getLong("t") - x.getLong("t") > 5 * minute })) {
                         reject("sensor-gap"); continue
                     }
-                    if (allWindow.any { !it.has("bg") }) { reject("missing-bg"); continue }
-                    if (allWindow.size < 72 || window.size < 72) { reject("short-window"); continue }
+                    if (causalFilter && allWindow.any { !it.has("bg") }) { reject("missing-bg"); continue }
+                    if (if (causalFilter) allWindow.size < 72 || window.size < 72 else window.size < 72) {
+                        reject("short-window"); continue
+                    }
                     if (causalFilter && allWindow.any { it.optBoolean("oldCannula") }) { reject("old-cannula"); continue }
                     if (causalFilter && allWindow.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
-                    if (allRows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
+                    val priorRows = if (causalFilter) allRows else rows
+                    if (priorRows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
                         (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) { reject("prior-hypo-rebound"); continue }
                     if (causalFilter && allRows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) { reject("prior-smb"); continue }
                     // Any SMB in the complete post-meal observation window invalidates the episode.
