@@ -66,3 +66,27 @@ This update supersedes the earlier statement that push-trigger execution was unc
 ### Safety scope unchanged
 - Only `aimi-replay` was modified.
 - No changes to `autoisf-atc3`, no app installation, and no live pump/profile changes.
+
+
+## Update at 2026-11-23 22:xx CET — APP23 execution completed; audit findings
+
+### Execution
+- APP23 run `45251769895`, commit `2325a131e0eed62e65742ed702808966a9bd09f7`: completed `success`.
+- Matrix: plan job + all 24 replay jobs completed successfully (25/25 jobs).
+- Separate compile run `45251757109`: completed `success`.
+- 24 result artifacts were uploaded, one per replay row. Artifact payloads are encrypted (`out/result.enc)); the GitHub connector exposes metadata but not the binary download/decryption path. Therefore do not claim the clinical summary metrics (TIR/CV/<3.9/<3.0/>10/hypo grams) have been aggregated from artifacts.
+
+### Findings visible in replay logs
+- Repeated across inspected jobs: ISF candidate acceptance is 0; gate fails with candidates rejected as meal / hypo-rebound / prior-insulin. Example replay job index 0: 123 candidates, 0 accepted (59 meal, 49 hypo-rebound, 15 prior-insulin).
+- CR: all inspected time blocks have 0 accepted candidates; rejection reasons are prior insulin and prior hypo rebound. All CR block values remain 1.00/1.00/1.00.
+- Basal: 0/3960 candidates accepted in inspected jobs; all 24 hourly buckets fail (0 eligible hours); dominant exclusions are hypo-rebound and meal-tail, plus causal-filter. This means basal learning is effectively disabled by the current filter combination on these datasets.
+- ISF displayed value remains 162 in most inspected jobs; a few move to 180, but candidate acceptance logs still show 0, so the apparent change needs trace-level audit before attributing it to ISF learning.
+- Percentage card does execute both directions in logs. Examples: index 0 shows pct- 2 / pct+ 2, final 100%; index 7 shows pct- 5 / pct+ 4, final 90%; index 11 shows pct- 6 / pct+ 5, final 90%. This suggests repeated down/up oscillation and warrants a dedicated transition audit; do not treat counts as successful stable adaptation.
+- LAPROTECT audit generally reports gate OPEN in inspected examples, with protected lows lower than all-cause lows because post-hypo 180m rows are excluded from protected lows. Validate this semantic separation against expected policy; do not weaken safety interlocks based on these logs alone.
+
+### Current conclusion / next work
+- Infrastructure and compilation are green.
+- Algorithmic acceptance is not green: ISF, CR, and especially basal are over-filtered (zero accepted in inspected replay jobs).
+- Do not integrate or deploy any learner changes. No changes to `autoisf-atc3`, production app, phone, pump, or live profile.
+- Next laboratory task: instrument the exact rejection pipeline and inspect why every basal candidate is classified as meal-tail / hypo-rebound; separately quantify ISF/CR rejection windows and validate whether the 4h/3h prior-insulin guards are unintentionally overlapping nearly all candidates. Then rerun the same 24-row batch and compare against this run.
+- Obtain clinical aggregate metrics only through a permitted artifact-decryption path; never print or expose `AIMI_REPLAY_KEY`.
