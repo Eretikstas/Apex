@@ -1456,7 +1456,7 @@ class HistoryReplayTest {
                     causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
                     window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
-                    window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
+                    (k - 36 until k).any { hypo[it] > 0.0 } || (k until k + 36).any { hypo[it] > 0.0 } -> "hypo-rebound"
                     window.any { rows[it].optBoolean("activity") } -> "activity"
                     window.any { rows[it].optBoolean("illness") } -> "illness"
                     window.any { rows[it].optBoolean("falseLow") } -> "false-low"
