@@ -1065,7 +1065,6 @@ class HistoryReplayTest {
                         when {
                             evidenceRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
                             evidenceRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
-                            evidenceRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
                             evidenceRows.any { it.optBoolean("activity") } -> "activity"
                             evidenceRows.any { it.optBoolean("illness") } -> "illness"
                             evidenceRows.any { it.optBoolean("falseLow") } -> "false-low"
@@ -1373,7 +1372,6 @@ class HistoryReplayTest {
                         when {
                             evidenceRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
                             evidenceRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
-                            evidenceRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
                             evidenceRows.any { it.optBoolean("activity") } -> "activity"
                             evidenceRows.any { it.optBoolean("illness") } -> "illness"
                             evidenceRows.any { it.optBoolean("falseLow") } -> "false-low"
