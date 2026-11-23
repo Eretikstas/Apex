@@ -180,3 +180,18 @@ Changes:
 - Compile + helper tests must pass before starting a fresh 24-scenario replay.
 - No clinical metrics are inferred from encrypted result artifacts.
 - No changes to `autoisf-atc3`, live profiles, pump settings, or the child's installed app.
+
+
+## Interim update — APP23 rerun after learner filter correction
+
+- Compile + learner audit helper tests: PASS, run 45264677162.
+- APP23 replay run: 45270000264, commit 4b87bf6b12263a986fb8a5fd28a5b2fe402c9c6c.
+- Batch: canonical 24 scenarios; at the time of this interim update 20/24 replay jobs completed successfully, 4 still running; no completed replay job failures.
+- Basal evidence is no longer zero: completed scenario logs show accepted observations in the hourly evidence audit and `gate=PASS`; typical hourly accepted totals are materially above the prior 0/3960 result. These are audit-row counts, not independent clinical outcomes.
+- ISF audit: 0 accepted candidates in every inspected completed scenario. Rejection causes remain meal-window, hypo-rebound and prior-insulin.
+- CR audit: 0 accepted episodes in every inspected completed scenario; prior-insulin and prior-hypo-rebound remain dominant rejection causes.
+- Apparent ISF profile movement (e.g. 162→180 or 203) is not evidence of an accepted ISF learner proposal: percentage-card normalization in `setPct()` scales `isfP` inversely when the global profile percentage changes. ISF audit remains at 0 accepted.
+- LAPROTECT now counts rebound/post-treatment lows as all-cause lows; examples show both OPEN and BLOCK_INCREASES when the all-cause low rate exceeds 3%.
+- Percentage card shows repeated down/up events in some scenarios (e.g. six decreases and four restores, ending at 80%). This requires stability/hysteresis review; do not treat as a validated learning outcome.
+- Encrypted result artifacts are being uploaded per scenario. Clinical TIR/CV/<3.9/<3.0/>10/hypo-treatment grams have not yet been extracted or aggregated; no clinical efficacy claim is made.
+- No changes to production branch `autoisf-atc3`, no app installation/deployment, and no live pump/profile changes.
