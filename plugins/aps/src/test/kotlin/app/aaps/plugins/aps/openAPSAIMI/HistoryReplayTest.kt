@@ -153,6 +153,11 @@ class HistoryReplayTest {
         pctBack: Boolean, blocked: Boolean, pctNow: Double, eligibleLowPct: Double, consecutiveChecks: Int,
     ): Boolean = pctBack && !blocked && pctNow < 0.9999 && eligibleLowPct <= 2.0 && consecutiveChecks >= 2
 
+    private fun isfHasLowInCausalWindow(bg: DoubleArray, k: Int): Boolean {
+        require(k >= 36 && k + 36 <= bg.size) { "ISF causal window is outside the BG series" }
+        return (k - 36 until k).any { bg[it] < 70.0 } || (k until k + 36).any { bg[it] < 70.0 }
+    }
+
     private data class SyntheticStressTokens(
         val outlierDay: Int? = null,
         val outlierMultiplier: Double = 1.0,
@@ -233,6 +238,12 @@ class HistoryReplayTest {
         assertEquals(false, percentageRestoreReady(true, true, 0.9, 1.0, 2))
         assertEquals(false, percentageRestoreReady(true, false, 0.9, 2.1, 2))
         assertEquals(false, percentageRestoreReady(true, false, 1.0, 0.0, 2))
+
+        val isfBg = DoubleArray(100) { 120.0 }
+        isfBg[14] = 65.0; assertEquals(true, isfHasLowInCausalWindow(isfBg, 50))
+        isfBg[14] = 120.0; isfBg[50] = 65.0; assertEquals(true, isfHasLowInCausalWindow(isfBg, 50))
+        isfBg[50] = 120.0; isfBg[86] = 65.0; assertEquals(false, isfHasLowInCausalWindow(isfBg, 50))
+        assertThrows(IllegalArgumentException::class.java) { isfHasLowInCausalWindow(isfBg, 20) }
 
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting")))
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "meal_bolus")))
@@ -1467,7 +1478,7 @@ class HistoryReplayTest {
                     causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
                     window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
-                    (k - 36 until k).any { hypo[it] > 0.0 } || (k until k + 36).any { hypo[it] > 0.0 } -> "hypo-rebound"
+                    isfHasLowInCausalWindow(bg, k) -> "low-in-response-window"
                     window.any { rows[it].optBoolean("activity") } -> "activity"
                     window.any { rows[it].optBoolean("illness") } -> "illness"
                     window.any { rows[it].optBoolean("falseLow") } -> "false-low"
