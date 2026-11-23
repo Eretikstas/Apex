@@ -6,6 +6,10 @@ on:
       - aimi-replay
     paths:
       - 'plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAIMI/**'
+      - 'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAIMI/DetermineBasalAIMI2.kt'
+      - 'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAIMI/orchestration/AimiAdaptationStatusBuilder.kt'
+      - 'plugins/main/src/main/kotlin/app/aaps/plugins/main/general/dashboard/viewmodel/AimiAdaptationStatusViewModel.kt'
+      - 'plugins/main/src/main/kotlin/app/aaps/plugins/main/general/dashboard/compose/AimiAdaptationStatusScreen.kt'
       - 'plugins/aps/build.gradle'
       - 'plugins/aps/build.gradle.kts'
       - '.github/workflows/aimi-replay-compile.yml'
@@ -46,3 +50,8 @@ jobs:
           AIMI_REPLAY_IN: ''
           AIMI_REPLAY_OUT: ''
         run: ./gradlew :plugins:aps:testFullDebugUnitTest --tests 'app.aaps.plugins.aps.openAPSAIMI.HistoryReplayTest' --console=plain
+
+      - name: Test adaptation status builder and dashboard presenter
+        run: |
+          ./gradlew :plugins:aps:testFullDebugUnitTest --tests 'app.aaps.plugins.aps.openAPSAIMI.orchestration.AimiAdaptationStatusBuilderTest' --console=plain
+          ./gradlew :plugins:main:testFullDebugUnitTest --tests 'app.aaps.plugins.main.general.dashboard.viewmodel.AimiAdaptationStatusViewModelTest' --console=plain
