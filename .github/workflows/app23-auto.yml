@@ -1,6 +1,6 @@
 name: APP23 one-time laboratory replay
-# Re-run the canonical 24-case batch after narrowing basal evidence to the measured hour.
-# Retry after the ISF audit compile fix (fc5fdf8).
+# Re-run canonical APP23 24-case batch after learner filter corrections (564c95b).
+# Compile and learner audit helper tests passed in run 45264677162.
 
 on:
   push:
