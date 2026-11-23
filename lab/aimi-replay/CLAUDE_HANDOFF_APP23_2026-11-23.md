@@ -393,9 +393,25 @@ For CR, prior-insulin remains the dominant rejection. Candidate-level review mus
 3. ISF and CR remain nonfunctional as learners in APP23: ISF accepted 0/50,719 candidate scans; CR accepted 12/16,651 scans but 0/2,001 block gates passed. Do not relax safeguards without timestamp-level causal review.
 4. Basal passed 534/534 gates but accepted only 27,392/2,049,612 scans (~1.34%); verify coverage by hour and day before considering it useful.
 5. Percentage event totals (74 decreases / 59 restores) need timeline-level analysis; this run's paired metrics do not isolate percentage card effects because APP23 bundled multiple learner features.
-6. UI empty-card audit is still separate and unresolved. Trace production card models, mappers, visibility rules and fallback rendering; replay summaries are not proof that production UI cards render populated payloads.
-7. The app23-auto.yml workflow file was temporarily repurposed to carry the baseline batch while triggering the run; inspect and restore its canonical APP23 definition only after verifying the dedicated APP24 workflow. Avoid triggering another replay unnecessarily.
+6. UI empty-card root cause found in production path: status was assigned only on selected early-return/special branches, while the ordinary successful path returned without it. The dashboard ViewModel reads only `loop.lastRun.request.rawData() as RT`. A lab-only central assignment now populates status on every returned result. Compile and focused builder/dashboard tests are queued, not yet validated.
+7. Canonical `app23-auto.yml` was restored from its pre-APP24 parent commit (`d50d838ab94e697f2cb46886f5a793accc8d7925`) in commit `b27db82c29d8dcd1cfbeb39342e95e3fa9ba4bdf`. Dedicated APP24 workflow remains separate. Restoration triggered APP23 run `45288804802`; plan passed, 20/24 replay jobs were in progress and 4 queued at last check.
 
 - APP23 learner run: https://github.com/Eretikstas/Apex/actions/runs/45278182666
 - APP24 matched baseline run: https://github.com/Eretikstas/Apex/actions/runs/45284611426
 - No changes to autoisf-atc3; no deployment, install, pump/profile mutation, or Nightscout write access.
+
+
+## APP23 workflow restoration and dashboard status fix — 2026-11-24
+
+- Restored `.github/workflows/app23-auto.yml` from its exact pre-APP24 parent version. Restoration commit: `b27db82c29d8dcd1cfbeb39342e95e3fa9ba4bdf`. The file again contains the canonical APP23 24-row batch with LEARNALL/LAISF/LACR/LACAUSE/LAPCTBACK/LADAYS/LAPROTECT. The dedicated APP24 workflow remains in `.github/workflows/app24-baseline-auto.yml`.
+- Restoration triggered APP23 run: https://github.com/Eretikstas/Apex/actions/runs/45288804802. Plan job PASS. At last poll: 20 replay jobs in progress, 4 queued; no failures reported yet. Synthetic lab replay only.
+
+### Empty AIMI adaptation dashboard cards — root cause and lab patch
+
+- Production UI source: `plugins/main/.../AimiAdaptationStatusViewModel.kt` reads status only from `loop.lastRun?.request?.rawData() as? RT)?.aimiAdaptationStatus`; `AimiAdaptationStatusScreen.kt` renders the module list from that status.
+- Production assignment source: `DetermineBasalAIMI2.kt` defines `assignAimiAdaptationStatus(rT)`, but before this patch it was reached only via `markFinalLoopDecisionFromRT` on selected early-return/special paths. The normal successful path in `runDetermineBasalTickInner` returned `finalResult` without calling the marker/helper. Consequently ordinary loop results had a null status and the ViewModel rendered its no-data state.
+- Lab-only fix: after `AimiLoopTelemetry.traceDetermineBasalTick(...)` returns, `determine_basal()` now calls `assignAimiAdaptationStatus(result)` under `runCatching`, logging a failure without affecting the returned result. This covers normal and telemetry-recovery results. It adds only UI metadata; it does not alter dose, basal, ISF, SMB, or safety calculations.
+- Fix commit: `a6ec942f71a8b909ecf2e264724d59c96b944a87`.
+- Compile workflow now watches the touched production files and runs the adaptation-status builder and dashboard presenter tests. Workflow commit: `ee8e36f875dfa440354531fe3818458d0702745d`; run: https://github.com/Eretikstas/Apex/actions/runs/45289173704. Status at last poll: queued, not yet validated.
+- Existing test `AimiAdaptationStatusBuilderTest` confirms the status object is intentionally `@Transient` and excluded from serialized RT wire format. This is consistent with the live dashboard reading the in-memory `lastRun.request.rawData()`; the status is not persisted across serialization/restart. The immediate empty-card defect was the missing assignment on the normal return path, not the transient annotation.
+- No change to `autoisf-atc3`; no install/deployment, pump/profile change, or Nightscout write.
