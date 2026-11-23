@@ -1,0 +1,71 @@
+name: AIMI replay dispatcher
+
+# Thin default-branch entry point. The replay implementation stays on aimi-replay.
+on:
+  workflow_dispatch:
+    inputs:
+      learn:
+        description: 'Let the AIMI learners learn during the replay'
+        type: boolean
+        default: true
+      prefs:
+        description: 'AIMI settings to try; tokens may be comma-separated'
+        type: string
+        default: ''
+      pretrained:
+        description: 'Two passes: learn on the whole history first, then replay it again'
+        type: boolean
+        default: false
+      react_floor:
+        description: 'Lowest learned reactivity (empty = AIMI default)'
+        type: string
+        default: ''
+      oref_prediction:
+        description: 'Use the oref prediction'
+        type: boolean
+        default: false
+      no_booster:
+        description: 'Prevent dynamic basal booster from raising temp basal'
+        type: boolean
+        default: false
+      booster_iob:
+        description: 'Count insulin on board in the basal booster'
+        type: boolean
+        default: false
+      sim:
+        description: 'Closed loop on the body model'
+        type: boolean
+        default: false
+      algo:
+        description: 'Algorithm on the body model'
+        type: choice
+        options: [aimi, autoisf, real]
+        default: aimi
+      isf:
+        description: 'ISF of body model in mg/dL per unit (empty = profile ISF)'
+        type: string
+        default: ''
+      batch:
+        description: 'Many runs at once: prefs lists separated by |; overrides prefs'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    uses: Eretikstas/Apex/.github/workflows/aimi-replay.yml@aimi-replay
+    with:
+      learn: ${{ inputs.learn }}
+      prefs: ${{ inputs.prefs }}
+      pretrained: ${{ inputs.pretrained }}
+      react_floor: ${{ inputs.react_floor }}
+      oref_prediction: ${{ inputs.oref_prediction }}
+      no_booster: ${{ inputs.no_booster }}
+      booster_iob: ${{ inputs.booster_iob }}
+      sim: ${{ inputs.sim }}
+      algo: ${{ inputs.algo }}
+      isf: ${{ inputs.isf }}
+      batch: ${{ inputs.batch }}
+    secrets: inherit
