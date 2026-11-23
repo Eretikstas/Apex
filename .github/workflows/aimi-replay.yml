@@ -291,15 +291,18 @@ jobs:
           ]
 
           log_lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines() if log_path.is_file() else []
+          # Gradle prefixes test-worker standard output with indentation. Strip it
+          # before matching, otherwise learner/audit records are silently omitted.
+          normalized_log = [(index, line.strip()) for index, line in enumerate(log_lines)]
           learner_all = [
-              (index, line) for index, line in enumerate(log_lines)
+              (index, line) for index, line in normalized_log
               if line.startswith("AIMI replay: learner ALL cards")
           ]
           selected_log = []
           if learner_all:
               selected_log.append(learner_all[-1])
           selected_log.extend(
-              (index, line) for index, line in enumerate(log_lines)
+              (index, line) for index, line in normalized_log
               if line.startswith("AIMI audit ")
           )
           selected_log.sort(key=lambda item: item[0])
