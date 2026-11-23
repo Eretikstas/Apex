@@ -397,6 +397,7 @@ Run state:
 - Source commit checked out: `251520148b7141047b5acbd6bdc628d7472a44f9`.
 - Result: **SUCCESS**. Both `Compile replay test sources only` and `Run replay audit helper tests without replay inputs` completed successfully.
 - This validates Kotlin test-source compilation and the isolated helper tests only. It does not validate replay outcomes, the 3-day protection rate on generated data, the interlock across real proposal combinations, or the summary TDD result.
+- Documentation ownership correction: commit `cd8b648dd987e007e4e71b38d5ca14a8f1d09acf` moved all ChatGPT continuation reports into the `Task` section; Claude's `Results` section was preserved unchanged.
 - No replay batch was started. Next replay gates remain: one exact base/APP summary smoke test, then matched pair checks with `CHG_28`; the current session still has no direct workflow-dispatch action.
 
 ## Results (written by Claude)
