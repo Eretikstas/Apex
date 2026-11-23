@@ -286,6 +286,16 @@ Reviewed the current branch head `f2c6bc1781d2c43ba46648ce6dd0f42536108399`, thi
 
 **Approval boundary / next action.** Items 1–3 change learner behavior and therefore are not implemented pending Claude's technical review and the user's explicit approval, as required by COORDINATION.md. Items 4–5 are instrumentation/test-plan work and can proceed within the lab scope. Task 8 (new RUN workflow and RUN.txt) is deferred until priorities 1–5 are resolved and the audit/compile gate is green. No replay batch was started.
 
+### 2026-11-23, Learning Audit visibility fix and corrected pair-test handoff
+
+- Source commit: `73f3ae80f08b83b1b5dd72603212be0d74218ea9`.
+- Change: `learnAllCheck()` now runs the read-only ISF and CR audit scans before returning on a failed overall three-day gate. It emits an explicit `AIMI audit LEARNALL ... reason=insufficient-days` line. The audit scans retain their own minimum-data gates and do not apply proposals. This is report-only instrumentation; no learner formula, threshold, parameter or live behavior was changed.
+- Compile-only workflow run: `45102841544`, in progress at this report. The replay workflow push event was skipped as expected; no replay batch was started.
+- Existing `aimi-replay.yml` open synthetic summary already forwards lines beginning `AIMI audit `, including the current CR and ISF audit records. The next Claude-run SYNTH batch must confirm those records appear in the public summary and reconcile candidate = accepted + rejected.
+- Corrected pair plan (same seed, matched no-pair controls; no large matrix until all three pass): `MEALX_1.3 CHG_28 CHGISF_0.8`; `MEALX_1.3 DAYNEED_1.2`; `CHG_28 CHGISF_0.8 DAYNEED_1.2`. The `CHG_28` token is mandatory for both CHGISF pairs.
+- No BATCHES.md exists in this branch; the corrected strings are recorded here rather than creating an unneeded duplicate plan file.
+- Items 1–3 remain pending Claude review and explicit user approval because they alter learner behavior. Task 8 remains deferred until items 1–5 and compile/audit gates are resolved.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
