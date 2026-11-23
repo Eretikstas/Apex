@@ -9,7 +9,7 @@ data here (the repository is public).
 | | ChatGPT | Claude |
 |---|---|---|
 | Branch | `aimi-replay` (the lab) | `autoisf-atc3` (the app, the Apex v4 driver, device tests, CI) |
-| Files it changes | `plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAIMI/HistoryReplayTest.kt`, `lab/aimi-replay/*.md` (except the "Results" part of STATUS.md), `replay/*.md`, `.github/workflows/aimi-replay-compile.yml` | everything in `autoisf-atc3`; in `aimi-replay` only the "Results" part of `lab/aimi-replay/STATUS.md` |
+| Files it changes | `plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAIMI/HistoryReplayTest.kt`, `lab/aimi-replay/*.md` (except the "Results" part of STATUS.md), `replay/*.md`, `.github/workflows/aimi-replay-compile.yml`; also (user 23.11, tasks 7 and 8 only) `.github/workflows/aimi-replay.yml` — ONLY to add the open summary step for `SYNTH_` jobs, never touching decryption, encryption or the replay step — and the new `.github/workflows/aimi-replay-run.yml` exactly as in task 8 (its checks may not be weakened), plus `lab/aimi-replay/RUN.txt` | everything in `autoisf-atc3`; in `aimi-replay` only the "Results" part of `lab/aimi-replay/STATUS.md` |
 | Runs | compile checks, approved SYNTH-only lab batches, and reading their public aggregate summaries | app/emulator tests and review of learner decisions; real-history runs and decryption remain separately approved |
 | Port into the app | no | yes, only after the lab check passed and the user agreed |
 
