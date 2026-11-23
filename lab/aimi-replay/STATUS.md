@@ -433,6 +433,26 @@ Run state:
 - Next action: one diagnostic replay only, same SYNTH_56 / SEED_1 / base APP inputs, with the seven audit tokens above appended; `batch` remains empty and all workflow booleans/settings remain at the same defaults. Review audit reconciliation and the LAPROTECT gate before any scenario matrix or pair checks.
 - No algorithm source, workflow logic, live AAPS settings, profiles, pump or Nightscout settings were changed in this continuation. This entry is in ChatGPT's Task section; Claude's Results section remains untouched.
 
+### 2026-11-23, diagnostic LAPROTECT replay — run 45155730520
+
+Run: https://github.com/Eretikstas/Apex/actions/runs/45155730520
+
+**Execution:** dispatcher and replay job both completed successfully. One matrix entry only. Replay source was `aimi-replay` commit `71a93ce2ee1d7b89c32dbdfdc9c9fd3fcf42a650`. Inputs confirmed in the plan-job log: `learn=true`, `pretrained=false`, `sim=false`, `algo=aimi`, empty batch/react_floor/isf, and all seven requested tokens present: `LEARNALL,LACAUSE,LAPROTECT,LAISF,LACR,LADAYS,LAPCTBACK`.
+
+Replay: 16,128 ticks, 0 failed, 0 sensor-gap ticks intentionally skipped; pass 1/1; Gradle BUILD SUCCESSFUL in 6m29s.
+
+Public synthetic metrics:
+- BG <70: 2.8%; BG <54: 0.0%; BG >180: 5.8%; CV: 27.2%.
+- Hypo treatment: 28.64 g/day; daily insulin: 14.91 U/day (within the previously declared 14–17 U/day smoke-test range).
+
+Compared with the base control run 45149628280: BG <70 2.7% -> 2.8%; BG <54 0.0% -> 0.0%; BG >180 8.2% -> 5.8%; CV 28.4% -> 27.2%; hypo treatment 27.64 -> 28.64 g/day; daily insulin 14.83 -> 14.91 U/day. This is a one-seed descriptive comparison, not evidence of causal benefit or safety validation.
+
+**Open blocker — learner/audit evidence was not surfaced.** The public summary contains no `Learner / audit:` section and no `AIMI audit LAPROTECT`, `AIMI audit ISF`, `AIMI audit CR`, or `AIMI replay: learner ALL cards` records. The workflow's summary step selects those exact prefixes from `gradle.log`; none were selected. Input-token presence is confirmed, but that alone does not prove the learner checks executed. Source review of `HistoryReplayTest.kt` shows the SYNTH path calls `synthetic(...)`; within that path `LEARNALL` should schedule checks from day 7 at 06:00 and print the LAPROTECT/CR/ISF audit lines, then print the final learner-ALL card summary. Investigate whether these test stdout lines are being suppressed/not captured or whether the scheduled branch is not reached. Do not claim LAPROTECT runtime validation or infer card behavior until the records are available.
+
+Artifact `aimi-replay-result-0` uploaded (1,089,973 bytes), but it contains encrypted replay output; no decryption key was accessed and private data was not inspected. Post-job Git cleanup emitted the known `.tmp-juggluco` missing-submodule warning after artifact upload; replay and artifact steps succeeded and overall job conclusion is success.
+
+No app branch, live AAPS settings, profiles, pump or Nightscout were changed. No additional run was started.
+ 
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
