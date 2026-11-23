@@ -61,6 +61,8 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -87,6 +89,61 @@ import java.util.zip.GZIPOutputStream
 class HistoryReplayTest {
 
     private val minute = 60_000L
+
+    private data class SyntheticStressTokens(
+        val outlierDay: Int? = null,
+        val outlierMultiplier: Double = 1.0,
+        val gapMinutes: Int? = null,
+    )
+
+    private fun parseSyntheticStressTokens(prefsText: String, days: Int): SyntheticStressTokens {
+        val tokens = prefsText.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val outlierTokens = tokens.filter { it.startsWith("OUTDAY") }
+        require(outlierTokens.size <= 1) { "use at most one OUTDAY_<day>_<factor> token" }
+        val outlier = outlierTokens.singleOrNull()?.let { token ->
+            val match = Regex("^OUTDAY_([0-9]+)_([0-9]+(?:\\.[0-9]+)?)$").matchEntire(token)
+                ?: throw IllegalArgumentException("invalid OUTDAY token: $token")
+            val day = match.groupValues[1].toInt()
+            val factor = match.groupValues[2].toDouble()
+            require(day in 1..days) { "OUTDAY day must be in 1..$days" }
+            require(factor.isFinite() && factor > 0.0) { "OUTDAY factor must be finite and > 0" }
+            day to factor
+        }
+        val gapTokens = tokens.filter { it.startsWith("GAP") }
+        require(gapTokens.size <= 1) { "use exactly one GAP_15, GAP_30 or GAP_60 token" }
+        val gapMinutes = gapTokens.singleOrNull()?.let { token ->
+            val match = Regex("^GAP_(15|30|60)$").matchEntire(token)
+                ?: throw IllegalArgumentException("invalid GAP token: $token")
+            match.groupValues[1].toInt()
+        }
+        if (gapMinutes != null) require(days >= 4) { "GAP requires at least four synthetic days" }
+        return SyntheticStressTokens(outlier?.first, outlier?.second ?: 1.0, gapMinutes)
+    }
+
+    private fun assertAuditReconciles(card: String, candidates: Int, accepted: Int, rejected: Int) {
+        check(candidates >= 0 && accepted >= 0 && rejected >= 0) { "negative $card audit counter" }
+        check(candidates == accepted + rejected) {
+            "$card audit mismatch: candidates=$candidates accepted=$accepted rejected=$rejected"
+        }
+    }
+
+    @Test
+    fun `synthetic stress tokens validate their boundaries`() {
+        val parsed = parseSyntheticStressTokens("SYNTH_7 OUTDAY_4_1.3 GAP_15", 7)
+        assertEquals(4, parsed.outlierDay)
+        assertEquals(1.3, parsed.outlierMultiplier, 0.000001)
+        assertEquals(15, parsed.gapMinutes)
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_3 GAP_15", 3) }
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_0_1.3", 7) }
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_20", 7) }
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_15 GAP_30", 7) }
+    }
+
+    @Test
+    fun `learning audit reconciliation guard rejects missing candidates`() {
+        assertAuditReconciles("CR", 5, 3, 2)
+        assertThrows(IllegalStateException::class.java) { assertAuditReconciles("ISF", 5, 3, 1) }
+    }
 
     /** AutoISF weights of the model loop; Eva's phone values, changed by the W..._<x> tokens (lab only). */
     private data class AisfWeights(
@@ -625,6 +682,7 @@ class HistoryReplayTest {
             pp = tok("WPP", 0.01), dura = tok("WDUR", 0.5), min = tok("WMIN", 0.3), max = tok("WMAX", 1.2)
         )
         val days = tok("SYNTH", 28.0).toInt()
+        val stressTokens = parseSyntheticStressTokens(prefsText, days)
         val rnd = Random(tok("SEED", 1.0).toLong())
         val kcr = tok("KCR", 0.03)
         val noiseSd = tok("NOISE", 0.25)
@@ -683,6 +741,12 @@ class HistoryReplayTest {
         val t0 = cfg.getLong("t0")
         val tz = ZoneOffset.ofHours(3)
         fun hourOf(t: Long) = Instant.ofEpochMilli(t).atZone(tz).hour
+        val gapStart = stressTokens.gapMinutes?.let {
+            Instant.ofEpochMilli(t0).atZone(tz).toLocalDate().plusDays(3).atTime(2, 0).atZone(tz).toInstant().toEpochMilli()
+        }
+        val gapEnd = gapStart?.plus((stressTokens.gapMinutes ?: 0) * minute)
+        fun sensorGapActive(at: Long) = gapStart != null && at >= gapStart && at < (gapEnd ?: gapStart)
+        fun sensorGapAffected(at: Long) = gapStart != null && at >= gapStart && at < (gapEnd ?: gapStart) + 60 * minute
         val iobCurve = curve(peak, dia)
         // Share of a dose still to act after m minutes: all of it before the dose acts.
         fun iobLeft(m: Double): Pair<Double, Double> = if (m <= 0.0) Pair(1.0, 0.0) else iobCurve(m)
@@ -800,6 +864,9 @@ class HistoryReplayTest {
             }
             return false
         }
+        fun hasSensorGap(rows: List<JSONObject>): Boolean =
+            rows.any { it.optBoolean("sensorGap") } ||
+                rows.zipWithNext().any { (a, b) -> b.getLong("t") - a.getLong("t") > 5 * minute }
         fun cleanBasalRow(r: JSONObject): Boolean = !causalFilter ||
             !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") ||
                 r.optBoolean("oldCannula") || r.optBoolean("sensorGap") || r.optBoolean("activity") ||
@@ -861,18 +928,18 @@ class HistoryReplayTest {
             for (k in 60 until w - 12) {
                 // LEARNB5: hours with a cannula older than 72 h are not used (user rule 19.11).
                 if (audit) auditCandidates++
+                val windowRows = (k - 60 until k + 13).map { out.getJSONObject(s0 + it) }
                 val reason = when {
+                    causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
                     canOld[k] || canOld[k + 12] -> "old-cannula"
-                    causalFilter && (k - 60 until k + 13).any { !cleanBasalRow(out.getJSONObject(s0 + it)) } -> {
-                        val rows = (k - 60 until k + 13).map { out.getJSONObject(s0 + it) }
+                    causalFilter && windowRows.any { !cleanBasalRow(it) } -> {
                         when {
-                            rows.any { it.optBoolean("sensorGap") } -> "sensor-gap"
-                            rows.any { it.optBoolean("oldCannula") } -> "old-cannula"
-                            rows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
-                            rows.any { it.optBoolean("afterMeal") } -> "meal-tail"
-                            rows.any { it.optBoolean("activity") } -> "activity"
-                            rows.any { it.optBoolean("illness") } -> "illness"
-                            rows.any { it.optBoolean("falseLow") } -> "false-low"
+                            windowRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
+                            windowRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
+                            windowRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
+                            windowRows.any { it.optBoolean("activity") } -> "activity"
+                            windowRows.any { it.optBoolean("illness") } -> "illness"
+                            windowRows.any { it.optBoolean("falseLow") } -> "false-low"
                             else -> "causal-filter"
                         }
                     }
@@ -894,6 +961,7 @@ class HistoryReplayTest {
             }
             if (audit) {
                 val rejected = auditCounts.values.sum()
+                assertAuditReconciles("Basal-advanced", auditCandidates, auditAccepted, rejected)
                 val minN = if (lbMin > 0) lbMin else if (lb5 && !lbFill) 4 else 3
                 val measuredHour = BooleanArray(24) { h ->
                     needs[h].size >= (if (tailHours[h]) maxOf(minN, lbTailMin) else minN)
@@ -1156,19 +1224,19 @@ class HistoryReplayTest {
             val auditDays = HashSet<Int>()
             for (k in 60 until w - 12) {
                 auditCandidates++
+                val windowRows = (k - 60 until k + 13).map { out.getJSONObject(s0 + it) }
                 val reason = when {
+                    causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
                     mn[k] != 0 -> "not-hour-boundary"
                     since[k] < 300 -> "meal-window"
-                    causalFilter && (k - 60 until k + 13).any { !cleanBasalRow(out.getJSONObject(s0 + it)) } -> {
-                        val rows = (k - 60 until k + 13).map { out.getJSONObject(s0 + it) }
+                    causalFilter && windowRows.any { !cleanBasalRow(it) } -> {
                         when {
-                            rows.any { it.optBoolean("sensorGap") } -> "sensor-gap"
-                            rows.any { it.optBoolean("oldCannula") } -> "old-cannula"
-                            rows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
-                            rows.any { it.optBoolean("afterMeal") } -> "meal-tail"
-                            rows.any { it.optBoolean("activity") } -> "activity"
-                            rows.any { it.optBoolean("illness") } -> "illness"
-                            rows.any { it.optBoolean("falseLow") } -> "false-low"
+                            windowRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
+                            windowRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
+                            windowRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
+                            windowRows.any { it.optBoolean("activity") } -> "activity"
+                            windowRows.any { it.optBoolean("illness") } -> "illness"
+                            windowRows.any { it.optBoolean("falseLow") } -> "false-low"
                             else -> "causal-filter"
                         }
                     }
@@ -1185,6 +1253,7 @@ class HistoryReplayTest {
                 auditAccepted++; auditDays.add(rowDay(out.getJSONObject(s0 + k)))
             }
             val rejected = auditCounts.values.sum()
+            assertAuditReconciles("Basal-classic", auditCandidates, auditAccepted, rejected)
             val eligibleHours = (0 until 24).count { needs[it].size >= 3 }
             val dayGate = enoughBasalDays && auditDays.size >= (if (require3Days) 3 else 1)
             val gate = dayGate && eligibleHours > 0
@@ -1217,6 +1286,7 @@ class HistoryReplayTest {
                         r.optDouble("bg", Double.NaN).let { !it.isNaN() && it > 180.0 }
                 }
                 val days = candidates.map { rowDay(it.value) }.distinct().size
+                assertAuditReconciles("ISF-pre-scan", candidates.size, 0, candidates.size)
                 println("AIMI audit ISF: candidates=${candidates.size} accepted=0 rejected=${candidates.size} reasons=insufficient-window:${candidates.size} days=$days gate=FAIL reason=pre-scan-insufficient-window")
                 return null
             }
@@ -1230,15 +1300,17 @@ class HistoryReplayTest {
                 ins[i] = num(nx, "deliv") * 5 / 60 + num(r, "units") + num(r, "man")
             }
             val act = DoubleArray(w) { k -> var a = 0.0; for (j in 0..minOf(60, k)) a += ins[k - j] * kern5[j]; a }
-            val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); val isfRejected = linkedMapOf<String, Int>(); var k = 48
+            val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); val isfRejected = linkedMapOf<String, Int>(); var auditCandidates = 0; var k = 48
             while (k < w - 36) {
                 // A correction may be a manual bolus or an SMB; the SMB at k is the event being measured.
                 val correction = (rows[k].optBoolean("manualCorrection") || num(rows[k], "units") > 0.0) &&
                     !bg[k].isNaN() && bg[k] > 180.0
                 if (!correction) { k++; continue }
+                auditCandidates++
                 val window = k - 48..k + 36
+                val windowRows = window.map { rows[it] }
                 val rejection = when {
-                    window.any { rows[it].optBoolean("sensorGap") } -> "sensor-gap"
+                    hasSensorGap(windowRows) -> "sensor-gap"
                     window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
                     window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
@@ -1264,7 +1336,8 @@ class HistoryReplayTest {
             }
             val isfGate = seen.size >= 5 && (!require3Days || seenDays.size >= 3)
             val rejectedTotal = isfRejected.values.sum()
-            println("AIMI audit ISF: candidates=${seen.size + rejectedTotal} accepted=${seen.size} rejected=$rejectedTotal reasons=${isfRejected.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${seenDays.size} gate=${if (isfGate) "PASS" else "FAIL"}")
+            assertAuditReconciles("ISF", auditCandidates, seen.size, rejectedTotal)
+            println("AIMI audit ISF: candidates=$auditCandidates accepted=${seen.size} rejected=$rejectedTotal reasons=${isfRejected.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${seenDays.size} gate=${if (isfGate) "PASS" else "FAIL"}")
             if (!isfGate) return null
             return Pair(seen.sorted()[seen.size / 2], seen.size)
         }
@@ -1286,8 +1359,7 @@ class HistoryReplayTest {
                     val tm = m.getLong("t")
                     val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
                     val allWindow = allRows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
-                    if (causalFilter && (allWindow.any { it.optBoolean("sensorGap") } ||
-                        allWindow.zipWithNext().any { (x, y) -> y.getLong("t") - x.getLong("t") > 5 * minute })) {
+                    if (causalFilter && hasSensorGap(allWindow)) {
                         reject("sensor-gap"); continue
                     }
                     if (causalFilter && allWindow.any { !it.has("bg") }) { reject("missing-bg"); continue }
@@ -1313,6 +1385,7 @@ class HistoryReplayTest {
                 }
                 val crGate = used >= 5 && (!require3Days || usedDays.size >= 3)
                 val rejectedTotal = rejected.values.sum()
+                assertAuditReconciles("CR-block-$b", candidates.size, used, rejectedTotal)
                 println("AIMI audit CR block=$b: candidates=${candidates.size} accepted=$used rejected=$rejectedTotal reasons=${rejected.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${usedDays.size} gate=${if (crGate) "PASS" else "FAIL"}")
                 if (!crGate) continue
                 val lf = lows.toDouble() / used; val hf = highs.toDouble() / used
@@ -1428,7 +1501,8 @@ class HistoryReplayTest {
             val actF = if (actDay && h in 10..21) 1.3 else if (actDay && h >= 22 || actNight) 1.2 else 1.0
             val failF = if (stFail > 0 && day > 0 && day % stFail == 0 && h in 14..19) 0.5 else 1.0
             val stressF = driftF * illF * actF * failF
-            val needNow = needBasal[h] * (if (h in 4..7) stDawn else 1.0) * (if (h in 10..17) stDay else 1.0)
+            val outlierFactor = if (stressTokens.outlierDay == day + 1) stressTokens.outlierMultiplier else 1.0
+            val needNow = needBasal[h] * (if (h in 4..7) stDawn else 1.0) * (if (h in 10..17) stDay else 1.0) * outlierFactor
             g += isfT * needNow / 60.0 - isfT * dayFactor[day] * (if (changed) chgIsf else 1.0) * canF * stressF * acting + csfT * carbsAbs + z + e
             g = g.coerceIn(30.0, 450.0)
             // Sensor.
@@ -1440,11 +1514,13 @@ class HistoryReplayTest {
             if (stComp > 0 && h < 6 && t >= compUntil && compRnd.nextDouble() < stComp / (7.0 * 6 * 60)) compUntil = t + 20 * minute
             if (t < compUntil) reading = maxOf(45.0, reading - 40.0)
             reading = reading.coerceIn(39.0, 400.0)
-            readT.add(t); readV.add(reading)
+            val sensorGapActive = sensorGapActive(t)
+            val sensorGapAffected = sensorGapAffected(t)
+            if (!sensorGapActive) { readT.add(t); readV.add(reading) }
 
             // Family: a low is treated with 6 g.
             // The family treats a low the sensor shows for 2 minutes (not a one-minute spike).
-            if (reading < 70.0 && readV.size > 1 && readV[readV.size - 2] < 70.0 && t - lastTreat >= 20 * minute) {
+            if (!sensorGapActive && reading < 70.0 && readV.size > 1 && readV[readV.size - 2] < 70.0 && t - lastTreat >= 20 * minute) {
                 // TREAT_<g>: fixed treatment size (default 6 g). TREATL: the learner's size - enough carbs to lift glucose
                 // to ~5.5 after the fall still coming (the last 15 min trend for 15 more min) and a part of the active
                 // insulin, at the profile carb sensitivity; 4-10 g, whole grams.
@@ -1472,14 +1548,15 @@ class HistoryReplayTest {
                 for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                 val bIob = basalIob(t)
                 val bIobUsed = if (noIob && reading < noIobBg) maxOf(bIob, 0.0) else bIob
-                val fall15 = readV.size > 15 && reading - readV[readV.size - 16] < -9.0
+                val wizardBg = if (sensorGapActive) targetP else reading
+                val fall15 = !sensorGapActive && readV.size > 15 && reading - readV[readV.size - 16] < -9.0
                 val thrNow = if (smartL) smartThr else 81.0
-                val waitNow = reading < thrNow || (smartL && fall15 && reading < thrNow + 18.0)
+                val waitNow = !sensorGapActive && (reading < thrNow || (smartL && fall15 && reading < thrNow + 18.0))
                 if (smartS && waitNow) { pend = Pending(t, ml.logged, reading); nDelayed++; if (smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, true)) }
                 else {
                     if (smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, false))
                     val icM = icAt(t)
-                    val wiz = ml.logged / icM + (reading - targetP) / isfP - iobAll - bIobUsed
+                    val wiz = ml.logged / icM + (wizardBg - targetP) / isfP - iobAll - bIobUsed
                     val afterHypo = chainP > 0.0 && ml.logged >= 13.0 && t - lastTreat < 180 * minute
                     // SPLITTYPE: the family marks the meal fast or slow in the calculator (right 85 % of the time);
                     // a fast meal gets the whole bolus now, only a slow one is split.
@@ -1506,7 +1583,7 @@ class HistoryReplayTest {
             // The dose is the wizard at the moment of firing: all carbs, minus all IOB (SMB given while waiting included).
             // Split bolus second part (SPLIT_<percent now>): checked from SPLITMIN_<min> (default 45) every minute; given when glucose >= 5.5
             // and not falling, minus the SMB the loop gave since the meal. Dropped after 90 min or if glucose < 4.5.
-            splits.removeAll { sp ->
+            if (!sensorGapActive) splits.removeAll { sp ->
                 val m = (t - sp.t) / minute
                 val rising = readV.size > 5 && reading >= readV[readV.size - 6]
                 val ready = if (splitAbs) devStreak >= 2 && reading >= 90.0 else reading >= 99.0
@@ -1517,7 +1594,7 @@ class HistoryReplayTest {
                     true
                 } else false
             }
-            pend?.let { pd ->
+            if (!sensorGapActive) pend?.let { pd ->
                 val m = (t - pd.t) / minute
                 val check = m == 10L || m >= 15L
                 val rising = readV.size > 5 && reading > readV[readV.size - 6]
@@ -1530,7 +1607,7 @@ class HistoryReplayTest {
                     pend = null; nFired++; delaySum += m
                 }
             }
-            if (smartL) mealWatch.removeAll { w ->
+            if (!sensorGapActive && smartL) mealWatch.removeAll { w ->
                 w.min = minOf(w.min, reading); w.max = maxOf(w.max, reading)
                 val age = (t - w.t) / minute
                 if (!w.delayed && age <= 150 && w.min < 70.0) {
@@ -1542,7 +1619,7 @@ class HistoryReplayTest {
                 } else age > 180
             }
             // Family: sometimes a manual correction on a rebound after a low.
-            if (!corrAsked && t - lastTreat in 10 * minute..120 * minute && reading > 160.0 && readV.size > 6 && reading > readV[readV.size - 6]) {
+            if (!sensorGapActive && !corrAsked && t - lastTreat in 10 * minute..120 * minute && reading > 160.0 && readV.size > 6 && reading > readV[readV.size - 6]) {
                 corrAsked = true
                 if (rnd.nextDouble() * 100 < corrPct) {
                     var iobAll = basalIob(t)
@@ -1558,7 +1635,7 @@ class HistoryReplayTest {
                 while (a > 0 && t - readT[a - 1] <= 61 * minute) a--
                 val winT = LongArray(readT.size - a) { readT[a + it] }
                 val winV = (a until readT.size).map { GV(timestamp = readT[it], raw = null, value = readV[it], trendArrow = TrendArrow.NONE, noise = null, sourceSensor = SourceSensor.UNKNOWN) }
-                val gs = if (ukf == null) glucoseStatus(winV, winT, t) else {
+                val gs = if (sensorGapActive) null else if (ukf == null) glucoseStatus(winV, winT, t) else {
                     // last 6 h, one value per 5 minutes, newest first
                     val n5 = minOf(72, (readT.size - 1) / 5 + 1)
                     val list = MutableList(n5) { j -> InMemoryGlucoseValue(timestamp = readT[readT.size - 1 - 5 * j], value = readV[readT.size - 1 - 5 * j]) }
@@ -1666,8 +1743,9 @@ class HistoryReplayTest {
                     }
                 }
                 episodes.removeAll { it.done && t - it.t0 > 6 * 3_600_000L }
-                val row = JSONObject().put("t", t).put("bg", reading).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
-                    .put("ntreat", nTreat).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
+                val row = JSONObject().put("t", t).put("bgTrue", g).put("smbOk", smbOk).put("guard", guardHold)
+                    .put("ntreat", nTreat)
+                if (!sensorGapActive) row.put("bg", reading).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
                 row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h]).put("lbg", gs?.glucose ?: JSONObject.NULL)
                 if (canEvery > 0) row.put("can", ((t - t0) / 3_600_000.0) % canEvery)
                 if (causalFilter) {
@@ -1685,11 +1763,11 @@ class HistoryReplayTest {
                         .put("afterSmb", afterSmb).put("afterManual", afterManual)
                         .put("afterInsulin", afterSmb || afterManual)
                         .put("oldCannula", canAgeNow > 72.0)
-                        .put("sensorGap", gs == null)
+                        .put("sensorGap", sensorGapAffected || gs == null)
                         .put("activity", activityNow).put("illness", illnessNow)
                         .put("falseLow", reading < 70.0 && t < compUntil)
                         .put("mealBolus", mealBolusNow).put("manualCorrection", manualCorrectionNow)
-                    if (reading < 70.0) {
+                    if (!sensorGapActive && reading < 70.0) {
                         val causes = ArrayList<String>()
                         if (priorEvent(t, 120, "units")) causes.add("smb")
                         if (priorEvent(t, 180, "mealBolus")) causes.add("meal_bolus")
