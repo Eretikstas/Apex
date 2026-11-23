@@ -270,6 +270,22 @@ Task 7 correction / supplied test prefs:
 - This is a `SYNTH_56` synthetic prefs string, not a separate literal `APP` token. It is retained as supplied, without adding or guessing tokens.
 - At the last status check, replay run `45099362646` and compile check `45100729376` were both still in progress. The GitHub integration exposes no workflow-dispatch action, so the requested one-job run has not been started. Do not start another replay until `45099362646` completes and the latest compile check is green.
 
+### 2026-11-23, safety-failure review — priorities 1–5 before Task 8
+
+Reviewed the current branch head `f2c6bc1781d2c43ba46648ce6dd0f42536108399`, this STATUS Results entry, `COORDINATION.md` (commit `10e60902ab`), and the current replay source. No source or workflow behavior was changed in this review.
+
+**1. Percentage protection must count SMB lows.** In `learnAllCheck()`, `lo3Eligible` currently includes only `hypoCause == fasting || meal_bolus`; this excludes `smb` and `ambiguous` lows. Proposed protection-only classification: include every valid BG low, including SMB/activity/illness/old-cannula-associated lows, except false-low artifacts, sensor-gap/transition rows, the first 24 h of the synthetic sensor stream, and rows in the 180-minute post-hypo-treatment rebound window. This is separate from causal attribution for CR/ISF/Basal. Keep the existing Percentage-down threshold (>4%) unless separately reviewed. There is currently no explicit first-sensor-day row flag; the synthetic stream starts at `t0`, so a deterministic first-24-hour marker is needed.
+
+**2. Add a three-day insulin-increase interlock (behavior change; pending Claude review and user approval).** Calculate the same protection-only all-cause low rate over the last 3 days. If it is >3%, block every proposal that increases insulin effect/delivery: Percentage up/restore, stronger CR, weaker ISF, positive Basal deltas, Dura up, and any analogous learner weight/multiplier increase. Do not block protective decreases. For mixed Basal proposals, block positive hourly deltas while retaining eligible negative deltas; do not discard the whole card blindly. Evaluate the gate against the pre-change snapshot before applying any proposal.
+
+**3. Dura down must use the same protection-only low definition.** Current `cleanDuraRow()` excludes post-hypo, old-cannula, sensor-gap, false-low, illness and activity rows, but it does not exclude SMB lows. Current Dura low-rate denominator is the narrower `valid` set. Proposed change: preserve `cleanDuraRow()` for flat-high evidence, but calculate the Dura low-protection rate from the shared all-cause protection window in item 1. This ensures SMB lows count and exclusions match Percentage protection.
+
+**4. CR/ISF audit visibility.** Current source already contains separate `AIMI audit CR block=...` and `AIMI audit ISF:...` lines, and the current `aimi-replay.yml` public synthetic-summary step selects lines beginning `AIMI audit `. The prior Results run was based on code `7f34c90ae0`; its missing audit output does not prove the current f2c6 source/summary path works. Before another learner batch, ensure the audit functions execute even when a minimum-days/window gate fails (report the pre-scan candidates and gate reason instead of silently returning), then verify the public summary contains CR and ISF candidate/accepted/rejected-by-reason counts for every check. Do not relax the six-hour post-meal SMB exclusion to manufacture CR data.
+
+**5. Correct the CHGISF pair-test specification.** `CHGISF_<x>` is only applied from `CHG_<day>`; the prior pair tests without `CHG_` did not exercise insulin-action change. Repeat with the required day token: (a) `MEALX_1.3 CHG_28 CHGISF_0.8`; (b) `MEALX_1.3 DAYNEED_1.2`; (c) `CHG_28 CHGISF_0.8 DAYNEED_1.2`. Use matched controls with the same seed and only the intended pair factors changed. No larger matrix until all three short checks pass.
+
+**Approval boundary / next action.** Items 1–3 change learner behavior and therefore are not implemented pending Claude's technical review and the user's explicit approval, as required by COORDINATION.md. Items 4–5 are instrumentation/test-plan work and can proceed within the lab scope. Task 8 (new RUN workflow and RUN.txt) is deferred until priorities 1–5 are resolved and the audit/compile gate is green. No replay batch was started.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
