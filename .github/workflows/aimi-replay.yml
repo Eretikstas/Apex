@@ -224,11 +224,6 @@ jobs:
               basal_rate = row.get("deliv", 0.0)
               smb = row.get("units", 0.0)
               manual = row.get("man", 0.0)
-              for value in (basal_rate, smb, manual):
-                  if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
-                      value = 0.0
-                  if value is basal_rate:
-                      pass
               if isinstance(basal_rate, (int, float)) and math.isfinite(float(basal_rate)):
                   insulin_units += float(basal_rate) / 60.0
               if isinstance(smb, (int, float)) and math.isfinite(float(smb)):
