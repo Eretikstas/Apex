@@ -333,6 +333,72 @@ After that fix is committed, run exactly **one** manual workflow job as the summ
 
 Do not start the wider replay batch yet. No live AAPS/profile/pump/Nightscout changes.
 
+### 2026-11-23, ChatGPT continuation without Claude — synthetic summary repair
+
+User authorized ChatGPT to continue the lab work without Claude and required every action to be recorded here. Work remains limited to branch `aimi-replay`; no app-branch or live AAPS changes.
+
+- Updated `.github/workflows/aimi-replay.yml` in commit `a3057c3187318087af221c8b6ed4c67bf2f4a527`.
+- Fixed `SYNTH_<days>` extraction to accept comma- or whitespace-separated preference tokens (the actual replay prefs use commas).
+- Fixed task-label tokenization to split on commas and whitespace.
+- Fixed basal insulin integration: infer the normal row interval from the median positive timestamp delta (ignoring gaps over 30 minutes), validate it is 1–15 minutes, and integrate `deliv` as U/hour × interval-hours. SMB and manual bolus units remain summed per row. This avoids the known fivefold undercount on 5-minute rows and remains robust to missing GAP ticks.
+- No replay was run. The next required validation is compile-only CI, followed by exactly one base APP / SYNTH_56 / seed 1 summary check. Do not start the replay until compile is green and no replay workflow is active. Check TDD against the expected approximate 14–17 U/day; if outside, stop and investigate.
+- Review requested: verify comma parsing, inferred cadence, and the insulin-unit semantics in the public summary. The summary step is part of the replay workflow; the replay step, encryption/decryption, and secrets were not changed.
+
+
+### 2026-11-23, ChatGPT implementation — opt-in LAPROTECT in replay learner
+
+User authorized continuation without Claude. Implemented the already-approved items 1–3 on `aimi-replay`; no live AAPS code, profile, pump, Nightscout, or `autoisf-atc3` changes.
+
+Commits:
+- `201cc323652fe2c1068b9fd037590cebcc3be143` — LAPROTECT logic and regression tests.
+- `2931d29e3693dcc9797adbd2f4d2c5c352bc3f5f` — require `LAPROTECT` to be paired with `LEARNALL`, so the interlock cannot be silently bypassed by a standalone learner path.
+
+Implementation:
+1. Protection-only all-cause low metric is separate from causal attribution. It counts all valid BG rows, including SMB/ambiguous/old-cannula/activity/illness-associated lows; excludes rows without BG, first 24 h, false-low artifacts, sensor-gap/transition rows, and the 180-minute post-hypo-treatment window. The row metadata needed for this metric is generated when either `LACAUSE` or `LAPROTECT` is enabled.
+2. The last-three-day protection rate blocks insulin-increasing proposals when >3%; insufficient valid-day coverage also fails closed for increases. Protective decreases remain eligible. Directional gating is applied to actual proposal effects: percentage restore/up, stronger CR (lower CR multiplier), stronger correction (lower ISF), positive basal deltas, and Dura up are blocked; weaker CR / higher ISF and protective decreases remain allowed. Basal gating applies per hour, including trend/shift paths, so mixed proposals retain eligible negative hourly deltas.
+3. Dura uses the same protection-only row definition over its seven-day evidence window. Dura down remains available when the all-cause low rate exceeds 4%; Dura up is blocked by the three-day interlock.
+4. Synthetic stress-token parsing now accepts comma-separated tokens as well as whitespace-separated tokens. Added regression tests for comma parsing and protection-row inclusion/exclusion.
+
+No replay was run. Compile-only validation is required before the single base APP / SYNTH_56 / seed 1 control run. That run must use the exact existing APP token list; do not reconstruct missing tokens from partial examples. Stop if TDD is outside approximately 14–17 U/day or if the summary fails. Claude review is no longer a dependency per the user's instruction, but the source-level review points below remain explicit checks for this independent continuation:
+- verify that the protection denominator and exclusions match the approved definition;
+- verify that every insulin-increasing path is gated and protective decreases are not blocked;
+- verify no-token behavior remains unchanged;
+- verify the Dura seven-day protection count and per-hour basal handling.
+
+
+### 2026-11-23, LAPROTECT scope guard and insulin accounting across GAP
+
+- Commit `251520148b7141047b5acbd6bdc628d7472a44f9` adds two safeguards:
+  1. `LAPROTECT` now requires both `LEARNALL` and `LACAUSE`. This prevents the protection token from running without the complete learner interlock or with unfiltered Dura flat-high evidence.
+  2. Synthetic output now records delivered basal rate and manual bolus units even on sensor-blackout rows. BG/COB remain absent during the blackout. This lets the aggregate TDD summary count insulin delivered during GAP instead of silently dropping it.
+- No replay was run. Compile-only validation remains pending for the current source head.
+
+
+### 2026-11-23, static pair-token audit and run/dispatch gate
+
+Source-only review of the three approved pair factors in `HistoryReplayTest.kt`:
+- `MEALX_<x>` scales generated meal grams at meal construction.
+- `CHG_<day>` sets the change day; `CHGISF_<x>` scales insulin action only when `day >= chgDay`. With no `CHG_`, the default day is 9999 and the factor does not activate during the 56-day run.
+- `DAYNEED_<x>` scales true basal need only during synthetic hours 10–17 (10:00–18:00).
+- Static inspection finds these factors applied at separate points without overwriting one another. This is not a runtime pair test; the three matched pair checks remain unvalidated.
+
+Run state:
+- Earlier replay batch `45099362646` is completed with failure (the previously recorded five failed jobs remain unresolved); it is not active.
+- Push-triggered `aimi-replay.yml` runs for the recent commits were skipped as intended. No replay is active.
+- Compile-only runs `45146011846`, `45146079235`, and `45146287550` were still in progress at this report; the latest source validation target is run `45146287550` for source commit `251520148b7141047b5acbd6bdc628d7472a44f9`.
+- The GitHub integration available in this session exposes read/write repository-file actions and workflow reruns, but no workflow-dispatch action. The workflow file is only on `aimi-replay`, not the repository default branch, so the manual `Run workflow` path remains unavailable without changing the default branch. No default-branch change was authorized.
+- The previously supplied long `SYNTH_56,SEED_1,...,PCTMAX_100` value is a complete prefs profile, not an extra standalone `APP` token list. Do not append an `APP` token or invent a different APP profile. The exact profile can only be used as supplied; it must not be relabelled or modified.
+- The one-job summary smoke test and matched pair runs are not started. Task 8 remains deferred until the current compile/audit gate and pair-run prerequisites are resolved; its approved RUN.txt wrapper has not been implemented in this report.
+
+
+### 2026-11-23, LAPROTECT compile and helper-test validation
+
+- Compile-only workflow run: `45146287550`.
+- Source commit checked out: `251520148b7141047b5acbd6bdc628d7472a44f9`.
+- Result: **SUCCESS**. Both `Compile replay test sources only` and `Run replay audit helper tests without replay inputs` completed successfully.
+- This validates Kotlin test-source compilation and the isolated helper tests only. It does not validate replay outcomes, the 3-day protection rate on generated data, the interlock across real proposal combinations, or the summary TDD result.
+- No replay batch was started. Next replay gates remain: one exact base/APP summary smoke test, then matched pair checks with `CHG_28`; the current session still has no direct workflow-dispatch action.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
@@ -461,68 +527,4 @@ unchanged. The user still has to say yes (asked in chat).
 Test on one job before the next batch: TDD should be about 14–17 U/day for base, like the APP table above.
 
 
-### 2026-11-23, ChatGPT continuation without Claude — synthetic summary repair
 
-User authorized ChatGPT to continue the lab work without Claude and required every action to be recorded here. Work remains limited to branch `aimi-replay`; no app-branch or live AAPS changes.
-
-- Updated `.github/workflows/aimi-replay.yml` in commit `a3057c3187318087af221c8b6ed4c67bf2f4a527`.
-- Fixed `SYNTH_<days>` extraction to accept comma- or whitespace-separated preference tokens (the actual replay prefs use commas).
-- Fixed task-label tokenization to split on commas and whitespace.
-- Fixed basal insulin integration: infer the normal row interval from the median positive timestamp delta (ignoring gaps over 30 minutes), validate it is 1–15 minutes, and integrate `deliv` as U/hour × interval-hours. SMB and manual bolus units remain summed per row. This avoids the known fivefold undercount on 5-minute rows and remains robust to missing GAP ticks.
-- No replay was run. The next required validation is compile-only CI, followed by exactly one base APP / SYNTH_56 / seed 1 summary check. Do not start the replay until compile is green and no replay workflow is active. Check TDD against the expected approximate 14–17 U/day; if outside, stop and investigate.
-- Review requested: verify comma parsing, inferred cadence, and the insulin-unit semantics in the public summary. The summary step is part of the replay workflow; the replay step, encryption/decryption, and secrets were not changed.
-
-
-### 2026-11-23, ChatGPT implementation — opt-in LAPROTECT in replay learner
-
-User authorized continuation without Claude. Implemented the already-approved items 1–3 on `aimi-replay`; no live AAPS code, profile, pump, Nightscout, or `autoisf-atc3` changes.
-
-Commits:
-- `201cc323652fe2c1068b9fd037590cebcc3be143` — LAPROTECT logic and regression tests.
-- `2931d29e3693dcc9797adbd2f4d2c5c352bc3f5f` — require `LAPROTECT` to be paired with `LEARNALL`, so the interlock cannot be silently bypassed by a standalone learner path.
-
-Implementation:
-1. Protection-only all-cause low metric is separate from causal attribution. It counts all valid BG rows, including SMB/ambiguous/old-cannula/activity/illness-associated lows; excludes rows without BG, first 24 h, false-low artifacts, sensor-gap/transition rows, and the 180-minute post-hypo-treatment window. The row metadata needed for this metric is generated when either `LACAUSE` or `LAPROTECT` is enabled.
-2. The last-three-day protection rate blocks insulin-increasing proposals when >3%; insufficient valid-day coverage also fails closed for increases. Protective decreases remain eligible. Directional gating is applied to actual proposal effects: percentage restore/up, stronger CR (lower CR multiplier), stronger correction (lower ISF), positive basal deltas, and Dura up are blocked; weaker CR / higher ISF and protective decreases remain allowed. Basal gating applies per hour, including trend/shift paths, so mixed proposals retain eligible negative hourly deltas.
-3. Dura uses the same protection-only row definition over its seven-day evidence window. Dura down remains available when the all-cause low rate exceeds 4%; Dura up is blocked by the three-day interlock.
-4. Synthetic stress-token parsing now accepts comma-separated tokens as well as whitespace-separated tokens. Added regression tests for comma parsing and protection-row inclusion/exclusion.
-
-No replay was run. Compile-only validation is required before the single base APP / SYNTH_56 / seed 1 control run. That run must use the exact existing APP token list; do not reconstruct missing tokens from partial examples. Stop if TDD is outside approximately 14–17 U/day or if the summary fails. Claude review is no longer a dependency per the user's instruction, but the source-level review points below remain explicit checks for this independent continuation:
-- verify that the protection denominator and exclusions match the approved definition;
-- verify that every insulin-increasing path is gated and protective decreases are not blocked;
-- verify no-token behavior remains unchanged;
-- verify the Dura seven-day protection count and per-hour basal handling.
-
-
-### 2026-11-23, LAPROTECT scope guard and insulin accounting across GAP
-
-- Commit `251520148b7141047b5acbd6bdc628d7472a44f9` adds two safeguards:
-  1. `LAPROTECT` now requires both `LEARNALL` and `LACAUSE`. This prevents the protection token from running without the complete learner interlock or with unfiltered Dura flat-high evidence.
-  2. Synthetic output now records delivered basal rate and manual bolus units even on sensor-blackout rows. BG/COB remain absent during the blackout. This lets the aggregate TDD summary count insulin delivered during GAP instead of silently dropping it.
-- No replay was run. Compile-only validation remains pending for the current source head.
-
-
-### 2026-11-23, static pair-token audit and run/dispatch gate
-
-Source-only review of the three approved pair factors in `HistoryReplayTest.kt`:
-- `MEALX_<x>` scales generated meal grams at meal construction.
-- `CHG_<day>` sets the change day; `CHGISF_<x>` scales insulin action only when `day >= chgDay`. With no `CHG_`, the default day is 9999 and the factor does not activate during the 56-day run.
-- `DAYNEED_<x>` scales true basal need only during synthetic hours 10–17 (10:00–18:00).
-- Static inspection finds these factors applied at separate points without overwriting one another. This is not a runtime pair test; the three matched pair checks remain unvalidated.
-
-Run state:
-- Earlier replay batch `45099362646` is completed with failure (the previously recorded five failed jobs remain unresolved); it is not active.
-- Push-triggered `aimi-replay.yml` runs for the recent commits were skipped as intended. No replay is active.
-- Compile-only runs `45146011846`, `45146079235`, and `45146287550` were still in progress at this report; the latest source validation target is run `45146287550` for source commit `251520148b7141047b5acbd6bdc628d7472a44f9`.
-- The GitHub integration available in this session exposes read/write repository-file actions and workflow reruns, but no workflow-dispatch action. The workflow file is only on `aimi-replay`, not the repository default branch, so the manual `Run workflow` path remains unavailable without changing the default branch. No default-branch change was authorized.
-- The previously supplied long `SYNTH_56,SEED_1,...,PCTMAX_100` value is a complete prefs profile, not an extra standalone `APP` token list. Do not append an `APP` token or invent a different APP profile. The exact profile can only be used as supplied; it must not be relabelled or modified.
-- The one-job summary smoke test and matched pair runs are not started. Task 8 remains deferred until the current compile/audit gate and pair-run prerequisites are resolved; its approved RUN.txt wrapper has not been implemented in this report.
-
-
-### 2026-11-23, LAPROTECT compile and helper-test validation
-
-- Compile-only workflow run: `45146287550`.
-- Source commit checked out: `251520148b7141047b5acbd6bdc628d7472a44f9`.
-- Result: **SUCCESS**. Both `Compile replay test sources only` and `Run replay audit helper tests without replay inputs` completed successfully.
-- This validates Kotlin test-source compilation and the isolated helper tests only. It does not validate replay outcomes, the 3-day protection rate on generated data, the interlock across real proposal combinations, or the summary TDD result.
-- No replay batch was started. Next replay gates remain: one exact base/APP summary smoke test, then matched pair checks with `CHG_28`; the current session still has no direct workflow-dispatch action.
