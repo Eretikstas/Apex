@@ -111,6 +111,28 @@ class HistoryReplayTest {
             row.optString("hypoCause") == "fasting" || row.optString("hypoCause") == "meal_bolus"
     }
 
+    private fun classifyHypoCause(
+        smbWithin2h: Boolean,
+        mealBolusWithin3h: Boolean,
+        reboundWithin3h: Boolean,
+        afterMeal: Boolean,
+        afterManual: Boolean,
+        afterSmb: Boolean,
+        afterHypo: Boolean,
+    ): String {
+        val causes = listOfNotNull(
+            if (smbWithin2h) "smb" else null,
+            if (mealBolusWithin3h) "meal_bolus" else null,
+            if (reboundWithin3h) "rebound" else null,
+        )
+        return when {
+            causes.size > 1 -> "ambiguous"
+            causes.size == 1 -> causes.first()
+            !afterMeal && !afterManual && !afterSmb && !afterHypo -> "fasting"
+            else -> "other"
+        }
+    }
+
     private fun protectionBlocksInsulinIncrease(validDays: Int, lowPct: Double): Boolean =
         validDays < 3 || lowPct > 3.0
 
@@ -196,6 +218,12 @@ class HistoryReplayTest {
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting").put("activity", true)))
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("activity", false)))
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("sensorGap", true)))
+        assertEquals("fasting", classifyHypoCause(false, false, false, false, false, false, false))
+        assertEquals("smb", classifyHypoCause(true, false, false, true, false, true, false))
+        assertEquals("meal_bolus", classifyHypoCause(false, true, false, true, true, false, false))
+        assertEquals("rebound", classifyHypoCause(false, false, true, false, false, false, true))
+        assertEquals("ambiguous", classifyHypoCause(true, true, false, true, true, true, false))
+        assertEquals("other", classifyHypoCause(false, false, false, true, false, false, false))
         assertEquals("sensor-start", protectionExclusionReason(JSONObject().put("t", start + 23 * 60 * minute).put("bg", 65.0), start))
         assertEquals("false-low", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
         assertEquals("sensor-gap", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
@@ -1895,16 +1923,15 @@ class HistoryReplayTest {
                         .put("falseLow", reading < 70.0 && t < compUntil)
                         .put("mealBolus", mealBolusNow).put("manualCorrection", manualCorrectionNow)
                     if (!sensorGapActive && reading < 70.0) {
-                        val causes = ArrayList<String>()
-                        if (priorEvent(t, 120, "units")) causes.add("smb")
-                        if (priorEvent(t, 180, "mealBolus")) causes.add("meal_bolus")
-                        if (priorEvent(t, 180, "hypo")) causes.add("rebound")
-                        val cause = when {
-                            causes.size > 1 -> "ambiguous"
-                            causes.size == 1 -> causes.first()
-                            !afterMeal && !afterManual && !afterSmb && !afterHypo -> "fasting"
-                            else -> "other"
-                        }
+                        val cause = classifyHypoCause(
+                            smbWithin2h = priorEvent(t, 120, "units"),
+                            mealBolusWithin3h = priorEvent(t, 180, "mealBolus"),
+                            reboundWithin3h = priorEvent(t, 180, "hypo"),
+                            afterMeal = afterMeal,
+                            afterManual = afterManual,
+                            afterSmb = afterSmb,
+                            afterHypo = afterHypo,
+                        )
                         row.put("hypoCause", cause)
                     }
                 }
