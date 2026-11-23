@@ -529,3 +529,24 @@ Test on one job before the next batch: TDD should be about 14–17 U/day for bas
 
 
 
+
+
+### 2026-11-23, default-branch replay dispatcher enabled
+
+User explicitly approved adding a minimal dispatcher to `main` so the single base SYNTH control can be launched without moving replay implementation or algorithm code to the default branch.
+
+Commits:
+- `58838301bbde51fdba030556250ba9c0c028a793` — added `.github/workflows/aimi-replay-dispatch.yml` to `main`. It exposes the same manual inputs and calls the reusable workflow on `aimi-replay`; it does not contain replay implementation.
+- `0ea5a7f90de58c546f33ddeef57d30702816c2a0` — added `workflow_call` input declarations to the existing replay workflow.
+- `ec544ec7ba5d5085bef920e6f390f999544b89c6` — allowed the plan job to run for both `workflow_dispatch` and `workflow_call`, and pinned checkout to `aimi-replay` so the reusable workflow executes the lab branch code, not `main`.
+
+Validation:
+- Confirmed dispatcher file exists on `main`; reusable workflow exists on `aimi-replay`; caller points to `Eretikstas/Apex/.github/workflows/aimi-replay.yml@aimi-replay`.
+- Push-triggered replay workflow correctly skipped (it only plans jobs for manual/reusable dispatch).
+- Compile check run `45148733890` is in progress for current source commit `ec544ec7ba5d5085bef920e6f390f999544b89c6`; do not launch the SYNTH replay until it completes successfully.
+- The available GitHub connection has no workflow-dispatch action and its generic fetch is GET-only. Therefore I cannot submit the dispatch event directly from this session; the dispatcher should now appear under Actions on the repository default branch.
+
+Exact approved single-control prefs, unchanged:
+`SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,SBIAS_0.15,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,TREATL,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100`
+
+Dispatch only one job: leave `batch` empty, set `prefs` to the exact string above, keep default `learn=true`, `pretrained=false`, `sim=false`, `algo=aimi`, and all other optional fields empty/false. This is the base APP / seed 1 synthetic control, not a batch.
