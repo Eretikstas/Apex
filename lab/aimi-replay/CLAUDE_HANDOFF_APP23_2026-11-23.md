@@ -276,3 +276,13 @@ Important interpretation:
 - Previous compile run 45272322156 (commit 2c660b1) remained in progress without step progress; it does not validate commit 64f4502.
 - No replay against the corrected ISF/CR/percentage logic has been run yet. After compile/helper tests pass, run the full 24-scenario APP23 batch.
 - No clinical efficacy claim; all changes remain confined to `aimi-replay`.
+
+
+## APP23 rejection-reason aggregate (24 scenarios; pre-latest CR/ISF corrections)
+
+Summed from audit logs across the 24 jobs in run 45270000264; these are rejection-event counts across overlapping candidate scans, not unique clinical episodes:
+
+- ISF: meal-window 23,459; rolling hypo-rebound 16,720; prior-insulin 4,402; accepted 0.
+- CR: prior-insulin 8,422; prior-hypo-rebound rolling flag 7,471; post-meal SMB 193; post-meal manual correction 25; ambiguous low 13; missing meal bolus 9; accepted 0.
+- This supports the two targeted corrections: replace the overbroad rolling hypo flag with actual measured BG <70 or recorded hypo-treatment carbs in the same 2 h pre-meal window for CR; replace ISF's 7 h rolling-flag scan with actual BG <70 inside the 3 h pre / 3 h post correction response window.
+- The large meal-window and prior-insulin counts remain intentionally protected. They are not relaxed without a separate insulin-on-board/meal-causality audit.
