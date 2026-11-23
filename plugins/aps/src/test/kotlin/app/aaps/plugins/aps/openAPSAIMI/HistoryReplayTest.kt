@@ -149,6 +149,10 @@ class HistoryReplayTest {
     private fun protectionBlocksInsulinIncrease(validDays: Int, lowPct: Double): Boolean =
         validDays < 3 || lowPct > 3.0
 
+    private fun percentageRestoreReady(
+        pctBack: Boolean, blocked: Boolean, pctNow: Double, eligibleLowPct: Double, consecutiveChecks: Int,
+    ): Boolean = pctBack && !blocked && pctNow < 0.9999 && eligibleLowPct <= 2.0 && consecutiveChecks >= 2
+
     private data class SyntheticStressTokens(
         val outlierDay: Int? = null,
         val outlierMultiplier: Double = 1.0,
@@ -223,6 +227,12 @@ class HistoryReplayTest {
         val reboundLow = JSONObject().put("t", start + 24 * 60 * minute).put("afterHypo", true).put("bg", 65.0)
         assertEquals(true, isProtectionRow(reboundLow, start))
         assertEquals(null, protectionExclusionReason(reboundLow, start))
+
+        assertEquals(false, percentageRestoreReady(true, false, 0.9, 1.0, 1))
+        assertEquals(true, percentageRestoreReady(true, false, 0.9, 1.0, 2))
+        assertEquals(false, percentageRestoreReady(true, true, 0.9, 1.0, 2))
+        assertEquals(false, percentageRestoreReady(true, false, 0.9, 2.1, 2))
+        assertEquals(false, percentageRestoreReady(true, false, 1.0, 0.0, 2))
 
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting")))
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "meal_bolus")))
@@ -1413,6 +1423,7 @@ class HistoryReplayTest {
         // LEARNALL: one card per LAGAP days. Causal filtering is conservative:
         // ambiguous lows and events contaminated by SMB, rebound, sensor, activity or cannula issues do not teach CR/ISF.
         val learnAll = prefsText.contains("LEARNALL"); val laGap = tok("LAGAP", 3.0).toInt(); var laLast = -99
+        var pctRestoreStreak = 0
         require(!laProtect || learnAll) { "LAPROTECT requires LEARNALL so every learner proposal passes the protection interlock" }
         require(!laProtect || causalFilter) { "LAPROTECT requires LACAUSE so Dura flat-high evidence keeps its causal exclusions" }
         val laIsf = prefsText.contains("LAISF"); val laCr = prefsText.contains("LACR"); val isfStart = isfP
@@ -1579,6 +1590,8 @@ class HistoryReplayTest {
                 println("AIMI audit LEARNALL day=$day: protectionDays=$protectionDays/3 gate=FAIL reason=insufficient-days")
                 return
             }
+            pctRestoreStreak = if (pctBack && !blockInsulinIncrease && pctNow < 0.9999 && lo3Eligible <= 2.0)
+                pctRestoreStreak + 1 else 0
             fun setPct(np: Double) {
                 val f = np / pctNow; pctNow = np
                 for (i in 0 until 24) profBasal[i] = Math.round(profBasal[i] * f * 100) / 100.0
@@ -1588,9 +1601,9 @@ class HistoryReplayTest {
             val duraBefore = aw.dura; val basalBefore = profBasal.copyOf()
             when {
                 // The percentage card moves down only for fasting or meal-bolus lows accepted by the causal filter.
-                percentageLearningLowPct > 4.0 && pctNow > 0.8001 -> { setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
+                percentageLearningLowPct > 4.0 && pctNow > 0.8001 -> { pctRestoreStreak = 0; setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
                 // Restoring percentage or making any other insulin-increasing proposal is blocked above 3 %.
-                pctBack && !blockInsulinIncrease && pctNow < 0.9999 && lo3Eligible <= 2.0 -> { setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
+                percentageRestoreReady(pctBack, blockInsulinIncrease, pctNow, lo3Eligible, pctRestoreStreak) -> { pctRestoreStreak = 0; setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
                 isf != null && isf.first > isfP * 1.10 && isfP < isfStart * 1.25 -> { isfP = minOf(isfStart * 1.25, isfP * 1.07); card = "isf+" }
                 cr.any { it == 1 } -> { val b = cr.indexOfFirst { it == 1 }; crBlock[b] = minOf(1.25, crBlock[b] * 1.07); card = "cr+$b" }
                 else -> {
