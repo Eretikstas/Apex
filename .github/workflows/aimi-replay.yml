@@ -1,9 +1,9 @@
 name: AIMI history replay
 
 # Runs recorded loop cycles through the AIMI decision engine (HistoryReplayTest) and stores what AIMI
-# would have decided. The input (replay/input.enc) and the result are health data of a real person,
-# so both are only kept encrypted: the key is the repository secret AIMI_REPLAY_KEY, the log shows
-# counts only, and the artifact holds the encrypted result and nothing else.
+# would have decided. The input (replay/input.enc) and the full result are kept encrypted with
+# AIMI_REPLAY_KEY. SYNTH_ jobs additionally publish aggregate-only metrics; no timestamps, raw glucose
+# rows, or per-meal carbohydrate amounts are exposed.
 
 on:
   workflow_dispatch:
