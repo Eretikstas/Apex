@@ -22,7 +22,7 @@ permissions:
 jobs:
   compile:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       GRADLE_OPTS: >-
         -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
@@ -55,3 +55,14 @@ jobs:
         run: |
           ./gradlew :plugins:aps:testFullDebugUnitTest --tests 'app.aaps.plugins.aps.openAPSAIMI.orchestration.AimiAdaptationStatusBuilderTest' --console=plain
           ./gradlew :plugins:main:testFullDebugUnitTest --tests 'app.aaps.plugins.main.general.dashboard.viewmodel.AimiAdaptationStatusViewModelTest' --console=plain
+
+      - name: Assemble laboratory FullDebug APK
+        run: ./gradlew :app:assembleFullDebug --console=plain
+
+      - name: Upload laboratory APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aimi-replay-fullDebug-apk
+          path: app/build/outputs/apk/full/debug/*.apk
+          if-no-files-found: error
+          retention-days: 3
