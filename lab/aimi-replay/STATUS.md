@@ -471,3 +471,24 @@ User authorized ChatGPT to continue the lab work without Claude and required eve
 - Fixed basal insulin integration: infer the normal row interval from the median positive timestamp delta (ignoring gaps over 30 minutes), validate it is 1–15 minutes, and integrate `deliv` as U/hour × interval-hours. SMB and manual bolus units remain summed per row. This avoids the known fivefold undercount on 5-minute rows and remains robust to missing GAP ticks.
 - No replay was run. The next required validation is compile-only CI, followed by exactly one base APP / SYNTH_56 / seed 1 summary check. Do not start the replay until compile is green and no replay workflow is active. Check TDD against the expected approximate 14–17 U/day; if outside, stop and investigate.
 - Review requested: verify comma parsing, inferred cadence, and the insulin-unit semantics in the public summary. The summary step is part of the replay workflow; the replay step, encryption/decryption, and secrets were not changed.
+
+
+### 2026-11-23, ChatGPT implementation — opt-in LAPROTECT in replay learner
+
+User authorized continuation without Claude. Implemented the already-approved items 1–3 on `aimi-replay`; no live AAPS code, profile, pump, Nightscout, or `autoisf-atc3` changes.
+
+Commits:
+- `201cc323652fe2c1068b9fd037590cebcc3be143` — LAPROTECT logic and regression tests.
+- `2931d29e3693dcc9797adbd2f4d2c5c352bc3f5f` — require `LAPROTECT` to be paired with `LEARNALL`, so the interlock cannot be silently bypassed by a standalone learner path.
+
+Implementation:
+1. Protection-only all-cause low metric is separate from causal attribution. It counts all valid BG rows, including SMB/ambiguous/old-cannula/activity/illness-associated lows; excludes rows without BG, first 24 h, false-low artifacts, sensor-gap/transition rows, and the 180-minute post-hypo-treatment window. The row metadata needed for this metric is generated when either `LACAUSE` or `LAPROTECT` is enabled.
+2. The last-three-day protection rate blocks insulin-increasing proposals when >3%; insufficient valid-day coverage also fails closed for increases. Protective decreases remain eligible. Directional gating is applied to actual proposal effects: percentage restore/up, stronger CR (lower CR multiplier), stronger correction (lower ISF), positive basal deltas, and Dura up are blocked; weaker CR / higher ISF and protective decreases remain allowed. Basal gating applies per hour, including trend/shift paths, so mixed proposals retain eligible negative hourly deltas.
+3. Dura uses the same protection-only row definition over its seven-day evidence window. Dura down remains available when the all-cause low rate exceeds 4%; Dura up is blocked by the three-day interlock.
+4. Synthetic stress-token parsing now accepts comma-separated tokens as well as whitespace-separated tokens. Added regression tests for comma parsing and protection-row inclusion/exclusion.
+
+No replay was run. Compile-only validation is required before the single base APP / SYNTH_56 / seed 1 control run. That run must use the exact existing APP token list; do not reconstruct missing tokens from partial examples. Stop if TDD is outside approximately 14–17 U/day or if the summary fails. Claude review is no longer a dependency per the user's instruction, but the source-level review points below remain explicit checks for this independent continuation:
+- verify that the protection denominator and exclusions match the approved definition;
+- verify that every insulin-increasing path is gated and protective decreases are not blocked;
+- verify no-token behavior remains unchanged;
+- verify the Dura seven-day protection count and per-hour basal handling.
