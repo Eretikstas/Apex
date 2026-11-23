@@ -422,3 +422,19 @@ For CR, prior-insulin remains the dominant rejection. Candidate-level review mus
 - APP23 workflow-restoration replay run `45288804802`: all 25 jobs completed successfully (1 plan + 24 replay scenarios).
 - Dashboard status fix compile/test run `45289173704`: compile workflow SUCCESS. Gradle completed APS production/test compilation and MAIN production/test compilation. Both targeted test tasks completed: `AimiAdaptationStatusBuilderTest` and `AimiAdaptationStatusViewModelTest`. No test/compile failures reported. The log contains unrelated existing compiler warnings and a post-job git submodule cleanup warning; these did not change the successful workflow conclusion.
 - This validates compilation and unit tests for the metadata assignment path. It does not yet constitute a visual end-to-end test on a running Android app/device; the dashboard rendering fix remains lab-only pending UI runtime verification.
+
+
+## Runtime handoff audit and laboratory APK — 2026-11-24
+
+- Confirmed the live in-memory handoff chain from production source:
+  1. `DetermineBasalAIMI2.determine_basal()` returns an `RT` and the new central `.also { result -> assignAimiAdaptationStatus(result) }` runs before return.
+  2. `OpenAPSAIMIPlugin.invoke()` receives that exact `RT` in `.also { ... }`, then calls `apsResultProvider.get().with(it)` and stores the returned APSResult as `lastAPSResult`.
+  3. `implementation/aps/DetermineBasalResult.kt` stores the exact object in `this.result = result`; `rawData(): RT = result` returns the same object. `newAndClone()` wraps the same `result` reference again.
+  4. `LoopPlugin.invoke()` assigns `lastRun.request = apsResult`.
+  5. `AimiAdaptationStatusViewModel` reads `loop.lastRun?.request?.rawData() as? RT)?.aimiAdaptationStatus`. Thus the transient field survives the actual live handoff; it is not dropped by APSResult wrapping/cloning.
+- `RT.aimiAdaptationStatus` remains `@Transient`, and `DetermineBasalResult.json()` serializes `result.serialize()`. The status is therefore intentionally omitted from persisted/device-status JSON. That does not break the current dashboard path, which reads the live in-memory `lastRun.request.rawData()` object. On process restart, `lastRun` is recreated by a subsequent loop; no stale serialized status is expected to repopulate the screen.
+- Added a focused regression test to `implementation/src/test/kotlin/app/aaps/implementation/aps/DetermineBasalResultTest.kt`: `in-memory AIMI status survives APSResult wrapping and cloning`. It asserts object identity and status identity through `with(rt)`, `rawData()`, and `newAndClone()`. Commit: `70a8856b3299d3bf5704867ccd1a286f9c99aed8`.
+- Compile workflow now executes the focused `:implementation:testFullDebugUnitTest` task and assembles/uploads `:app:assembleFullDebug` as a short-retention lab artifact. Workflow definition commit: `0eb252bc43289038631afbf31e80196286c27bde`; run: https://github.com/Eretikstas/Apex/actions/runs/45292186462. Pending at report time.
+- User-provided APK `aaps-4.1-custom-261015-1156.apk` SHA-256 `71a05169498495998d1e63a2edd0b18d824fba5e2b3a0d775f591c4d269c93bb`. Static DEX scan found no `openAPSAIMI`, `AimiAdaptationStatus`, or `AimiAdaptationStatusViewModel` class-name strings. This file cannot be treated as a runtime validation target for the current AIMI status-card code. A fresh lab FullDebug APK is being built from `aimi-replay`; it will not be installed on any device.
+- Runtime visual verification on an emulator/device remains unperformed. Source handoff + regression test + build artifact are the available validation route; do not claim a visual E2E pass until one is actually run.
+- No production branch changes, no install/deployment, no pump/profile changes, no Nightscout writes.
