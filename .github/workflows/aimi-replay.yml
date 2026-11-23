@@ -120,18 +120,18 @@ jobs:
         id: replay
         continue-on-error: true
         env:
-          AIMI_REPLAY_KEY: \${{ secrets.AIMI_REPLAY_KEY }}
+          AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}
           # Passed as an environment value, never pasted into the script text.
-          AIMI_REPLAY_PREFS: \${{ matrix.prefs }}
-          AIMI_REPLAY_SIM: \${{ inputs.sim && '1' || '0' }}
-          AIMI_REPLAY_ALGO: \${{ inputs.algo }}
-          AIMI_REPLAY_SIM_ISF: \${{ inputs.isf }}
-          AIMI_REPLAY_REACT_FLOOR: \${{ inputs.react_floor }}
-          AIMI_REPLAY_PRED: \${{ inputs.oref_prediction && 'oref' || '' }}
+          AIMI_REPLAY_PREFS: ${{ matrix.prefs }}
+          AIMI_REPLAY_SIM: ${{ inputs.sim && '1' || '0' }}
+          AIMI_REPLAY_ALGO: ${{ inputs.algo }}
+          AIMI_REPLAY_SIM_ISF: ${{ inputs.isf }}
+          AIMI_REPLAY_REACT_FLOOR: ${{ inputs.react_floor }}
+          AIMI_REPLAY_PRED: ${{ inputs.oref_prediction && 'oref' || '' }}
           AIMI_REPLAY_TRACE: '1'
-          AIMI_REPLAY_NO_BOOSTER: \${{ inputs.no_booster && '1' || '0' }}
-          AIMI_REPLAY_BOOSTER_IOB: \${{ inputs.booster_iob && '1' || '0' }}
-          AIMI_REPLAY_PASSES: \${{ inputs.pretrained && '2' || '1' }}
+          AIMI_REPLAY_NO_BOOSTER: ${{ inputs.no_booster && '1' || '0' }}
+          AIMI_REPLAY_BOOSTER_IOB: ${{ inputs.booster_iob && '1' || '0' }}
+          AIMI_REPLAY_PASSES: ${{ inputs.pretrained && '2' || '1' }}
         run: |
           set +e
           W="$RUNNER_TEMP/replay"
@@ -144,7 +144,7 @@ jobs:
           export AIMI_REPLAY_SMB_INTERVAL
           export AIMI_REPLAY_OUT="$W/out.json.gz"
           export AIMI_REPLAY_HEAP=5g
-          export AIMI_REPLAY_LEARN=\${{ inputs.learn && '1' || '0' }}
+          export AIMI_REPLAY_LEARN=${{ inputs.learn && '1' || '0' }}
           # Keep the full Gradle log and replay output only in the encrypted archive.
           ./gradlew :plugins:aps:testFullDebugUnitTest --tests '*HistoryReplayTest*' --console=plain > "$W/gradle.log" 2>&1
           code=$?
@@ -155,9 +155,9 @@ jobs:
           exit $code
 
       - name: Public synthetic summary
-        if: \${{ always() && contains(matrix.prefs, 'SYNTH_') }}
+        if: ${{ always() && contains(matrix.prefs, 'SYNTH_') }}
         env:
-          AIMI_REPLAY_PREFS: \${{ matrix.prefs }}
+          AIMI_REPLAY_PREFS: ${{ matrix.prefs }}
         run: |
           python3 - <<'PY'
           import gzip
@@ -259,9 +259,9 @@ jobs:
           PY
 
       - name: Encrypt result
-        if: \${{ always() }}
+        if: ${{ always() }}
         env:
-          AIMI_REPLAY_KEY: \${{ secrets.AIMI_REPLAY_KEY }}
+          AIMI_REPLAY_KEY: ${{ secrets.AIMI_REPLAY_KEY }}
         run: |
           set +e
           W="$RUNNER_TEMP/replay"
@@ -279,9 +279,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Preserve replay failure status
-        if: \${{ always() }}
+        if: ${{ always() }}
         env:
-          REPLAY_EXIT_CODE: \${{ steps.replay.outputs.exit_code }}
+          REPLAY_EXIT_CODE: ${{ steps.replay.outputs.exit_code }}
         run: |
           if [ "$REPLAY_EXIT_CODE" != "0" ]; then
             echo "Replay failed with exit code $REPLAY_EXIT_CODE"
