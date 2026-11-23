@@ -745,8 +745,16 @@ class HistoryReplayTest {
             Instant.ofEpochMilli(t0).atZone(tz).toLocalDate().plusDays(3).atTime(2, 0).atZone(tz).toInstant().toEpochMilli()
         }
         val gapEnd = gapStart?.plus((stressTokens.gapMinutes ?: 0) * minute)
-        fun sensorGapActive(at: Long) = gapStart != null && at >= gapStart && at < (gapEnd ?: gapStart)
-        fun sensorGapAffected(at: Long) = gapStart != null && at >= gapStart && at < (gapEnd ?: gapStart) + 60 * minute
+        fun isSensorGapActive(at: Long): Boolean {
+            val start = gapStart ?: return false
+            val finish = gapEnd ?: return false
+            return at >= start && at < finish
+        }
+        fun isSensorGapAffected(at: Long): Boolean {
+            val start = gapStart ?: return false
+            val finish = gapEnd ?: return false
+            return at >= start && at < finish + 60 * minute
+        }
         val iobCurve = curve(peak, dia)
         // Share of a dose still to act after m minutes: all of it before the dose acts.
         fun iobLeft(m: Double): Pair<Double, Double> = if (m <= 0.0) Pair(1.0, 0.0) else iobCurve(m)
@@ -1514,8 +1522,8 @@ class HistoryReplayTest {
             if (stComp > 0 && h < 6 && t >= compUntil && compRnd.nextDouble() < stComp / (7.0 * 6 * 60)) compUntil = t + 20 * minute
             if (t < compUntil) reading = maxOf(45.0, reading - 40.0)
             reading = reading.coerceIn(39.0, 400.0)
-            val sensorGapActive = sensorGapActive(t)
-            val sensorGapAffected = sensorGapAffected(t)
+            val sensorGapActive = isSensorGapActive(t)
+            val sensorGapAffected = isSensorGapAffected(t)
             if (!sensorGapActive) { readT.add(t); readV.add(reading) }
 
             // Family: a low is treated with 6 g.
@@ -1549,7 +1557,7 @@ class HistoryReplayTest {
                 val bIob = basalIob(t)
                 val bIobUsed = if (noIob && reading < noIobBg) maxOf(bIob, 0.0) else bIob
                 val wizardBg = if (sensorGapActive) targetP else reading
-                val fall15 = !sensorGapActive && readV.size > 15 && reading - readV[readV.size - 16] < -9.0
+                val fall15 = !sensorGapActive && readV.size > 15 && t - readT[readT.size - 16] <= 20 * minute && reading - readV[readV.size - 16] < -9.0
                 val thrNow = if (smartL) smartThr else 81.0
                 val waitNow = !sensorGapActive && (reading < thrNow || (smartL && fall15 && reading < thrNow + 18.0))
                 if (smartS && waitNow) { pend = Pending(t, ml.logged, reading); nDelayed++; if (smartL && ml.logged >= 13.0) mealWatch.add(MealWatch(t, reading, true)) }
@@ -1619,7 +1627,7 @@ class HistoryReplayTest {
                 } else age > 180
             }
             // Family: sometimes a manual correction on a rebound after a low.
-            if (!sensorGapActive && !corrAsked && t - lastTreat in 10 * minute..120 * minute && reading > 160.0 && readV.size > 6 && reading > readV[readV.size - 6]) {
+            if (!sensorGapActive && !corrAsked && t - lastTreat in 10 * minute..120 * minute && reading > 160.0 && readV.size > 6 && t - readT[readT.size - 6] <= 30 * minute && reading > readV[readV.size - 6]) {
                 corrAsked = true
                 if (rnd.nextDouble() * 100 < corrPct) {
                     var iobAll = basalIob(t)
