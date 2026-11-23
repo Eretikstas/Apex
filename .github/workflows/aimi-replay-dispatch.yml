@@ -9,9 +9,9 @@ on:
         type: boolean
         default: true
       prefs:
-        description: 'AIMI settings to try; tokens may be comma-separated'
+        description: 'Diagnostic APP / seed 1 profile (clear to run without diagnostic tokens)'
         type: string
-        default: ''
+        default: 'SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,SBIAS_0.15,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,TREATL,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100,LEARNALL,LACAUSE,LAPROTECT,LAISF,LACR,LADAYS,LAPCTBACK'
       pretrained:
         description: 'Two passes: learn on the whole history first, then replay it again'
         type: boolean
