@@ -102,6 +102,15 @@ class HistoryReplayTest {
     private fun isProtectionRow(row: JSONObject, t0: Long): Boolean =
         protectionExclusionReason(row, t0) == null
 
+    // A low may teach the percentage card only when its cause is attributable to fasting or a meal bolus.
+    // Other clean readings remain in the denominator; contaminated rows are excluded from both numerator and denominator.
+    private fun isPercentageLearningRow(row: JSONObject): Boolean {
+        if (!row.has("bg") || row.optBoolean("falseLow") || row.optBoolean("sensorGap") ||
+            row.optBoolean("oldCannula") || row.optBoolean("activity") || row.optBoolean("illness")) return false
+        return row.getDouble("bg") >= 70.0 ||
+            row.optString("hypoCause") == "fasting" || row.optString("hypoCause") == "meal_bolus"
+    }
+
     private fun protectionBlocksInsulinIncrease(validDays: Int, lowPct: Double): Boolean =
         validDays < 3 || lowPct > 3.0
 
@@ -179,6 +188,14 @@ class HistoryReplayTest {
         val reboundLow = JSONObject().put("t", start + 24 * 60 * minute).put("afterHypo", true).put("bg", 65.0)
         assertEquals(false, isProtectionRow(reboundLow, start))
         assertEquals("post-hypo-180m", protectionExclusionReason(reboundLow, start))
+
+        assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting")))
+        assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "meal_bolus")))
+        assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "smb")))
+        assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "ambiguous")))
+        assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting").put("activity", true)))
+        assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("activity", false)))
+        assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 120.0).put("sensorGap", true)))
         assertEquals("sensor-start", protectionExclusionReason(JSONObject().put("t", start + 23 * 60 * minute).put("bg", 65.0), start))
         assertEquals("false-low", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
         assertEquals("sensor-gap", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
@@ -933,11 +950,12 @@ class HistoryReplayTest {
             rows.any { it.optBoolean("sensorGap") } ||
                 rows.zipWithNext().any { (a, b) -> b.getLong("t") - a.getLong("t") > 5 * minute }
         fun cleanBasalRow(r: JSONObject): Boolean = !causalFilter ||
-            !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") ||
+            !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") || r.optBoolean("afterInsulin") ||
                 r.optBoolean("oldCannula") || r.optBoolean("sensorGap") || r.optBoolean("activity") ||
                 r.optBoolean("illness") || r.optBoolean("falseLow"))
         fun cleanDuraRow(r: JSONObject): Boolean = !causalFilter ||
-            !(r.optBoolean("afterHypo") || r.optBoolean("oldCannula") || r.optBoolean("sensorGap") ||
+            !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") || r.optBoolean("afterInsulin") ||
+                r.optBoolean("oldCannula") || r.optBoolean("sensorGap") ||
                 r.optBoolean("falseLow") || r.optBoolean("illness") || r.optBoolean("activity"))
         var failed = 0; var gapSkipped = 0
         val end = t0 + days * 86_400_000L
@@ -1393,8 +1411,12 @@ class HistoryReplayTest {
                     window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
                     window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
+                    window.any { rows[it].optBoolean("activity") } -> "activity"
+                    window.any { rows[it].optBoolean("illness") } -> "illness"
+                    window.any { rows[it].optBoolean("falseLow") } -> "false-low"
+                    window.any { rows[it].optBoolean("afterMeal") || meal[it] > 0.0 } -> "meal"
+                    (k - 48 until k).any { rows[it].optBoolean("afterInsulin") } -> "prior-insulin"
                     window.any { it != k && (num(rows[it], "man") > 0.0 || num(rows[it], "units") > 0.0) } -> "overlapping-bolus"
-                    window.any { meal[it] > 0.0 } -> "meal"
                     bg[k] - bg[k - 3] >= 18.0 -> "rising-glucose"
                     else -> null
                 }
@@ -1491,13 +1513,13 @@ class HistoryReplayTest {
             val protectedLowCount = protectionRows.count { it.getDouble("bg") < 70.0 }
             val last3 = last3Rows.filter { it.has("bg") }
             val lo3 = if (last3.isEmpty()) 0.0 else last3.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
-            val eligibleLows = if (!causalFilter) last3 else last3.filter {
-                (it.optString("hypoCause") == "fasting" || it.optString("hypoCause") == "meal_bolus") &&
-                    !it.optBoolean("falseLow") && !it.optBoolean("sensorGap") && !it.optBoolean("oldCannula") &&
-                    !it.optBoolean("activity") && !it.optBoolean("illness")
-            }
-            val lo3Eligible = if (last3.isEmpty()) 0.0 else eligibleLows.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
-            val percentageProtectionLows = if (laProtect) protectionLowPct else lo3Eligible
+            val percentageRows = if (!causalFilter) last3 else last3.filter { isPercentageLearningRow(it) }
+            val percentageLowRows = if (!causalFilter) percentageRows.filter { it.getDouble("bg") < 70.0 }
+                else percentageRows.filter { it.getDouble("bg") < 70.0 }
+            val lo3Eligible = if (percentageRows.isEmpty()) 0.0 else percentageLowRows.size * 100.0 / percentageRows.size
+            // LAPROTECT is a separate all-cause interlock. It must not make SMB-, rebound- or activity-related lows
+            // teach the percentage card; those events still block insulin increases through blockInsulinIncrease.
+            val percentageProtectionLows = lo3Eligible
             if (laProtect) println("AIMI audit LAPROTECT day=$day: rows=${protectionRows.size} validDays=$protectionValidDays/3 allLows=${allMeasuredLows.size} protectedLows=$protectedLowCount excluded=${protectionExcludedLows.entries.joinToString(",") { "${it.key}:${it.value}" }} lowRate=${"%.2f".format(protectionLowPct)} % gate=${if (blockInsulinIncrease) "BLOCK_INCREASES" else "OPEN"} reason=${if (!protectionDataReady) "insufficient-valid-days" else if (protectionLowPct > 3.0) "low-rate-over-3pct" else "none"}")
             // Run the read-only CR/ISF audit scans even when the overall three-day gate fails.
             // Their own gates still prevent proposals; this makes candidate/rejection counts visible.
@@ -1518,7 +1540,7 @@ class HistoryReplayTest {
                 // Protection-only all-cause lows are separate from causal attribution to CR/ISF/Basal.
                 percentageProtectionLows > 4.0 && pctNow > 0.8001 -> { setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
                 // Restoring percentage or making any other insulin-increasing proposal is blocked above 3 %.
-                pctBack && !blockInsulinIncrease && pctNow < 0.9999 && lo3 <= 2.0 -> { setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
+                pctBack && !blockInsulinIncrease && pctNow < 0.9999 && lo3Eligible <= 2.0 -> { setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
                 isf != null && isf.first > isfP * 1.10 && isfP < isfStart * 1.25 -> { isfP = minOf(isfStart * 1.25, isfP * 1.07); card = "isf+" }
                 cr.any { it == 1 } -> { val b = cr.indexOfFirst { it == 1 }; crBlock[b] = minOf(1.25, crBlock[b] * 1.07); card = "cr+$b" }
                 else -> {
