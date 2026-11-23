@@ -350,3 +350,14 @@ Summed from all 24 job logs. Each candidate is assigned the first matching rejec
 The dominant ISF cause is now the 3 h pre / 2 h post meal window, not the prior-insulin rule. The next investigation should test whether that interval is correctly anchored to the correction event and whether it treats any meal-row marker as active for the whole causal interval. Do not shorten it until candidate-level timelines confirm the correction is no longer affected by meal absorption.
 
 For CR, prior-insulin remains the dominant rejection. Candidate-level review must distinguish SMB/manual insulin in the preceding 2 h from background basal delivery and from the meal's own bolus; only the first two may be contamination, while the meal bolus is the event whose response is being measured.
+
+
+## APP24 matched APP baseline — started 2026-11-23
+
+- Prepared a 24-row APP baseline batch from the exact APP23 scenario definitions, seeds and stress tokens.
+- Removed only the APP23-specific `LEARNALL, LAISF, LACR, LACAUSE, LAPCTBACK, LADAYS, LAPROTECT` switches; retained `LEARNB5` and `LEARNDURA`, and restored the prior `PCTCARD,PCTMAX_100` behavior.
+- Batch files: `lab/aimi-replay/app24_baseline_batch.json` and `lab/aimi-replay/app24_baseline_batch.txt`.
+- Workflow: `.github/workflows/app24-baseline-auto.yml`.
+- Run 45284611426: plan PASS; 24 replay jobs created. At report update, several replay jobs are in progress and the remainder queued. This is the matched comparator for APP23 run 45278182666.
+- The paired comparison will use the public second-half synthetic summaries (BG<70, BG<54, BG>180, CV, hypo-treatment grams/day and insulin U/day), grouped by matching scenario/seed. It will not establish clinical safety; it is a controlled synthetic comparison only.
+- Do not alter the production branch or deploy.
