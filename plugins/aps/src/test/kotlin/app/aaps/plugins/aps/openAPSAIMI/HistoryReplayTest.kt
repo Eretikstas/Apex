@@ -133,8 +133,14 @@ class HistoryReplayTest {
         assertEquals(4, parsed.outlierDay)
         assertEquals(1.3, parsed.outlierMultiplier, 0.000001)
         assertEquals(15, parsed.gapMinutes)
+        assertEquals(30, parseSyntheticStressTokens("SYNTH_7 GAP_30", 7).gapMinutes)
+        assertEquals(60, parseSyntheticStressTokens("SYNTH_7 GAP_60", 7).gapMinutes)
+        assertEquals(0.7, parseSyntheticStressTokens("SYNTH_7 OUTDAY_7_0.7", 7).outlierMultiplier, 0.000001)
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_3 GAP_15", 3) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_0_1.3", 7) }
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_8_1.3", 7) }
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_4_0", 7) }
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_4_1.3 OUTDAY_5_0.7", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_20", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_15 GAP_30", 7) }
     }
@@ -741,6 +747,8 @@ class HistoryReplayTest {
         val t0 = cfg.getLong("t0")
         val tz = ZoneOffset.ofHours(3)
         fun hourOf(t: Long) = Instant.ofEpochMilli(t).atZone(tz).hour
+        // OUTDAY is a one-based whole-day multiplier. GAP removes all sensor samples for the selected duration.
+        // The blackout is day 4 at 02:00 in the synthetic UTC+3 clock; the following hour is marked as recovery.
         val gapStart = stressTokens.gapMinutes?.let {
             Instant.ofEpochMilli(t0).atZone(tz).toLocalDate().plusDays(3).atTime(2, 0).atZone(tz).toInstant().toEpochMilli()
         }
@@ -1318,7 +1326,7 @@ class HistoryReplayTest {
                 val window = k - 48..k + 36
                 val windowRows = window.map { rows[it] }
                 val rejection = when {
-                    hasSensorGap(windowRows) -> "sensor-gap"
+                    causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
                     window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
                     window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
