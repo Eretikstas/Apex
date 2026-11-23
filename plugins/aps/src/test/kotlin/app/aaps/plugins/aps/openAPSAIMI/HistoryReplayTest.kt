@@ -90,6 +90,15 @@ class HistoryReplayTest {
 
     private val minute = 60_000L
 
+    private fun isProtectionRow(row: JSONObject, t0: Long): Boolean {
+        val timestamp = row.optLong("t", Long.MIN_VALUE)
+        return row.has("bg") &&
+            timestamp >= t0 + 24 * 60 * minute &&
+            !row.optBoolean("falseLow") &&
+            !row.optBoolean("sensorGap") &&
+            !row.optBoolean("afterHypo")
+    }
+
     private data class SyntheticStressTokens(
         val outlierDay: Int? = null,
         val outlierMultiplier: Double = 1.0,
@@ -97,7 +106,7 @@ class HistoryReplayTest {
     )
 
     private fun parseSyntheticStressTokens(prefsText: String, days: Int): SyntheticStressTokens {
-        val tokens = prefsText.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+        val tokens = prefsText.trim().split(Regex("[,\\s]+")).filter { it.isNotBlank() }
         val outlierTokens = tokens.filter { it.startsWith("OUTDAY") }
         require(outlierTokens.size <= 1) { "use at most one OUTDAY_<day>_<factor> token" }
         val outlier = outlierTokens.singleOrNull()?.let { token ->
@@ -133,6 +142,9 @@ class HistoryReplayTest {
     @Test
     fun `synthetic stress tokens validate their boundaries`() {
         val parsed = parseSyntheticStressTokens("SYNTH_7 LACAUSE OUTDAY_4_1.3 GAP_15", 7)
+        val commaParsed = parseSyntheticStressTokens("SYNTH_7,LACAUSE,OUTDAY_4_1.3,GAP_15", 7)
+        assertEquals(4, commaParsed.outlierDay)
+        assertEquals(15, commaParsed.gapMinutes)
         assertEquals(4, parsed.outlierDay)
         assertEquals(1.3, parsed.outlierMultiplier, 0.000001)
         assertEquals(15, parsed.gapMinutes)
@@ -147,6 +159,19 @@ class HistoryReplayTest {
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_4_1.3 OUTDAY_5_0.7", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 LACAUSE GAP_20", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_15 GAP_30", 7) }
+    }
+
+    @Test
+    fun `LAPROTECT includes all causes but excludes invalid low rows`() {
+        val start = 1_000_000L
+        val smbLow = JSONObject().put("t", start + 24 * 60 * minute).put("bg", 65.0)
+            .put("hypoCause", "smb").put("oldCannula", true).put("activity", true).put("illness", true)
+        assertEquals(true, isProtectionRow(smbLow, start))
+        assertEquals(false, isProtectionRow(JSONObject().put("t", start + 23 * 60 * minute).put("bg", 65.0), start))
+        assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
+        assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
+        assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("afterHypo", true).put("bg", 65.0), start))
+        assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute), start))
     }
 
     @Test
@@ -871,6 +896,7 @@ class HistoryReplayTest {
         var mealPtr = 0
         val out = JSONArray()
         val causalFilter = prefsText.contains("LACAUSE")
+        val laProtect = prefsText.split(Regex("[,\\s]+")).contains("LAPROTECT")
         val require3Days = prefsText.contains("LADAYS")
         val pctBack = prefsText.contains("LAPCTBACK")
         fun rowDay(r: JSONObject) = ((r.getLong("t") - t0) / 86_400_000L).toInt()
@@ -1018,7 +1044,7 @@ class HistoryReplayTest {
             val d = nn / 288.0
             return doubleArrayOf(ins / d, hi * 100.0 / maxOf(1, nn), hy / d)
         }
-        fun learnBasal2(day: Int) {
+        fun learnBasal2(day: Int, blockIncreases: Boolean = false) {
             val needs = hourNeeds(minOf(out.length(), lbDays * 288), audit = true)
             val sb = StringBuilder(); var changed = 0
             if (lbTrend && day >= 21 && day - lastTrendDay >= 7) {
@@ -1034,12 +1060,15 @@ class HistoryReplayTest {
                     else -> 1.0
                 }
                 val f = if (!lbTrend2) f0 else if (f0 != 1.0 && f0 == lastTrendF) f0 else { lastTrendF = f0; 1.0 }
-                if (f != 1.0) {
+                if (f != 1.0 && !(blockIncreases && f > 1.0)) {
                     lastTrendF = 1.0
                     for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
                     lastTrendDay = day; lastDir.fill(0); upCount.fill(0)
                     println("AIMI replay: learner TREND card day $day: x$f (TDD ${"%.1f".format(base[0])}->${"%.1f".format(now7[0])}, >10 ${"%.1f".format(base[1])}->${"%.1f".format(now7[1])} %, hypo ${"%.0f".format(base[2])}->${"%.0f".format(now7[2])} g), total ${"%.2f".format(profBasal.sum())}")
                     return
+                } else if (f > 1.0 && blockIncreases) {
+                    lastTrendF = 1.0
+                    println("AIMI audit LAPROTECT: blocked positive basal trend proposal on day $day")
                 }
             }
             // shift detector on the last 7 days
@@ -1049,11 +1078,15 @@ class HistoryReplayTest {
             val dirS = if (ratio > 1.10) 1 else if (ratio < 0.90) -1 else 0
             if (!lb3 && !lb5 && dirS != 0 && dirS == lastShift) {
                 val f = ratio.coerceIn(0.85, 1.15)
-                for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
-                sb.append(" SHIFT x%.2f".format(f)); changed = 24; lastShift = 0
-                lastDir.fill(0)
+                if (blockIncreases && f > 1.0) {
+                    sb.append(" SHIFT blocked-positive x%.2f".format(f)); lastShift = 0
+                } else {
+                    for (h in 0 until 24) profBasal[h] = Math.round(profBasal[h] * f * 100) / 100.0
+                    sb.append(" SHIFT x%.2f".format(f)); changed = 24; lastShift = 0
+                    lastDir.fill(0)
+                }
             } else {
-                lastShift = dirS
+                lastShift = if (blockIncreases && dirS > 0) 0 else dirS
                 // LBMIN_<n>: clean hour windows needed to call an hour "measured" (user 19.11: 2).
                 val minN = if (lbMin > 0) lbMin else if (lb5 && !lbFill) 4 else 3
                 val own = DoubleArray(24) { if (needs[it].size >= (if (tailHours[it]) maxOf(minN, lbTailMin) else minN)) med(needs[it]) else Double.NaN }
@@ -1097,7 +1130,7 @@ class HistoryReplayTest {
                         cnt > lbLowMax
                     }
                     val need = if (strict && dir == 1) 3 else 2
-                    if (dir == 1 && lowNear) { lastDir[h] = 0; upCount[h] = 0; continue }
+                    if (dir == 1 && (lowNear || blockIncreases)) { lastDir[h] = 0; upCount[h] = 0; continue }
                     if (dir != 0 && dir == lastDir[h]) upCount[h]++ else upCount[h] = if (dir != 0) 1 else 0
                     if (dir != 0 && upCount[h] >= need) {
                         val target = if (lb5) profBasal[h] + 0.5 * (v - profBasal[h]) else v
@@ -1110,7 +1143,9 @@ class HistoryReplayTest {
             println("AIMI replay: learner basal card v2 day $day: $changed hours changed, total ${"%.2f".format(profBasal.sum())} U/day (shift ratio ${"%.2f".format(ratio)});$sb")
             if (learnCr > 0.0) {
                 val r = profBasal.sum() / basalStart
-                icNow = (icP / (1 + learnCr * (r - 1))).coerceIn(icP * 0.75, icP * 1.25)
+                val proposedCr = (icP / (1 + learnCr * (r - 1))).coerceIn(icP * 0.75, icP * 1.25)
+                if (!blockIncreases || proposedCr >= icNow) icNow = proposedCr
+                else println("AIMI audit LAPROTECT: blocked stronger CR proposal on day $day")
                 println("AIMI replay: learner CR day $day: basal x${"%.2f".format(r)} -> CR ${"%.1f".format(icNow)} (profile ${"%.1f".format(icP)})")
             }
         }
@@ -1196,12 +1231,14 @@ class HistoryReplayTest {
         // a 5 min reading over 10 mmol/L that ends 30 min all over 10 and within 1 mmol/L (what dura acts on). Flat highs
         // >= 2 % of the time with lows (< 3.9) <= 3 % -> dura +0.25 (max 2.0); lows > 4 % -> dura -0.25 (min 0.25).
         val learnDura = prefsText.contains("LEARNDURA")
-        fun learnDuraCard(day: Int) {
+        fun learnDuraCard(day: Int, blockIncreases: Boolean = false) {
             val n = out.length()
             val rows = (maxOf(0, n - 7 * 288) until n).map { out.getJSONObject(it) }
             val valid = rows.filter { it.has("bg") && cleanDuraRow(it) }
-            // Require at least five distinct days; never stitch filtered gaps into a flat run.
-            if (valid.size < 5 * 12 || valid.map { rowDay(it) }.distinct().size < 5) return
+            val lowRows = if (laProtect) rows.filter { isProtectionRow(it, t0) } else valid
+            // Require five distinct days of valid low-protection evidence. Flat-high evidence remains causal-filtered.
+            if (lowRows.size < 5 * 12 || lowRows.map { rowDay(it) }.distinct().size < 5) return
+            if (!laProtect && (valid.size < 5 * 12 || valid.map { rowDay(it) }.distinct().size < 5)) return
             var flat = 0; var flatDenom = 0
             for (i in 6 until rows.size) {
                 val w = rows.subList(i - 6, i + 1)
@@ -1211,16 +1248,16 @@ class HistoryReplayTest {
                     if (values.all { it > 180.0 } && values.max() - values.min() < 18.0) flat++
                 }
             }
-            if (flatDenom == 0) return
-            val flatPct = flat * 100.0 / flatDenom
-            val lowPct = valid.count { it.getDouble("bg") < 70.0 } * 100.0 / valid.size
+            if (flatDenom == 0 && !laProtect) return
+            val flatPct = if (flatDenom == 0) 0.0 else flat * 100.0 / flatDenom
+            val lowPct = lowRows.count { it.getDouble("bg") < 70.0 } * 100.0 / lowRows.size
             val old = aw.dura
-            if (flatPct >= 2.0 && lowPct <= 3.0) aw = aw.copy(dura = minOf(2.0, aw.dura + 0.25))
-            else if (lowPct > 4.0) aw = aw.copy(dura = maxOf(0.25, aw.dura - 0.25))
-            println("AIMI replay: learner DURA day $day: valid days ${valid.map { rowDay(it) }.distinct().size}/7, flat high ${"%.1f".format(flatPct)} %, low ${"%.1f".format(lowPct)} % -> dura ${"%.2f".format(old)} -> ${"%.2f".format(aw.dura)}")
+            if (lowPct > 4.0) aw = aw.copy(dura = maxOf(0.25, aw.dura - 0.25))
+            else if (!blockIncreases && flatDenom > 0 && flatPct >= 2.0 && lowPct <= 3.0) aw = aw.copy(dura = minOf(2.0, aw.dura + 0.25))
+            println("AIMI replay: learner DURA day $day: valid days ${lowRows.map { rowDay(it) }.distinct().size}/7, flat high ${"%.1f".format(flatPct)} %, protection lows ${"%.1f".format(lowPct)} % -> dura ${"%.2f".format(old)} -> ${"%.2f".format(aw.dura)}")
         }
-        fun learnBasal(day: Int) {
-            if (lb2 || lb3 || lb5) { learnBasal2(day); return }
+        fun learnBasal(day: Int, blockIncreases: Boolean = false) {
+            if (lb2 || lb3 || lb5) { learnBasal2(day, blockIncreases); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
             val windowRows = (s0 until n).map { out.getJSONObject(it) }
             val enoughBasalDays = !require3Days || distinctDays(windowRows.takeLast(minOf(windowRows.size, 7 * 288))) >= 3
@@ -1284,6 +1321,7 @@ class HistoryReplayTest {
                 if (needs[h].size < 3) continue
                 val med = needs[h].sorted()[needs[h].size / 2]
                 val nv = (Math.round(med.coerceIn(profBasal[h] * 0.8, profBasal[h] * 1.2) * 100) / 100.0)
+                if (blockIncreases && nv > profBasal[h]) continue
                 if (Math.abs(nv - profBasal[h]) >= 0.02) { sb.append(" %02d:%.2f->%.2f".format(h, profBasal[h], nv)); profBasal[h] = nv; changed++ }
             }
             lbCards++
@@ -1419,6 +1457,12 @@ class HistoryReplayTest {
             val last3Rows = (maxOf(0, n - 3 * 288) until n).map { out.getJSONObject(it) }
             val enoughProtectionDays = !require3Days || enoughDays(last3Rows)
             val protectionDays = last3Rows.map { rowDay(it) }.distinct().size
+            val protectionRows = if (laProtect) last3Rows.filter { isProtectionRow(it, t0) } else emptyList()
+            val protectionValidDays = protectionRows.map { rowDay(it) }.distinct().size
+            val protectionLowPct = if (protectionRows.isEmpty()) 0.0 else
+                protectionRows.count { it.getDouble("bg") < 70.0 } * 100.0 / protectionRows.size
+            val protectionDataReady = protectionValidDays >= 3
+            val blockInsulinIncrease = laProtect && (!protectionDataReady || protectionLowPct > 3.0)
             val last3 = last3Rows.filter { it.has("bg") }
             val lo3 = if (last3.isEmpty()) 0.0 else last3.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
             val eligibleLows = if (!causalFilter) last3 else last3.filter {
@@ -1427,6 +1471,8 @@ class HistoryReplayTest {
                     !it.optBoolean("activity") && !it.optBoolean("illness")
             }
             val lo3Eligible = if (last3.isEmpty()) 0.0 else eligibleLows.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
+            val percentageProtectionLows = if (laProtect) protectionLowPct else lo3Eligible
+            if (laProtect) println("AIMI audit LAPROTECT day=$day: rows=${protectionRows.size} validDays=$protectionValidDays/3 lows=${"%.2f".format(protectionLowPct)} % gate=${if (blockInsulinIncrease) "BLOCK_INCREASES" else "OPEN"} reason=${if (!protectionDataReady) "insufficient-valid-days" else if (protectionLowPct > 3.0) "low-rate-over-3pct" else "none"}")
             // Run the read-only CR/ISF audit scans even when the overall three-day gate fails.
             // Their own gates still prevent proposals; this makes candidate/rejection counts visible.
             val isf = if (laIsf) isfSeen() else null
@@ -1443,19 +1489,19 @@ class HistoryReplayTest {
             var card = ""
             val duraBefore = aw.dura; val basalBefore = profBasal.copyOf()
             when {
-                // Percentage protection reacts only to lows not explained by SMB or treatment rebound.
-                lo3Eligible > 4.0 && pctNow > 0.8001 -> { setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
-                // LAPCTBACK is second priority: return only to 100 %, never boost above it.
-                pctBack && pctNow < 0.9999 && lo3 <= 2.0 -> { setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
+                // Protection-only all-cause lows are separate from causal attribution to CR/ISF/Basal.
+                percentageProtectionLows > 4.0 && pctNow > 0.8001 -> { setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
+                // Restoring percentage or making any other insulin-increasing proposal is blocked above 3 %.
+                pctBack && !blockInsulinIncrease && pctNow < 0.9999 && lo3 <= 2.0 -> { setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
                 isf != null && isf.first > isfP * 1.10 && isfP < isfStart * 1.25 -> { isfP = minOf(isfStart * 1.25, isfP * 1.07); card = "isf+" }
                 cr.any { it == 1 } -> { val b = cr.indexOfFirst { it == 1 }; crBlock[b] = minOf(1.25, crBlock[b] * 1.07); card = "cr+$b" }
                 else -> {
                     tailBlockOk = BooleanArray(3) { cr[it] == 0 }
-                    if (learnB) { learnBasal(day); if (!profBasal.contentEquals(basalBefore)) card = "basal" }
+                    if (learnB) { learnBasal(day, blockInsulinIncrease); if (!profBasal.contentEquals(basalBefore)) card = "basal" }
                     if (card == "") when {
-                        cr.any { it == -1 } -> { val b = cr.indexOfFirst { it == -1 }; crBlock[b] = maxOf(0.75, crBlock[b] / 1.07); card = "cr-$b" }
-                        isf != null && isf.first < isfP * 0.90 && lo3 <= 3.0 && isfP > isfStart * 0.75 -> { isfP = maxOf(isfStart * 0.75, isfP / 1.07); card = "isf-" }
-                        else -> if (learnDura) { learnDuraCard(day); if (aw.dura != duraBefore) card = "dura" }
+                        !blockInsulinIncrease && cr.any { it == -1 } -> { val b = cr.indexOfFirst { it == -1 }; crBlock[b] = maxOf(0.75, crBlock[b] / 1.07); card = "cr-$b" }
+                        !blockInsulinIncrease && isf != null && isf.first < isfP * 0.90 && lo3 <= 3.0 && isfP > isfStart * 0.75 -> { isfP = maxOf(isfStart * 0.75, isfP / 1.07); card = "isf-" }
+                        else -> if (learnDura) { learnDuraCard(day, blockInsulinIncrease); if (aw.dura != duraBefore) card = "dura" }
                     }                }
             }
             if (card != "") { laLast = day; laNote(card) }
@@ -1778,7 +1824,7 @@ class HistoryReplayTest {
                 if (!sensorGapActive) row.put("bg", reading).put("man", manThisTick).put("gw", guardW).put("cap", capMult).put("exp", expRise).put("mrg", relMargin).put("deliv", rateNow).put("cob", logged.sumOf { it.left })
                 row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h]).put("lbg", gs?.glucose ?: JSONObject.NULL)
                 if (canEvery > 0) row.put("can", ((t - t0) / 3_600_000.0) % canEvery)
-                if (causalFilter) {
+                if (causalFilter || laProtect) {
                     val canAgeNow = if (canEvery > 0) ((t - t0) / 3_600_000.0) % canEvery else 0.0
                     val afterMeal = mealThisTick > 0.0 || priorEvent(t, 300, "meal")
                     val afterHypo = hypoThisTick > 0.0 || priorEvent(t, 180, "hypo")
