@@ -460,6 +460,16 @@ No app branch, live AAPS settings, profiles, pump or Nightscout were changed. No
 - Fixed `.github/workflows/aimi-replay.yml` on `aimi-replay`: normalize log lines with `strip()` before prefix matching and publish the normalized lines. Commit: `faf7b64daf20ec706d3043181507c729a00b793d`.
 - No algorithm, learner gates, replay inputs, public metrics, or live AAPS settings were changed. No workflow was launched. The diagnostic run's encrypted artifact was not decrypted; this fix makes the next explicitly launched diagnostic run's public summary able to expose matching audit records, but runtime LAPROTECT behavior remains unverified until those records are visible.
 
+### 2026-11-23, dispatcher default corrected after empty-prefs run
+
+Run [45158356369](https://github.com/Eretikstas/Apex/actions/runs/45158356369) completed successfully, but it was not the diagnostic replay: the dispatcher passed an empty `prefs` value. The reusable workflow therefore skipped the SYNTH public summary (`contains(matrix.prefs, 'SYNTH_')` was false). Replay itself completed with 4,641 ticks, 0 failed, pass 1/1, and `BUILD SUCCESSFUL`; the encrypted artifact was uploaded. No learner audit result can be inferred from this run.
+
+To prevent the same input omission, the default-branch dispatcher `.github/workflows/aimi-replay-dispatch.yml` now pre-fills `prefs` with the previously approved single-run diagnostic APP / seed 1 profile: the base SYNTH_56 profile plus `LEARNALL,LACAUSE,LAPROTECT,LAISF,LACR,LADAYS,LAPCTBACK`. The reusable replay implementation and learner logic were not changed. Users can explicitly clear the field when a no-token run is intended.
+
+Dispatcher commit: `2eeeeb0dfd58147d6b832856705443b7ab6720cd` on `main`.
+
+Next validation: launch the dispatcher again with the prefilled `prefs` unchanged, `batch` empty, and the existing single-run defaults. Verify the resulting public synthetic summary and audit lines; do not treat the empty-prefs run as diagnostic evidence.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
