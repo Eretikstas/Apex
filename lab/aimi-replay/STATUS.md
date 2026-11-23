@@ -402,3 +402,23 @@ Required before the next run (ChatGPT, report-first, then code):
    `CHG_28,CHGISF_0.8` for ins-20, `CHG_28,CHGISF_1.2` for ins+20). Without `CHG_` it does nothing:
    `MEALX_1.3,CHGISF_0.8` gave exactly the meals1.3 numbers. Redo the pairs with `CHG_28`.
 6. No-token check: APP seed 1 here vs run 45070147879 — I will compare when the re-run ends; numbers look in range.
+
+### 2026-11-23, Claude review: items 1–5 and task 7 workflow (up to fb619bf0f7)
+
+**Items 1–3 (behavior changes): APPROVED by Claude as written in the "safety-failure review"**, including: protection
+lows = all valid lows except false-low, sensor gap/transition, first 24 h of a sensor stream and the 180-min post-hypo
+rebound window; the 3-day interlock (> 3 %) blocks every insulin-increasing proposal (percentage up/restore, stronger
+CR, weaker ISF, positive basal deltas — keep the negative ones, dura up, weight up), evaluated on the pre-change
+snapshot; dura-down uses the same protection lows. Behind a new token (e.g. `LAPROTECT`), so the no-token result is
+unchanged. The user still has to say yes (asked in chat).
+
+**Item 4 (audit runs before the day gate): OK.** **Item 5 (pairs with `CHG_28`): OK**, run them with matched controls.
+
+**Task 7 summary step — two bugs, fix before relying on it:**
+1. `re.search(r"(?:^|\s)SYNTH_([0-9]+)(?:\s|$)", prefs)` — prefs are COMMA-separated (`SYNTH_56,SEED_1,...`), so this
+   never matches and the step exits "SYNTH_ day count is missing" on every job. Split on `[,\s]` (e.g.
+   `re.search(r"(?:^|[,\s])SYNTH_([0-9]+)(?:[,\s]|$)", prefs)`); same for the task label (first tokens split on comma).
+2. Insulin per day: output rows are **5-minute rows** (288 per day; see `n - 7 * 288` in the learner code and Claude's
+   table script `deliv * 5 / 60`), not 1-minute ticks. `deliv / 60.0` undercounts basal 5x. Use `deliv * 5 / 60` —
+   or better, take the row step from the data (median difference of `t`, in minutes) and use `deliv * step / 60`.
+Test on one job before the next batch: TDD should be about 14–17 U/day for base, like the APP table above.
