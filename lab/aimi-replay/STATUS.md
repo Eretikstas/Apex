@@ -500,3 +500,20 @@ No replay was run. Compile-only validation is required before the single base AP
   1. `LAPROTECT` now requires both `LEARNALL` and `LACAUSE`. This prevents the protection token from running without the complete learner interlock or with unfiltered Dura flat-high evidence.
   2. Synthetic output now records delivered basal rate and manual bolus units even on sensor-blackout rows. BG/COB remain absent during the blackout. This lets the aggregate TDD summary count insulin delivered during GAP instead of silently dropping it.
 - No replay was run. Compile-only validation remains pending for the current source head.
+
+
+### 2026-11-23, static pair-token audit and run/dispatch gate
+
+Source-only review of the three approved pair factors in `HistoryReplayTest.kt`:
+- `MEALX_<x>` scales generated meal grams at meal construction.
+- `CHG_<day>` sets the change day; `CHGISF_<x>` scales insulin action only when `day >= chgDay`. With no `CHG_`, the default day is 9999 and the factor does not activate during the 56-day run.
+- `DAYNEED_<x>` scales true basal need only during synthetic hours 10–17 (10:00–18:00).
+- Static inspection finds these factors applied at separate points without overwriting one another. This is not a runtime pair test; the three matched pair checks remain unvalidated.
+
+Run state:
+- Earlier replay batch `45099362646` is completed with failure (the previously recorded five failed jobs remain unresolved); it is not active.
+- Push-triggered `aimi-replay.yml` runs for the recent commits were skipped as intended. No replay is active.
+- Compile-only runs `45146011846`, `45146079235`, and `45146287550` were still in progress at this report; the latest source validation target is run `45146287550` for source commit `251520148b7141047b5acbd6bdc628d7472a44f9`.
+- The GitHub integration available in this session exposes read/write repository-file actions and workflow reruns, but no workflow-dispatch action. The workflow file is only on `aimi-replay`, not the repository default branch, so the manual `Run workflow` path remains unavailable without changing the default branch. No default-branch change was authorized.
+- The previously supplied long `SYNTH_56,SEED_1,...,PCTMAX_100` value is a complete prefs profile, not an extra standalone `APP` token list. Do not append an `APP` token or invent a different APP profile. The exact profile can only be used as supplied; it must not be relabelled or modified.
+- The one-job summary smoke test and matched pair runs are not started. Task 8 remains deferred until the current compile/audit gate and pair-run prerequisites are resolved; its approved RUN.txt wrapper has not been implemented in this report.
