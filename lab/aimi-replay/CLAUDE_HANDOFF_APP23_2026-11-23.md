@@ -438,3 +438,12 @@ For CR, prior-insulin remains the dominant rejection. Candidate-level review mus
 - User-provided APK `aaps-4.1-custom-261015-1156.apk` SHA-256 `71a05169498495998d1e63a2edd0b18d824fba5e2b3a0d775f591c4d269c93bb`. Static DEX scan found no `openAPSAIMI`, `AimiAdaptationStatus`, or `AimiAdaptationStatusViewModel` class-name strings. This file cannot be treated as a runtime validation target for the current AIMI status-card code. A fresh lab FullDebug APK is being built from `aimi-replay`; it will not be installed on any device.
 - Runtime visual verification on an emulator/device remains unperformed. Source handoff + regression test + build artifact are the available validation route; do not claim a visual E2E pass until one is actually run.
 - No production branch changes, no install/deployment, no pump/profile changes, no Nightscout writes.
+
+
+### Second dashboard refresh defect — event ordering — 2026-11-24
+
+- Additional source trace found that `OpenAPSAIMIPlugin.invoke()` sends `EventOpenAPSUpdateGui` immediately after setting `lastAPSResult`, but this occurs before returning to `LoopPlugin.executeInvokeInternal()`.
+- Only after `usedAPS.invoke()` returns does LoopPlugin assign `lastRun.request = apsResult`. LoopPlugin then emits `EventLoopUpdateGui` after the result has been installed (including the unconditional update near the end of the lastRun processing block).
+- The AIMI status ViewModel previously subscribed only to `EventOpenAPSUpdateGui`, so its immediate refresh could read the previous/null `lastRun.request`. A 60-second timer eventually refreshed it, but the new status was not pushed at the correct lifecycle point.
+- Lab patch: ViewModel now also subscribes to `EventLoopUpdateGui`, preserving the APS event and minute freshness timer. This triggers refresh after Loop stores the latest APSResult, avoiding the up-to-one-minute stale/no-data window. Commit: `9961d72a2fcfdce5e1208924b689c2c748351736`.
+- This is a UI event-ordering fix only; it does not change APS calculations, pump requests, insulin, basal, or profiles. Compile + FullDebug APK build are being rerun against the latest commit; visual emulator E2E remains outstanding.
