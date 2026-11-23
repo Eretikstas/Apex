@@ -195,3 +195,17 @@ Changes:
 - Percentage card shows repeated down/up events in some scenarios (e.g. six decreases and four restores, ending at 80%). This requires stability/hysteresis review; do not treat as a validated learning outcome.
 - Encrypted result artifacts are being uploaded per scenario. Clinical TIR/CV/<3.9/<3.0/>10/hypo-treatment grams have not yet been extracted or aggregated; no clinical efficacy claim is made.
 - No changes to production branch `autoisf-atc3`, no app installation/deployment, and no live pump/profile changes.
+
+
+## Follow-up — ISF causal-window correction (2026-11-23)
+
+- Commit: `7e16831f11f051e250f805f5c16092117bd4b3d2` on `aimi-replay`.
+- Finding: the ISF rejection condition scanned `afterHypo` over the entire 7 h candidate window (4 h pre + 3 h post). Since `afterHypo` is itself a rolling 180-minute flag, a hypo anywhere in that broad window could mark many later rows and reject a correction even when the hypo was not temporally close to the correction. This was broader than the intended causal exclusion.
+- Change: ISF now rejects an event for an actual hypo in the 3 h immediately before the correction or in the 3 h response window after it. The wider sensor-gap, missing-BG, old-cannula, activity, illness and false-low checks remain unchanged. Meal and separate-bolus filters remain unchanged.
+- Safety intent: do not accept corrections contaminated by a recent low or a low during the measured response; remove only the inherited rolling-flag overreach outside the correction's causal window.
+- Compile workflow automatically triggered by the source change: run 45271884135; status was in progress when this note was written.
+- APP23 run 45270000264: 23/24 replay jobs had completed successfully at this note; scenario 22 remained in progress. The 23 completed jobs had no replay-job failures.
+- No claim of clinical improvement. Await compile/helper-test result and then a fresh APP23 replay before evaluating whether ISF obtains valid candidates.
+- CR remains at zero accepted episodes in inspected scenarios. Do not loosen its prior-insulin or prior-hypo exclusions without a separate causal analysis.
+- Percentage down/up oscillation remains unresolved; no arbitrary cooldown or relaxation has been added yet.
+- All work remains confined to `aimi-replay`; no production branch, installed app, live profile, pump or Nightscout changes.
