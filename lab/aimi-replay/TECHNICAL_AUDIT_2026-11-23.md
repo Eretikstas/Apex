@@ -45,7 +45,7 @@ Source commits:
 - Invalid day range, zero factor, too-short GAP dataset, unsupported GAP duration, and duplicate scenario tokens.
 - Reconciliation helper accepts a balanced count and throws on a mismatch.
 
-These tests are present in the replay test source. The configured GitHub workflow compiles test sources only; it does not execute these new unit tests.
+These tests are present in the replay test source. The compile workflow now has a second step that runs only the `HistoryReplayTest` JUnit class with `AIMI_REPLAY_IN` and `AIMI_REPLAY_OUT` explicitly empty. The replay method therefore exits through its existing assumption gate; the two pure helper tests execute without opening the encrypted replay input or running a replay batch. This workflow change is committed as `c5db9c996396f1a17a463c875a757064a4945092`; its run is queued and the tests are not yet confirmed passed.
 
 ## Static audit findings
 
@@ -97,7 +97,7 @@ This was static archive/manifest inspection only. The APK was not installed, exe
 
 ## Validation status
 
-At report update, latest source commit is `70b796b71e1df3925742bf379a4e5f6de7e5e788`; its compile-only run `45096199938` is in progress. Compile-only runs `45095912758` (source `76828a2`) and `45096047502` (source `e3c5e6f`) are also in progress. Earlier source commits `3e7792f`, `b40050a`, `8fb7ae7`, and `037cca0` have compile-only success. The history-replay workflow remains skipped; no replay batch ran. The history-replay workflow was skipped; no replay batch ran.
+At report update, latest source commit is `70b796b71e1df3925742bf379a4e5f6de7e5e788`; compile-only run `45096199938` is in progress. Runs `45095912758` (source `76828a2`) and `45096047502` (source `e3c5e6f`) are also in progress. Earlier source commits `3e7792f`, `b40050a`, `8fb7ae7`, and `037cca0` have compile-only success. Workflow-only commit `c5db9c9` has new run `45096342199` queued; it will compile and run the two isolated helper tests with replay inputs disabled. The history-replay workflow remains skipped; no replay batch ran. The history-replay workflow was skipped; no replay batch ran.
 
 Update this report after the latest compile run finishes. A compile pass validates Kotlin test-source compilation only; it does not validate replay outputs or learning behavior.
 
