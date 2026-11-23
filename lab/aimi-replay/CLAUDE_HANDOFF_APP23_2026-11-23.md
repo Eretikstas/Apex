@@ -404,7 +404,7 @@ For CR, prior-insulin remains the dominant rejection. Candidate-level review mus
 ## APP23 workflow restoration and dashboard status fix — 2026-11-24
 
 - Restored `.github/workflows/app23-auto.yml` from its exact pre-APP24 parent version. Restoration commit: `b27db82c29d8dcd1cfbeb39342e95e3fa9ba4bdf`. The file again contains the canonical APP23 24-row batch with LEARNALL/LAISF/LACR/LACAUSE/LAPCTBACK/LADAYS/LAPROTECT. The dedicated APP24 workflow remains in `.github/workflows/app24-baseline-auto.yml`.
-- Restoration triggered APP23 run: https://github.com/Eretikstas/Apex/actions/runs/45288804802. Plan job PASS. At last poll: 20 replay jobs in progress, 4 queued; no failures reported yet. Synthetic lab replay only.
+- Restoration triggered APP23 run: https://github.com/Eretikstas/Apex/actions/runs/45288804802. Completed SUCCESS: plan PASS and all 24/24 replay scenario jobs PASS; no replay failures. Synthetic lab replay only.
 
 ### Empty AIMI adaptation dashboard cards — root cause and lab patch
 
@@ -412,6 +412,13 @@ For CR, prior-insulin remains the dominant rejection. Candidate-level review mus
 - Production assignment source: `DetermineBasalAIMI2.kt` defines `assignAimiAdaptationStatus(rT)`, but before this patch it was reached only via `markFinalLoopDecisionFromRT` on selected early-return/special paths. The normal successful path in `runDetermineBasalTickInner` returned `finalResult` without calling the marker/helper. Consequently ordinary loop results had a null status and the ViewModel rendered its no-data state.
 - Lab-only fix: after `AimiLoopTelemetry.traceDetermineBasalTick(...)` returns, `determine_basal()` now calls `assignAimiAdaptationStatus(result)` under `runCatching`, logging a failure without affecting the returned result. This covers normal and telemetry-recovery results. It adds only UI metadata; it does not alter dose, basal, ISF, SMB, or safety calculations.
 - Fix commit: `a6ec942f71a8b909ecf2e264724d59c96b944a87`.
-- Compile workflow now watches the touched production files and runs the adaptation-status builder and dashboard presenter tests. Workflow commit: `ee8e36f875dfa440354531fe3818458d0702745d`; run: https://github.com/Eretikstas/Apex/actions/runs/45289173704. Status at last poll: queued, not yet validated.
+- Compile workflow watches the touched production files and runs the adaptation-status builder and dashboard presenter tests. Workflow commit: `ee8e36f875dfa440354531fe3818458d0702745d`; run: https://github.com/Eretikstas/Apex/actions/runs/45289173704. Completed SUCCESS. Gradle compiled `plugins:aps` and `plugins:main`; `AimiAdaptationStatusBuilderTest` and `AimiAdaptationStatusViewModelTest` test tasks both completed with BUILD SUCCESSFUL. Existing unrelated Kotlin deprecation/resource warnings remain; no compile or test failure reported.
 - Existing test `AimiAdaptationStatusBuilderTest` confirms the status object is intentionally `@Transient` and excluded from serialized RT wire format. This is consistent with the live dashboard reading the in-memory `lastRun.request.rawData()`; the status is not persisted across serialization/restart. The immediate empty-card defect was the missing assignment on the normal return path, not the transient annotation.
 - No change to `autoisf-atc3`; no install/deployment, pump/profile change, or Nightscout write.
+
+
+### Validation completion — 2026-11-24
+
+- APP23 workflow-restoration replay run `45288804802`: all 25 jobs completed successfully (1 plan + 24 replay scenarios).
+- Dashboard status fix compile/test run `45289173704`: compile workflow SUCCESS. Gradle completed APS production/test compilation and MAIN production/test compilation. Both targeted test tasks completed: `AimiAdaptationStatusBuilderTest` and `AimiAdaptationStatusViewModelTest`. No test/compile failures reported. The log contains unrelated existing compiler warnings and a post-job git submodule cleanup warning; these did not change the successful workflow conclusion.
+- This validates compilation and unit tests for the metadata assignment path. It does not yet constitute a visual end-to-end test on a running Android app/device; the dashboard rendering fix remains lab-only pending UI runtime verification.
