@@ -255,6 +255,13 @@ Validation:
 - The exact APP prefs string from private `app22_batch.json` is not present in the available files/context. It was not guessed, so the requested base/seed-1/APP one-job run has not been started. Supply that exact prefs string (or the file) before dispatch.
 - Once a SYNTH-only run completes, ChatGPT can read the public aggregate summary from the Actions run. The encrypted artifact remains unreadable here; Claude's role is to review the learner decisions, not extract the numeric summary.
 
+
+Task 7 follow-up:
+- `6c857c8757705e48b3e722ebc4a405ae70f94381` updates the workflow header comment so it accurately describes the aggregate-only SYNTH_ exception.
+- Compile-check run `45100729376` for that latest workflow commit was **in progress** at the last check. Run `45100552307` for the earlier compile-workflow commit was also still in progress.
+- GitHub accepted the updated `aimi-replay.yml` workflow on push (push-triggered replay runs were skipped as intended); this is a YAML registration check, not an execution test of the summary step.
+- The requested one-job APP replay remains pending: run `45099362646` is still in progress, and the exact APP prefs from `app22_batch.json` are unavailable. Do not dispatch a second replay while the first is active or substitute guessed APP tokens.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
