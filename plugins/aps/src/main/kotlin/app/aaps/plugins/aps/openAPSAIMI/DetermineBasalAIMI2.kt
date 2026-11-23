@@ -20156,6 +20156,11 @@ class DetermineBasalaimiSMB2 @Inject constructor(
             },
         ) {
             AimiDetermineBasalTickOrchestrator.run(this, ctx)
+        }.also { result ->
+            // Populate the dashboard snapshot for every completed tick, including the normal path
+            // and telemetry recovery results. This is UI-only metadata; it does not alter dosing.
+            runCatching { assignAimiAdaptationStatus(result) }
+                .onFailure { aapsLogger.error(LTag.APS, "AIMI adaptation status assignment failed", it) }
         }
     }
 
