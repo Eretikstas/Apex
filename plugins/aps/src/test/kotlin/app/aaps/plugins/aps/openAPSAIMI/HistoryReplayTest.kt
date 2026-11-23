@@ -90,14 +90,20 @@ class HistoryReplayTest {
 
     private val minute = 60_000L
 
-    private fun isProtectionRow(row: JSONObject, t0: Long): Boolean {
-        val timestamp = row.optLong("t", Long.MIN_VALUE)
-        return row.has("bg") &&
-            timestamp >= t0 + 24 * 60 * minute &&
-            !row.optBoolean("falseLow") &&
-            !row.optBoolean("sensorGap") &&
-            !row.optBoolean("afterHypo")
+    private fun protectionExclusionReason(row: JSONObject, t0: Long): String? = when {
+        !row.has("bg") -> "missing-bg"
+        row.optLong("t", Long.MIN_VALUE) < t0 + 24 * 60 * minute -> "sensor-start"
+        row.optBoolean("falseLow") -> "false-low"
+        row.optBoolean("sensorGap") -> "sensor-gap"
+        row.optBoolean("afterHypo") -> "post-hypo-180m"
+        else -> null
     }
+
+    private fun isProtectionRow(row: JSONObject, t0: Long): Boolean =
+        protectionExclusionReason(row, t0) == null
+
+    private fun protectionBlocksInsulinIncrease(validDays: Int, lowPct: Double): Boolean =
+        validDays < 3 || lowPct > 3.0
 
     private data class SyntheticStressTokens(
         val outlierDay: Int? = null,
@@ -170,8 +176,21 @@ class HistoryReplayTest {
         assertEquals(false, isProtectionRow(JSONObject().put("t", start + 23 * 60 * minute).put("bg", 65.0), start))
         assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
         assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
-        assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute).put("afterHypo", true).put("bg", 65.0), start))
-        assertEquals(false, isProtectionRow(JSONObject().put("t", start + 24 * 60 * minute), start))
+        val reboundLow = JSONObject().put("t", start + 24 * 60 * minute).put("afterHypo", true).put("bg", 65.0)
+        assertEquals(false, isProtectionRow(reboundLow, start))
+        assertEquals("post-hypo-180m", protectionExclusionReason(reboundLow, start))
+        assertEquals("sensor-start", protectionExclusionReason(JSONObject().put("t", start + 23 * 60 * minute).put("bg", 65.0), start))
+        assertEquals("false-low", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
+        assertEquals("sensor-gap", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
+        assertEquals("missing-bg", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute), start))
+    }
+
+    @Test
+    fun `LAPROTECT blocks insulin increases at the strict three percent boundary`() {
+        assertEquals(true, protectionBlocksInsulinIncrease(2, 0.0))
+        assertEquals(false, protectionBlocksInsulinIncrease(3, 3.0))
+        assertEquals(true, protectionBlocksInsulinIncrease(3, 3.0001))
+        assertEquals(true, protectionBlocksInsulinIncrease(7, 4.0))
     }
 
     @Test
@@ -1464,7 +1483,12 @@ class HistoryReplayTest {
             val protectionLowPct = if (protectionRows.isEmpty()) 0.0 else
                 protectionRows.count { it.getDouble("bg") < 70.0 } * 100.0 / protectionRows.size
             val protectionDataReady = protectionValidDays >= 3
-            val blockInsulinIncrease = laProtect && (!protectionDataReady || protectionLowPct > 3.0)
+            val blockInsulinIncrease = laProtect && protectionBlocksInsulinIncrease(protectionValidDays, protectionLowPct)
+            val allMeasuredLows = last3Rows.filter { it.has("bg") && it.getDouble("bg") < 70.0 }
+            val protectionExcludedLows = allMeasuredLows.mapNotNull { row ->
+                protectionExclusionReason(row, t0)?.let { it to row }
+            }.groupingBy { it.first }.eachCount()
+            val protectedLowCount = protectionRows.count { it.getDouble("bg") < 70.0 }
             val last3 = last3Rows.filter { it.has("bg") }
             val lo3 = if (last3.isEmpty()) 0.0 else last3.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
             val eligibleLows = if (!causalFilter) last3 else last3.filter {
@@ -1474,7 +1498,7 @@ class HistoryReplayTest {
             }
             val lo3Eligible = if (last3.isEmpty()) 0.0 else eligibleLows.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
             val percentageProtectionLows = if (laProtect) protectionLowPct else lo3Eligible
-            if (laProtect) println("AIMI audit LAPROTECT day=$day: rows=${protectionRows.size} validDays=$protectionValidDays/3 lows=${"%.2f".format(protectionLowPct)} % gate=${if (blockInsulinIncrease) "BLOCK_INCREASES" else "OPEN"} reason=${if (!protectionDataReady) "insufficient-valid-days" else if (protectionLowPct > 3.0) "low-rate-over-3pct" else "none"}")
+            if (laProtect) println("AIMI audit LAPROTECT day=$day: rows=${protectionRows.size} validDays=$protectionValidDays/3 allLows=${allMeasuredLows.size} protectedLows=$protectedLowCount excluded=${protectionExcludedLows.entries.joinToString(",") { "${it.key}:${it.value}" }} lowRate=${"%.2f".format(protectionLowPct)} % gate=${if (blockInsulinIncrease) "BLOCK_INCREASES" else "OPEN"} reason=${if (!protectionDataReady) "insufficient-valid-days" else if (protectionLowPct > 3.0) "low-rate-over-3pct" else "none"}")
             // Run the read-only CR/ISF audit scans even when the overall three-day gate fails.
             // Their own gates still prevent proposals; this makes candidate/rejection counts visible.
             val isf = if (laIsf) isfSeen() else null
