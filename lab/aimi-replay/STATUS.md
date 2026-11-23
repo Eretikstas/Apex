@@ -422,6 +422,17 @@ Run state:
 - Conclusion: **not a summary-parser defect and not evidence that audit lines were lost**. This was the base APP/no-extra-learner-tokens control, not an audit-enabled replay. No source or workflow change and no additional replay were made.
 - To obtain per-card audit lines, a separate, explicitly approved diagnostic run must use the audit-enabled token combination (at minimum `LEARNALL,LACAUSE`; `LAPROTECT` only if specifically intended). Do not append these tokens to or relabel the already completed base control profile.
 
+
+
+### 2026-11-23, diagnostic-token audit after base control
+
+- Rechecked completed run `45149628280` directly from its replay job log. The workflow printed the exact input values and one matrix entry; the public summary contains the six aggregate metrics and no learner/audit subsection. The run's overall and replay-step conclusions are success.
+- Corrected the previous diagnostic handoff after inspecting `HistoryReplayTest.kt`: `LEARNALL` enables the all-card learner and final `learner ALL cards` line, but it does **not** by itself enable CR/ISF scans. Those are separately gated by `LACR` and `LAISF`; `LACAUSE` enables causal filtering; `LAPROTECT` enables the all-cause low interlock and is explicitly required to be combined with both `LEARNALL` and `LACAUSE`. `LADAYS` enables the three-distinct-day gates; `LAPCTBACK` enables percentage restoration.
+- Therefore the complete single-job diagnostic profile should append these approved lab tokens to the unchanged base control prefs: `LEARNALL,LACAUSE,LAPROTECT,LAISF,LACR,LADAYS,LAPCTBACK`. This is a distinct diagnostic profile, not a replacement for or relabeling of the base APP control. No second run has been started.
+- Expected visibility in that run: per-day `AIMI audit LAPROTECT`, CR block audit lines, ISF audit, Basal audit lines, `AIMI audit LEARNALL`, and the final `AIMI replay: learner ALL cards` summary, subject to the learner's scheduled check days and available data. Absence of a card-specific line must be interpreted against its explicit token gate and day schedule, not assumed to be a parser failure.
+- Next action: one diagnostic replay only, same SYNTH_56 / SEED_1 / base APP inputs, with the seven audit tokens above appended; `batch` remains empty and all workflow booleans/settings remain at the same defaults. Review audit reconciliation and the LAPROTECT gate before any scenario matrix or pair checks.
+- No algorithm source, workflow logic, live AAPS settings, profiles, pump or Nightscout settings were changed in this continuation. This entry is in ChatGPT's Task section; Claude's Results section remains untouched.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
