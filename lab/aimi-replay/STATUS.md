@@ -470,6 +470,20 @@ Dispatcher commit: `2eeeeb0dfd58147d6b832856705443b7ab6720cd` on `main`.
 
 Next validation: launch the dispatcher again with the prefilled `prefs` unchanged, `batch` empty, and the existing single-run defaults. Verify the resulting public synthetic summary and audit lines; do not treat the empty-prefs run as diagnostic evidence.
 
+### 2026-11-23, LAPROTECT rebound audit and strict-boundary tests
+
+Reviewed the actual synthetic replay implementation against the previously approved safety-failure review.
+
+Findings:
+1. The protection-low eligibility rule is already aligned with the approved specification: count measured lows after the first 24 hours, excluding false-low rows, sensor-gap/transition rows, and the 180-minute post-hypo-treatment rebound window. The causal learner's exclusions remain separate; SMB-associated lows still count for protection unless they fall into one of the explicitly excluded windows.
+2. The insulin-increase interlock is computed from the last three days: fewer than three valid protection days blocks increases; otherwise a protection-low rate strictly greater than 3.0% blocks increases. Exactly 3.0% is open. This matches the approved strict threshold.
+3. The previous LAPROTECT line did not explain how many measured lows were excluded as sensor-start, false-low, sensor-gap, or post-hypo rebound. That made it difficult to distinguish low burden from exclusion burden.
+
+Replay-only instrumentation and tests committed:
+- `43a92f063474acce5819de3d6802d8b5fc2acbd4` — reason-coded protection exclusions (`missing-bg`, `sensor-start`, `false-low`, `sensor-gap`, `post-hypo-180m`), aggregate all-low/protected-low counts, and explicit tests for the strict 3.0% boundary and insufficient valid days.
+
+No learner formulas, live app code, profiles, pump settings, or Nightscout settings were changed. No replay was launched. The push-triggered compile workflow should validate Kotlin compilation and the isolated helper tests; record its run result before any replay scenario is considered.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
