@@ -1472,9 +1472,10 @@ class HistoryReplayTest {
                     val priorRows = if (causalFilter) allRows else rows
                     if (priorRows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
                         (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) { reject("prior-hypo-rebound"); continue }
-                    if (causalFilter && allRows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) { reject("prior-smb"); continue }
+                    if (causalFilter && allRows.any { it.getLong("t") in (tm - 180 * minute) until tm && (it.optBoolean("afterSmb") || it.optBoolean("afterManual")) }) { reject("prior-insulin"); continue }
                     // Any SMB in the complete post-meal observation window invalidates the episode.
                     if (causalFilter && allWindow.any { it.optDouble("units", 0.0) > 0.0 }) { reject("post-meal-smb-6h"); continue }
+                    if (causalFilter && allWindow.any { it.optBoolean("manualCorrection") }) { reject("post-meal-correction"); continue }
                     if (causalFilter && !m.optBoolean("mealBolus")) { reject("missing-meal-bolus"); continue }
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
@@ -1517,9 +1518,9 @@ class HistoryReplayTest {
             val percentageLowRows = if (!causalFilter) percentageRows.filter { it.getDouble("bg") < 70.0 }
                 else percentageRows.filter { it.getDouble("bg") < 70.0 }
             val lo3Eligible = if (percentageRows.isEmpty()) 0.0 else percentageLowRows.size * 100.0 / percentageRows.size
-            // LAPROTECT is a separate all-cause interlock. It must not make SMB-, rebound- or activity-related lows
-            // teach the percentage card; those events still block insulin increases through blockInsulinIncrease.
-            val percentageProtectionLows = lo3Eligible
+            // LAPROTECT is a separate all-cause interlock. SMB-, rebound- and activity-related lows cannot teach the
+            // percentage card, but remain visible to the insulin-increase interlock.
+            val percentageLearningLowPct = lo3Eligible
             if (laProtect) println("AIMI audit LAPROTECT day=$day: rows=${protectionRows.size} validDays=$protectionValidDays/3 allLows=${allMeasuredLows.size} protectedLows=$protectedLowCount excluded=${protectionExcludedLows.entries.joinToString(",") { "${it.key}:${it.value}" }} lowRate=${"%.2f".format(protectionLowPct)} % gate=${if (blockInsulinIncrease) "BLOCK_INCREASES" else "OPEN"} reason=${if (!protectionDataReady) "insufficient-valid-days" else if (protectionLowPct > 3.0) "low-rate-over-3pct" else "none"}")
             // Run the read-only CR/ISF audit scans even when the overall three-day gate fails.
             // Their own gates still prevent proposals; this makes candidate/rejection counts visible.
@@ -1537,8 +1538,8 @@ class HistoryReplayTest {
             var card = ""
             val duraBefore = aw.dura; val basalBefore = profBasal.copyOf()
             when {
-                // Protection-only all-cause lows are separate from causal attribution to CR/ISF/Basal.
-                percentageProtectionLows > 4.0 && pctNow > 0.8001 -> { setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
+                // The percentage card moves down only for fasting or meal-bolus lows accepted by the causal filter.
+                percentageLearningLowPct > 4.0 && pctNow > 0.8001 -> { setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
                 // Restoring percentage or making any other insulin-increasing proposal is blocked above 3 %.
                 pctBack && !blockInsulinIncrease && pctNow < 0.9999 && lo3Eligible <= 2.0 -> { setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
                 isf != null && isf.first > isfP * 1.10 && isfP < isfStart * 1.25 -> { isfP = minOf(isfStart * 1.25, isfP * 1.07); card = "isf+" }
