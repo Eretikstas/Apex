@@ -309,6 +309,30 @@ Reviewed the current branch head `f2c6bc1781d2c43ba46648ce6dd0f42536108399`, thi
 - No BATCHES.md exists in this branch; the corrected strings are recorded here rather than creating an unneeded duplicate plan file.
 - Items 1–3 remain pending Claude review and explicit user approval because they alter learner behavior. Task 8 remains deferred until items 1–5 and compile/audit gates are resolved.
 
+
+### 2026-11-23, explicit user approval and one-job summary validation
+
+The user has now explicitly answered **YES** to learner-protection items 1–3. This is approval to implement them behind the opt-in token `LAPROTECT`; absence of the token must preserve the prior behavior exactly.
+
+Approved behavior:
+1. Protection-only low counting includes all valid lows, including SMB-associated lows, while excluding false-low artifacts, sensor-gap/transition rows, the first 24 hours of the synthetic sensor stream, and the 180-minute post-hypo-treatment rebound window.
+2. If the three-day protection-low rate is >3%, block every proposal that increases insulin effect/delivery (percentage up/restore, stronger CR, weaker ISF, positive basal deltas, Dura up, and learner weight/multiplier increases). Do not block protective decreases; for mixed basal proposals, retain eligible negative deltas and block positive ones. Evaluate against the pre-change snapshot.
+3. Dura-down protection uses the same protection-only low definition; retain the existing clean-row filter for flat-high evidence.
+
+**Before implementing or running learner changes, fix and validate the public summary.** Claude owns this summary correction and the Results section. Fix:
+- Parse comma- or whitespace-separated prefs for both SYNTH day count and task label.
+- Integrate basal delivery using the actual row interval (five-minute rows in the current schema: `deliv * 5 / 60`, or derive the median timestamp interval). Do not use `deliv / 60`.
+
+After that fix is committed, run exactly **one** manual workflow job as the summary smoke test:
+- Workflow: `AIMI history replay`, branch: `aimi-replay`.
+- Use the single `prefs` input (leave `batch` empty); do not launch a matrix or any other scenarios.
+- Exact supplied base/APP, seed-1 prefs (do not modify or reconstruct): `SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,SBIAS_0.15,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,TREATL,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100`.
+- Keep workflow defaults unchanged; one job only.
+- Confirm the public summary parses SYNTH_56 and reports TDD around 14–17 U/day. If outside that range or the summary fails, stop and investigate; do not start another replay.
+- Record the workflow run ID, commit, summary output, and TDD in Results.
+
+Do not start the wider replay batch yet. No live AAPS/profile/pump/Nightscout changes.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
