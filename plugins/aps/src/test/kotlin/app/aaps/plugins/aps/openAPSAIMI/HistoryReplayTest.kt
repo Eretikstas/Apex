@@ -116,7 +116,10 @@ class HistoryReplayTest {
                 ?: throw IllegalArgumentException("invalid GAP token: $token")
             match.groupValues[1].toInt()
         }
-        if (gapMinutes != null) require(days >= 4) { "GAP requires at least four synthetic days" }
+        if (gapMinutes != null) {
+            require(days >= 4) { "GAP requires at least four synthetic days" }
+            require(tokens.contains("LACAUSE")) { "GAP requires LACAUSE so causal audit can reject blackout and recovery windows" }
+        }
         return SyntheticStressTokens(outlier?.first, outlier?.second ?: 1.0, gapMinutes)
     }
 
@@ -129,19 +132,20 @@ class HistoryReplayTest {
 
     @Test
     fun `synthetic stress tokens validate their boundaries`() {
-        val parsed = parseSyntheticStressTokens("SYNTH_7 OUTDAY_4_1.3 GAP_15", 7)
+        val parsed = parseSyntheticStressTokens("SYNTH_7 LACAUSE OUTDAY_4_1.3 GAP_15", 7)
         assertEquals(4, parsed.outlierDay)
         assertEquals(1.3, parsed.outlierMultiplier, 0.000001)
         assertEquals(15, parsed.gapMinutes)
-        assertEquals(30, parseSyntheticStressTokens("SYNTH_7 GAP_30", 7).gapMinutes)
-        assertEquals(60, parseSyntheticStressTokens("SYNTH_7 GAP_60", 7).gapMinutes)
+        assertEquals(30, parseSyntheticStressTokens("SYNTH_7 LACAUSE GAP_30", 7).gapMinutes)
+        assertEquals(60, parseSyntheticStressTokens("SYNTH_7 LACAUSE GAP_60", 7).gapMinutes)
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_15", 7) }
         assertEquals(0.7, parseSyntheticStressTokens("SYNTH_7 OUTDAY_7_0.7", 7).outlierMultiplier, 0.000001)
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_3 GAP_15", 3) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_0_1.3", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_8_1.3", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_4_0", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 OUTDAY_4_1.3 OUTDAY_5_0.7", 7) }
-        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_20", 7) }
+        assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 LACAUSE GAP_20", 7) }
         assertThrows(IllegalArgumentException::class.java) { parseSyntheticStressTokens("SYNTH_7 GAP_15 GAP_30", 7) }
     }
 
