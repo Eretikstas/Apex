@@ -216,6 +216,23 @@ User-directed design decision: use pure `propose…(state)` plus selected-only `
 
 Design and test gates are documented in `TECHNICAL_AUDIT_2026-11-23.md`. Implementation has not yet been committed or compile-validated. No replay batch or live AAPS change was made.
 
+
+### 2026-11-23, compile and isolated Learning Audit helper-test confirmation
+
+- Latest branch head before this report: `2577350eb1261003ab337b827c6f079d3b4bf587`.
+- Workflow-only commit `c5db9c996396f1a17a463c875a757064a4945092`, run `45096342199`: **success**.
+- `:plugins:aps:compileFullDebugUnitTestKotlin`: `BUILD SUCCESSFUL` (6m 53s).
+- Isolated `HistoryReplayTest` JUnit invocation: `BUILD SUCCESSFUL` (24s), with `AIMI_REPLAY_IN` and `AIMI_REPLAY_OUT` explicitly empty. This confirms compilation and the helper-test step without opening replay inputs or executing a replay batch.
+- The compile runs previously listed as in progress for source commits `76828a2`, `e3c5e6f`, and `70b796b` are now completed successfully (runs `45095912758`, `45096047502`, and `45096199938` respectively).
+- **Phase 1 (Learning Audit journal + compile/helper tests) is compile-validated.** This does not validate replay learning behavior or close Claude's semantic review points.
+- **Next owner action: Claude runs Phase 2** — existing 8 scenarios x 3 seeds, APP baseline and causal learner tokens exactly as specified above; compare audit reconciliation, card decisions and safety outcomes. No OUTDAY/GAP or pair matrix in this batch.
+- **Then Phase 3:** three isolated matched pair checks, one at a time, same seed and matched no-pair control, third factor=1.0:
+  1. `MEALX_1.2 CHG_4 CHGISF_1.2`
+  2. `MEALX_1.2 DAYNEED_1.2`
+  3. `CHG_4 CHGISF_1.2 DAYNEED_1.2`
+- For every run, Claude records intended synthetic change, expected card response, unrelated-card response and audit evidence in Results. Stop on unreconciled counters, unexplained card response, or incorrect synthetic effect.
+- ChatGPT has not dispatched replay. No live AAPS/profile/pump/Nightscout changes.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
