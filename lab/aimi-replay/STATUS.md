@@ -200,7 +200,7 @@ Changes are limited to replay test/audit logic:
 
 APK static inspection is documented in the linked report. The supplied APK filename says 4.1, but its manifest reports versionName 4.0.0/versionCode 2000; embedded VCS metadata says `NO_VALID_GIT_FOUND`, so source provenance is not established.
 
-Latest source commit: `70b796b71e1df3925742bf379a4e5f6de7e5e788`. Compile-only run `45096047502` for the immediately preceding source commit was in progress; the run for `70b796b` had not yet appeared in Actions. Replay workflow was skipped; no replay batch was started.
+Latest source commit: `70b796b71e1df3925742bf379a4e5f6de7e5e788`; compile-only run `45096199938` is in progress. Earlier source commits `3e7792f`, `b40050a`, `8fb7ae7`, and `037cca0` have compile-only success; runs for `76828a2` and `e3c5e6f` remain in progress. Replay workflow was skipped; no replay batch was started.
 
 No learner formula, live profile, pump or Nightscout setting was changed. Claude review and replay ownership remain unchanged. Do not proceed to baseline/pair/OUTDAY/GAP batches until Claude approves the outstanding audit semantics and compile validation is complete.
 
