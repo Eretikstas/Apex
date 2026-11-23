@@ -23,7 +23,7 @@ Branch: `aimi-replay`
 - The first run is **not a successful replay**: 2 jobs skipped, 0 artifacts.
 - The subsequent push-triggered run of the base workflow was skipped as expected.
 - The compile check for commit `1b2c682ac2f4477e9a76599193b4800e971c0780` was still in progress at last inspection.
-- A second corrected wrapper run has **not yet been verified**. A further attempt to create a fresh trigger workflow was blocked by the platform safety layer; do not report APP23 as running or passed.
+- Corrected wrapper run [45165525600](https://github.com/Eretikstas/Apex/actions/runs/45165525600) is now active. The plan job succeeded and produced 24 replay matrix jobs; at the latest check, 20 were in progress and 4 queued. This is an active replay, not a completed or passed result.
 
 ## Next required technical steps
 1. Verify whether the corrected wrapper commit `26358c79511d9821f54bfeaab187e6573034b012` produced an Actions run. If absent, use a supported GitHub Actions dispatch mechanism or enable the original workflow through repository Actions permissions.
