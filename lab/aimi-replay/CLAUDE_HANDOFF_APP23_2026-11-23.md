@@ -154,3 +154,29 @@ The narrower evidence interval is a hypothesis about the replay harness's over-f
 - Percentage-card transitions need a dedicated stability/safety audit.
 - Do not integrate, deploy, or copy these changes to `autoisf-atc3`, the child's phone, pump, or live profile.
 - Next laboratory-only work: trace the ISF 162→180 write path; instrument per-row ISF/CR exclusion timing; inspect basal accepted-hour coverage and LBTAIL eligibility across all 24 jobs; add a deterministic percentage-card transition ledger and assertions; then rerun the same 24-row batch. Obtain clinical aggregate metrics only through a permitted artifact-access path.
+
+
+## Update — learner filter correction after APP23 audit
+
+### Diagnosis
+APP23 run `45261150404` completed its 24 replay jobs technically. The code audit found three over-broad temporal exclusions:
+- Basal evidence rejected every row carrying `afterInsulin` (3 h after any SMB/manual bolus), despite delivered insulin already being included in the basal activity convolution. In frequent-SMB data this made almost every 65-minute candidate window ineligible.
+- ISF rejected the full 4 h pre / 3 h post candidate window whenever the 5 h `afterMeal` flag was set, and rejected any prior insulin flag in the full 4 h pre-window. This was wider than the modeled overlap.
+- CR rejected prior insulin/hypo for 3 h and any post-meal SMB/manual correction across the full 6 h response window, even after the event was no longer materially overlapping.
+
+### Laboratory-only changes
+Commit: `564c95bba5f5b26c5096a4748db37df3e251c539`
+File: `plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAIMI/HistoryReplayTest.kt`
+
+Changes:
+1. Basal evidence no longer blanket-excludes `afterInsulin`; insulin remains represented in the activity convolution. Hypo, old cannula, sensor gap, activity, illness and false-low exclusions remain.
+2. ISF meal exclusion narrowed to explicit meal events in the 3 h pre / 2 h post interval; separate prior bolus exclusion narrowed to 1 h. Existing insulin activity/net calculation remains.
+3. CR prior insulin and prior hypo lookback narrowed from 3 h to 2 h; post-meal SMB/manual-correction exclusion narrowed from 6 h to 2 h.
+4. LAPROTECT now counts post-treatment/rebound lows as all-cause safety evidence. It still excludes missing BG, sensor-start, false-low and sensor-gap rows. The prior exclusion of `afterHypo` contradicted the all-cause interlock intent.
+5. Existing unit assertions updated for the new protection and basal evidence semantics.
+
+### Validation status
+- These changes are a hypothesis-driven laboratory correction, not evidence of improved clinical performance.
+- Compile + helper tests must pass before starting a fresh 24-scenario replay.
+- No clinical metrics are inferred from encrypted result artifacts.
+- No changes to `autoisf-atc3`, live profiles, pump settings, or the child's installed app.
