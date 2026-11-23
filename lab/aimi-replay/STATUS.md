@@ -411,6 +411,17 @@ Run state:
 - A post-job cleanup warning reported `fatal: No url found for submodule path '.tmp-juggluco' in .gitmodules`; it occurred during Git post-action cleanup after the replay, summary, encryption and artifact upload steps had succeeded. Overall GitHub job conclusion is success. The warning is recorded separately from replay correctness.
 - Artifact `aimi-replay-result-0` was uploaded encrypted (1,020,337 bytes); no decryption or inspection of private replay output was performed in this check. No further replay was launched.
 
+
+### 2026-11-23, why learner audit lines are absent from the base control summary
+
+- Investigated completed run `45149628280`, replay job `137607503933`, workflow source at `aimi-replay` commit `304b3c49917786e8a5d483eb98dc2f772c0e2b64`, and replay learner source.
+- **Root cause: the exact approved base APP control prefs do not enable the experimental audit learner.** The prefs contain none of `LEARNALL`, `LACAUSE`, or `LAPROTECT`. Workflow input `learn=true` enables replay learning generally; it does not implicitly add the separate `LEARNALL` / causal-protection tokens.
+- Source confirms `learnAll = prefsText.contains("LEARNALL")`; the final `AIMI replay: learner ALL cards ...` line is printed only under `if (learnAll)`. Causal filtering is separately controlled by `LACAUSE`, and the protection interlock by `LAPROTECT` (which requires both `LEARNALL` and `LACAUSE`). Therefore this base APP control was not expected to produce those audit lines.
+- The public-summary step selects only existing lines beginning `AIMI replay: learner ALL cards` and `AIMI audit `; it does not generate audit data itself. With no audit lines present, it correctly publishes only aggregate synthetic metrics and omits the `Learner / audit` subsection.
+- GitHub job logs intentionally expose only a filtered subset of the Gradle output. The complete Gradle log is packaged inside `result.enc` in artifact `aimi-replay-result-0`; the artifact was downloaded and confirmed to contain only encrypted `result.enc`. No decryption key was read or used, and private replay data was not inspected.
+- Conclusion: **not a summary-parser defect and not evidence that audit lines were lost**. This was the base APP/no-extra-learner-tokens control, not an audit-enabled replay. No source or workflow change and no additional replay were made.
+- To obtain per-card audit lines, a separate, explicitly approved diagnostic run must use the audit-enabled token combination (at minimum `LEARNALL,LACAUSE`; `LAPROTECT` only if specifically intended). Do not append these tokens to or relabel the already completed base control profile.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
