@@ -233,3 +233,13 @@ Changes:
 - Percentage card continues to produce multiple decreases/restorations within some runs (scenario 22: 4 decreases, 2 restores, final 80%). The two-consecutive-window restoration hysteresis is intended to reduce immediate reversals; it is not yet tested.
 - The encrypted artifacts do not provide accessible clinical metrics in the current workflow surface. No TIR/CV/hypoglycemia efficacy conclusion is possible.
 - Next validation target is compile/helper tests for commit `377f75facf2cefdac28bbc99a6b025a9db4d5306`, then a new 24-case replay against that exact commit. Do not reuse APP23 metrics as validation of the newer code.
+
+
+## ISF low-window precision refinement — commit 2c660b1cff1521737956de92adba6c3b44bb0ff8
+
+- Further audit of the synthetic row schema showed `hypo` records carbohydrate treatment grams, not every measured low. The first correction-window patch therefore still used a treatment-event proxy.
+- Refined ISF contamination test to reject an actual BG <70 mg/dL in the 3 h before correction or 3 h after correction. Sensor-gap, missing-BG, old-cannula, activity, illness, false-low, meal-window and separate-bolus filters remain in place.
+- Added boundary assertions for lows at the first included pre-window tick, at the correction tick, just outside the post-window, and an invalid short array window.
+- Compile + helper tests for this exact commit: run 45272322156 (in progress at time of writing).
+- APP23 run 45270000264 is complete (24/24 success) but predates this ISF correction and cannot validate it. A new full replay must follow a passing compile/test.
+- Percentage restore hysteresis remains part of the same source branch and is included in this compile run.
