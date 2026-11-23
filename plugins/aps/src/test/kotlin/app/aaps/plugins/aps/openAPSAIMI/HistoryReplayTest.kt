@@ -890,7 +890,7 @@ class HistoryReplayTest {
         fun cleanDuraRow(r: JSONObject): Boolean = !causalFilter ||
             !(r.optBoolean("afterHypo") || r.optBoolean("oldCannula") || r.optBoolean("sensorGap") ||
                 r.optBoolean("falseLow") || r.optBoolean("illness") || r.optBoolean("activity"))
-        var failed = 0
+        var failed = 0; var gapSkipped = 0
         val end = t0 + days * 86_400_000L
         var t = t0
         var manThisTick = 0.0
@@ -1839,8 +1839,13 @@ class HistoryReplayTest {
                     }
                     row.put("units", smb).put("rate", rate ?: JSONObject.NULL).put("dur", dur ?: JSONObject.NULL).put("iob", chained.iobArray[0].iob)
                 } catch (ex: Throwable) {
-                    failed++
-                    row.put("error", ex.javaClass.simpleName)
+                    if (sensorGapActive && ex is IllegalStateException && ex.message == "no glucose") {
+                        gapSkipped++
+                        row.put("error", "sensor-gap")
+                    } else {
+                        failed++
+                        row.put("error", ex.javaClass.simpleName)
+                    }
                 }
                 out.put(row)
                 // LEARNB: the learner's basal card every LBEVERY_<d> days (default 4) at 06:00, accepted at once.
@@ -1872,7 +1877,7 @@ class HistoryReplayTest {
         if (chainP > 0.0 || smartL || guardChain || learnCrm)
             println("AIMI replay: CHAIN meals $nChain, SMARTL level ${"%.1f".format(smartThr / 18.0)} (up $smartUp down $smartDown), GUARDCHAIN minutes $nGuardChain, CR blocks ${crBlock.joinToString { "%.2f".format(it) }}")
         if (learnG) println("AIMI replay: learner ended with guard ${guardW.roundToInt()} min, cap ${"%.2f".format(capMult)}x profile; stricter $tighten times, looser $loosen times")
-        println("AIMI replay: ${out.length()} ticks, $failed failed")
+        println("AIMI replay: ${out.length()} ticks, $failed failed, $gapSkipped sensor-gap ticks intentionally skipped")
     }
 
     private fun readHistory(data: JSONObject): History {
