@@ -102,6 +102,14 @@ class HistoryReplayTest {
     private fun isProtectionRow(row: JSONObject, t0: Long): Boolean =
         protectionExclusionReason(row, t0) == null
 
+    // Basal evidence is judged over the hour whose glucose change is being explained.
+    // Meal exclusion is handled separately by the 5 h meal window / explicit LBTAIL rule;
+    // scanning the preceding 5 h for afterMeal made LBTAIL impossible and rejected nearly every hour.
+    private fun isBasalEvidenceRow(row: JSONObject): Boolean =
+        !(row.optBoolean("afterHypo") || row.optBoolean("afterInsulin") ||
+            row.optBoolean("oldCannula") || row.optBoolean("sensorGap") ||
+            row.optBoolean("activity") || row.optBoolean("illness") || row.optBoolean("falseLow"))
+
     // A low may teach the percentage card only when its cause is attributable to fasting or a meal bolus.
     // Other clean readings remain in the denominator; contaminated rows are excluded from both numerator and denominator.
     private fun isPercentageLearningRow(row: JSONObject): Boolean {
@@ -216,6 +224,13 @@ class HistoryReplayTest {
 
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting")))
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "meal_bolus")))
+        assertEquals(true, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("afterMeal", true)))
+        assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("afterHypo", true)))
+        assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("afterInsulin", true)))
+        assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("activity", true)))
+        assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("illness", true)))
+        assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("falseLow", true)))
+        assertEquals(false, isBasalEvidenceRow(JSONObject().put("bg", 120.0).put("sensorGap", true)))
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "smb")))
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "ambiguous")))
         assertEquals(false, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting").put("activity", true)))
@@ -984,10 +999,6 @@ class HistoryReplayTest {
         fun hasSensorGap(rows: List<JSONObject>): Boolean =
             rows.any { it.optBoolean("sensorGap") } ||
                 rows.zipWithNext().any { (a, b) -> b.getLong("t") - a.getLong("t") > 5 * minute }
-        fun cleanBasalRow(r: JSONObject): Boolean = !causalFilter ||
-            !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") || r.optBoolean("afterInsulin") ||
-                r.optBoolean("oldCannula") || r.optBoolean("sensorGap") || r.optBoolean("activity") ||
-                r.optBoolean("illness") || r.optBoolean("falseLow"))
         fun cleanDuraRow(r: JSONObject): Boolean = !causalFilter ||
             !(r.optBoolean("afterMeal") || r.optBoolean("afterHypo") || r.optBoolean("afterInsulin") ||
                 r.optBoolean("oldCannula") || r.optBoolean("sensorGap") ||
@@ -1046,18 +1057,18 @@ class HistoryReplayTest {
             for (k in 60 until w - 12) {
                 // LEARNB5: hours with a cannula older than 72 h are not used (user rule 19.11).
                 if (audit) auditCandidates++
-                val windowRows = (k - 60 until k + 13).map { out.getJSONObject(s0 + it) }
+                val evidenceRows = (k until k + 13).map { out.getJSONObject(s0 + it) }
                 val reason = when {
-                    causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
+                    causalFilter && hasSensorGap(evidenceRows) -> "sensor-gap"
                     canOld[k] || canOld[k + 12] -> "old-cannula"
-                    causalFilter && windowRows.any { !cleanBasalRow(it) } -> {
+                    causalFilter && evidenceRows.any { !isBasalEvidenceRow(it) } -> {
                         when {
-                            windowRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
-                            windowRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
-                            windowRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
-                            windowRows.any { it.optBoolean("activity") } -> "activity"
-                            windowRows.any { it.optBoolean("illness") } -> "illness"
-                            windowRows.any { it.optBoolean("falseLow") } -> "false-low"
+                            evidenceRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
+                            evidenceRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
+                            evidenceRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
+                            evidenceRows.any { it.optBoolean("activity") } -> "activity"
+                            evidenceRows.any { it.optBoolean("illness") } -> "illness"
+                            evidenceRows.any { it.optBoolean("falseLow") } -> "false-low"
                             else -> "causal-filter"
                         }
                     }
@@ -1353,19 +1364,19 @@ class HistoryReplayTest {
             val auditDays = HashSet<Int>()
             for (k in 60 until w - 12) {
                 auditCandidates++
-                val windowRows = (k - 60 until k + 13).map { out.getJSONObject(s0 + it) }
+                val evidenceRows = (k until k + 13).map { out.getJSONObject(s0 + it) }
                 val reason = when {
-                    causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
+                    causalFilter && hasSensorGap(evidenceRows) -> "sensor-gap"
                     mn[k] != 0 -> "not-hour-boundary"
                     since[k] < 300 -> "meal-window"
-                    causalFilter && windowRows.any { !cleanBasalRow(it) } -> {
+                    causalFilter && evidenceRows.any { !isBasalEvidenceRow(it) } -> {
                         when {
-                            windowRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
-                            windowRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
-                            windowRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
-                            windowRows.any { it.optBoolean("activity") } -> "activity"
-                            windowRows.any { it.optBoolean("illness") } -> "illness"
-                            windowRows.any { it.optBoolean("falseLow") } -> "false-low"
+                            evidenceRows.any { it.optBoolean("oldCannula") } -> "old-cannula"
+                            evidenceRows.any { it.optBoolean("afterHypo") || it.optDouble("hypo", 0.0) > 0.0 } -> "hypo-rebound"
+                            evidenceRows.any { it.optBoolean("afterMeal") } -> "meal-tail"
+                            evidenceRows.any { it.optBoolean("activity") } -> "activity"
+                            evidenceRows.any { it.optBoolean("illness") } -> "illness"
+                            evidenceRows.any { it.optBoolean("falseLow") } -> "false-low"
                             else -> "causal-filter"
                         }
                     }
@@ -1442,7 +1453,7 @@ class HistoryReplayTest {
                 val window = k - 48..k + 36
                 val windowRows = window.map { rows[it] }
                 val rejection = when {
-                    causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
+                    causalFilter && hasSensorGap(evidenceRows) -> "sensor-gap"
                     window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
                     window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
