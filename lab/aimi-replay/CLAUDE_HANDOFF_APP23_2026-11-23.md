@@ -90,3 +90,30 @@ This update supersedes the earlier statement that push-trigger execution was unc
 - Do not integrate or deploy any learner changes. No changes to `autoisf-atc3`, production app, phone, pump, or live profile.
 - Next laboratory task: instrument the exact rejection pipeline and inspect why every basal candidate is classified as meal-tail / hypo-rebound; separately quantify ISF/CR rejection windows and validate whether the 4h/3h prior-insulin guards are unintentionally overlapping nearly all candidates. Then rerun the same 24-row batch and compare against this run.
 - Obtain clinical aggregate metrics only through a permitted artifact-decryption path; never print or expose `AIMI_REPLAY_KEY`.
+
+
+## Update at 2026-11-23 22:xx CET — basal evidence-window correction and rerun
+
+### Root cause identified
+The APP23 audit's zero basal acceptance was traced to a contradictory filter in the replay harness:
+- Each basal candidate was checked against a 73-sample window spanning 5 h before through 1 h after the measured hour.
+- `cleanBasalRow` rejected any `afterMeal` flag in that whole window, even though `afterMeal` remains true for 5 h and the basal estimator separately enforces its 5 h meal exclusion / explicit `LBTAIL` exception.
+- This made the LBTAIL path logically unreachable and extended meal contamination rejection beyond the intended candidate interval. The same wide window also rejected candidates for any prior hypo/insulin/activity flag found in the 5 h history, rather than checking the hour whose glucose change is being attributed.
+
+### Laboratory-only correction
+On `aimi-replay`, in `HistoryReplayTest.kt`:
+- Added `isBasalEvidenceRow`: checks post-hypo, post-insulin, old-cannula, sensor-gap, activity, illness and false-low flags; deliberately does not reject `afterMeal`.
+- Both advanced and classic basal audits now evaluate causal/sensor-gap flags only across the 13 samples of the measured hour (hour start through +60 min).
+- Meal handling remains separate and conservative: the existing 5 h `since[k]` gate remains, and the 3–5 h `LBTAIL` exception still requires COB <0.5 and an allowed CR block.
+- Added unit assertions proving afterMeal alone is not a basal-evidence contaminant while hypo, insulin, activity, illness, false-low and sensor-gap still are.
+- Audit reason classification was aligned with the new evidence window.
+- Commits: `7f7411b2c6633a9ccb3cad213f6f1fb71cefd826`, `f3461ec90c6b175e1d7aa5d80dc7af9a7d552169`.
+
+### Rerun
+- Triggered the canonical APP23 24-row batch again by updating only the scoped launcher comment: commit `4ddb436843b355f7675015723df3a35d9e8ca5dc`.
+- Compile workflow is also configured to run automatically on the test-source change.
+- Pending verification: confirm compile job and all 24 replay jobs, then compare basal acceptance/hour coverage and all clinical aggregate metrics with run `45251769895`.
+- This is a replay-harness/laboratory change only. No production branch, app installation, phone, pump, or live profile was changed.
+
+### Interpretation guard
+The narrower evidence interval is a hypothesis about the replay harness's over-filtering, not proof that more basal samples are clinically valid. The 5 h meal rule, LBTAIL COB/CR checks, hypo and insulin exclusions, cannula/sensor/activity/illness guards remain in force. Do not integrate until the rerun demonstrates acceptable data quality and independent safety/clinical review.
