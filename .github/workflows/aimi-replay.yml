@@ -98,7 +98,7 @@ permissions:
 
 jobs:
   plan:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || inputs.batch != '' || inputs.prefs != '' }}
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.m.outputs.matrix }}
