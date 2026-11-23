@@ -453,6 +453,13 @@ Artifact `aimi-replay-result-0` uploaded (1,089,973 bytes), but it contains encr
 
 No app branch, live AAPS settings, profiles, pump or Nightscout were changed. No additional run was started.
  
+### 2026-11-23, fix learner/audit summary log matching
+
+- Investigated completed diagnostic run `45155730520`, replay job `137628083643`. The Gradle job log shows test-worker output lines indented (for example, the visible `AIMI replay: 16128 ticks...` and `AIMI replay: pass 1 of 1 done` lines).
+- Root cause of the missing public learner/audit subsection: the workflow summary parser used `line.startswith(...)` on raw Gradle output. The leading indentation prevented both `AIMI replay: learner ALL cards` and `AIMI audit ` lines from matching, even when present in the test output. This is a summary-parser defect; the earlier hypothesis that test stdout was not captured is not supported.
+- Fixed `.github/workflows/aimi-replay.yml` on `aimi-replay`: normalize log lines with `strip()` before prefix matching and publish the normalized lines. Commit: `faf7b64daf20ec706d3043181507c729a00b793d`.
+- No algorithm, learner gates, replay inputs, public metrics, or live AAPS settings were changed. No workflow was launched. The diagnostic run's encrypted artifact was not decrypted; this fix makes the next explicitly launched diagnostic run's public summary able to expose matching audit records, but runtime LAPROTECT behavior remains unverified until those records are visible.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
