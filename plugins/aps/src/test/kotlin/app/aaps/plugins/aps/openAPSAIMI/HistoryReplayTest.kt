@@ -895,17 +895,16 @@ class HistoryReplayTest {
             if (audit) {
                 val rejected = auditCounts.values.sum()
                 val minN = if (lbMin > 0) lbMin else if (lb5 && !lbFill) 4 else 3
-                val eligibleHours = (0 until 24).count { h ->
+                val measuredHour = BooleanArray(24) { h ->
                     needs[h].size >= (if (tailHours[h]) maxOf(minN, lbTailMin) else minN)
                 }
-                val fillRatioPossible = lbFill && (0 until 24).count { h ->
-                    needs[h].size >= (if (tailHours[h]) maxOf(minN, lbTailMin) else minN)
-                } >= 4
+                val eligibleHours = measuredHour.count { it }
+                val fillRatioPossible = lbFill && eligibleHours >= 4
                 val estimatedHours = if (fillRatioPossible) 24 - eligibleHours else if (lbFill2) {
                     (0 until 24).count { h ->
-                        needs[h].size < (if (tailHours[h]) maxOf(minN, lbTailMin) else minN) &&
-                            (1..23).any { d -> needs[(h - d + 24) % 24].size >= minN } &&
-                            (1..23).any { d -> needs[(h + d) % 24].size >= minN }
+                        !measuredHour[h] &&
+                            (1..23).any { d -> measuredHour[(h - d + 24) % 24] } &&
+                            (1..23).any { d -> measuredHour[(h + d) % 24] }
                     }
                 } else 0
                 val dayGate = enoughWindowDays && auditDays.size >= (if (require3Days) 3 else 1)
@@ -1276,7 +1275,7 @@ class HistoryReplayTest {
             val allRows = (maxOf(0, out.length() - 8 * 288) until out.length()).map { out.getJSONObject(it) }
                 .filter { it.getLong("t") >= nowT - 7 * 86_400_000L }
             val rows = allRows.filter { it.has("bg") }
-            val meals = rows.filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 360 * minute }
+            val meals = allRows.filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 360 * minute }
             for (b in 0..2) {
                 var highs = 0; var lows = 0; var used = 0
                 val usedDays = HashSet<Int>()
@@ -1287,15 +1286,19 @@ class HistoryReplayTest {
                     val tm = m.getLong("t")
                     val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
                     val allWindow = allRows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
-                    if (causalFilter && allWindow.any { it.optBoolean("sensorGap") }) { reject("sensor-gap"); continue }
-                    if (window.size < 72) { reject("short-window"); continue }
-                    if (causalFilter && window.any { it.optBoolean("oldCannula") }) { reject("old-cannula"); continue }
-                    if (causalFilter && window.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
-                    if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
+                    if (causalFilter && (allWindow.any { it.optBoolean("sensorGap") } ||
+                        allWindow.zipWithNext().any { (x, y) -> y.getLong("t") - x.getLong("t") > 5 * minute })) {
+                        reject("sensor-gap"); continue
+                    }
+                    if (allWindow.any { !it.has("bg") }) { reject("missing-bg"); continue }
+                    if (allWindow.size < 72 || window.size < 72) { reject("short-window"); continue }
+                    if (causalFilter && allWindow.any { it.optBoolean("oldCannula") }) { reject("old-cannula"); continue }
+                    if (causalFilter && allWindow.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
+                    if (allRows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
                         (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) { reject("prior-hypo-rebound"); continue }
-                    if (causalFilter && rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) { reject("prior-smb"); continue }
+                    if (causalFilter && allRows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) { reject("prior-smb"); continue }
                     // Any SMB in the complete post-meal observation window invalidates the episode.
-                    if (causalFilter && window.any { it.optDouble("units", 0.0) > 0.0 }) { reject("post-meal-smb-6h"); continue }
+                    if (causalFilter && allWindow.any { it.optDouble("units", 0.0) > 0.0 }) { reject("post-meal-smb-6h"); continue }
                     if (causalFilter && !m.optBoolean("mealBolus")) { reject("missing-meal-bolus"); continue }
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
