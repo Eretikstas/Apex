@@ -294,3 +294,46 @@ Summed from audit logs across the 24 jobs in run 45270000264; these are rejectio
 - This validates the ISF actual-BG causal-window helper and percentage restore hysteresis as they existed in commit 2c660b1.
 - It does NOT include the later CR change in commit 64f4502.
 - Current validation for commit 64f4502 is run 45273029777; compile step is still running. Do not launch APP23 until this exact commit passes both compile and helper tests.
+
+
+## APP23 corrected replay results — run 45278182666
+
+- Source commit executed: `173a47c0782b3ffaba5b37fdfa3fd27e982b3881` on `aimi-replay`.
+- Compile/helper-test run 45273029777 completed successfully before this replay: test-source compilation PASS; replay audit helper tests PASS.
+- APP23 plan job PASS; all 24/24 replay jobs PASS; each replay step, public synthetic summary generation, encrypted result creation and artifact upload completed. No replay job failures.
+- This is a synthetic replay batch, not a clinical validation and not a paired APP-baseline comparison.
+
+### Aggregated audit counters
+
+Counts below are sums of daily audit scans from all 24 replay-job logs. Candidate rows can recur across successive rolling windows; counts are not unique meals, corrections or clinical events.
+
+| Audit | Candidate scans | Accepted | Rejected | Gate result |
+|---|---:|---:|---:|---|
+| ISF | 50,719 | 0 | 50,719 | 0/667 daily gates PASS |
+| CR (all 3 blocks) | 16,651 | 12 | 16,639 | 0/2,001 block gates PASS |
+| Basal | 2,049,612 | 27,392 | 2,022,220 | 534/534 daily gates PASS |
+
+- ISF still has zero accepted observations. Main rejection causes remain meal-window contamination, actual BG <70 inside the response window, and prior insulin. The corrected actual-BG check removed reliance on the broad rolling `afterHypo` flag, but did not create a usable ISF sample.
+- CR accepted 12 candidate meal blocks across all scans, but none of the 2,001 block audits met the minimum gate (at least 5 accepted meals and 3 distinct days). CR therefore made no parameter change; all final CR multipliers remained 1.00/1.00/1.00.
+- Basal passed all 534 audit gates, but only 27,392 of 2,049,612 candidate windows were accepted (about 1.34%). This is a gate-pass result, not proof of sufficient coverage or clinical usefulness. Accepted counts per scenario were roughly 37–101 per daily audit; many candidate rows are not hour boundaries or fall in meal/rebound windows.
+
+### Learner card behavior
+
+- Across the 24 final replay summaries, reported card events sum to approximately: percentage decreases 74, percentage restores 59, basal updates 237, Dura updates 19. These are replay event counters, not independent patient outcomes.
+- Percentage card still shows substantial down/up activity despite the two-consecutive-check restore hysteresis. Several scenarios finish at 90%; two finish at 80%; most finish at 100%. This requires a paired baseline and per-check timeline review before deciding whether oscillation is acceptably reduced.
+- ISF profile summaries show no accepted ISF evidence; some final ISF values differ due to percentage-card scaling, not because the ISF learner passed its gate.
+- CR multipliers remain unchanged. No evidence of an active CR learning card in this batch.
+- Basal and Dura cards are non-empty in many scenarios. The final card summaries do not establish that every UI card model has a non-empty display payload; this replay logs learner events/values, not the production UI card mapper.
+
+### Conclusions / next audit
+
+1. Do not relax ISF or CR filters yet. The next diagnostic should report per-candidate rejection precedence and compare exact timestamps against meal bolus, SMB/manual insulin, and measured BG to identify whether the remaining exclusions are causal or over-broad.
+2. For ISF, specifically inspect whether the meal filter's 3 h pre / 2 h post interval and the overlapping-bolus checks are rejecting every correction by design in this synthetic SMB-heavy loop.
+3. For CR, inspect the 2 h pre-meal insulin rule against meal-time IOB and prior SMB chain. Do not remove insulin-contamination protection without modeling the delivered insulin contribution.
+4. For basal, examine the 1.34% accepted-window rate and the per-hour coverage distribution; gate PASS alone is insufficient.
+5. For percentage, generate a paired APP-vs-LEARN replay on identical seeds and export the daily pct / BG-low / TDD timeline to quantify oscillation and safety trade-offs.
+6. UI empty-card audit remains separate: trace the production card data model, mapper, visibility predicate and rendering fallback. HistoryReplayTest has no imported card model or mapper; its learner card labels are plain strings.
+
+- Direct run: https://github.com/Eretikstas/Apex/actions/runs/45278182666
+- Corrected compile/helper run: https://github.com/Eretikstas/Apex/actions/runs/45273029777
+- No changes to `autoisf-atc3`; no deployment, install, pump/profile mutation, or Nightscout write access.
