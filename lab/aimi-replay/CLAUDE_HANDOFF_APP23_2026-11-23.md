@@ -124,3 +124,33 @@ The narrower evidence interval is a hypothesis about the replay harness's over-f
 - Compile checks: `45255870246` (first filter patch) and `45255915278` (final filter + audit-reason patch) were both observed in progress at last poll.
 - Early log download attempts for the new replay jobs returned BlobNotFound while jobs were still running; no result is inferred from that.
 - Next gate: wait for the current jobs to complete, then inspect each job's basal audit line and verify that accepted candidates and eligible hours are nonzero in at least some eligible days, without relaxing the meal/COB or hypo/insulin safeguards.
+
+
+## Update at 2026-11-23 22:54 CET — APP23 corrected rerun completed
+
+### Execution verification
+- Run: `45261150404`
+- Run URL: https://github.com/Eretikstas/Apex/actions/runs/45261150404
+- Tested commit: `de50ec7a31ff446fa8930b4898bbfedfab168936`
+- Plan job: success.
+- Replay matrix: all 24/24 jobs completed with conclusion `success`.
+- Each replay log reports 16,128 or 24,192 ticks, 0 failed ticks, and 0 sensor-gap ticks intentionally skipped.
+- 24 encrypted result artifacts uploaded (one per batch row); artifact names `aimi-replay-result-0` through `aimi-replay-result-23`. Artifacts are present and not expired at inspection.
+- Compile check for the preceding ISF audit fix: run `45259513694`, conclusion `success`.
+
+### Findings from the completed logs
+- **ISF:** every inspected replay job reports 0 accepted candidates and gate FAIL. Rejections are dominated by hypo-rebound and meal windows, with prior-insulin also present. In some jobs the displayed ISF value moves 162 → 180 despite 0 accepted ISF candidates; do not attribute this change to successful ISF learning without tracing the value writer.
+- **CR:** all three blocks in inspected jobs report 0 accepted candidates; values remain 1.00/1.00/1.00. Main rejection reasons remain prior-insulin and prior-hypo-rebound; occasional post-meal SMB rejection is also logged.
+- **Basal:** the previous blanket 0/3960 result is no longer universal after the evidence-window correction. Acceptance varies by scenario/seed from 0 to a small number (examples include 1–6/3960); eligible-hour coverage remains below threshold in most inspected rows. A small minority of replay rows reaches gate PASS, but the estimator is still generally starved of eligible evidence. This is a partial improvement in harness behavior, not evidence of safe or useful basal adaptation.
+- **Percentage card:** both `pct-` and `pct+` events execute. Example final states include 100% after balanced counts and 90% after more downward than upward events (e.g. 5 down / 4 up). Continue auditing transition order, hysteresis and persistence; counts alone do not establish a stable or beneficial learner.
+- **LAPROTECT:** inspected daily audits generally show gate OPEN. The protected-low count is lower than all-cause lows because rows in the 180-minute post-hypo interval are excluded. Keep this separate from the all-cause safety interlock; no safety threshold is relaxed by this run.
+- **Clinical aggregate metrics (TIR, CV, time <3.9/<3.0/>10, hypo-treatment grams):** not reported. The artifacts contain encrypted `result.enc` payloads and the available GitHub connection exposes metadata but no supported binary retrieval/decryption path. No decryption key was printed or exposed.
+
+### Decision
+- Infrastructure/replay execution: PASS.
+- Algorithmic readiness: FAIL / NOT DEMONSTRATED.
+- ISF and CR learning are effectively blocked by current eligibility filters in the inspected logs.
+- Basal evidence availability improved but remains inadequate in most rows.
+- Percentage-card transitions need a dedicated stability/safety audit.
+- Do not integrate, deploy, or copy these changes to `autoisf-atc3`, the child's phone, pump, or live profile.
+- Next laboratory-only work: trace the ISF 162→180 write path; instrument per-row ISF/CR exclusion timing; inspect basal accepted-hour coverage and LBTAIL eligibility across all 24 jobs; add a deterministic percentage-card transition ledger and assertions; then rerun the same 24-row batch. Obtain clinical aggregate metrics only through a permitted artifact-access path.
