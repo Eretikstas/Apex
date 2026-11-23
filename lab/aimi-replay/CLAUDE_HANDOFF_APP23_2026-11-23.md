@@ -209,3 +209,16 @@ Changes:
 - CR remains at zero accepted episodes in inspected scenarios. Do not loosen its prior-insulin or prior-hypo exclusions without a separate causal analysis.
 - Percentage down/up oscillation remains unresolved; no arbitrary cooldown or relaxation has been added yet.
 - All work remains confined to `aimi-replay`; no production branch, installed app, live profile, pump or Nightscout changes.
+
+
+## Follow-up — percentage restoration hysteresis (2026-11-23)
+
+- Commit: `377f75facf2cefdac28bbc99a6b025a9db4d5306` on `aimi-replay`.
+- APP23 evidence: several 56/84-day replay scenarios issued multiple percentage decreases and restorations in the same run (e.g. 6 decreases / 4 restores; another 6 / 5). The old rule restored 10 percentage points after only one qualifying 3-day low-rate window, allowing a rapid reversal of the preceding decrease.
+- Change: percentage restoration now requires two consecutive eligible learner checks with eligible low rate <=2%, no LAPROTECT insulin-increase block, and pctBack enabled. Checks are separated by the existing LAGAP (default 3 days), so the earliest restoration is after at least 6 days of sustained evidence. The streak resets after a decrease, a failed qualifying window, or a restoration; each +10-point step therefore requires fresh sustained evidence.
+- Added pure helper assertions for first-check rejection, second-check acceptance, protection block, low-rate threshold and 100% ceiling.
+- Compile + helper-test workflow triggered for this exact source commit: run 45272107823; in progress at report time.
+- The preceding compile run 45271884135 targets the earlier ISF-only commit and is not the final validation for this combined source state.
+- APP23 run 45270000264: 23/24 replay jobs complete successfully; scenario 22 remains in progress. No completed replay failures.
+- Neither change is clinically validated. The next required sequence is: compile + helper tests for commit 377f75f, then a fresh full 24-scenario replay; compare ISF accepted counts and percentage event counts. CR remains unlearned (zero accepted in inspected scenarios) and its exclusions remain unchanged.
+- All changes remain on `aimi-replay`; production branch, installed app, live profile and pump are untouched.
