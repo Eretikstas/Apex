@@ -86,6 +86,7 @@ File supplied: `aaps-4.1-custom-261015-1156.apk`
 - Ten DEX files; native libraries for arm64-v8a, armeabi-v7a, x86 and x86_64.
 - Embedded Android Gradle Plugin metadata: 9.4.1.
 - `META-INF/version-control-info.textproto` says `NO_VALID_GIT_FOUND`; the APK cannot be tied to a repository commit from this metadata.
+- A raw byte scan of all ten DEX files found no literal `AIMI` or `openAPSAIMI` marker. This is not proof that AIMI is absent (obfuscation/build variants can hide names), but it is another reason not to assume this APK contains the current AIMI branch.
 - No JAR-style `.RSA/.DSA/.EC/.SF` signature entries were present. APK v2/v3 signing was not verified because `apksigner` was unavailable in the inspection environment.
 
 This was static archive/manifest inspection only. The APK was not installed, executed, or tested against a pump/CGM. No source-to-binary equivalence has been established.
