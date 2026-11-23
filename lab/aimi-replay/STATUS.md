@@ -142,6 +142,22 @@ Required before batch: Claude to review these points, correct/approve the audit 
 - Fixed by separating `px` and `py` declarations on separate lines. Commit: `faa3c7cf5498059a810bebf24020188cd00b659f`.
 - Compile-only should be rechecked on this commit. No replay batch was run. Audit-semantic findings above remain open and require Claude review; a passing compile alone does not close them.
 
+
+### 2026-11-23, audit gate and reason-priority corrections
+
+Commits on `aimi-replay`:
+- `7ea198b818faff1584bd1cc937a3f38ce0a4eb92` — explicit per-hour Basal eligibility and candidate accounting.
+- `2ae8f59079da1ab32358a867c555248addc00556` — sensor-gap reason priority for CR, ISF and classic Basal.
+
+Changes are confined to replay test audit/reporting logic:
+1. Advanced Basal now reports per-hour sample counts, actual thresholds (including LBMIN/LBTAIL), eligible hours and estimated/fill hours. The audit PASS is no longer based on an aggregate accepted-window count.
+2. Classic Basal now reports per-hour eligibility against its actual three-sample threshold.
+3. Both Basal paths scan candidate windows before applying the distinct-day gate; otherwise-clean windows are explicitly rejected as `insufficient-days`. Classic learner still returns before changing its profile when the day gate fails.
+4. ISF's insufficient-window path now pre-counts correction candidates and reports them as rejected by the pre-scan gate, rather than claiming zero candidates.
+5. CR retains the full time-indexed rows separately from BG-valid rows and checks the complete six-hour window for `sensorGap` before the short-window test. ISF and classic Basal prioritize sensor-gap over generic missing-BG when both apply.
+
+No learner formula, clinical parameter, live profile, pump or Nightscout setting was changed. No replay batch was started. Compile-only run `45093582395` was queued for commit `2ae8f59079da1ab32358a867c555248addc00556`; confirm its result before treating this audit pass as compile-validated. Claude review remains required before any replay batch.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
