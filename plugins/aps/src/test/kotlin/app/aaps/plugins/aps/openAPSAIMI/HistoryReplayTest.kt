@@ -158,6 +158,9 @@ class HistoryReplayTest {
         return (k - 36 until k).any { bg[it] < 70.0 } || (k until k + 36).any { bg[it] < 70.0 }
     }
 
+    private fun hasRecentHypoEvidence(bg: Double, hypoCarbs: Double): Boolean =
+        hypoCarbs > 0.0 || (bg.isFinite() && bg < 70.0)
+
     private data class SyntheticStressTokens(
         val outlierDay: Int? = null,
         val outlierMultiplier: Double = 1.0,
@@ -244,6 +247,10 @@ class HistoryReplayTest {
         isfBg[14] = 120.0; isfBg[50] = 65.0; assertEquals(true, isfHasLowInCausalWindow(isfBg, 50))
         isfBg[50] = 120.0; isfBg[86] = 65.0; assertEquals(false, isfHasLowInCausalWindow(isfBg, 50))
         assertThrows(IllegalArgumentException::class.java) { isfHasLowInCausalWindow(isfBg, 20) }
+        assertEquals(true, hasRecentHypoEvidence(65.0, 0.0))
+        assertEquals(true, hasRecentHypoEvidence(110.0, 15.0))
+        assertEquals(false, hasRecentHypoEvidence(110.0, 0.0))
+        assertEquals(false, hasRecentHypoEvidence(Double.NaN, 0.0))
 
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "fasting")))
         assertEquals(true, isPercentageLearningRow(JSONObject().put("bg", 65.0).put("hypoCause", "meal_bolus")))
@@ -1541,7 +1548,7 @@ class HistoryReplayTest {
                     if (causalFilter && allWindow.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
                     val priorRows = if (causalFilter) allRows else rows
                     if (priorRows.any { it.getLong("t") in (tm - 120 * minute) until tm &&
-                        (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) { reject("prior-hypo-rebound"); continue }
+                        hasRecentHypoEvidence(it.optDouble("bg", Double.NaN), it.optDouble("hypo", 0.0)) }) { reject("prior-hypo-rebound"); continue }
                     if (causalFilter && allRows.any { it.getLong("t") in (tm - 120 * minute) until tm &&
                         (it.optDouble("units", 0.0) > 0.0 || it.optDouble("man", 0.0) > 0.0) }) { reject("prior-insulin"); continue }
                     // Later boluses invalidate only the first 2 h, not the entire 6 h meal tail.
