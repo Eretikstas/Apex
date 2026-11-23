@@ -23,3 +23,22 @@
 
 ## Next technical gate
 A repository owner must re-enable the disabled workflow once in GitHub Actions. After that, the prepared launcher can be manually dispatched. Then inspect the actual `workflow_dispatch` run, all jobs/logs/artifacts, and report the 24 scenarios across their seeds. Until a completed run and its artifacts are observed, there are no APP23 performance conclusions.
+
+
+## Update at 2026-11-23 12:37 CET — push-trigger fallback
+To avoid requiring the repository owner to re-enable the manually disabled `run-app23.yml`, a separate one-time push-triggered reusable-workflow caller was added:
+- `.github/workflows/app23-auto.yml`
+- Trigger: push to `aimi-replay`, restricted to changes of this exact workflow file.
+- It calls the existing `aimi-replay.yml` reusable workflow with `learn=true`, `pretrained=false`, `sim=false`, `algo=aimi`, and the prepared batch.
+- Latest corrected commit: `6237bffa30331ffe45d08644e976d7b9f2567970`.
+
+### Batch validation correction
+An initial manually reconstructed version accidentally contained only 21 rows; one intermediate correction also remained at 21 rows. These were superseded by the latest commit, which embeds the canonical `lab/aimi-replay/app23_batch.txt` verbatim.
+Latest batch validation:
+- exactly 24 rows;
+- all required flags present in every row: `LEARNALL, LAISF, LACR, LACAUSE, LAPCTBACK, LADAYS, LAPROTECT, LEARNB5`;
+- expected 8 scenarios × 3 seeds.
+Earlier push-triggered runs, if GitHub accepted them, may have used incomplete 21-row versions. Do not use those results. Only evaluate a run tied to commit `6237bffa30331ffe45d08644e976d7b9f2567970` or later.
+
+### Run visibility limitation
+The connected GitHub workflow-run listing wrapper filters to pull-request-triggered runs, so it returned no runs for this push-triggered commit. A GET-only fetch is also not exposing the Actions run collection in this connector. Thus execution has been configured to trigger on push, but a matching run ID/status and its artifacts are not yet independently confirmed from this connection. Do not claim completion until the run tied to the latest commit is verified in GitHub Actions.
