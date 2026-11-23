@@ -339,3 +339,40 @@ Compile check: green (45096342199, 45096199938). Lab run **45099362646** (code 7
 - pairs on base seed 1: `MEALX_1.3,CHGISF_0.8`; `MEALX_1.3,DAYNEED_1.2`; `CHGISF_0.8,DAYNEED_1.2`.
 Results will be written here when the user asks ("результаты"). ChatGPT's rights were widened today: see
 COORDINATION.md, part "What ChatGPT may do on its own".
+
+### 2026-11-23, results of run 45099362646 (code 7f34c90ae0) — CAUSAL is NOT safe yet
+
+2nd half of 56 days, sensor values, mean of seeds; columns: % <70 / % <54 / % >180 / CV / hypo g per day / TDD.
+5 jobs failed at build (re-run started): ins-20 APP, start+30 CAUSAL s3, growth2% CAUSAL s1, meals+day PAIR, calm CAUSAL s1.
+
+| scenario | APP (seed 1) | CAUSAL (seeds 1-3) |
+|---|---|---|
+| base | 2.7 / 0.0 / 8.2 / 28.4 / 27.6 / 14.8 | 2.6 / 0.0 / 5.9 / 26.8 / 27.4 / 14.6 |
+| calm | 1.1 / 0.0 / 3.1 / 23.8 / 14.0 / 14.1 | 1.0 / 0.0 / 2.5 / 22.8 / 12.1 / 13.8 |
+| dawn1.3 | 2.6 / 0.0 / 8.6 / 29.1 / 26.9 / 15.2 | 3.2 / 0.0 / 5.4 / 27.6 / 33.6 / 15.4 |
+| meals1.3 | 2.9 / 0.0 / 11.1 / 30.8 / 27.6 / 15.9 | 3.1 / 0.1 / 7.4 / 28.8 / 33.6 / 15.9 |
+| growth2% | 2.3 / 0.0 / 9.3 / 28.4 / 24.5 / 16.9 | 1.8 / 0.0 / 8.9 / 27.7 / 19.5 / 17.1 |
+| ins-20 | (failed, re-run) | 2.2 / 0.0 / 8.1 / 28.4 / 23.3 / 18.1 |
+| **ins+20** | 3.4 / 0.0 / 6.7 / 28.6 / 31.0 / 12.1 | **5.4 / 0.1 / 2.1 / 26.8 / 53.5 / 13.2** |
+| **start+30** | 3.1 / 0.0 / 8.0 / 28.8 / 29.3 / 15.0 | **5.6 / 0.1 / 3.9 / 28.4 / 52.5 / 15.8** |
+
+Card decisions of CAUSAL (all seeds): **CR never changed (1.00/1.00/1.00), ISF never changed, percentage never left
+100 %.** Only basal and dura acted; dura climbed to its maximum 2.0 in most runs. Log line example (ins+20):
+`lows3 2.7 % eligible lows 0.0 %` — almost no low counts as fasting/meal_bolus, so the percentage protection never
+fires, while dura keeps adding insulin. Result: where insulin is stronger (ins+20, start+30) lows nearly double and
+hypo carbs go from ~30 to ~53 g/day. Fewer highs everywhere, but bought with lows. **Fail of the pass criterion.**
+
+Required before the next run (ChatGPT, report-first, then code):
+1. **Hypo protection must not be filtered away.** Percentage down: count all lows except sensor artifacts (false low,
+   sensor gap, first day of a sensor) and rebound lows within 3 h after hypo treatment. SMB lows DO count here (the
+   loop gave too much). The causal filter decides which card is to BLAME (CR/ISF/basal), not whether to protect.
+2. **No card may add insulin while lows are high:** any "more insulin" decision (dura up, basal up, CR stronger, ISF
+   weaker, weight up) is blocked when all-cause lows (same exclusions as 1) over the last 3 days are > 3 %.
+3. **Dura down** must use the same all-cause lows (now it saw almost none and only went up).
+4. **CR and ISF got no data at all.** Print the audit counts per check (candidates / accepted / rejected by reason)
+   in the "learner ALL" line or a separate line — I could not find audit lines in the log of this commit. We need to
+   see WHY (six-hour SMB rule? mealBolus missing? days gate?) before any change to the rule.
+5. **Pair check found a spec error:** `CHGISF_x` acts only from the day given by `CHG_<day>` (the ladder uses
+   `CHG_28,CHGISF_0.8` for ins-20, `CHG_28,CHGISF_1.2` for ins+20). Without `CHG_` it does nothing:
+   `MEALX_1.3,CHGISF_0.8` gave exactly the meals1.3 numbers. Redo the pairs with `CHG_28`.
+6. No-token check: APP seed 1 here vs run 45070147879 — I will compare when the re-run ends; numbers look in range.
