@@ -172,7 +172,7 @@ jobs:
           output = work / "out.json.gz"
           log_path = work / "gradle.log"
           prefs = os.environ.get("AIMI_REPLAY_PREFS", "").strip()
-          match = re.search(r"(?:^|\s)SYNTH_([0-9]+)(?:\s|$)", prefs)
+          match = re.search(r"(?:^|[,\s])SYNTH_([0-9]+)(?:[,\s]|$)", prefs)
           if not match:
               raise SystemExit("SYNTH_ day count is missing from prefs")
           total_days = int(match.group(1))
@@ -219,19 +219,34 @@ jobs:
               if isinstance(row.get("hypo", 0.0), (int, float))
               and math.isfinite(float(row.get("hypo", 0.0)))
           )
+          # Rows are sampled at a regular cadence, but GAP scenarios may omit ticks.
+          # Infer the normal row interval from short positive timestamp deltas.
+          timestamps = sorted({row["t"] for row in selected})
+          step_deltas = [
+              (right - left) / 60_000.0
+              for left, right in zip(timestamps, timestamps[1:])
+              if 0.0 < (right - left) / 60_000.0 <= 30.0
+          ]
+          if not step_deltas:
+              raise SystemExit("cannot infer synthetic row interval for insulin integration")
+          step_minutes = statistics.median(step_deltas)
+          if not 1.0 <= step_minutes <= 15.0:
+              raise SystemExit(f"unexpected synthetic row interval: {step_minutes:.2f} min")
+
           insulin_units = 0.0
           for row in selected:
               basal_rate = row.get("deliv", 0.0)
               smb = row.get("units", 0.0)
               manual = row.get("man", 0.0)
               if isinstance(basal_rate, (int, float)) and math.isfinite(float(basal_rate)):
-                  insulin_units += float(basal_rate) / 60.0
+                  insulin_units += float(basal_rate) * step_minutes / 60.0
               if isinstance(smb, (int, float)) and math.isfinite(float(smb)):
                   insulin_units += float(smb)
               if isinstance(manual, (int, float)) and math.isfinite(float(manual)):
                   insulin_units += float(manual)
 
-          task_name = " ".join(prefs.split()[:3]) or "synthetic"
+          pref_tokens = [token for token in re.split(r"[,\s]+", prefs) if token]
+          task_name = " ".join(pref_tokens[:3]) or "synthetic"
           table = [
               "| Task | BG <70 (%) | BG <54 (%) | BG >180 (%) | CV (%) | Hypo treatment (g/day) | Daily insulin (U/day) |",
               "|---|---:|---:|---:|---:|---:|---:|",
