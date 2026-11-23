@@ -187,6 +187,7 @@ Source commits:
 - `b40050a4e7591908598e08189332a32d06993493`: sensor-gap/recovery timeline hardening.
 - `8fb7ae73561ec8bc193be34f8d24413d78711dde`: preserve non-causal ISF behavior; expand boundary checks.
 - `037cca0c148eec99b470ee30e0df4a61a8d9b4d5`: avoid stale sensor values during synthetic GAP.
+- `76828a294ba8fa4f0c309cba20d24d3789c5f727`: count intentional no-glucose GAP ticks separately from genuine replay exceptions.
 
 Changes are limited to replay test/audit logic:
 1. ISF now counts correction candidates independently; CR and both Basal paths also assert `candidates = accepted + rejected` using fail-fast guards.
@@ -197,7 +198,7 @@ Changes are limited to replay test/audit logic:
 
 APK static inspection is documented in the linked report. The supplied APK filename says 4.1, but its manifest reports versionName 4.0.0/versionCode 2000; embedded VCS metadata says `NO_VALID_GIT_FOUND`, so source provenance is not established.
 
-Latest source commit: `037cca0c148eec99b470ee30e0df4a61a8d9b4d5`. Compile-only run `45095656854` was in progress when this note was written. Replay workflow was skipped; no replay batch was started.
+Latest source commit: `76828a294ba8fa4f0c309cba20d24d3789c5f727`. Compile-only run `45095656854` for the immediately preceding source commit was still in progress; the run for `76828a2` had not yet appeared in Actions. Replay workflow was skipped; no replay batch was started.
 
 No learner formula, live profile, pump or Nightscout setting was changed. Claude review and replay ownership remain unchanged. Do not proceed to baseline/pair/OUTDAY/GAP batches until Claude approves the outstanding audit semantics and compile validation is complete.
 
