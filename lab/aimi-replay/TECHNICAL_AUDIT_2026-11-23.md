@@ -18,6 +18,7 @@ Source commits:
 - `037cca0c148eec99b470ee30e0df4a61a8d9b4d5` — prevent synthetic family logic from using stale sensor values after a gap.
 - `76828a294ba8fa4f0c309cba20d24d3789c5f727` — count intentional no-glucose GAP ticks separately from genuine replay exceptions.
 - `e3c5e6f9d66a467887d1898ae8c5b1fd72e56524` — exclude outcome-learning episodes that overlap the blackout or its 60-minute recovery window.
+- `70b796b71e1df3925742bf379a4e5f6de7e5e788` — require `LACAUSE` whenever GAP is requested, so blackout/recovery is audited causally.
 
 ### Learning Audit counters
 
@@ -31,7 +32,7 @@ Source commits:
 ### New synthetic scenarios
 
 - `OUTDAY_<day>_<factor>`: day is one-based; factor must be finite and positive. It scales true basal need on that day only. Example high-need outlier: `OUTDAY_4_1.3`; low-need outlier: `OUTDAY_4_0.7`.
-- `GAP_15`, `GAP_30`, `GAP_60`: exactly one token is allowed, and the synthetic dataset must contain at least four days. The blackout starts on day 4 at 02:00 in the synthetic UTC+3 clock.
+- `GAP_15`, `GAP_30`, `GAP_60`: exactly one token is allowed, the synthetic dataset must contain at least four days, and `LACAUSE` is mandatory. The blackout starts on day 4 at 02:00 in the synthetic UTC+3 clock.
 - During GAP, sensor samples are omitted from the sensor history; replay rows omit BG rather than filling or interpolating it. The underlying body/noise simulation continues. The loop receives no glucose status during the blackout. Sensor-dependent hypo treatments and manual corrections are suppressed; meal bolus calculation uses target BG (no unavailable sensor correction) while retaining IOB accounting.
 - The gap and the following 60-minute recovery period are marked as sensor-contaminated for causal audit. This allows CR, ISF, Basal and Dura filters to reject blackout/recovery windows.
 - Reading/noise generation still consumes the same seeded random stream during a blackout; only the sample insertion is omitted.
@@ -96,7 +97,7 @@ This was static archive/manifest inspection only. The APK was not installed, exe
 
 ## Validation status
 
-At report update, latest source commit is `e3c5e6f9d66a467887d1898ae8c5b1fd72e56524`. Compile-only run `45095912758` for the immediately preceding source commit `76828a294ba8fa4f0c309cba20d24d3789c5f727` was in progress; a run for `e3c5e6f` had not yet appeared in the Actions listing. Older intermediate compile runs were also still in progress. The history-replay workflow was skipped; no replay batch ran.
+At report update, latest source commit is `70b796b71e1df3925742bf379a4e5f6de7e5e788`. Compile-only run `45096047502` for the immediately preceding source commit `e3c5e6f9d66a467887d1898ae8c5b1fd72e56524` was in progress; a run for `70b796b` had not yet appeared in the Actions listing. Older intermediate compile runs were also still in progress. The history-replay workflow was skipped; no replay batch ran.
 
 Update this report after the latest compile run finishes. A compile pass validates Kotlin test-source compilation only; it does not validate replay outputs or learning behavior.
 
