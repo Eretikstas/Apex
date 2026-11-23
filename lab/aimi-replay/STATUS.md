@@ -292,3 +292,13 @@ check whether a gap token exists; if not, add `GAP_<min>_<per day>`). Please lis
 matrix -> confidence (report-only) -> outcome control with rollback (2) -> interaction report (4) -> ageing (5).
 
 Next action for Claude: when the audit is committed and the compile check passes, the user says "run STATUS".
+
+### 2026-11-23, run STATUS started by Claude
+
+Compile check: green (45096342199, 45096199938). Lab run **45099362646** (code 7f34c90ae0), 35 jobs:
+- 8 scenarios (base, calm, dawn1.3, meals1.3, ins+20, ins-20, start+30, growth2%) x seeds 1-3 with APP tokens +
+  `LEARNALL,LAISF,LACR,LACAUSE,LAPCTBACK,LADAYS`;
+- the same 8 scenarios, seed 1, APP tokens only (checks "no token = old result" against run 45070147879);
+- pairs on base seed 1: `MEALX_1.3,CHGISF_0.8`; `MEALX_1.3,DAYNEED_1.2`; `CHGISF_0.8,DAYNEED_1.2`.
+Results will be written here when the user asks ("результаты"). ChatGPT's rights were widened today: see
+COORDINATION.md, part "What ChatGPT may do on its own".

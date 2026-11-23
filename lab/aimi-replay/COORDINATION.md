@@ -13,6 +13,24 @@ data here (the repository is public).
 | Runs | the compile check only (it runs on push) | the lab batches (`aimi-replay.yml`), the emulator runs, decrypting the results |
 | Port into the app | no | yes, only after the lab check passed and the user agreed |
 
+## What ChatGPT may do on its own (user 23.11), always with a report
+
+ChatGPT may do these WITHOUT waiting for Claude, but after EACH one it writes a short report in `STATUS.md` ("Task"):
+what it did, commit or run id, what Claude should look at.
+- Fix a red compile check; add report-only logging; add new tokens that are OFF by default (no token = old result);
+  update the lab documents; prepare batch strings in `lab/aimi-replay/BATCHES.md`.
+- Start lab batches (`aimi-replay.yml`, input `batch`) ONLY when: every job has `SYNTH_` (the virtual child, never real
+  history); at most 120 jobs per start and at most 2 starts per day; no other `aimi-replay.yml` run is in progress
+  (check the Actions page first); the code is at a green compile commit. Re-run failed jobs of its own runs once.
+- The results are encrypted and ChatGPT cannot read them: after a run ends, the user tells Claude "результаты" (or
+  "run STATUS"), and Claude writes the tables in "Results".
+
+Still needs Claude (and the user) first:
+- any change of what the learner does WITHOUT new tokens, or of a formula the app learner uses;
+- turning on cards that change values in a batch for the first time (e.g. `LAWAPPLY`, `LAROLLBACK`): first a report-only
+  run, then Claude's review;
+- runs on real history (no `SYNTH_`), anything outside branch `aimi-replay`, anything in the app, settings, Nightscout.
+
 ## How work moves
 
 1. ChatGPT makes a change in `aimi-replay` as small commits with clear messages, then writes in `STATUS.md`, part
