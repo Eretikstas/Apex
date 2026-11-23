@@ -222,3 +222,14 @@ Changes:
 - APP23 run 45270000264: 23/24 replay jobs complete successfully; scenario 22 remains in progress. No completed replay failures.
 - Neither change is clinically validated. The next required sequence is: compile + helper tests for commit 377f75f, then a fresh full 24-scenario replay; compare ISF accepted counts and percentage event counts. CR remains unlearned (zero accepted in inspected scenarios) and its exclusions remain unchanged.
 - All changes remain on `aimi-replay`; production branch, installed app, live profile and pump are untouched.
+
+
+## APP23 run 45270000264 — final completion
+
+- All 24/24 replay jobs completed successfully; 0 replay-job failures. Plan job also succeeded.
+- Basal audit: every inspected scenario had a nonzero accepted count and `gate=PASS`; accepted rows varied substantially by scenario. This is a data-eligibility audit only, not proof of correct basal estimates or clinical benefit.
+- ISF audit: still 0 accepted candidates in all inspected scenarios, including final scenario 22. Rejections in scenario 22 were dominated by meal-window (90–115 per scan), then hypo-rebound and prior-insulin. The first ISF window correction is not yet evaluated in a full replay because APP23 run 45270000264 used the pre-correction commit.
+- CR audit: 0 accepted meal blocks in the inspected scenarios; prior-insulin and prior-hypo-rebound remain dominant.
+- Percentage card continues to produce multiple decreases/restorations within some runs (scenario 22: 4 decreases, 2 restores, final 80%). The two-consecutive-window restoration hysteresis is intended to reduce immediate reversals; it is not yet tested.
+- The encrypted artifacts do not provide accessible clinical metrics in the current workflow surface. No TIR/CV/hypoglycemia efficacy conclusion is possible.
+- Next validation target is compile/helper tests for commit `377f75facf2cefdac28bbc99a6b025a9db4d5306`, then a new 24-case replay against that exact commit. Do not reuse APP23 metrics as validation of the newer code.
