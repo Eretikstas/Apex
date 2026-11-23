@@ -337,3 +337,16 @@ Counts below are sums of daily audit scans from all 24 replay-job logs. Candidat
 - Direct run: https://github.com/Eretikstas/Apex/actions/runs/45278182666
 - Corrected compile/helper run: https://github.com/Eretikstas/Apex/actions/runs/45273029777
 - No changes to `autoisf-atc3`; no deployment, install, pump/profile mutation, or Nightscout write access.
+
+
+### Detailed rejection precedence totals for corrected APP23
+
+Summed from all 24 job logs. Each candidate is assigned the first matching rejection reason in the current `when` chain; rolling windows overlap, so these are scan-event totals.
+
+- ISF (50,719 rejected): meal 34,909; low-in-response-window 8,510; prior-insulin 7,293; overlapping-bolus 7. Accepted 0.
+- CR (16,639 rejected): prior-insulin 11,532; prior-hypo-rebound 4,328; post-meal SMB within 2 h 642; ambiguous-low 62; post-meal manual correction within 2 h 61; missing meal bolus 14. Accepted 12 but no block passed its sample/day gate.
+- Basal (2,022,220 rejected): not-hour-boundary 1,081,985; hypo-rebound 869,106; meal-window 65,055; meal-in-window 5,765; BG out of range 309. Accepted 27,392.
+
+The dominant ISF cause is now the 3 h pre / 2 h post meal window, not the prior-insulin rule. The next investigation should test whether that interval is correctly anchored to the correction event and whether it treats any meal-row marker as active for the whole causal interval. Do not shorten it until candidate-level timelines confirm the correction is no longer affected by meal absorption.
+
+For CR, prior-insulin remains the dominant rejection. Candidate-level review must distinguish SMB/manual insulin in the preceding 2 h from background basal delivery and from the meal's own bolus; only the first two may be contamination, while the meal bolus is the event whose response is being measured.
