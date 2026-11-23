@@ -97,7 +97,7 @@ This was static archive/manifest inspection only. The APK was not installed, exe
 
 ## Validation status
 
-At report update, latest source commit is `70b796b71e1df3925742bf379a4e5f6de7e5e788`. Compile-only run `45096047502` for the immediately preceding source commit `e3c5e6f9d66a467887d1898ae8c5b1fd72e56524` was in progress; a run for `70b796b` had not yet appeared in the Actions listing. Older intermediate compile runs were also still in progress. The history-replay workflow was skipped; no replay batch ran.
+At report update, latest source commit is `70b796b71e1df3925742bf379a4e5f6de7e5e788`; its compile-only run `45096199938` is in progress. Compile-only runs `45095912758` (source `76828a2`) and `45096047502` (source `e3c5e6f`) are also in progress. Earlier source commits `3e7792f`, `b40050a`, `8fb7ae7`, and `037cca0` have compile-only success. The history-replay workflow remains skipped; no replay batch ran. The history-replay workflow was skipped; no replay batch ran.
 
 Update this report after the latest compile run finishes. A compile pass validates Kotlin test-source compilation only; it does not validate replay outputs or learning behavior.
 
