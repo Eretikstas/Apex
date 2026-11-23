@@ -247,8 +247,7 @@ class HistoryReplayTest {
         else emptyList()
         fun movedTime(t: Long): Long = movedBoluses.firstOrNull { it.first == t }?.second ?: t
         history.boluses.replaceAll { b -> if (b.type != BS.Type.SMB && movedBoluses.any { it.first == b.timestamp }) b.copy(timestamp = movedTime(b.timestamp)) else b }
-        history.boluses.sortBy { it.timestamp }
-        val chain = Chain(
+        history.boluses.sortBy { it.timestamp }        val chain = Chain(
             startMs = startMs,
             manual = bolusRows.filter { !it.getBoolean(2) }.map { Pair(movedTime(it.getLong(0)), it.getDouble(1)) }.toMutableList(),
             realBefore = bolusRows.filter { it.getBoolean(2) && it.getLong(0) < startMs }.map { Pair(it.getLong(0), it.getDouble(1)) },
@@ -497,8 +496,7 @@ class HistoryReplayTest {
                         .put("react", harness.engine.unifiedReactivityLearner.getCombinedFactor(Instant.ofEpochMilli(now).atZone(ZoneOffset.ofHours(3)).hour)))
                 }
                 row.put("iob", chained.iobArray[0].iob)
-                    .put("errors", (rt.consoleError ?: emptyList<String>()).joinToString(" | ").take(400))
-                    .put("pkpd", (rt.consoleLog ?: emptyList<String>()).filter { it.contains("PKPD") || it.contains("DIA (learned)") || it.contains("ISF") || it.contains("asal") }.joinToString(" | ").take(900))
+                    .put("errors", (rt.consoleError ?: emptyList<String>()).joinToString(" | ").take(400))                    .put("pkpd", (rt.consoleLog ?: emptyList<String>()).filter { it.contains("PKPD") || it.contains("DIA (learned)") || it.contains("ISF") || it.contains("asal") }.joinToString(" | ").take(900))
                 // Full AIMI log for some ticks with a high temp at a normal glucose: to see which part set it.
                 val basalNow = tick.getJSONObject("prof").getDouble("basal")
                 if (traceLeft > 0 && algo == "aimi" && (rt.rate ?: 0.0) > basalNow * 1.5 && (gsSim?.glucose ?: 999.0) < 125.0 && i % 7 == 0) {
@@ -747,8 +745,7 @@ class HistoryReplayTest {
         // 6 mg/dL per 5 min in two loop cycles in a row - instead of a glucose level.
         val splitAbs = prefsText.contains("SPLITABS")
         var lastDev = 0.0; var devStreak = 0
-        val splits = ArrayList<Split>(); var nSplit = 0; var nSplitGiven = 0; var nSplitDrop = 0
-        var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
+        val splits = ArrayList<Split>(); var nSplit = 0; var nSplitGiven = 0; var nSplitDrop = 0        var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
         // CHAIN_<pct>: a meal within 3 h after a hypo treatment gets only <pct> % of its meal part now (default 50); the rest
         // waits as a split part (seen rise, from SPLITMIN, dropped after 120 min). Breaks "low -> meal bolus -> low".
         val chainP = tok("CHAIN", 0.0) / 100.0; var nChain = 0
@@ -997,8 +994,7 @@ class HistoryReplayTest {
                 val tm = m.getLong("t")
                 val w = rows.filter { it.getLong("t") in tm..(tm + 240 * minute) }
                 if (w.any { it.getDouble("bg") < 70.2 }) lows++
-                else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
-            }
+                else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++            }
             val hf = highs.toDouble() / meals.size; val lf = lows.toDouble() / meals.size
             val old = icNow
             if (lf >= 0.25) icNow = minOf(icNow * 1.07, icP * 1.25)
@@ -1133,7 +1129,10 @@ class HistoryReplayTest {
         fun isfSeen(): Pair<Double, Int>? {
             val n = out.length(); val w = minOf(n, 7 * 288); val s0 = n - w
             val rows = (s0 until n).map { out.getJSONObject(it) }
-            if (rows.size < 7 * 288 / 2 || (require3Days && !enoughDays(rows))) return null
+            if (rows.size < 7 * 288 / 2 || (require3Days && !enoughDays(rows))) {
+                println("AIMI audit ISF: candidates=0 accepted=0 rejected=0 days=0 gate=FAIL reason=insufficient-window")
+                return null
+            }
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w); val hr = IntArray(w)
             fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
             for (i in 0 until w) {
@@ -1144,31 +1143,42 @@ class HistoryReplayTest {
                 ins[i] = num(nx, "deliv") * 5 / 60 + num(r, "units") + num(r, "man")
             }
             val act = DoubleArray(w) { k -> var a = 0.0; for (j in 0..minOf(60, k)) a += ins[k - j] * kern5[j]; a }
-            val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); var k = 48
+            val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); val isfRejected = linkedMapOf<String, Int>(); var k = 48
             while (k < w - 36) {
                 // A correction may be a manual bolus or an SMB; the SMB at k is the event being measured.
                 val correction = (rows[k].optBoolean("manualCorrection") || num(rows[k], "units") > 0.0) &&
                     !bg[k].isNaN() && bg[k] > 180.0
-                val clean = (k - 48..k + 36).all { j ->
-                    val r = rows[j]
-                    !bg[j].isNaN() &&
-                        !r.optBoolean("oldCannula") && !r.optBoolean("sensorGap") &&
-                        !r.optBoolean("afterHypo") && num(r, "hypo") <= 0.0 &&
-                        (j == k || (num(r, "man") <= 0.0 && num(r, "units") <= 0.0))
+                if (!correction) { k++; continue }
+                val window = k - 48..k + 36
+                val rejection = when {
+                    window.any { bg[it].isNaN() } -> "missing-bg"
+                    window.any { rows[it].optBoolean("sensorGap") } -> "sensor-gap"
+                    window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
+                    window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
+                    window.any { it != k && (num(rows[it], "man") > 0.0 || num(rows[it], "units") > 0.0) } -> "overlapping-bolus"
+                    window.any { meal[it] > 0.0 } -> "meal"
+                    bg[k] - bg[k - 3] >= 18.0 -> "rising-glucose"
+                    else -> null
                 }
-                val ok = correction && clean && !bg[k + 36].isNaN() &&
-                    !bg[k - 3].isNaN() && bg[k] - bg[k - 3] < 18.0 &&
-                    (k - 48..k + 36).none { meal[it] > 0.0 }
-                if (!ok) { k++; continue }
+                if (rejection != null) {
+                    isfRejected[rejection] = (isfRejected[rejection] ?: 0) + 1
+                    k++; continue
+                }
                 var net = 0.0
                 for (j in k until k + 36) net += act[j] - profBasal[hr[j]] / 12.0
                 if (net >= 0.3) {
                     seen.add((bg[k] - bg[k + 36]) / net)
                     seenDays.add(rowDay(rows[k]))
                     k += 36
-                } else k++
+                } else {
+                    isfRejected["insufficient-net"] = (isfRejected["insufficient-net"] ?: 0) + 1
+                    k++
+                }
             }
-            if (seen.size < 5 || (require3Days && seenDays.size < 3)) return null
+            val isfGate = seen.size >= 5 && (!require3Days || seenDays.size >= 3)
+            val rejectedTotal = isfRejected.values.sum()
+            println("AIMI audit ISF: candidates=${seen.size + rejectedTotal} accepted=${seen.size} rejected=$rejectedTotal reasons=${isfRejected.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${seenDays.size} gate=${if (isfGate) "PASS" else "FAIL"}")
+            if (!isfGate) return null
             return Pair(seen.sorted()[seen.size / 2], seen.size)
         }
         fun crBlockVerdict(): IntArray {
@@ -1181,31 +1191,34 @@ class HistoryReplayTest {
             for (b in 0..2) {
                 var highs = 0; var lows = 0; var used = 0
                 val usedDays = HashSet<Int>()
-                for (m in meals.filter { blockOf(hourOf(it.getLong("t"))) == b }) {
+                val rejected = linkedMapOf<String, Int>()
+                fun reject(reason: String) { rejected[reason] = (rejected[reason] ?: 0) + 1 }
+                val candidates = meals.filter { blockOf(hourOf(it.getLong("t"))) == b }
+                for (m in candidates) {
                     val tm = m.getLong("t")
                     val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
-                    if (window.size < 72 || (causalFilter && window.any {
-                        it.optBoolean("oldCannula") || it.optBoolean("sensorGap") ||
-                            it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow")
-                    })) continue
+                    if (window.size < 72) { reject("short-window"); continue }
+                    if (causalFilter && window.any { it.optBoolean("sensorGap") }) { reject("sensor-gap"); continue }
+                    if (causalFilter && window.any { it.optBoolean("oldCannula") }) { reject("old-cannula"); continue }
+                    if (causalFilter && window.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
                     if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
-                        (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) continue
-                    if (causalFilter && rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) continue
-                    // Any SMB in the complete post-meal observation window invalidates the episode,
-                    // for both low and high outcomes; otherwise highs can bias CR stronger.
-                    if (causalFilter && window.any { it.optDouble("units", 0.0) > 0.0 }) continue
-                    if (causalFilter && !m.optBoolean("mealBolus")) continue
+                        (it.optDouble("hypo", 0.0) > 0.0 || it.optBoolean("afterHypo")) }) { reject("prior-hypo-rebound"); continue }
+                    if (causalFilter && rows.any { it.getLong("t") in (tm - 180 * minute) until tm && it.optBoolean("afterSmb") }) { reject("prior-smb"); continue }
+                    // Any SMB in the complete post-meal observation window invalidates the episode.
+                    if (causalFilter && window.any { it.optDouble("units", 0.0) > 0.0 }) { reject("post-meal-smb-6h"); continue }
+                    if (causalFilter && !m.optBoolean("mealBolus")) { reject("missing-meal-bolus"); continue }
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
-                    // SMB-caused, rebound or ambiguous lows are not evidence against the meal CR.
-                    if (causalFilter && lowRows.any { it.optString("hypoCause") != "meal_bolus" }) continue
-                    if (causalFilter && window.any { it.optDouble("units", 0.0) > 0.0 } && lowRows.isNotEmpty()) continue
+                    if (causalFilter && lowRows.any { it.optString("hypoCause") != "meal_bolus" }) { reject("ambiguous-low"); continue }
                     used++; usedDays.add(rowDay(m))
                     if (lowRows.isNotEmpty()) { lows++; continue }
                     if (window.none { it.getDouble("bg") < 70.2 } &&
                         w4.any { it.getLong("t") >= tm + 120 * minute && it.getDouble("bg") > 180.0 }) highs++
                 }
-                if (used < 5 || (require3Days && usedDays.size < 3)) continue
+                val crGate = used >= 5 && (!require3Days || usedDays.size >= 3)
+                val rejectedTotal = rejected.values.sum()
+                println("AIMI audit CR block=$b: candidates=${candidates.size} accepted=$used rejected=$rejectedTotal reasons=${rejected.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${usedDays.size} gate=${if (crGate) "PASS" else "FAIL"}")
+                if (!crGate) continue
                 val lf = lows.toDouble() / used; val hf = highs.toDouble() / used
                 res[b] = if (lf >= 0.30) 1 else if (hf >= 0.40 && lf <= 0.10) -1 else 0
             }
@@ -1247,8 +1260,7 @@ class HistoryReplayTest {
                         cr.any { it == -1 } -> { val b = cr.indexOfFirst { it == -1 }; crBlock[b] = maxOf(0.75, crBlock[b] / 1.07); card = "cr-$b" }
                         isf != null && isf.first < isfP * 0.90 && lo3 <= 3.0 && isfP > isfStart * 0.75 -> { isfP = maxOf(isfStart * 0.75, isfP / 1.07); card = "isf-" }
                         else -> if (learnDura) { learnDuraCard(day); if (aw.dura != duraBefore) card = "dura" }
-                    }
-                }
+                    }                }
             }
             if (card != "") { laLast = day; laNote(card) }
             println("AIMI replay: learner ALL day $day: lows3 ${"%.1f".format(lo3)} % eligible lows ${"%.1f".format(lo3Eligible)} % isf seen ${isf?.let { "%.0f (n=%d)".format(it.first, it.second) } ?: "-"} profile ${"%.0f".format(isfP)} cr ${cr.joinToString("/")} x${crBlock.joinToString("/") { "%.2f".format(it) }} -> ${if (card == "") "no change" else card}")
@@ -1497,8 +1509,7 @@ class HistoryReplayTest {
                 var guardHold = false
                 if (gs != null) {
                     if (gs.glucose < 75.6) { smbState = false; smbOffAt = t }
-                    else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true
-                    else if (!smbState && t - smbOffAt >= 90 * minute) smbState = true
+                    else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true                    else if (!smbState && t - smbOffAt >= 90 * minute) smbState = true
                     val swing = guardChain && treatTimes.count { t - it <= 240 * minute } >= 2
                     val gwEff = if (swing) minOf(240.0, guardW * 1.5) else guardW
                     if (swing && t - lastTreat < gwEff * minute && t - lastTreat >= guardW * minute) nGuardChain++
@@ -1747,8 +1758,7 @@ class HistoryReplayTest {
 
     /**
      * The body model of the closed loop replay. Glucose = the real glucose + what the extra (or missing)
-     * insulin of the algorithm would have done, with ISF [isf] and the insulin curve peak 35 min / 5 h
-     * (fitted on Eva's fasting periods). Everything else (food, the meal boluses, the day) is in the
+     * insulin of the algorithm would have done, with ISF [isf] and the insulin curve peak 35 min / 5 h     * (fitted on Eva's fasting periods). Everything else (food, the meal boluses, the day) is in the
      * real glucose already. The real hypo treatments ([removed]) are taken out and the model gives its
      * own ([treats], 6 g, carb sensitivity [csf], absorbed in 30 min after 5 min) when glucose is low.
      * No feedback of glucose on the body: a type 1 body has almost none.
@@ -1997,8 +2007,7 @@ class HistoryReplayTest {
     }
 
     private fun aisfInterpolate(x: Double): Double {
-        val px = doubleArrayOf(50.0, 60.0, 80.0, 90.0, 100.0, 110.0, 150.0, 180.0, 200.0)
-        val py = doubleArrayOf(-0.5, -0.5, -0.3, -0.2, 0.0, 0.0, 0.5, 0.7, 0.7)
+        val px = doubleArrayOf(50.0, 60.0, 80.0, 90.0, 100.0, 110.0, 150.0, 180.0, 200.0)        val py = doubleArrayOf(-0.5, -0.5, -0.3, -0.2, 0.0, 0.0, 0.5, 0.7, 0.7)
         val v = when {
             x < px[0] -> py[0] + (py[1] - py[0]) / (px[1] - px[0]) * (x - px[0])
             x > px.last() -> py[7] + (py[8] - py[7]) / (px[8] - px[7]) * (x - px[7])
