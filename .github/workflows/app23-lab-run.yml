@@ -1,4 +1,5 @@
 name: APP23 laboratory replay (one-shot automatic start)
+# Trigger revision: reusable workflow now accepts non-empty prepared batches.
 
 on:
   push:
