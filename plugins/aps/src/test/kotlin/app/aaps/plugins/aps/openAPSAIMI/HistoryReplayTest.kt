@@ -1417,7 +1417,8 @@ class HistoryReplayTest {
             if (day < 7 || day - laLast < laGap) return
             val n = out.length()
             val last3Rows = (maxOf(0, n - 3 * 288) until n).map { out.getJSONObject(it) }
-            if (require3Days && !enoughDays(last3Rows)) return
+            val enoughProtectionDays = !require3Days || enoughDays(last3Rows)
+            val protectionDays = last3Rows.map { rowDay(it) }.distinct().size
             val last3 = last3Rows.filter { it.has("bg") }
             val lo3 = if (last3.isEmpty()) 0.0 else last3.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
             val eligibleLows = if (!causalFilter) last3 else last3.filter {
@@ -1426,14 +1427,20 @@ class HistoryReplayTest {
                     !it.optBoolean("activity") && !it.optBoolean("illness")
             }
             val lo3Eligible = if (last3.isEmpty()) 0.0 else eligibleLows.count { it.getDouble("bg") < 70.0 } * 100.0 / last3.size
+            // Run the read-only CR/ISF audit scans even when the overall three-day gate fails.
+            // Their own gates still prevent proposals; this makes candidate/rejection counts visible.
+            val isf = if (laIsf) isfSeen() else null
+            val cr = if (laCr) crBlockVerdict() else IntArray(3)
+            if (!enoughProtectionDays) {
+                println("AIMI audit LEARNALL day=$day: protectionDays=$protectionDays/3 gate=FAIL reason=insufficient-days")
+                return
+            }
             fun setPct(np: Double) {
                 val f = np / pctNow; pctNow = np
                 for (i in 0 until 24) profBasal[i] = Math.round(profBasal[i] * f * 100) / 100.0
                 isfP /= f; icNow /= f
             }
             var card = ""
-            val isf = if (laIsf) isfSeen() else null
-            val cr = if (laCr) crBlockVerdict() else IntArray(3)
             val duraBefore = aw.dura; val basalBefore = profBasal.copyOf()
             when {
                 // Percentage protection reacts only to lows not explained by SMB or treatment rebound.
