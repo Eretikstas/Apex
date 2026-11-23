@@ -1160,9 +1160,6 @@ class HistoryReplayTest {
                 val reason = when {
                     mn[k] != 0 -> "not-hour-boundary"
                     since[k] < 300 -> "meal-window"
-                    bg[k].isNaN() || bg[k + 12].isNaN() -> "missing-bg"
-                    bg[k] !in 70.0..216.0 -> "bg-out-of-range"
-                    (k until k + 12).any { meal[it] > 0 } -> "meal-in-window"
                     causalFilter && (k - 60 until k + 13).any { !cleanBasalRow(out.getJSONObject(s0 + it)) } -> {
                         val rows = (k - 60 until k + 13).map { out.getJSONObject(s0 + it) }
                         when {
@@ -1176,6 +1173,9 @@ class HistoryReplayTest {
                             else -> "causal-filter"
                         }
                     }
+                    bg[k].isNaN() || bg[k + 12].isNaN() -> "missing-bg"
+                    bg[k] !in 70.0..216.0 -> "bg-out-of-range"
+                    (k until k + 12).any { meal[it] > 0 } -> "meal-in-window"
                     else -> null
                 }
                 if (reason != null) { auditReject(reason); continue }
@@ -1239,8 +1239,8 @@ class HistoryReplayTest {
                 if (!correction) { k++; continue }
                 val window = k - 48..k + 36
                 val rejection = when {
-                    window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("sensorGap") } -> "sensor-gap"
+                    window.any { bg[it].isNaN() } -> "missing-bg"
                     window.any { rows[it].optBoolean("oldCannula") } -> "old-cannula"
                     window.any { rows[it].optBoolean("afterHypo") || num(rows[it], "hypo") > 0.0 } -> "hypo-rebound"
                     window.any { it != k && (num(rows[it], "man") > 0.0 || num(rows[it], "units") > 0.0) } -> "overlapping-bolus"
@@ -1286,9 +1286,9 @@ class HistoryReplayTest {
                 for (m in candidates) {
                     val tm = m.getLong("t")
                     val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
-                    if (window.size < 72) { reject("short-window"); continue }
                     val allWindow = allRows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
                     if (causalFilter && allWindow.any { it.optBoolean("sensorGap") }) { reject("sensor-gap"); continue }
+                    if (window.size < 72) { reject("short-window"); continue }
                     if (causalFilter && window.any { it.optBoolean("oldCannula") }) { reject("old-cannula"); continue }
                     if (causalFilter && window.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
                     if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
