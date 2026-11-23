@@ -858,10 +858,6 @@ class HistoryReplayTest {
             var auditCandidates = 0; var auditAccepted = 0
             val auditDays = HashSet<Int>()
             val enoughWindowDays = !require3Days || distinctDays((s0 until n).map { out.getJSONObject(it) }.takeLast(minOf(w, 7 * 288))) >= 3
-            if (!enoughWindowDays) {
-                if (audit) println("AIMI audit Basal: candidates=0 accepted=0 rejected=0 days=0 gate=FAIL reason=insufficient-days")
-                return needs
-            }
             for (k in 60 until w - 12) {
                 // LEARNB5: hours with a cannula older than 72 h are not used (user rule 19.11).
                 if (audit) auditCandidates++
@@ -888,6 +884,7 @@ class HistoryReplayTest {
                     else -> null
                 }
                 if (reason != null) { auditReject(reason); continue }
+                if (!enoughWindowDays) { auditReject("insufficient-days"); continue }
                 val tail = lbTail && since[k] in 180 until 300 && cob[k] < 0.5 && tailBlockOk[blockOf(hr[k])]
                 if (tail) tailHours[hr[k]] = true
                 var a = 0.0; for (j in k until k + 12) a += act[j]
@@ -897,7 +894,23 @@ class HistoryReplayTest {
             }
             if (audit) {
                 val rejected = auditCounts.values.sum()
-                println("AIMI audit Basal: candidates=$auditCandidates accepted=$auditAccepted rejected=$rejected reasons=${auditCounts.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${auditDays.size} hours=${(0 until 24).count { needs[it].isNotEmpty() }} samplesPerHour=${(0 until 24).filter { needs[it].isNotEmpty() }.joinToString(",") { "$it:${needs[it].size}" }} gate=${if (auditAccepted >= 3 && auditDays.size >= (if (require3Days) 3 else 1)) "PASS" else "FAIL"}")
+                val minN = if (lbMin > 0) lbMin else if (lb5 && !lbFill) 4 else 3
+                val eligibleHours = (0 until 24).count { h ->
+                    needs[h].size >= (if (tailHours[h]) maxOf(minN, lbTailMin) else minN)
+                }
+                val fillRatioPossible = lbFill && (0 until 24).count { h ->
+                    needs[h].size >= (if (tailHours[h]) maxOf(minN, lbTailMin) else minN)
+                } >= 4
+                val estimatedHours = if (fillRatioPossible) 24 - eligibleHours else if (lbFill2) {
+                    (0 until 24).count { h ->
+                        needs[h].size < (if (tailHours[h]) maxOf(minN, lbTailMin) else minN) &&
+                            (1..23).any { d -> needs[(h - d + 24) % 24].size >= minN } &&
+                            (1..23).any { d -> needs[(h + d) % 24].size >= minN }
+                    }
+                } else 0
+                val dayGate = enoughWindowDays && auditDays.size >= (if (require3Days) 3 else 1)
+                val gate = dayGate && (eligibleHours > 0 || estimatedHours > 0)
+                println("AIMI audit Basal: candidates=$auditCandidates accepted=$auditAccepted rejected=$rejected reasons=${auditCounts.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${auditDays.size} eligibleHours=$eligibleHours estimatedHours=$estimatedHours thresholds=min:$minN,tail:${maxOf(minN, lbTailMin)} perHour=${(0 until 24).joinToString(",") { h -> "$h:${needs[h].size}/${if (tailHours[h]) maxOf(minN, lbTailMin) else minN}" }} gate=${if (gate) "PASS" else "FAIL"} reason=${if (!enoughWindowDays) "insufficient-days" else if (eligibleHours == 0 && estimatedHours == 0) "no-hour-meets-threshold" else "none"}")
             }
             return needs
         }
@@ -1123,7 +1136,7 @@ class HistoryReplayTest {
             if (lb2 || lb3 || lb5) { learnBasal2(day); return }
             val n = out.length(); val w = minOf(n, lbDays * 288); val s0 = n - w
             val windowRows = (s0 until n).map { out.getJSONObject(it) }
-            if (require3Days && distinctDays(windowRows.takeLast(minOf(windowRows.size, 7 * 288))) < 3) return
+            val enoughBasalDays = !require3Days || distinctDays(windowRows.takeLast(minOf(windowRows.size, 7 * 288))) >= 3
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w)
             val hr = IntArray(w); val mn = IntArray(w)
             fun num(r: JSONObject, k: String) = r.optDouble(k, 0.0).let { if (it.isNaN()) 0.0 else it }
@@ -1166,13 +1179,18 @@ class HistoryReplayTest {
                     else -> null
                 }
                 if (reason != null) { auditReject(reason); continue }
+                if (!enoughBasalDays) { auditReject("insufficient-days"); continue }
                 var a = 0.0; for (j in k until k + 12) a += act[j]
                 var hy = 0.0; for (j in maxOf(0, k - 6) until k + 12) hy += hypo[j]
                 needs[hr[k]].add(a + (bg[k + 12] - bg[k]) / isfP - hy / icP)
                 auditAccepted++; auditDays.add(rowDay(out.getJSONObject(s0 + k)))
             }
             val rejected = auditCounts.values.sum()
-            println("AIMI audit Basal: candidates=$auditCandidates accepted=$auditAccepted rejected=$rejected reasons=${auditCounts.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${auditDays.size} hours=${(0 until 24).count { needs[it].isNotEmpty() }} samplesPerHour=${(0 until 24).filter { needs[it].isNotEmpty() }.joinToString(",") { "$it:${needs[it].size}" }} gate=${if (auditAccepted >= 3 && auditDays.size >= (if (require3Days) 3 else 1)) "PASS" else "FAIL"}")
+            val eligibleHours = (0 until 24).count { needs[it].size >= 3 }
+            val dayGate = enoughBasalDays && auditDays.size >= (if (require3Days) 3 else 1)
+            val gate = dayGate && eligibleHours > 0
+            println("AIMI audit Basal: candidates=$auditCandidates accepted=$auditAccepted rejected=$rejected reasons=${auditCounts.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${auditDays.size} eligibleHours=$eligibleHours thresholds=min:3 perHour=${(0 until 24).joinToString(",") { h -> "$h:${needs[h].size}/3" }} gate=${if (gate) "PASS" else "FAIL"} reason=${if (!enoughBasalDays) "insufficient-days" else if (eligibleHours == 0) "no-hour-meets-threshold" else "none"}")
+            if (!enoughBasalDays) return
             val sb = StringBuilder(); var changed = 0
             for (h in 0 until 24) {
                 if (needs[h].size < 3) continue
@@ -1192,8 +1210,15 @@ class HistoryReplayTest {
         fun isfSeen(): Pair<Double, Int>? {
             val n = out.length(); val w = minOf(n, 7 * 288); val s0 = n - w
             val rows = (s0 until n).map { out.getJSONObject(it) }
-            if (rows.size < 7 * 288 / 2 || (require3Days && !enoughDays(rows))) {
-                println("AIMI audit ISF: candidates=0 accepted=0 rejected=0 days=0 gate=FAIL reason=insufficient-window")
+            val enoughIsfWindow = rows.size >= 7 * 288 / 2 && (!require3Days || enoughDays(rows))
+            if (!enoughIsfWindow) {
+                val candidates = rows.withIndex().filter { (i, r) ->
+                    i >= 48 && i < rows.size - 36 &&
+                        (r.optBoolean("manualCorrection") || r.optDouble("units", 0.0) > 0.0) &&
+                        r.optDouble("bg", Double.NaN).let { !it.isNaN() && it > 180.0 }
+                }
+                val days = candidates.map { rowDay(it.value) }.distinct().size
+                println("AIMI audit ISF: candidates=${candidates.size} accepted=0 rejected=${candidates.size} reasons=insufficient-window:${candidates.size} days=$days gate=FAIL reason=pre-scan-insufficient-window")
                 return null
             }
             val bg = DoubleArray(w); val ins = DoubleArray(w); val meal = DoubleArray(w); val hypo = DoubleArray(w); val hr = IntArray(w)
@@ -1248,8 +1273,9 @@ class HistoryReplayTest {
             val res = IntArray(3)
             if (out.length() == 0) return res
             val nowT = out.getJSONObject(out.length() - 1).getLong("t")
-            val rows = (maxOf(0, out.length() - 8 * 288) until out.length()).map { out.getJSONObject(it) }
-                .filter { it.getLong("t") >= nowT - 7 * 86_400_000L && it.has("bg") }
+            val allRows = (maxOf(0, out.length() - 8 * 288) until out.length()).map { out.getJSONObject(it) }
+                .filter { it.getLong("t") >= nowT - 7 * 86_400_000L }
+            val rows = allRows.filter { it.has("bg") }
             val meals = rows.filter { it.optDouble("meal", 0.0) >= 13.0 && it.getLong("t") <= nowT - 360 * minute }
             for (b in 0..2) {
                 var highs = 0; var lows = 0; var used = 0
@@ -1261,7 +1287,8 @@ class HistoryReplayTest {
                     val tm = m.getLong("t")
                     val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
                     if (window.size < 72) { reject("short-window"); continue }
-                    if (causalFilter && window.any { it.optBoolean("sensorGap") }) { reject("sensor-gap"); continue }
+                    val allWindow = allRows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
+                    if (causalFilter && allWindow.any { it.optBoolean("sensorGap") }) { reject("sensor-gap"); continue }
                     if (causalFilter && window.any { it.optBoolean("oldCannula") }) { reject("old-cannula"); continue }
                     if (causalFilter && window.any { it.optBoolean("activity") || it.optBoolean("illness") || it.optBoolean("falseLow") }) { reject("activity-illness-false-low"); continue }
                     if (rows.any { it.getLong("t") in (tm - 180 * minute) until tm &&
