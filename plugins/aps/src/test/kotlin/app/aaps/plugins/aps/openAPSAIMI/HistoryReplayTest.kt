@@ -247,7 +247,8 @@ class HistoryReplayTest {
         else emptyList()
         fun movedTime(t: Long): Long = movedBoluses.firstOrNull { it.first == t }?.second ?: t
         history.boluses.replaceAll { b -> if (b.type != BS.Type.SMB && movedBoluses.any { it.first == b.timestamp }) b.copy(timestamp = movedTime(b.timestamp)) else b }
-        history.boluses.sortBy { it.timestamp }        val chain = Chain(
+        history.boluses.sortBy { it.timestamp }
+        val chain = Chain(
             startMs = startMs,
             manual = bolusRows.filter { !it.getBoolean(2) }.map { Pair(movedTime(it.getLong(0)), it.getDouble(1)) }.toMutableList(),
             realBefore = bolusRows.filter { it.getBoolean(2) && it.getLong(0) < startMs }.map { Pair(it.getLong(0), it.getDouble(1)) },
@@ -745,7 +746,8 @@ class HistoryReplayTest {
         // 6 mg/dL per 5 min in two loop cycles in a row - instead of a glucose level.
         val splitAbs = prefsText.contains("SPLITABS")
         var lastDev = 0.0; var devStreak = 0
-        val splits = ArrayList<Split>(); var nSplit = 0; var nSplitGiven = 0; var nSplitDrop = 0        var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
+        val splits = ArrayList<Split>(); var nSplit = 0; var nSplitGiven = 0; var nSplitDrop = 0
+        var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
         // CHAIN_<pct>: a meal within 3 h after a hypo treatment gets only <pct> % of its meal part now (default 50); the rest
         // waits as a split part (seen rise, from SPLITMIN, dropped after 120 min). Breaks "low -> meal bolus -> low".
         val chainP = tok("CHAIN", 0.0) / 100.0; var nChain = 0
@@ -1027,7 +1029,8 @@ class HistoryReplayTest {
                 val tm = m.getLong("t")
                 val w = rows.filter { it.getLong("t") in tm..(tm + 240 * minute) }
                 if (w.any { it.getDouble("bg") < 70.2 }) lows++
-                else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++            }
+                else if (w.filter { it.getLong("t") >= tm + 90 * minute }.any { it.getDouble("bg") > 180.0 }) highs++
+            }
             val hf = highs.toDouble() / meals.size; val lf = lows.toDouble() / meals.size
             val old = icNow
             if (lf >= 0.25) icNow = minOf(icNow * 1.07, icP * 1.25)
@@ -1569,7 +1572,8 @@ class HistoryReplayTest {
                 var guardHold = false
                 if (gs != null) {
                     if (gs.glucose < 75.6) { smbState = false; smbOffAt = t }
-                    else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true                    else if (!smbState && t - smbOffAt >= 90 * minute) smbState = true
+                    else if (gs.glucose > z2On && gs.shortAvgDelta > 1.8) smbState = true
+                    else if (!smbState && t - smbOffAt >= 90 * minute) smbState = true
                     val swing = guardChain && treatTimes.count { t - it <= 240 * minute } >= 2
                     val gwEff = if (swing) minOf(240.0, guardW * 1.5) else guardW
                     if (swing && t - lastTreat < gwEff * minute && t - lastTreat >= guardW * minute) nGuardChain++
@@ -1818,7 +1822,8 @@ class HistoryReplayTest {
 
     /**
      * The body model of the closed loop replay. Glucose = the real glucose + what the extra (or missing)
-     * insulin of the algorithm would have done, with ISF [isf] and the insulin curve peak 35 min / 5 h     * (fitted on Eva's fasting periods). Everything else (food, the meal boluses, the day) is in the
+     * insulin of the algorithm would have done, with ISF [isf] and the insulin curve peak 35 min / 5 h
+     * (fitted on Eva's fasting periods). Everything else (food, the meal boluses, the day) is in the
      * real glucose already. The real hypo treatments ([removed]) are taken out and the model gives its
      * own ([treats], 6 g, carb sensitivity [csf], absorbed in 30 min after 5 min) when glucose is low.
      * No feedback of glucose on the body: a type 1 body has almost none.
