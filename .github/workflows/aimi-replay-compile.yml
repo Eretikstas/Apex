@@ -39,3 +39,9 @@ jobs:
 
       - name: Compile replay test sources only
         run: ./gradlew :plugins:aps:compileFullDebugUnitTestKotlin --console=plain
+
+      - name: Run replay audit helper tests without replay inputs
+        env:
+          AIMI_REPLAY_IN: ''
+          AIMI_REPLAY_OUT: ''
+        run: ./gradlew :plugins:aps:testFullDebugUnitTest --tests 'app.aaps.plugins.aps.openAPSAIMI.HistoryReplayTest' --console=plain
