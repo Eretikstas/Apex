@@ -458,3 +458,9 @@ For CR, prior-insulin remains the dominant rejection. Candidate-level review mus
 - APK static inspection: uploaded `aaps-4.1-custom-261015-1156.apk` is a 143,068,212-byte APK with 10 DEX files. SHA-256: `71a05169498495998d1e63a2edd0b18d824fba5e2b3a0d775f591c4d269c93bb`. `META-INF/version-control-info.textproto` says `NO_VALID_GIT_FOUND`. No `AimiAdaptationStatus` / `AimiAdaptationStatusViewModel` / `aimiAdaptationStatus` identifiers or corresponding adaptation-dashboard labels were found in DEX/resource string scans. This APK is not evidence that the current dashboard patch is present; do not use it for visual validation.
 - Latest compile workflow run `45292186462` was still in progress at inspection: replay helper tests passed; adaptation builder/dashboard tests were running; APSResult wrapper test and FullDebug APK assembly/upload were pending. No success claim is made for this run until its terminal conclusion and all steps are checked.
 - No visual emulator/device E2E has been run. The remaining verification target is a fresh FullDebug APK from the current `aimi-replay` commit, followed by a controlled emulator-only launch and inspection of the nine cards. No APK is installed on a user/child device.
+
+
+### Additional validation status — 2026-11-24
+
+- Run `45292186462` (commit `0eb252bc43289038631afbf31e80196286c27bde`): replay helper tests PASS; adaptation-status builder and dashboard presenter tests PASS; new `DetermineBasalResultTest` status handoff regression test PASS. FullDebug APK assembly is still running in that job.
+- Latest run `45292411458` (commit `9961d72a2fcfdce5e1208924b689c2c748351736`) includes the additional `EventLoopUpdateGui` subscription. Its Gradle compile stage is still running at the time of this note; therefore the final event-listener patch is not yet marked validated. The APK artifact from this latest source revision is also pending.
