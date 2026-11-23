@@ -243,3 +243,24 @@ Changes:
 - Compile + helper tests for this exact commit: run 45272322156 (in progress at time of writing).
 - APP23 run 45270000264 is complete (24/24 success) but predates this ISF correction and cannot validate it. A new full replay must follow a passing compile/test.
 - Percentage restore hysteresis remains part of the same source branch and is included in this compile run.
+
+
+## APP23 public synthetic metrics recovered from workflow summaries
+
+The workflow's `Public synthetic summary` step does expose aggregate-only second-half metrics (not raw rows). These were extracted from all 24 successful jobs in run 45270000264. Values below are means across seeds/scenarios grouped by synthetic duration; they are NOT APP-vs-LEARN paired comparisons.
+
+| Synthetic window | n | BG <70 mg/dL | BG <54 mg/dL | BG >180 mg/dL | Derived TIR 70–180 | CV | Hypo treatment | Insulin |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 56 days | 15 | 2.73% | 0.01% | 7.15% | 90.11% | 28.28% | 29.30 g/day | 15.01 U/day |
+| 84 days | 9 | 2.72% | 0.03% | 10.11% | 87.17% | 29.88% | 27.12 g/day | 15.90 U/day |
+
+Per-job ranges:
+- 56-day group: BG <70 1.1–4.7%; BG <54 0–0.1%; BG >180 1.2–12.7%; CV 22.0–31.4%; hypo treatment 14.25–47.89 g/day; insulin 13.51–16.46 U/day.
+- 84-day group: BG <70 1.8–3.7%; BG <54 0–0.1%; BG >180 5.0–15.6%; CV 28.1–31.0%; hypo treatment 18.19–36.45 g/day; insulin 12.19–18.54 U/day.
+
+Important interpretation:
+- The summary covers only the second half of each synthetic replay (28 days for SYNTH_56; 42 days for SYNTH_84), not the full replay.
+- TIR is derived as 100% - BG<70% - BG>180%; <54% is a subset of <70% and must not be subtracted twice.
+- These aggregates mix different stress profiles (noise, dawn, meal sensitivity, drift, profile/ISF perturbations, etc.). Do not interpret the 56-day and 84-day groups as a controlled duration comparison.
+- There is no paired APP baseline for these exact 24 scenarios in run 45270000264. Therefore these values describe this learner-enabled replay only and cannot establish improvement or regression.
+- ISF and CR accepted counts remain zero in the audited learner. No ISF/CR learned parameter changes should be claimed from the final summaries.
