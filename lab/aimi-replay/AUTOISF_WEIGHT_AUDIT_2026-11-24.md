@@ -125,3 +125,39 @@ Do not derive patient-specific settings or recommend weight changes from these t
 ## Conclusion
 
 This static pass identifies the formulas, preference defaults/ranges, neutral semantics, current test gaps, and one concrete Kotlin/JS branch difference. It does not establish runtime behavior, automation restoration, or clinical safety. Claude should review the source-linked findings and either confirm the JS divergence is intentional or add a parity test. Any formula/default/UI modification remains outside this report and requires separate explicit approval.
+
+
+## Independent second-pass findings — enablement, automation and execution path
+
+### Master enable switch
+
+The master preference `ApsUseAutoIsfWeights` is `false` by default in `core/keys/.../BooleanKey.kt`. The plugin returns `sens / sensitivityRatio` before applying any of the six weight formulas whenever this switch is off. Therefore the effective default state is not merely six neutral weights: the entire weighted AutoISF path is disabled by default. The enable action turns on the master switch only; it does not populate any weights or relax `autoISF_min/max`. With min=max=1.0 and all six weights=0.0, enabling alone still leaves the weight-derived factor neutral.
+
+### Automation scope and validation
+
+The automation implementation exposes enable, disable, set acceleration weight, and set IOB threshold actions, plus triggers for acceleration weight and IOB threshold. It does **not** expose setters/triggers for the other five weights. `ActionSetAcceWeight` clamps deserialized values to 0..1 and its test covers a normal value and an over-maximum JSON value. It has no explicit finite-value check; add NaN and ±Infinity JSON/direct-action tests and verify the preference store cannot retain non-finite values. Existing action tests do not establish scene rollback/restart restoration; that behavior belongs to the scene/state machinery and remains unverified by this audit.
+
+### Actual execution versus JS reference
+
+The production APS plugin constructs `DetermineBasalAutoISF` and passes the six preferences into `OapsProfileAutoIsf`. The JS asset is loaded by the separate `DetermineBasalAdapterAutoISFJS` instrumentation adapter; it is a test/reference execution path, not evidence that production runs both engines. Thus Kotlin/JS parity should be tested explicitly in shared fixtures, but a difference in the JS adapter must first be classified against the active production route rather than assumed to be a live dual-engine defect.
+
+### Newly confirmed risk / design observations
+
+1. **Enable action can give a false impression of activation.** The UI/automation action enables the master boolean, but with defaults `autoISF_min=1`, `autoISF_max=1`, and six weights at zero, the weighted factor remains 1.0. The app should clearly distinguish “enabled” from “has non-neutral configured weights”; do not silently change defaults.
+2. **Range weight semantics need explicit labeling.** The polygon output is a signed delta multiplied by a weight. Zero disables the BG-range effect; 1.0 applies the original polygon; 2.0 doubles it. This is different from a conventional multiplicative factor where 1.0 is neutral.
+3. **The low-BG branch short-circuits PP and Dura.** When `bg_ISF < 1`, Kotlin returns immediately after combining BG and acceleration factors. The PP and Dura formulas are not evaluated for that run. This is mirrored by the JS asset. Add a test proving this is intended, since it means the six factors are not independently additive in all conditions.
+4. **Acceleration weight is not symmetric with braking weight.** The predicted-minimum branch negates the brake weight; the normal branch uses positive brake weight. Tests need all sign/target quadrants and predicted-minimum conditions, not just one acceleration fixture.
+5. **Factor telemetry is intentionally mixed-stage.** `AutoIsfFactors.acceIsf` is documented as the raw acceleration factor before final limits, while `finalIsf` is applied after bounds and activity/temp-target logic. UI graphs must not present the raw factor as the final applied factor.
+6. **Input validation is distributed, not complete at the formula boundary.** Key metadata constrains UI values, and the acceleration automation action clamps values, but the AutoISF formula reads preference doubles directly. There is no local guard in `autoISF()` for every weight being finite and within its declared range. Imported/corrupt values therefore need explicit tests at the algorithm boundary; `AutoIsfFactors.finiteOnly()` protects telemetry serialization, not the factor calculation itself.
+
+### Additional tests requested
+
+- Verify default master switch=false and assert no weighted AutoISF factor path runs.
+- Enable with untouched defaults and assert final factor remains 1.0; distinguish this from active non-neutral configuration.
+- For the `bg_ISF < 1` early-return path, assert PP and Dura are not used; compare with `bg_ISF == 1` and `bg_ISF > 1` paths.
+- Add explicit tests for `autoISF_min == autoISF_max == 1`, each boundary equality, and invalid persisted min/max ordering/non-finite values.
+- Add NaN, +Infinity, -Infinity, negative and above-range values for all six weights through the preference-to-profile-to-formula path; expected behavior must be a safe neutral/abort path, never a non-finite insulin factor.
+- Add parity fixtures for the production Kotlin engine and JS instrumentation adapter for common branches, and document the known activity/resistance modifier difference.
+- Add scene tests that change acceleration weight, restore it on normal end, interruption, and process restart; verify restoration does not accidentally overwrite a newer manual setting.
+
+No source code or clinical preference defaults were changed by this second pass. Findings remain static-review evidence; no Android runtime test or clinical validation is claimed.
