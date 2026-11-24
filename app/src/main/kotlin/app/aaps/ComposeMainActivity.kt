@@ -196,6 +196,7 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 import dagger.hilt.android.AndroidEntryPoint
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -345,8 +346,14 @@ class ComposeMainActivity : AppCompatActivity() {
         setIntent(intent)
         val route = intent.getStringExtra(EXTRA_NAVIGATE_ROUTE) ?: return
         intent.removeExtra(EXTRA_NAVIGATE_ROUTE)
-        navController?.navigate(route) {
-            launchSingleTop = true
+        val controller = navController ?: return
+        lifecycleScope.launch {
+            // The Compose NavHost is installed only after app initialization completes.
+            // Wait for its start destination before navigating to an incoming route.
+            controller.currentBackStackEntryFlow.first()
+            controller.navigate(route) {
+                launchSingleTop = true
+            }
         }
     }
 
@@ -374,6 +381,9 @@ class ComposeMainActivity : AppCompatActivity() {
         LaunchedEffect(navController) {
             val route = composeActivity.intent.getStringExtra(EXTRA_NAVIGATE_ROUTE) ?: return@LaunchedEffect
             composeActivity.intent.removeExtra(EXTRA_NAVIGATE_ROUTE)
+            // AppContent (and therefore NavHost) is composed only after config initialization.
+            // Do not navigate until NavHost has installed its start destination.
+            navController.currentBackStackEntryFlow.first()
             navController.navigate(route) {
                 launchSingleTop = true
             }
