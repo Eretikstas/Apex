@@ -685,3 +685,16 @@ Dispatch only one job: leave `batch` empty, set `prefs` to the exact string abov
 - Trigger: push to `aimi-replay` touching only this workflow, or manual workflow dispatch. The commit itself should trigger the first run; check the Actions run before treating the emulator path as validated.
 - Safety/isolation: no app source edits, no changes to Claude's `autoisf-atc3` or `atc3-driver` branches, no real pump/CGM/Nightscout credentials, and no live profile. Legacy instrumentation source exclusions occur only in the ephemeral Actions checkout, matching the existing ATC3 workflow.
 - Current status: workflow definition committed and read back. Build, emulator boot, instrumentation pass and artifact availability are **not yet confirmed** until the Actions run completes. Claude may adapt the workflow to his UI/card test plan; keep any adaptations on his app branch or a separately reviewed lab workflow.
+
+
+### 2026-11-24 — independent second-pass AutoISF weight audit
+
+Extended `lab/aimi-replay/AUTOISF_WEIGHT_AUDIT_2026-11-24.md` in commit `dd959e6fff60e1ca3f65b826aa4aea621c627bd3`. New findings for Claude:
+- Master `ApsUseAutoIsfWeights` defaults false; enabling alone with all six weights=0 and min=max=1 leaves the weighted factor neutral.
+- Automation supports only enable/disable, acceleration weight, and IOB threshold; other five weights have no automation setters/triggers in the inspected implementation.
+- Scene restore/restart behavior is not established by ActionAutoIsfTest; needs dedicated state/scene tests.
+- Production plugin uses Kotlin `DetermineBasalAutoISF`; JS engine is loaded by a separate instrumentation adapter, so parity should be tested deliberately, not assumed to be dual production execution.
+- Low-BG `bg_ISF < 1` branch returns before PP and Dura calculation; verify this short-circuit is intended.
+- Direct formula boundary has no explicit finite/range guard for every weight; add NaN/Infinity/corrupt-import tests. Telemetry `finiteOnly()` does not protect the insulin-factor calculation.
+
+Read-only static audit only. No app source, formula, preference default, clinical setting, or workflow changed. Claude owns any proposed fixes and must return exact tests/results before modifications are considered.
