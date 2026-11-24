@@ -134,7 +134,7 @@ open class OpenAPSAutoISFPlugin(
     private var consoleLog = mutableListOf<String>()
     val autoIsfVersion = "3.2.1"
     val autoIsfWeights; get() = preferences.get(BooleanKey.ApsUseAutoIsfWeights)
-    private fun readAutoIsfDouble(key: DoubleKey): Double {
+    internal fun readAutoIsfDouble(key: DoubleKey): Double {
         val stored = preferences.get(key)
         val safe = if (stored.isFinite()) stored.coerceIn(key.min, key.max) else key.defaultValue
         if (stored.toBits() != safe.toBits()) {
