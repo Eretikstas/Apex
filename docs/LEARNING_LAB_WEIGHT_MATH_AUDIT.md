@@ -95,3 +95,14 @@ The current tests do not constitute a complete six-weight test matrix. One exist
 - Do not describe UI min/max as recommended values.
 - Use deterministic synthetic traces and record input features, each intermediate factor, final factor, and bypass reason.
 - Keep all experiments disconnected from real pump, CGM, patient profile, and therapy configuration.
+
+## Input-validation finding: non-finite persisted values
+
+A source-path audit found a validation gap that needs a dedicated fix/review before any broader testing:
+
+- The six AutoISF weight getters in `OpenAPSAutoISFPlugin` read `Preferences.get(DoubleKey...)` directly.
+- `PreferencesImpl.get(DoublePreferenceKey)` reads the stored double (or its default in simple mode); it does not check finiteness or the key's min/max.
+- `PreferencesImpl.put(DoubleNonPreferenceKey)` and `putRemote(...)` write the supplied double directly to the key-value store.
+- The Compose `PreferenceDoubleState` setter calls `coerceIn(key.min, key.max)`, but this alone is not a finite-number validator: NaN comparisons do not select either bound, so NaN can pass through that clamp operation.
+
+Therefore UI slider bounds are not sufficient protection against corrupted, imported, or synchronized values. The AutoISF algorithm itself needs a reviewed finite-and-range guard for its six weights (and min/max factors), with a deterministic fallback and regression tests for NaN and both infinities. This lab audit does not change production calculation code; the finding is recorded for a separate, explicit hardening review.
