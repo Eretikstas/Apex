@@ -1,6 +1,5 @@
 package app.aaps.plugins.aps.openAPSAutoISF
 
-import app.aaps.core.data.aps.SMBDefaults
 import app.aaps.core.data.configuration.Constants
 import app.aaps.core.interfaces.bgQualityCheck.BgQualityCheck
 import app.aaps.core.interfaces.constraints.ConstraintsChecker
