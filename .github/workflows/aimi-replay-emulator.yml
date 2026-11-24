@@ -12,6 +12,7 @@ on:
       - 'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAutoISF/**'
       - 'plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAutoISF/**'
       - 'app/src/androidTest/kotlin/app/aaps/e2e/**'
+      - 'app/src/main/kotlin/app/aaps/ComposeMainActivity.kt'
 
 concurrency:
   group: aimi-replay-emulator-${{ github.ref }}
