@@ -676,3 +676,12 @@ Dispatch only one job: leave `batch` empty, set `prefs` to the exact string abov
 - Main findings for Claude: Kotlin `withinISFlimits` has resistance/activity/inactivity branches absent from the bundled JS reference; the algorithm path does not explicitly validate each weight for finite/range values; weight scales/units are implicit; existing tests do not isolate all six weights or the requested branch/boundary/interaction cases; automation restore is not verified by inspected tests.
 - Exact formulas, bypass gates, neutral semantics, risk ranking and proposed one-factor/pair matrix are in the report.
 - Claude owns any app-branch changes and should review the report. No AutoISF formula/default/UI change is proposed or authorized by this audit.
+
+
+### 2026-11-24, isolated GitHub Actions Android emulator smoke workflow
+
+- Added `.github/workflows/aimi-replay-emulator.yml` on `aimi-replay` only (workflow commit `7eea48a0068fd3d1930170c0219c3df5ba71f98e`; instrumentation-result check correction `560069155d18cff0824350adc044f04730b6067d`).
+- It reuses the proven GitHub-hosted KVM + Android Emulator Runner pattern from `atc3-screens.yml`, builds FullDebug and the instrumentation APK, boots an API 31 Pixel 6 emulator, and runs `RingSkinScreensTest` with synthetic in-app glucose/profile data. It uploads screenshots, instrumentation output and reports as a 14-day artifact.
+- Trigger: push to `aimi-replay` touching only this workflow, or manual workflow dispatch. The commit itself should trigger the first run; check the Actions run before treating the emulator path as validated.
+- Safety/isolation: no app source edits, no changes to Claude's `autoisf-atc3` or `atc3-driver` branches, no real pump/CGM/Nightscout credentials, and no live profile. Legacy instrumentation source exclusions occur only in the ephemeral Actions checkout, matching the existing ATC3 workflow.
+- Current status: workflow definition committed and read back. Build, emulator boot, instrumentation pass and artifact availability are **not yet confirmed** until the Actions run completes. Claude may adapt the workflow to his UI/card test plan; keep any adaptations on his app branch or a separately reviewed lab workflow.
