@@ -698,3 +698,20 @@ Extended `lab/aimi-replay/AUTOISF_WEIGHT_AUDIT_2026-11-24.md` in commit `dd959e6
 - Direct formula boundary has no explicit finite/range guard for every weight; add NaN/Infinity/corrupt-import tests. Telemetry `finiteOnly()` does not protect the insulin-factor calculation.
 
 Read-only static audit only. No app source, formula, preference default, clinical setting, or workflow changed. Claude owns any proposed fixes and must return exact tests/results before modifications are considered.
+
+
+### 2026-11-24, AutoISF deterministic test-matrix handoff
+
+Added `lab/aimi-replay/AUTOISF_WEIGHT_TEST_MATRIX_2026-11-24.md` in commit `b9a3d4538ff28a494c5f0c381b698b796b66c28e`.
+
+The report-only matrix specifies:
+- master enable/disable and neutral controls;
+- one-factor tests for all six weights, including branch quadrants and exact threshold boundaries;
+- seven pair/short-circuit interaction groups;
+- min/max boundary and corrupt-limit cases;
+- Kotlin/JS shared-fixture parity with the known activity/resistance divergence explicitly isolated;
+- NaN/Infinity/negative/out-of-range persisted/imported values through the complete preference-to-formula path;
+- automation/scene restore and restart lifecycle cases;
+- telemetry stage-by-stage assertions.
+
+No app-side source or formula was changed. This is a lab-branch test specification only; Claude owns app-side test implementation and must confirm expected invalid-input fallback and Kotlin/JS divergence classification before implementation. No patient-specific weights are recommended.
