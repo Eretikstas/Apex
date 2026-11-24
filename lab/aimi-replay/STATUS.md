@@ -715,3 +715,23 @@ The report-only matrix specifies:
 - telemetry stage-by-stage assertions.
 
 No app-side source or formula was changed. This is a lab-branch test specification only; Claude owns app-side test implementation and must confirm expected invalid-input fallback and Kotlin/JS divergence classification before implementation. No patient-specific weights are recommended.
+
+
+### 2026-11-24, first AutoISF weight boundary tests added (lab branch)
+
+Added `plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAutoISF/AutoIsfWeightBoundaryTest.kt` in commit `a0208af015ec1fa42af78bc3c8c7fe2286d50317` (follow-up import cleanup: `021bf328f11f651451563a3a2dc45b38df0ba570`).
+
+Initial deterministic tests cover:
+- lower- and higher-BG interpolation weights independently scaling their respective sides;
+- zero lower/higher weights producing neutral interpolation;
+- the 100 mg/dL interpolation centre and adjacent values;
+- min/max factor clamp behavior immediately below, at and above each boundary;
+- neutral min=max=1 behavior.
+
+Extended `.github/workflows/aimi-replay-compile.yml` to include the AutoISF test directory and run this test class before the existing replay checks (commit `2a5eaddedcdd41e48b71045df5ecf9d70ebf1697`).
+
+CI run `45298059989` was created by the push and is currently in progress at checkout/JDK setup. No pass/fail result is claimed yet.
+
+**Coverage is intentionally partial:** this first slice directly exercises production interpolation and limit functions. It does not yet isolate acceleration, braking, PP or Dura in the full AutoISF path; it does not test invalid persisted weights or min/max because expected fail-closed behavior and Kotlin/JS divergence classification still require app-owner review. No production formula, default, preference, profile or pump behavior was changed.
+
+Claude handoff: review the tests and confirm the invalid-input fallback contract plus the Kotlin/JS fixture classification before the next test tranche. ChatGPT continues test-only work on `aimi-replay`; no edits to `autoisf-atc3`.
