@@ -512,6 +512,9 @@ fun rememberPreferenceIntState(
 /**
  * Remembers a MutableState for a DoublePreferenceKey backed by Preferences.
  */
+private fun sanitizePreferenceDouble(value: Double, key: DoublePreferenceKey): Double =
+    if (value.isFinite()) value.coerceIn(key.min, key.max) else key.defaultValue
+
 @Composable
 fun rememberPreferenceDoubleState(
     key: DoublePreferenceKey
@@ -602,15 +605,18 @@ internal class PreferenceDoubleState(
 ) : MutableState<Double> {
 
     init {
-        getSharedDoubleState(sharedStates, key.key, preferences.get(key))
+        val storedValue = preferences.get(key)
+        val safeValue = sanitizePreferenceDouble(storedValue, key)
+        getSharedDoubleState(sharedStates, key.key, safeValue)
+        if (storedValue.toBits() != safeValue.toBits()) preferences.put(key, safeValue)
     }
 
     override var value: Double
-        get() = getSharedDoubleState(sharedStates, key.key, preferences.get(key))
+        get() = sanitizePreferenceDouble(getSharedDoubleState(sharedStates, key.key, preferences.get(key)), key)
         set(value) {
-            val clampedValue = value.coerceIn(key.min, key.max)
-            setSharedDoubleState(sharedStates, key.key, clampedValue)
-            preferences.put(key, clampedValue)
+            val safeValue = sanitizePreferenceDouble(value, key)
+            setSharedDoubleState(sharedStates, key.key, safeValue)
+            preferences.put(key, safeValue)
         }
 
     override fun component1(): Double = value
