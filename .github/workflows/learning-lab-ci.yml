@@ -43,6 +43,21 @@ jobs:
       - name: Build Full Debug app
         run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
 
+      - name: Locate Full Debug APK
+        id: apk
+        shell: bash
+        run: |
+          echo "APK files under app/build/outputs:"
+          find "$GITHUB_WORKSPACE/app/build/outputs" -type f -name '*.apk' -print 2>/dev/null || true
+          APK="$(find "$GITHUB_WORKSPACE/app/build/outputs" -type f -name '*.apk' -print -quit 2>/dev/null || true)"
+          if [ -z "$APK" ]; then
+            echo "::error::assembleFullDebug succeeded but no APK was found under app/build/outputs"
+            find "$GITHUB_WORKSPACE/app/build/outputs" -maxdepth 6 -type f -print 2>/dev/null || true
+            exit 1
+          fi
+          echo "apk_path=$APK" >> "$GITHUB_OUTPUT"
+          echo "Selected APK: $APK"
+
       - name: Emulator smoke test
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -53,8 +68,8 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -accel off -memory 2048 -cores 2
           script: |
-            APK="$(find "$GITHUB_WORKSPACE/app/build/outputs/apk/full/debug" -maxdepth 1 -name '*.apk' -print -quit)"
-            test -n "$APK"
+            APK="${{ steps.apk.outputs.apk_path }}"
+            test -f "$APK"
             adb install -r "$APK"
             adb shell monkey -p info.nightscout.androidaps 1
             sleep 45
@@ -90,9 +105,9 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload APK
-        if: ${{ success() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: learning-lab-full-debug-apk
-          path: app/build/outputs/apk/full/debug/*.apk
-          if-no-files-found: error
+          path: app/build/outputs/**/*.apk
+          if-no-files-found: ignore
