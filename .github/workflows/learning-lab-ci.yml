@@ -50,6 +50,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -accel off
           script: |
             APK="$(find app/build/outputs/apk/full/debug -maxdepth 1 -name '*.apk' -print -quit)"
             test -n "$APK"
