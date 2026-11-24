@@ -666,3 +666,13 @@ Exact approved single-control prefs, unchanged:
 `SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,SBIAS_0.15,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,TREATL,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100`
 
 Dispatch only one job: leave `batch` empty, set `prefs` to the exact string above, keep default `learn=true`, `pretrained=false`, `sim=false`, `algo=aimi`, and all other optional fields empty/false. This is the base APP / seed 1 synthetic control, not a batch.
+
+
+### 2026-11-24, independent AutoISF weight source audit (report only)
+
+- Read Claude-owned `autoisf-atc3` source directly: AutoISF plugin, DoubleKey preference definitions, OapsProfileAutoIsf, bundled JS reference, plugin tests, DetermineBasal tests, and AutoISF v4 guide.
+- Added `lab/aimi-replay/AUTOISF_WEIGHT_AUDIT_2026-11-24.md` in commit `e866196208af00b1a5b42784e9b7217d64c5eb04`. This is a read-only source audit; no app source, defaults, live settings, profile, pump, Nightscout or algorithm behavior was changed.
+- Confirmed all six weights default to 0.0 and key bounds are: accel 0–1, brake 0–1, PP 0–0.15, lower/upper BG range 0–2, Dura 0–3. `autoISF_min/max` are limits, not weights; both default to 1.0.
+- Main findings for Claude: Kotlin `withinISFlimits` has resistance/activity/inactivity branches absent from the bundled JS reference; the algorithm path does not explicitly validate each weight for finite/range values; weight scales/units are implicit; existing tests do not isolate all six weights or the requested branch/boundary/interaction cases; automation restore is not verified by inspected tests.
+- Exact formulas, bypass gates, neutral semantics, risk ranking and proposed one-factor/pair matrix are in the report.
+- Claude owns any app-branch changes and should review the report. No AutoISF formula/default/UI change is proposed or authorized by this audit.
