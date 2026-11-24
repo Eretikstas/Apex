@@ -134,14 +134,22 @@ open class OpenAPSAutoISFPlugin(
     private var consoleLog = mutableListOf<String>()
     val autoIsfVersion = "3.2.1"
     val autoIsfWeights; get() = preferences.get(BooleanKey.ApsUseAutoIsfWeights)
-    private val autoISF_max; get() = preferences.get(DoubleKey.ApsAutoIsfMax)
-    private val autoISF_min; get() = preferences.get(DoubleKey.ApsAutoIsfMin)
-    private val bgAccel_ISF_weight; get() = preferences.get(DoubleKey.ApsAutoIsfBgAccelWeight)
-    private val bgBrake_ISF_weight; get() = preferences.get(DoubleKey.ApsAutoIsfBgBrakeWeight)
-    private val pp_ISF_weight; get() = preferences.get(DoubleKey.ApsAutoIsfPpWeight)
-    private val lower_ISFrange_weight; get() = preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)
-    private val higher_ISFrange_weight; get() = preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)
-    private val dura_ISF_weight; get() = preferences.get(DoubleKey.ApsAutoIsfDuraWeight)
+    private fun readAutoIsfDouble(key: DoubleKey): Double {
+        val stored = preferences.get(key)
+        val safe = if (stored.isFinite()) stored.coerceIn(key.min, key.max) else key.defaultValue
+        if (stored.toBits() != safe.toBits()) {
+            consoleError.add("Invalid AutoISF preference ${key.key}=$stored; using bounded value $safe")
+        }
+        return safe
+    }
+    private val autoISF_max; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfMax)
+    private val autoISF_min; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfMin)
+    private val bgAccel_ISF_weight; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfBgAccelWeight)
+    private val bgBrake_ISF_weight; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfBgBrakeWeight)
+    private val pp_ISF_weight; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfPpWeight)
+    private val lower_ISFrange_weight; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfLowBgWeight)
+    private val higher_ISFrange_weight; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfHighBgWeight)
+    private val dura_ISF_weight; get() = readAutoIsfDouble(DoubleKey.ApsAutoIsfDuraWeight)
     private val smb_delivery_ratio; get() = preferences.get(DoubleKey.ApsAutoIsfSmbDeliveryRatio)
     private val smb_delivery_ratio_min; get() = preferences.get(DoubleKey.ApsAutoIsfSmbDeliveryRatioMin)
     private val smb_delivery_ratio_max; get() = preferences.get(DoubleKey.ApsAutoIsfSmbDeliveryRatioMax)
