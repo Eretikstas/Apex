@@ -53,8 +53,8 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
         whenever(preferences.get(BooleanKey.ApsUseAutoIsfWeights)).thenReturn(true)
         whenever(preferences.get(DoubleKey.ApsAutoIsfMin)).thenReturn(0.7)
         whenever(preferences.get(DoubleKey.ApsAutoIsfMax)).thenReturn(1.5)
-        whenever(preferences.get(DoubleKey.ApsAutoIsfBgAccelWeight)).thenReturn(2.0)
-        whenever(preferences.get(DoubleKey.ApsAutoIsfBgBrakeWeight)).thenReturn(4.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfBgAccelWeight)).thenReturn(1.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfBgBrakeWeight)).thenReturn(1.0)
         whenever(iobCobCalculator.ads).thenReturn(mock())
         val calculator = mock<GlucoseStatusCalculatorAutoIsf>()
         whenever(calculator.getGlucoseStatusData(false)).thenReturn(
@@ -148,6 +148,50 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
         assertThat(openAPSAutoISFPlugin.determine_varSMBratio(180, 90.0, "enforced")).isEqualTo(0.6)
         whenever(preferences.get(DoubleKey.ApsAutoIsfSmbDeliveryRatioBgRange)).thenReturn(0.0)
         assertThat(openAPSAutoISFPlugin.determine_varSMBratio(180, 90.0, "enforced")).isEqualTo(0.55)
+    }
+
+    @Test
+    fun `all six AutoISF weights replace NaN and infinities with their defaults`() {
+        val keys = listOf(
+            DoubleKey.ApsAutoIsfBgAccelWeight,
+            DoubleKey.ApsAutoIsfBgBrakeWeight,
+            DoubleKey.ApsAutoIsfLowBgWeight,
+            DoubleKey.ApsAutoIsfHighBgWeight,
+            DoubleKey.ApsAutoIsfPpWeight,
+            DoubleKey.ApsAutoIsfDuraWeight
+        )
+        keys.forEach { key ->
+            listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY).forEach { invalid ->
+                whenever(preferences.get(key)).thenReturn(invalid)
+                assertThat(openAPSAutoISFPlugin.readAutoIsfDouble(key))
+                    .isEqualTo(key.defaultValue)
+            }
+        }
+    }
+
+    @Test
+    fun `all six AutoISF weights clamp finite values to their declared bounds`() {
+        val keys = listOf(
+            DoubleKey.ApsAutoIsfBgAccelWeight,
+            DoubleKey.ApsAutoIsfBgBrakeWeight,
+            DoubleKey.ApsAutoIsfLowBgWeight,
+            DoubleKey.ApsAutoIsfHighBgWeight,
+            DoubleKey.ApsAutoIsfPpWeight,
+            DoubleKey.ApsAutoIsfDuraWeight
+        )
+        keys.forEach { key ->
+            whenever(preferences.get(key)).thenReturn(key.max + 100.0)
+            assertThat(openAPSAutoISFPlugin.readAutoIsfDouble(key)).isEqualTo(key.max)
+            whenever(preferences.get(key)).thenReturn(key.min - 100.0)
+            assertThat(openAPSAutoISFPlugin.readAutoIsfDouble(key)).isEqualTo(key.min)
+        }
+    }
+
+    @Test
+    fun `valid AutoISF weight values are preserved`() {
+        val key = DoubleKey.ApsAutoIsfDuraWeight
+        whenever(preferences.get(key)).thenReturn(1.25)
+        assertThat(openAPSAutoISFPlugin.readAutoIsfDouble(key)).isEqualTo(1.25)
     }
 
     @Test
