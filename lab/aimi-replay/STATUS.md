@@ -772,3 +772,11 @@ Log-count follow-up for run 45296311819: the full job log contains 935 Android r
 - Corrected the three zero-weight assertions (and centre assertion) to use a numeric tolerance in commit `691240e1cd878e98fd1a3c3aa7452f0841c79dfc`. No production source or formula changed.
 - A new push-triggered CI run should validate the correction. Until that run completes successfully, AutoISF boundary tests remain unvalidated. Remaining coverage is still partial: acceleration/braking, PP, Dura, invalid/non-finite persisted inputs, and Kotlin/JS fixture parity are not yet covered.
 - Android emulator run [45296311819](https://github.com/Eretikstas/Apex/actions/runs/45296311819) is independently green: FullDebug + instrumentation APK built, Pixel 6 API 31 emulator booted, `RingSkinScreensTest` reported `OK (1 test)`, and 15 screenshots were uploaded (artifact 14877931520).
+
+
+### 2026-11-24, expanded AutoISF weight branch tests (pending CI)
+
+- Added integration assertions to `OpenAPSAutoISFPluginTest.autoISFTest` in commit `8089e21129ad014eeb93753b06bcca2ce8384846`.
+- The added cases exercise PP, Dura, acceleration and braking weights through the production `autoISF()` path, attempting to neutralize/bypass unrelated factors and compare weighted versus zero-weight outputs.
+- This is test-only; no AutoISF formula, default, preference, app UI or live setting was changed.
+- CI must confirm whether the fixture and expected branch isolation are valid. Until the new run completes, do not count these branches as passed. Invalid/non-finite persisted-value handling and Kotlin/JS parity remain open.
