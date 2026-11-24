@@ -59,6 +59,8 @@ jobs:
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | tee emulator-activity.txt
             adb shell screencap -p /sdcard/aaps-home.png
             adb pull /sdcard/aaps-home.png aaps-home.png
+            adb shell uiautomator dump /sdcard/aaps-window.xml
+            adb pull /sdcard/aaps-window.xml aaps-window.xml
             adb logcat -d -t 12000 > emulator-logcat.txt
             if grep -E 'FATAL EXCEPTION|Process: info.nightscout.androidaps' emulator-logcat.txt; then
               exit 1
@@ -72,6 +74,7 @@ jobs:
           name: learning-lab-emulator-evidence
           path: |
             aaps-home.png
+            aaps-window.xml
             emulator-activity.txt
             emulator-logcat.txt
           if-no-files-found: ignore
