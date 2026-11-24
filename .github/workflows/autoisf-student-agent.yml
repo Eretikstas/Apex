@@ -1,0 +1,42 @@
+name: AutoISF student agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "GitHub issue number containing the student assignment"
+        required: true
+        type: number
+      model:
+        description: "OpenAI API model name"
+        required: true
+        default: "gpt-6"
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: autoisf-student-${{ inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  solve-assignment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated learning branch
+        uses: actions/checkout@v5
+        with:
+          ref: aimi-learning-lab
+
+      - name: Run independent student agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ inputs.model }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          python3 .github/scripts/autoisf_student.py
