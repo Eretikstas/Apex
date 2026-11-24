@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import app.aaps.core.keys.BooleanKey
 import app.aaps.core.keys.DoubleKey
+import androidx.compose.runtime.mutableStateMapOf
 import app.aaps.core.keys.IntKey
 import app.aaps.core.keys.StringKey
 import app.aaps.core.keys.interfaces.Preferences
@@ -16,6 +17,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
+import org.mockito.kotlin.verify
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -65,6 +68,30 @@ class AdaptivePreferenceItemsTest {
     fun doubleItemRenders() {
         render { AdaptiveDoublePreferenceItem(doubleKey = DoubleKey.OverviewInsulinButtonIncrement1) }
         compose.onRoot().assertIsDisplayed()
+    }
+
+    @Test
+    fun doublePreferenceStateRepairsNaNAndInfinitiesToDefault() {
+        val key = DoubleKey.ApsAutoIsfBgAccelWeight
+        listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY).forEach { invalid ->
+            whenever(prefs.get(key)).thenReturn(invalid)
+            val state = PreferenceDoubleState(prefs, key, mutableStateMapOf())
+            assertThat(state.value).isEqualTo(key.defaultValue)
+            verify(prefs).put(key, key.defaultValue)
+        }
+    }
+
+    @Test
+    fun doublePreferenceStateClampsPersistedAndEnteredFiniteValues() {
+        val key = DoubleKey.ApsAutoIsfDuraWeight
+        whenever(prefs.get(key)).thenReturn(key.max + 10.0)
+        val state = PreferenceDoubleState(prefs, key, mutableStateMapOf())
+        assertThat(state.value).isEqualTo(key.max)
+        verify(prefs).put(key, key.max)
+
+        state.value = key.min - 10.0
+        assertThat(state.value).isEqualTo(key.min)
+        verify(prefs).put(key, key.min)
     }
 
     @Test
