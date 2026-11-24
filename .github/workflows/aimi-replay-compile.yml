@@ -6,6 +6,7 @@ on:
       - aimi-replay
     paths:
       - 'plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAIMI/**'
+      - 'plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAutoISF/**'
       - 'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAIMI/DetermineBasalAIMI2.kt'
       - 'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAIMI/orchestration/AimiAdaptationStatusBuilder.kt'
       - 'plugins/main/src/main/kotlin/app/aaps/plugins/main/general/dashboard/viewmodel/AimiAdaptationStatusViewModel.kt'
@@ -45,6 +46,9 @@ jobs:
 
       - name: Compile replay test sources only
         run: ./gradlew :plugins:aps:compileFullDebugUnitTestKotlin --console=plain
+
+      - name: Test AutoISF weight boundaries
+        run: ./gradlew :plugins:aps:testFullDebugUnitTest --tests 'app.aaps.plugins.aps.openAPSAutoISF.AutoIsfWeightBoundaryTest' --console=plain
 
       - name: Run replay audit helper tests without replay inputs
         env:
