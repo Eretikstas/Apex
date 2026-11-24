@@ -117,3 +117,13 @@ A source-path audit found a validation gap that needs a dedicated fix/review bef
 - The Compose `PreferenceDoubleState` setter calls `coerceIn(key.min, key.max)`, but this alone is not a finite-number validator: NaN comparisons do not select either bound, so NaN can pass through that clamp operation.
 
 Therefore UI slider bounds are not sufficient protection against corrupted, imported, or synchronized values. The AutoISF algorithm itself needs a reviewed finite-and-range guard for its six weights (and min/max factors), with a deterministic fallback and regression tests for NaN and both infinities. This lab audit does not change production calculation code; the finding is recorded for a separate, explicit hardening review.
+
+## Hardening implemented on the learning branch
+
+- The six AutoISF weight reads and the AutoISF min/max bounds now pass through a finite-and-range guard. Non-finite values fall back to the key default; finite out-of-range values are clamped to the key bounds. A diagnostic entry records any correction.
+- Compose `PreferenceDoubleState` now applies the same finite/range policy when it loads or accepts a value; a repaired persisted value is written back.
+- Regression tests were added for all six weights with NaN, positive/negative infinity, below-minimum and above-maximum values, plus a valid in-range value.
+- Compose state tests cover invalid stored values and values entered through the state setter.
+- A Preferences service recreation test checks that a synthetic AutoISF weight remains stored in the shared test key-value store.
+
+These changes are isolated to `aimi-learning-lab`. They have not yet passed CI; do not treat the branch as a verified build until the latest workflow completes.
