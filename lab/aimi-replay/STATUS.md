@@ -763,3 +763,12 @@ Scope and interpretation: this confirms the isolated laboratory FullDebug build,
 
 
 Log-count follow-up for run 45296311819: the full job log contains 935 Android resource-format warnings of the “multiple substitutions in non-positional format” class, spanning 24 locale resource sets and 36 distinct string keys (848 warning lines originate from the APS module). The build remains green, but Claude should decide whether these existing localized resource declarations need cleanup. The emulator job log also contains 20 SwiftShader ColorBuffer/texture-binding error lines; no fatal instrumentation or app crash followed them, and the 15 screenshots are present.
+
+
+### 2026-11-24, AutoISF boundary-test CI failure and correction
+
+- CI run [45298059989](https://github.com/Eretikstas/Apex/actions/runs/45298059989) compiled the test sources successfully, then ran 5 tests: 4 passed, 1 failed.
+- The only failure was an overly strict signed-zero assertion: interpolation returned IEEE-754 `-0.0`, while the test compared it to `0.0` using exact equality. This is numerically neutral and is not a production algorithm defect.
+- Corrected the three zero-weight assertions (and centre assertion) to use a numeric tolerance in commit `691240e1cd878e98fd1a3c3aa7452f0841c79dfc`. No production source or formula changed.
+- A new push-triggered CI run should validate the correction. Until that run completes successfully, AutoISF boundary tests remain unvalidated. Remaining coverage is still partial: acceleration/braking, PP, Dura, invalid/non-finite persisted inputs, and Kotlin/JS fixture parity are not yet covered.
+- Android emulator run [45296311819](https://github.com/Eretikstas/Apex/actions/runs/45296311819) is independently green: FullDebug + instrumentation APK built, Pixel 6 API 31 emulator booted, `RingSkinScreensTest` reported `OK (1 test)`, and 15 screenshots were uploaded (artifact 14877931520).
