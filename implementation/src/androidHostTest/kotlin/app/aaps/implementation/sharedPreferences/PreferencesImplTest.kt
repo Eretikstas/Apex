@@ -2,6 +2,7 @@ package app.aaps.implementation.sharedPreferences
 
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.keys.BooleanKey
+import app.aaps.core.keys.DoubleKey
 import app.aaps.core.keys.StringNonKey
 import app.aaps.core.keys.interfaces.AppPlatform
 import app.aaps.core.keys.interfaces.observeEffective
@@ -42,12 +43,12 @@ class PreferencesImplTest {
         BooleanKey.NsClient3UseWs to true
     )
 
-    private fun preferences(client: Boolean): PreferencesImpl {
+    private fun preferences(client: Boolean, store: FileKeyValueStore = FileKeyValueStore()): PreferencesImpl {
         val config = mock<Config>()
         whenever(config.APS).thenReturn(!client)
         whenever(config.AAPSCLIENT).thenReturn(client)
         whenever(config.platform).thenReturn(AppPlatform.Android)
-        return PreferencesImpl(FileKeyValueStore(), { mock() }, { mock() }, { mock() }, mock(), config, mock())
+        return PreferencesImpl(store, { mock() }, { mock() }, { mock() }, mock(), config, mock())
     }
 
     /** A master outside simple mode, every forced key stored as the opposite of its forced value. */
@@ -56,6 +57,18 @@ class PreferencesImplTest {
             prefs.put(BooleanKey.GeneralSimpleMode, false)
             forcedKeys.forEach { (key, forced) -> prefs.put(key, !forced) }
         }
+
+    @Test
+    fun `AutoISF weight survives recreating the Preferences service over the same store`() {
+        val store = FileKeyValueStore()
+        val firstInstance = preferences(client = false, store = store)
+        firstInstance.put(BooleanKey.GeneralSimpleMode, false)
+        firstInstance.put(DoubleKey.ApsAutoIsfDuraWeight, 1.25)
+
+        val recreatedInstance = preferences(client = false, store = store)
+
+        assertThat(recreatedInstance.get(DoubleKey.ApsAutoIsfDuraWeight)).isEqualTo(1.25)
+    }
 
     @Test
     fun `exactly the agreed keys are forced by hardened mode, and their default is the hardened value`() {
