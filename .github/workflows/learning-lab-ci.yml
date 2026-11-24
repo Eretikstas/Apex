@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      ANDROID_I_WANT_MY_TCG: "yes"
       GRADLE_OPTS: >-
         -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
         -Dkotlin.daemon.jvm.options="-Xmx2g"
