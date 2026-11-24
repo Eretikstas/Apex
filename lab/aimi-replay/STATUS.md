@@ -735,3 +735,28 @@ CI run `45298059989` was created by the push and is currently in progress at che
 **Coverage is intentionally partial:** this first slice directly exercises production interpolation and limit functions. It does not yet isolate acceleration, braking, PP or Dura in the full AutoISF path; it does not test invalid persisted weights or min/max because expected fail-closed behavior and Kotlin/JS divergence classification still require app-owner review. No production formula, default, preference, profile or pump behavior was changed.
 
 Claude handoff: review the tests and confirm the invalid-input fallback contract plus the Kotlin/JS fixture classification before the next test tranche. ChatGPT continues test-only work on `aimi-replay`; no edits to `autoisf-atc3`.
+
+
+### 2026-11-24, Android Emulator smoke run 45296311819 — SUCCESS
+
+Run: [45296311819](https://github.com/Eretikstas/Apex/actions/runs/45296311819), branch `aimi-replay`, tested commit `560069155d18cff0824350adc044f04730b6067d`. Completed successfully at 2026-11-24 00:39:33 UTC. The earlier “not yet confirmed” note above is superseded by this result.
+
+All 11 substantive job steps completed successfully:
+- FullDebug app APK and FullDebug AndroidTest APK both built; Gradle reported `BUILD SUCCESSFUL` in 11m51s.
+- KVM setup succeeded. Android 31 `google_apis`, `x86_64`, Pixel 6 emulator booted; the test script set locale to `ru-RU`.
+- Both APKs installed successfully.
+- Instrumentation `app.aaps.e2e.RingSkinScreensTest#ringScreens` completed with `OK (1 test)` in approximately 233.1 seconds.
+- The test produced 15 screenshots; every row in `out/screens/index.txt` is marked `ok`. Coverage represented in the index: stable/falling/rising states for day and night, low variants, AIMI window, and Assignments menu.
+
+Artifact:
+- Name: `aimi-replay-emulator-smoke`; ID: `14877931520`; size: 3,371,808 bytes; SHA-256: `becc442d0d62ee69264a18890e0e523f199133a908060104cd424bbaddff0b98`.
+- Contains 18 files: 15 PNG screenshots, `out/screens/index.txt`, `out/instrument.txt`, and `out/logcat.txt`.
+- [Download artifact](https://github.com/Eretikstas/Apex/actions/runs/45296311819/artifacts/14877931520); expiry: 2026-12-08 00:39:26 UTC.
+
+Log review:
+- Instrumentation output explicitly reports `OK (1 test)`; the captured device logcat contains no `FATAL EXCEPTION`, `Fatal signal`, or `ANR in` markers.
+- The emulator emitted repeated SwiftShader graphics messages (`Failed to find ColorBuffer` / invalid texture binding) during capture, but the test completed and all 15 screenshots were saved and visually readable.
+- Build emitted Android resource-format warnings for non-positional multiple substitutions in localized strings; these did not fail the build.
+- Post-job Git cleanup emitted a warning because submodule path `.tmp-juggluco` has no URL in `.gitmodules`; this happened after successful test and artifact upload. Actions also reported a Node.js 20 deprecation warning. Neither changed the successful workflow conclusion.
+
+Scope and interpretation: this confirms the isolated laboratory FullDebug build, emulator boot, APK installation, and one synthetic Ring UI instrumentation test. It does not validate the nine app adaptation cards, AutoISF weight behavior, pump/CGM connectivity, clinical behavior, or Claude's production/app-branch workflow. No app source, live settings, profile, pump, or Nightscout configuration was changed by this run. Claude may use this workflow as a starting point for his own UI/card scenarios.
