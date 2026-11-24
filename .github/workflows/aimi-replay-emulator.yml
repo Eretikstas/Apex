@@ -9,6 +9,9 @@ on:
       - aimi-replay
     paths:
       - '.github/workflows/aimi-replay-emulator.yml'
+      - 'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAutoISF/**'
+      - 'plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAutoISF/**'
+      - 'app/src/androidTest/kotlin/app/aaps/e2e/**'
 
 concurrency:
   group: aimi-replay-emulator-${{ github.ref }}
@@ -90,7 +93,7 @@ jobs:
           disable-animations: true
           script: |
             SCREENS_TEST=app.aaps.e2e.RingSkinScreensTest bash tools/atc3_screens.sh
-            grep -Eq 'OK \([1-9][0-9]* tests?\)' out/instrument.txt
+            grep -Eq 'OK \\([1-9][0-9]* tests?\\)' out/instrument.txt
 
       - name: Upload emulator evidence
         if: always()
