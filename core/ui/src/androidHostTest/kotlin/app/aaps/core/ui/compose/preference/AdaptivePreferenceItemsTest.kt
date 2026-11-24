@@ -94,6 +94,13 @@ class AdaptivePreferenceItemsTest {
         state.value = key.min - 10.0
         assertThat(state.value).isEqualTo(key.min)
         verify(prefs, atLeastOnce()).put(key, key.min)
+
+        state.value = Double.NaN
+        assertThat(state.value).isEqualTo(key.defaultValue)
+        state.value = Double.POSITIVE_INFINITY
+        assertThat(state.value).isEqualTo(key.max)
+        state.value = Double.NEGATIVE_INFINITY
+        assertThat(state.value).isEqualTo(key.min)
     }
 
     @Test
