@@ -8,7 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import app.aaps.ComposeMainActivity
-import app.aaps.core.data.plugin.PluginBase
+import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.configuration.Config
 import app.aaps.core.interfaces.configuration.ConfigBuilder
 import app.aaps.core.keys.BooleanNonKey
