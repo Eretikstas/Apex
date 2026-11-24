@@ -272,5 +272,59 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
         whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(2.0)
         assertThat(openAPSAutoISFPlugin.autoISF(profile)).isEqualTo(47.11 * 1.0)                       // bg_ISF strengthened by acce_ISF
 
+        // Exercise each remaining weight through the production autoISF() path. Keep the
+        // other factors neutral/bypassed so each assertion isolates one preference.
+        whenever(preferences.get(BooleanKey.ApsUseAutoIsfWeights)).thenReturn(true)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(0.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(0.0)
+        whenever(glucoseStatus.corrSqu).thenReturn(0.4711) // bypass acceleration
+        whenever(glucoseStatus.a2).thenReturn(0.0)
+        whenever(glucoseStatus.bgAcceleration).thenReturn(0.0)
+        whenever(glucoseStatus.glucose).thenReturn(110.0) // target + 10: BG-range factor is neutral
+        whenever(glucoseStatus.delta).thenReturn(2.0)
+        whenever(glucoseStatus.shortAvgDelta).thenReturn(1.0)
+        whenever(glucoseStatus.duraISFminutes).thenReturn(0.0)
+        whenever(glucoseStatus.duraISFaverage).thenReturn(0.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfPpWeight)).thenReturn(0.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfDuraWeight)).thenReturn(0.0)
+        val ppNeutral = openAPSAutoISFPlugin.autoISF(profile)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfPpWeight)).thenReturn(0.1)
+        val ppWeighted = openAPSAutoISFPlugin.autoISF(profile)
+        assertThat(ppWeighted).isLessThan(ppNeutral) // positive post-prandial delta strengthens ISF
+
+        // Duration factor: PP is bypassed by a negative short average delta.
+        whenever(glucoseStatus.delta).thenReturn(0.0)
+        whenever(glucoseStatus.shortAvgDelta).thenReturn(-1.0)
+        whenever(glucoseStatus.duraISFminutes).thenReturn(60.0)
+        whenever(glucoseStatus.duraISFaverage).thenReturn(110.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfPpWeight)).thenReturn(0.0)
+        val duraNeutral = openAPSAutoISFPlugin.autoISF(profile)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfDuraWeight)).thenReturn(1.0)
+        val duraWeighted = openAPSAutoISFPlugin.autoISF(profile)
+        assertThat(duraWeighted).isLessThan(duraNeutral) // sustained high BG strengthens ISF
+
+        // Acceleration and braking are isolated in opposite target/direction quadrants.
+        whenever(glucoseStatus.duraISFminutes).thenReturn(0.0)
+        whenever(glucoseStatus.duraISFaverage).thenReturn(0.0)
+        whenever(glucoseStatus.shortAvgDelta).thenReturn(-1.0)
+        whenever(glucoseStatus.glucose).thenReturn(120.0) // above target, accelerating away
+        whenever(glucoseStatus.corrSqu).thenReturn(1.0)
+        whenever(glucoseStatus.a2).thenReturn(1.0)
+        whenever(glucoseStatus.a1).thenReturn(0.0)
+        whenever(glucoseStatus.bgAcceleration).thenReturn(1.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfBgAccelWeight)).thenReturn(0.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfBgBrakeWeight)).thenReturn(0.0)
+        val accelNeutral = openAPSAutoISFPlugin.autoISF(profile)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfBgAccelWeight)).thenReturn(0.5)
+        val accelWeighted = openAPSAutoISFPlugin.autoISF(profile)
+        assertThat(accelWeighted).isLessThan(accelNeutral)
+
+        whenever(glucoseStatus.glucose).thenReturn(90.0) // below target, positive acceleration towards target
+        whenever(preferences.get(DoubleKey.ApsAutoIsfBgBrakeWeight)).thenReturn(0.5)
+        val brakeWeighted = openAPSAutoISFPlugin.autoISF(profile)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfBgBrakeWeight)).thenReturn(0.0)
+        val brakeNeutral = openAPSAutoISFPlugin.autoISF(profile)
+        assertThat(brakeWeighted).isLessThan(brakeNeutral)
+
     }
 }
