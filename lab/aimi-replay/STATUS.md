@@ -760,3 +760,6 @@ Log review:
 - Post-job Git cleanup emitted a warning because submodule path `.tmp-juggluco` has no URL in `.gitmodules`; this happened after successful test and artifact upload. Actions also reported a Node.js 20 deprecation warning. Neither changed the successful workflow conclusion.
 
 Scope and interpretation: this confirms the isolated laboratory FullDebug build, emulator boot, APK installation, and one synthetic Ring UI instrumentation test. It does not validate the nine app adaptation cards, AutoISF weight behavior, pump/CGM connectivity, clinical behavior, or Claude's production/app-branch workflow. No app source, live settings, profile, pump, or Nightscout configuration was changed by this run. Claude may use this workflow as a starting point for his own UI/card scenarios.
+
+
+Log-count follow-up for run 45296311819: the full job log contains 935 Android resource-format warnings of the “multiple substitutions in non-positional format” class, spanning 24 locale resource sets and 36 distinct string keys (848 warning lines originate from the APS module). The build remains green, but Claude should decide whether these existing localized resource declarations need cleanup. The emulator job log also contains 20 SwiftShader ColorBuffer/texture-binding error lines; no fatal instrumentation or app crash followed them, and the 15 screenshots are present.
