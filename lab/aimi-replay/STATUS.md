@@ -484,6 +484,38 @@ Replay-only instrumentation and tests committed:
 
 No learner formulas, live app code, profiles, pump settings, or Nightscout settings were changed. No replay was launched. The push-triggered compile workflow should validate Kotlin compilation and the isolated helper tests; record its run result before any replay scenario is considered.
 
+
+### AutoISF weight audit — explicit handoff to Claude (2026-11-24)
+
+**Missing workstream identified by the user: audit the AutoISF weights themselves.** The existing AIMI replay work on CR/ISF/Basal learning and the ISF causal filter does not cover the AutoISF weight system. Treat this as a separate task, not as completed by the Learning Audit.
+
+Relevant app-side source locations on autoisf-atc3 (Claude owns these files; ChatGPT must not edit the app branch):
+- plugins/aps/src/commonMain/kotlin/app/aaps/plugins/aps/openAPSAutoISF/OpenAPSAutoISFPlugin.kt — preference reads, profile wiring, and autoISF() calculation.
+- plugins/aps/src/commonMain/kotlin/app/aaps/plugins/aps/openAPSAutoISF/DetermineBasalAutoISF.kt and app/src/androidTest/assets/OpenAPSSMBAutoISF/determine-basal.js — algorithm implementation/reference behavior.
+- core/interfaces/src/commonMain/kotlin/app/aaps/core/interfaces/aps/OapsProfileAutoIsf.kt — profile fields.
+- plugins/aps/src/androidHostTest/kotlin/app/aaps/plugins/aps/openAPSAutoISF/OpenAPSAutoISFPluginTest.kt and DetermineBasalAutoISFTest.kt — existing tests.
+- docs/AutoISF-v4-Guide.md — user-facing descriptions.
+
+Weights/controls explicitly present in the source:
+1. bgAccel_ISF_weight — acceleration contribution.
+2. bgBrake_ISF_weight — braking/deceleration contribution, including the predicted-near-minimum branch.
+3. pp_ISF_weight — post-prandial delta contribution.
+4. lower_ISFrange_weight and higher_ISFrange_weight — low/high BG-range interpolation multipliers.
+5. dura_ISF_weight — sustained-high-glucose/duration contribution.
+6. autoISF_min and autoISF_max — final factor bounds; audit these with the weights, but identify them as limits, not weights.
+
+**Required audit (report first; do not change clinical defaults or live settings):**
+- Trace each preference from key/default/UI/scene/automation through profile construction into the exact formula and final ISF.
+- For every weight, document units, allowed range, default, sign, neutral value, monotonic direction, clamp behavior, and conditions under which it is bypassed.
+- Check boundary values, zero/neutral behavior, negative/NaN/infinite inputs, and whether a weight can invert the intended direction or compound another factor unexpectedly.
+- Verify Kotlin implementation and JS reference have equivalent equations and branch conditions; explain any intentional divergence.
+- Add/identify isolated tests that vary exactly one weight at a time with fixed inputs, plus paired interaction tests (acce/brake; BG-range with acce; pp with dura; weight with min/max clamp). Assert intermediate factor and final ISF, not only a final aggregate.
+- Verify persisted/displayed factor telemetry reports the factor actually applied, and scene/automation overrides restore previous weight values correctly.
+- Provide a table of all weight keys with source locations, defaults/ranges, formula, current test coverage, missing tests, and risk classification.
+- Do not optimize or recommend patient-specific weight values from synthetic data. No pump, profile, Nightscout, or live app setting changes.
+
+**Acceptance:** Claude returns a source-linked audit and proposed test matrix; any formula/default/UI change requires separate review and explicit user approval. This task is an app-branch handoff only; it does not authorize ChatGPT to edit autoisf-atc3 or port anything from the lab.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
