@@ -49,8 +49,6 @@ class AutoIsfWeightBoundaryTest : TestBaseWithProfile() {
         whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(2.0)
         whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(3.0)
 
-        // Existing interpolation control points: unweighted lower contribution at x=45 is -0.5;
-        // unweighted higher contribution at x=130 is +0.25.
         assertThat(sut.interpolate(45.0)).isWithin(1e-9).of(-1.0)
         assertThat(sut.interpolate(130.0)).isWithin(1e-9).of(0.75)
     }
@@ -60,9 +58,10 @@ class AutoIsfWeightBoundaryTest : TestBaseWithProfile() {
         whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(0.0)
         whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(0.0)
 
-        assertThat(sut.interpolate(45.0)).isEqualTo(0.0)
-        assertThat(sut.interpolate(100.0)).isEqualTo(0.0)
-        assertThat(sut.interpolate(130.0)).isEqualTo(0.0)
+        // Floating-point interpolation may produce negative zero; compare numerically.
+        assertThat(sut.interpolate(45.0)).isWithin(1e-9).of(0.0)
+        assertThat(sut.interpolate(100.0)).isWithin(1e-9).of(0.0)
+        assertThat(sut.interpolate(130.0)).isWithin(1e-9).of(0.0)
     }
 
     @Test
@@ -75,7 +74,7 @@ class AutoIsfWeightBoundaryTest : TestBaseWithProfile() {
         val above = sut.interpolate(100.001)
 
         assertThat(below).isAtMost(0.0)
-        assertThat(center).isEqualTo(0.0)
+        assertThat(center).isWithin(1e-9).of(0.0)
         assertThat(above).isAtLeast(0.0)
     }
 
