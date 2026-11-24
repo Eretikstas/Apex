@@ -69,6 +69,17 @@ This path is bypassed when duration is under 10 minutes or the duration-average 
 
 The code describes this as responding to sustained high glucose. This term can grow with both duration and distance above target; the final combined factor is subsequently limited by `autoISF_min` and `autoISF_max`.
 
+## Persisted-value validation finding
+
+A source-level audit found a concrete non-finite-value gap in this baseline:
+
+- `PreferenceDoubleState.value` writes `value.coerceIn(key.min, key.max)`.
+- Kotlin range clamping does not turn `NaN` into a finite in-range number; comparisons against NaN are false, so NaN can pass through unchanged.
+- `PreferencesImpl.get(DoublePreferenceKey)` reads the stored double from the key-value store without an additional finite/range repair step.
+- The AutoISF plugin reads the six weights from preferences for its calculations; the UI slider's nominal min/max is therefore not proof that a corrupted/imported persisted value is safe.
+
+This is a software robustness finding, not evidence that a normal user can enter NaN through the visible slider. The lab must add regression coverage for NaN and ±Infinity at both the preference-state/storage boundary and the AutoISF calculation boundary before proposing a production fix. Do not change clinical behavior on this finding alone.
+
 ## Combination and test implications
 
 When the algorithm reaches the combined branch, it takes the maximum of duration, BG-range, acceleration, and post-prandial factors. If acceleration is below 1, that maximum is multiplied by acceleration. The result is passed through `withinISFlimits()`, which also incorporates the autosens/activity/temporary-target sensitivity ratio.
