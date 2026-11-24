@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: learning-lab-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   autoisf-tests-and-app:
