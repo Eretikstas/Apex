@@ -42,6 +42,40 @@ jobs:
       - name: Build Full Debug app
         run: ./gradlew --console=plain :app:assembleFullDebug --stacktrace
 
+      - name: Emulator smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 600
+          script: |
+            APK="$(find app/build/outputs/apk/full/debug -maxdepth 1 -name '*.apk' -print -quit)"
+            test -n "$APK"
+            adb install -r "$APK"
+            adb shell monkey -p info.nightscout.androidaps 1
+            sleep 45
+            adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | tee emulator-activity.txt
+            adb shell screencap -p /sdcard/aaps-home.png
+            adb pull /sdcard/aaps-home.png aaps-home.png
+            adb logcat -d -t 12000 > emulator-logcat.txt
+            if grep -E 'FATAL EXCEPTION|Process: info.nightscout.androidaps' emulator-logcat.txt; then
+              exit 1
+            fi
+            grep -q 'info.nightscout.androidaps' emulator-activity.txt
+
+      - name: Upload emulator evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: learning-lab-emulator-evidence
+          path: |
+            aaps-home.png
+            emulator-activity.txt
+            emulator-logcat.txt
+          if-no-files-found: ignore
+
       - name: Upload AutoISF test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
