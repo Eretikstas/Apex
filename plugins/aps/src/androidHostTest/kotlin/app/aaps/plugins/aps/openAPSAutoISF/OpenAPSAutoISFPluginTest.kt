@@ -162,6 +162,33 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
     }
 
     @Test
+    fun `interpolate applies lower and higher range weights independently`() {
+        whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(0.5)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(0.25)
+
+        assertThat(openAPSAutoISFPlugin.interpolate(80.0)).isWithin(0.000001).of(-0.15)
+        assertThat(openAPSAutoISFPlugin.interpolate(150.0)).isWithin(0.000001).of(0.125)
+    }
+
+    @Test
+    fun `zero lower and higher range weights neutralize the interpolation curve`() {
+        whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(0.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(0.0)
+
+        assertThat(openAPSAutoISFPlugin.interpolate(50.0)).isEqualTo(0.0)
+        assertThat(openAPSAutoISFPlugin.interpolate(100.0)).isEqualTo(0.0)
+        assertThat(openAPSAutoISFPlugin.interpolate(200.0)).isEqualTo(0.0)
+    }
+
+    @Test
+    fun `range interpolation remains neutral at the center knot`() {
+        whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(2.0)
+        whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(2.0)
+
+        assertThat(openAPSAutoISFPlugin.interpolate(100.0)).isEqualTo(0.0)
+    }
+
+    @Test
     fun loop_smbTest() {
         val profile = OapsProfileAutoIsf(
             dia = 0.0, // not used
