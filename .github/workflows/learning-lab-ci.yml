@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: learning-lab-${{ github.ref }}
+  group: learning-lab-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
