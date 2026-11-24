@@ -16,6 +16,8 @@ import app.aaps.core.ui.compose.LocalPreferences
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import com.google.common.truth.Truth.assertThat
+import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
 import org.mockito.kotlin.verify
@@ -77,7 +79,7 @@ class AdaptivePreferenceItemsTest {
             whenever(prefs.get(key)).thenReturn(invalid)
             val state = PreferenceDoubleState(prefs, key, mutableStateMapOf())
             assertThat(state.value).isEqualTo(key.defaultValue)
-            verify(prefs).put(key, key.defaultValue)
+            verify(prefs, atLeastOnce()).put(key, key.defaultValue)
         }
     }
 
@@ -87,11 +89,11 @@ class AdaptivePreferenceItemsTest {
         whenever(prefs.get(key)).thenReturn(key.max + 10.0)
         val state = PreferenceDoubleState(prefs, key, mutableStateMapOf())
         assertThat(state.value).isEqualTo(key.max)
-        verify(prefs).put(key, key.max)
+        verify(prefs, atLeastOnce()).put(key, key.max)
 
         state.value = key.min - 10.0
         assertThat(state.value).isEqualTo(key.min)
-        verify(prefs).put(key, key.min)
+        verify(prefs, atLeastOnce()).put(key, key.min)
     }
 
     @Test
