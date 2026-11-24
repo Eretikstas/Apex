@@ -68,9 +68,8 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -accel off -memory 2048 -cores 2
           script: |
-            APK="${{ steps.apk.outputs.apk_path }}"
-            test -f "$APK"
-            adb install -r "$APK"
+            test -f "${{ steps.apk.outputs.apk_path }}"
+            adb install -r "${{ steps.apk.outputs.apk_path }}"
             adb shell monkey -p info.nightscout.androidaps 1
             sleep 45
             adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity' | tee emulator-activity.txt
