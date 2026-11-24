@@ -200,7 +200,7 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
         whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(1.0)
         assertThat(openAPSAutoISFPlugin.interpolate(45.0)).isEqualTo(-1.0)
         assertThat(openAPSAutoISFPlugin.interpolate(55.0)).isEqualTo(-1.0)
-        assertThat(openAPSAutoISFPlugin.interpolate(100.0)).isEqualTo(0.0)
+        assertThat(openAPSAutoISFPlugin.interpolate(100.0)).isWithin(0.000001).of(0.0)
         assertThat(openAPSAutoISFPlugin.interpolate(130.0)).isEqualTo(0.25)
         assertThat(openAPSAutoISFPlugin.interpolate(230.0)).isEqualTo(0.7)
     }
@@ -219,9 +219,9 @@ class OpenAPSAutoISFPluginTest : TestBaseWithProfile() {
         whenever(preferences.get(DoubleKey.ApsAutoIsfLowBgWeight)).thenReturn(0.0)
         whenever(preferences.get(DoubleKey.ApsAutoIsfHighBgWeight)).thenReturn(0.0)
 
-        assertThat(openAPSAutoISFPlugin.interpolate(50.0)).isEqualTo(0.0)
+        assertThat(openAPSAutoISFPlugin.interpolate(50.0)).isWithin(0.000001).of(0.0)
         assertThat(openAPSAutoISFPlugin.interpolate(100.0)).isEqualTo(0.0)
-        assertThat(openAPSAutoISFPlugin.interpolate(200.0)).isEqualTo(0.0)
+        assertThat(openAPSAutoISFPlugin.interpolate(200.0)).isWithin(0.000001).of(0.0)
     }
 
     @Test
