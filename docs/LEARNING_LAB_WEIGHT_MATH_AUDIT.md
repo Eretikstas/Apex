@@ -75,11 +75,12 @@ When the algorithm reaches the combined branch, it takes the maximum of duration
 
 The source test suite currently includes:
 - `interpolateTest` with five curve checkpoints;
+- three new synthetic unit tests verify independent lower/higher range-weight scaling, zero-weight neutrality, and the center-knot invariant;
 - `withinISFLimitsTest` for lower/upper bounds and sensitivity-ratio cases;
 - three `autoISF` tests for run autosens reuse, missing glucose status, and weights disabled;
 - a broad `autoISFTest` integration-style test.
 
-The current tests do not constitute a complete six-weight test matrix. Missing explicit coverage to add in the lab:
+The current tests do not constitute a complete six-weight test matrix. One existing integration-style test injects an acceleration weight of 2.0 even though the preference's declared maximum is 1.0; this is a mock input outside the UI range and must not be treated as an endorsed or valid setting. Missing explicit coverage to add in the lab:
 - each weight independently at zero, interior, and source-declared upper bound;
 - activation/bypass gates for fit correlation, delta direction, duration threshold, and target-relative glucose;
 - lower-branch early return versus combined branch;
