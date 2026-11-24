@@ -65,13 +65,24 @@ class AutoIsfWeightsUiTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         ctx.startActivity(intent)
 
+        // The emulator boots in ru-RU and a first-run permissions sheet can cover the
+        // preference list. Dismiss that sheet before inspecting the underlying screen.
+        device.waitForIdle(2_000)
+        if (device.findObject(By.text("Требуются разрешения")) != null ||
+            device.findObject(By.text("Permissions required")) != null
+        ) {
+            device.pressBack()
+            device.waitForIdle(1_000)
+        }
+
+        // Resolve labels from resources so the assertion follows the emulator locale.
         val expected = listOf(
-            "BG acceleration ISF weight",
-            "BG brake ISF weight",
-            "Low BG range weight",
-            "High BG range weight",
-            "Post-prandial ISF weight",
-            "Duration ISF weight"
+            ctx.getString(app.aaps.core.keys.R.string.pref_title_bg_accel_weight),
+            ctx.getString(app.aaps.core.keys.R.string.pref_title_bg_brake_weight),
+            ctx.getString(app.aaps.core.keys.R.string.pref_title_low_bg_weight),
+            ctx.getString(app.aaps.core.keys.R.string.pref_title_high_bg_weight),
+            ctx.getString(app.aaps.core.keys.R.string.pref_title_pp_weight),
+            ctx.getString(app.aaps.core.keys.R.string.pref_title_dura_weight)
         )
         val found = linkedSetOf<String>()
         val deadline = SystemClock.uptimeMillis() + 60_000L
