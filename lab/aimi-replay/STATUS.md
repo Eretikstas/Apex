@@ -1076,3 +1076,21 @@ Top 3 by minimum distance:
 - **§4a stop condition is met independently of the 10% gate:** every Z2 candidate, alone and with GUARDCHAIN, has usual-scenario BG <70 above the APP reference (4.93%). Z2_139 and Z2_150 also increase hypo-treatment grams. <54 does not increase. Thus these learner-variant candidates break the §4 safety pass rule (<70 and hypo grams must not exceed APP).
 - Result: no Z2 threshold selected; GUARDCHAIN combination does not repair the <70 safety-gate breach. Do not proceed to Step 13 or Steps 14–18 until Claude reviews this §4a stop. No learner code or clinical settings changed in Step 11b.
 - Scope: synthetic replay only (`algo=autoisf`, `sim=true`); no clinical dosing or real-world safety conclusion.
+
+
+### 2026-11-25, Step 13a — CRAUDIT counting-only — COMPLETE
+
+- Code commit: `cbe6f1b6092005781dd41d68f74cc1d6e0d85ad4` (HistoryReplayTest.kt only). RUN commit: `b7eb88001db7fe6b188d1e042558b64bd1581d4d`. Dispatcher: `45690171315`. Replay: [`45690200848`](https://github.com/Eretikstas/Apex/actions/runs/45690200848), 1 plan + 3/3 replay jobs successful.
+- CAL usual, APP variant, seeds 1–3. Public summaries:
+
+| Seed | BG <70 % | BG <54 % | BG >180 % | CV % | Hypo g/day | Insulin U/day | ISF candidates / accepted | CR candidates / accepted |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 | 25 / 0 | 14 / 0 |
+| 2 | 4.0 | 0.1 | 4.2 | 27.7 | 24.11 | 10.92 | 37 / 0 | 15 / 0 |
+| 3 | 4.8 | 0.3 | 4.5 | 28.9 | 29.64 | 11.63 | 53 / 0 | 14 / 0 |
+| Mean | 4.93 | 0.30 | 4.80 | 28.77 | 28.99 | 11.44 | 115 / 0 | 43 / 0 |
+
+- ISF rejection reasons (115/115): meal 62, low in response window 40, distinct SMB within 6 h 13. CR rejection reasons (43/43): prior insulin 26, prior hypo/rebound 17. All three CR blocks and the ISF audit had zero accepted observations; gates FAIL for insufficient uncontaminated evidence. This is a diagnostic result, not a stop.
+- The mean replay metrics exactly match the Step 10 APP usual reference; CRAUDIT made no CR/ISF parameter writes. No dosing or learner behavior changed in this substep.
+- The source compile step and preceding helper/unit tests passed; full compile workflow [`45689360655`](https://github.com/Eretikstas/Apex/actions/runs/45689360655) was still assembling the laboratory APK when this note was written.
+- Next: Step 13b WATTR implementation and no-token APP control; then Step 13c planted positive/negative tests.
