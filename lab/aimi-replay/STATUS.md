@@ -629,8 +629,18 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 ### 2026-11-25, Claude: plan addition (user) — weight sweep again AFTER step 18
 
 - The old weight sweep (run 45071041692, 22.11) is dropped: uncalibrated model, the run failed.
-- After step 18 (not before): one run of the AutoISF weight tokens (WLOW, WHIGH, WACC, WBRK, WPP, WMIN, WMAX, each one
-  step up and one step down, alone) on APP (a) + CAL, usual scenario, seeds 1-3. Same table as step 11. Then STOP.
+- After step 18 (not before): a weight sweep on APP (a) + CAL, usual scenario, seeds 1-3, by
+  `AUTOISF_WEIGHTS_GUIDE.md` (ga-zelle 3.2 Quick Guide + BerNie FCL book). Rules from those sources:
+  1. One weight at a time, small steps, from the value the model uses now (`runTickAutoIsf`: accel 0.0, brake 0.2,
+     pp 0.01, lower 0.0, higher 0.0, dura 0.0, autoISF_min 0.7, autoISF_max 1.2). Stay in the author ranges.
+  2. Values: brake 0.1 / 0.3; pp 0.005 / 0.02; dura 0.2 / 0.5 (author: careful above 1.5); higher range 0.2;
+     lower range 0.2; accel 0.02 (author start) WITH brake = 30-40 % of accel (0.007), as the author pairs them.
+     autoISF_max 1.3 alone (as the clamp limits every weight).
+  3. Per row also report: how often each `_ISF` effect WON (only the winning effect acts, guide section 2), and how
+     often the min/max clamp cut the factor. A weight that never wins cannot help, write that.
+  4. Read results by meal phase (guide section 3): lows 2-4 h after meals point to pp / brake / accel too high.
+  5. This is a model result, not advice for the real loop (authors: basal/CR/ISF first, good CGM days only).
+  Same table as step 11 plus the two counts. Then STOP for Claude.
 
 ### 2026-11-25, Claude: numbers of steps 11, 11b, 13a checked against all 219 job logs — ALL MATCH
 
