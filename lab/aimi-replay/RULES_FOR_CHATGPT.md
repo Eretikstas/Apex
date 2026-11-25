@@ -133,3 +133,8 @@ Report format for every step: commit, run id, table, which assumptions failed. N
 pass rule. Then write a short final list: which tokens pass, how much they lower <70 on each scenario. STOP.
 
 Never in this chain: new learner formulas, src/main code, the app branch, real numbers of the child in the repo.
+
+## 6. Sources (user 25.11)
+
+New emulator parameters and training ranges come ONLY from `SOURCES.md` (official sources). No row there = do not
+use it, or write "our estimate" next to it in STATUS. Never invent a range from memory.
