@@ -626,6 +626,12 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude: plan addition (user) — weight sweep again AFTER step 18
+
+- The old weight sweep (run 45071041692, 22.11) is dropped: uncalibrated model, the run failed.
+- After step 18 (not before): one run of the AutoISF weight tokens (WLOW, WHIGH, WACC, WBRK, WPP, WMIN, WMAX, each one
+  step up and one step down, alone) on APP (a) + CAL, usual scenario, seeds 1-3. Same table as step 11. Then STOP.
+
 ### 2026-11-25, Claude: numbers of steps 11, 11b, 13a checked against all 219 job logs — ALL MATCH
 
 - Every reported mean (6 columns, usual scenario) equals the job summaries (checked by a script and, independently,
