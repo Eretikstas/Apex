@@ -207,6 +207,10 @@ jobs:
           grep -E "^e: " "$W/gradle.log" | head -40 || true
           exit $code
 
+      - name: Test synthetic day comparison tool
+        if: ${{ always() && contains(matrix.prefs, 'DUMPCSV') }}
+        run: python3 -m unittest discover -s lab/aimi-replay/tools -p 'test_compare_days.py' -v
+
       - name: Public synthetic summary
         if: ${{ always() && contains(matrix.prefs, 'SYNTH_') }}
         env:
@@ -241,7 +245,7 @@ jobs:
 
           # DUMPCSV is an explicit opt-in. The CSV contains only the synthetic virtual-child
           # series and is published separately; real replay inputs/results remain encrypted.
-          pref_tokens = [token for token in re.split(r"[,\\s]+", prefs) if token]
+          pref_tokens = [token for token in re.split(r"[,\s]+", prefs) if token]
           if "DUMPCSV" in pref_tokens:
               log_lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines() if log_path.is_file() else []
               stripped = [line.strip() for line in log_lines]
@@ -256,7 +260,7 @@ jobs:
               dump_dir = Path("out")
               dump_dir.mkdir(exist_ok=True)
               dump_path = dump_dir / "dump.csv"
-              dump_path.write_text("\\n".join(csv_lines) + "\\n", encoding="utf-8")
+              dump_path.write_text("\n".join(csv_lines) + "\n", encoding="utf-8")
               print(f"DUMPCSV artifact ready: {dump_path} ({len(csv_lines) - 1} 5-minute rows)")
 
           timed = [row for row in rows if isinstance(row, dict) and isinstance(row.get("t"), (int, float))]
