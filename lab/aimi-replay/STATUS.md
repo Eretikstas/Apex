@@ -935,3 +935,6 @@ workflows, no code outside `HistoryReplayTest.kt` and `lab/` without Claude and 
 - Dispatcher run: 45647794121 (queued at record time). Replay run: 45647793789 (queued at record time).
 - Grid: APP base prefs from app22_batch.json, seeds 1–3; MEALX 0.7/0.8/0.9 × CHGISF 1.0/1.1/1.2 × SBIAS 0.30/0.45; fixed TREAT_5 and LACAUSE. CHG_28 included to activate CHGISF. 3 × 3 × 2 × 3 = 54 jobs. Every job uses SYNTH_56; workflow fixes algo=autoisf, sim=true, learn=false.
 - Private target T is not written here. After all numeric summaries: calculate means over 3 seeds, distance to T across <70, <54, >180, CV and insulin U/day; rank top 3; then STOP. No code/workflow changes.
+
+- Dispatcher run 45647794121 failed before starting replay: repository-enforced guard reported "3 starts in 24 h already". No replay jobs ran; replay push run 45647793789 was skipped. This is a hard repository limit and was not bypassed.
+- The three successful RUN.txt dispatcher starts in the rolling window were 45622075003 (2026-11-25 13:17:31Z), 45629598681 (14:01:41Z), and 45640354963 (15:00:54Z). Earliest possible retry after the oldest expires: 2026-11-26 13:17:31Z (14:17:31 Europe/Paris), assuming no additional start and no active run.
