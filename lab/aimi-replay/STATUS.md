@@ -2,6 +2,20 @@
 
 ## Task (written by ChatGPT)
 
+### Side task — virtual/real CGM comparison (separate from RULES §5 chain)
+
+- Scope: synthetic virtual-child data only. No real CGM data, private profiles, or patient identifiers are written to the repository or public artifacts.
+- Added opt-in DUMPCSV in HistoryReplayTest.kt, OFF unless explicitly present in replay preferences. It exports virtual model true BG, sensor BG, total delivered insulin, logged meal carbs, and hypo-treatment carbs, aggregated into 5-minute rows. Basal is integrated from the one-minute delivered U/hour rate; SMB and manual boluses are added.
+- Added lab/aimi-replay/tools/compare_days.py (Python 3 + numpy only) and a synthetic-only unit test. The comparison reports hourly BG mean/SD, CV, 6-hour low/high percentages, overnight slope, meal response, ROC/drop percentiles, low episodes/context, and 30/60/120-minute autocorrelation. Thresholds are declared at the top of the script. Meal-bolus context is an explicitly labeled proxy because the requested CSV has combined insulin and no separate bolus column.
+- Updated the replay workflow to extract only the opt-in synthetic CSV into a separate artifact; private replay input and JSON output remain encrypted. The same workflow runs the comparison unit test when DUMPCSV is enabled.
+- Code commits: source export a6f9fb32; comparison script/test 01f14b43, 62e42cac; workflow/artifact/test wiring 28008c52, b0986df4.
+- Compile gate for exact current HEAD b0986df4f44ea016861e1f8c22865ce30bf52dc5: run 45712156657, currently in progress. No replay has been started.
+- No-token invariant reference (Step 13a APP usual, seed 1): BG <70 6.0%, BG <54 0.5%, BG >180 5.7%, CV 29.7%, hypo treatment 33.21 g/day, insulin 11.78 U/day. The DUMPCSV run must reproduce these exact summary values; any difference is a failure of the report-only invariant.
+- Planned one-job RUN entry after compile is green (same Step 13a APP(a)+CAL usual+seed 1 line, adding only DUMPCSV):
+  SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100,SBIAS_0.45,TREAT_5,CHG_28,CHGISF_1.2,MEALX_0.7,LACAUSE,CRAUDIT,DUMPCSV
+- This side task does not alter RULES §5, the chain's next step, learner formulas, clinical settings, or app source.
+
+
 ### Progress checklist — chain §5 (updated 2026-11-25 17:28 CET)
 
 - [x] Step 9b — calibration completed: 54/54 jobs; CAL accepted by Claude/user: `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`; ranking and distance recorded.
