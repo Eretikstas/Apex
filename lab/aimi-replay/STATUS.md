@@ -6,9 +6,29 @@
 
 - [x] Step 9b — calibration completed: 54/54 jobs; CAL accepted by Claude/user: `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`; ranking and distance recorded.
 - [x] Step 10 batch definition — 36 jobs assembled to match the six §5 scenarios, three seeds, and two variants; launched through RUN.txt commit `e997ab29b152abf2a8ae7f0bbd2ae45d82866991`.
-- [ ] Step 10 execution/results — RUN `45653668453` still active at last check: plan succeeded; first jobs page showed 29 replay jobs, 17 in progress and 12 queued; no replay completion confirmed. Await all 36 and collect numeric summaries before marking complete.
-- [ ] Step 11 — not started; requires completed Step 10 scenario baseline.
-- [ ] Step 12 — not started; requires Step 11 results and selection of passing tokens.
+- [x] Step 10 execution/results — replay run `45653668453`: 1 plan + 36/36 replay jobs completed successfully; all 36 public summaries extracted from job logs. APP vs no-learner comparison and scenario means recorded below.
+- [ ] Step 11 — first batch in preparation; 6 low-protection token variants, 6 scenarios x 3 seeds = 108 jobs (second 18-job batch reserved for the second Z2 threshold).
+- [ ] Step 12 — not started; depends on Step 11 pass-gate results.
+
+
+### 2026-11-25, Step 10 — calibrated virtual-child baseline — COMPLETE
+
+- CAL: `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`. RUN.txt start commit `e997ab29b152abf2a8ae7f0bbd2ae45d82866991`; replay run `45653668453`. GitHub API reports 37/37 jobs completed successfully (1 plan + 36 replay); all 36 result artifacts exist, and all 36 public summaries were extracted from their corresponding job logs. No encrypted artifact or key was used.
+- Six §5 scenarios, seeds 1–3, matched APP and APP-without-learner-cards. Means across seeds (columns: `<70 / <54 / >180 / CV / hypo g/day / insulin U/day`):
+
+| Scenario | APP | Without learner cards |
+|---|---:|---:|
+| usual | 4.93 / 0.30 / 4.80 / 28.77 / 28.99 / 11.44 | 8.17 / 0.77 / 2.13 / 28.47 / 43.87 / 12.11 |
+| MEALX one step lower | 4.70 / 0.17 / 4.57 / 28.17 / 27.08 / 11.13 | 8.07 / 0.67 / 1.50 / 28.00 / 43.45 / 11.80 |
+| CHGISF one step higher | 5.87 / 0.40 / 3.50 / 28.20 / 33.33 / 10.74 | 9.37 / 0.73 / 1.03 / 27.80 / 51.31 / 11.37 |
+| CHGISF one step lower | 4.37 / 0.17 / 6.37 / 28.93 / 24.94 / 12.36 | 6.33 / 0.33 / 2.70 / 28.23 / 35.48 / 12.80 |
+| DRIFT_2 | 4.37 / 0.17 / 7.10 / 29.37 / 25.36 / 12.73 | 6.10 / 0.33 / 3.43 / 28.57 / 34.59 / 13.12 |
+| NOISE_0.12 | 11.97 / 2.97 / 14.33 / 39.80 / 55.95 / 12.58 | 15.27 / 3.80 / 8.47 / 38.07 / 70.77 / 13.26 |
+
+- Matched safety comparison across all 18 scenario/seed pairs: APP had lower `<70` in 18/18, `<54` was never higher (17 lower, 1 equal), and hypo treatment was lower in 18/18. Thus the existing APP learner cards pass the §4 low/hypo comparison against their removal.
+- Trade-off: APP had higher `>180` in every scenario mean and higher CV in most scenarios. The low-reduction benefit is accompanied by more hyperglycemia/variability; this is a synthetic replay comparison, not a clinical recommendation.
+- Public summary code labels each job with the first three fixed preference tokens only; scenario mapping was reconstructed from the committed RUN.txt order (six scenarios × three seeds × APP/no-card pair). The numeric rows themselves were read from each job's emitted summary.
+- Step 10 complete; proceed to Step 11 per §5.
 
 
 ### 2026-11-25, Task 9 hypo-model calibration — RUNNING
