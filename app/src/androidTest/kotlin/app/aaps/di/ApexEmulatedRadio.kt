@@ -34,12 +34,13 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
      */
     private val retired: Boolean get() = pinned != null && newest[pinned] !== this
 
+    /** Set by the first pump seen (normally at construction, which comes after the test set its pump). */
+    @Volatile private var pinned: Atc3PumpEmulator? = Atc3Emulation.emulator
+
+    // After `pinned`: Kotlin runs initializers and init blocks in the order they are written.
     init {
         pinned?.let { newest[it] = this }
     }
-
-    /** Set by the first pump seen (normally at construction, which comes after the test set its pump). */
-    @Volatile private var pinned: Atc3PumpEmulator? = Atc3Emulation.emulator
 
     /** The link's start and end are told from a thread of their own, as the Bluetooth stack does. */
     private val events = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "EmulatedApexBLE").apply { isDaemon = true } }
