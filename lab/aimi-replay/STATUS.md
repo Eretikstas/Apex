@@ -2,6 +2,17 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-25, Task 9 hypo-model calibration — RUNNING
+
+- Claude's updated decision is authoritative: Task 3 (CHG_28 matched pairs) is CANCELLED; Tasks 1–3 are closed. See `RULES_FOR_CHATGPT.md` §5, commit `2f7f54b4458cfaf2732874b3f1fb4e00d4e45c1c`.
+- Step 0 token inventory completed and accepted. No token exists for “eaten less than recorded”; none was invented.
+- One 72-job batch started by replacing the single active batch line in `RUN.txt`; start commit: `4eaf23742086141fe7d9d08b57e9c373db06f790`.
+- Dispatcher run: `45640354963` (in progress). Replay run: `45640354873` (in progress).
+- Grid: APP base prefs from `app22_batch.json`, seeds 1–3; insulin action after day 28: `CHGISF_1.0/1.1/1.2/1.3`; low-end sensor bias: `SBIAS_0.15/0.30/0.45); hypo treatment: `TREATL` vs `TREAT_5`; diagnostic token: `LACAUSE`. 4 × 3 × 2 × 3 = 72 jobs. All jobs use the workflow's fixed `algo=autoisf`, `sim=true`, `learn=false`.
+- Compile gate: `45630910694` succeeded on commit `bae268fabd2fd26cb561b5e735f7548df33167b3`; no replay/model source was changed for Task 9.
+- Awaiting public run summary. Target bands remain private and are not recorded here. No calibration claim is made. After numeric results and top-three ranking are recorded, STOP for Claude review.
+
+
 ### 2026-11-25, LAPROTECT batch 45629646841 — completed; safety pass NOT met; stop before CHG_28
 
 - Fix commit: `ed1085154d72f3dab1d27edc58f827c61629a947`; compile run `45624674552` green.
