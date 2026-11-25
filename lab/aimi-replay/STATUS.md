@@ -2,6 +2,15 @@
 
 ## Task (written by ChatGPT)
 
+### Progress checklist — chain §5 (updated 2026-11-25 17:28 CET)
+
+- [x] Step 9b — calibration completed: 54/54 jobs; CAL accepted by Claude/user: `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`; ranking and distance recorded.
+- [x] Step 10 batch definition — 36 jobs assembled to match the six §5 scenarios, three seeds, and two variants; launched through RUN.txt commit `e997ab29b152abf2a8ae7f0bbd2ae45d82866991`.
+- [ ] Step 10 execution/results — RUN `45653668453` still active at last check: plan succeeded; first jobs page showed 29 replay jobs, 17 in progress and 12 queued; no replay completion confirmed. Await all 36 and collect numeric summaries before marking complete.
+- [ ] Step 11 — not started; requires completed Step 10 scenario baseline.
+- [ ] Step 12 — not started; requires Step 11 results and selection of passing tokens.
+
+
 ### 2026-11-25, Task 9 hypo-model calibration — RUNNING
 
 - Claude's updated decision is authoritative: Task 3 (CHG_28 matched pairs) is CANCELLED; Tasks 1–3 are closed. See `RULES_FOR_CHATGPT.md` §5, commit `2f7f54b4458cfaf2732874b3f1fb4e00d4e45c1c`.
