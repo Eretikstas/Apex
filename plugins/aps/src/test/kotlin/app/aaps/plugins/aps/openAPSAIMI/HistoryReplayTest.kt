@@ -2711,3 +2711,4 @@ class HistoryReplayTest {
             )
         }
 }
+// Compile-gate marker: no replay behavior change.
