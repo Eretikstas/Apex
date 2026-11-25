@@ -89,6 +89,14 @@ Pass rule here: <54 not higher than (a), <70 lower than (a) by at least 10 % rel
 (54 jobs). Table as in step 11 with the gate result per row. Failing the 10 % gate is NOT a stop: it only means
 "not chosen". Report both runs, then STOP (step 12 waits for Claude).
 
+**Step 13 (after 11b, go on without asking): learner attribution, see `LEARNER_ATTRIBUTION_SPEC.md`.**
+13a. Implement token `CRAUDIT` (counting only, no behaviour change) and run the CR/ISF audit on CAL usual, 3 seeds.
+13b. Implement token `WATTR` (weight cards, report-only, rules 1–6 of the spec) in HistoryReplayTest.kt, OFF by
+     default; compile green; check that without the token the APP control numbers are unchanged.
+13c. Run the planted-cause test (spec section 3) with `WATTR` and `CRAUDIT`: positive and negative cases, 3 seeds.
+     Report the score table per card. This is a test of the learner's judgement: a bad score is a RESULT, not a stop.
+Then STOP. Do not apply any weight change in the model; WATTR only reports.
+
 **Step 12 — the best together.** Combine the tokens that passed step 11 (all of them, and the best 2). Same table and
 pass rule. Then write a short final list: which tokens pass, how much they lower <70 on each scenario. STOP.
 
