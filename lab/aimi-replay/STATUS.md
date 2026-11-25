@@ -516,6 +516,16 @@ Weights/controls explicitly present in the source:
 
 **Acceptance:** Claude returns a source-linked audit and proposed test matrix; any formula/default/UI change requires separate review and explicit user approval. This task is an app-branch handoff only; it does not authorize ChatGPT to edit autoisf-atc3 or port anything from the lab.
 
+
+### 2026-11-25, LAPROTECT pct- source correction
+
+- Fixed `learnAllCheck()` so the `pct-` branch uses `protectionLowPct` when `LAPROTECT` is enabled and retains `percentageLearningLowPct` otherwise:
+  `(if (laProtect) protectionLowPct else percentageLearningLowPct) > 4.0`.
+- Added a deterministic boundary/source-selection test: LAPROTECT=true selects the all-cause rate (including the strict >4.0 boundary); LAPROTECT=false preserves the legacy learning-only rate.
+- Commit: `ed1085154d72f3dab1d27edc58f827c61629a947`.
+- Compile check is pending; commit status currently reports `pending` with no checks yet. Do not write RUN.txt or start replay until this exact commit has a green compile result.
+- The next 24-job batch remains as specified in RULES_FOR_CHATGPT.md. Before starting it, re-check the exact base / APP / seed 1 control against `2.7 / 0.0 / 8.2 / 28.4 / 27.64 / 14.83`, check that no replay is in progress, and verify the 24-hour start limit. No replay has been started by this task.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
