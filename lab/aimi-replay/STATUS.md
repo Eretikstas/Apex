@@ -9,11 +9,20 @@
 - Added lab/aimi-replay/tools/compare_days.py (Python 3 + numpy only) and a synthetic-only unit test. The comparison reports hourly BG mean/SD, CV, 6-hour low/high percentages, overnight slope, meal response, ROC/drop percentiles, low episodes/context, and 30/60/120-minute autocorrelation. Thresholds are declared at the top of the script. Meal-bolus context is an explicitly labeled proxy because the requested CSV has combined insulin and no separate bolus column.
 - Updated the replay workflow to extract only the opt-in synthetic CSV into a separate artifact; private replay input and JSON output remain encrypted. The same workflow runs the comparison unit test when DUMPCSV is enabled.
 - Code commits: source export a6f9fb32; comparison script/test 01f14b43, 62e42cac; workflow/artifact/test wiring 28008c52, b0986df4.
-- Compile gate for exact current HEAD b0986df4f44ea016861e1f8c22865ce30bf52dc5: run 45712156657, currently in progress. No replay has been started.
+- Compile gate for the DUMPCSV code/workflow completed successfully: run 45712156657. One replay was then launched; see completion record below.
 - No-token invariant reference (Step 13a APP usual, seed 1): BG <70 6.0%, BG <54 0.5%, BG >180 5.7%, CV 29.7%, hypo treatment 33.21 g/day, insulin 11.78 U/day. The DUMPCSV run must reproduce these exact summary values; any difference is a failure of the report-only invariant.
-- Planned one-job RUN entry after compile is green (same Step 13a APP(a)+CAL usual+seed 1 line, adding only DUMPCSV):
+- Executed one-job RUN entry (same Step 13a APP(a)+CAL usual+seed 1 line, adding only DUMPCSV):
   SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100,SBIAS_0.45,TREAT_5,CHG_28,CHGISF_1.2,MEALX_0.7,LACAUSE,CRAUDIT,DUMPCSV
 - This side task does not alter RULES §5, the chain's next step, learner formulas, clinical settings, or app source.
+
+
+### DUMPCSV execution — 2026-11-25 — REPLAY OK; TOOL TEST BLOCKED
+
+- RUN commit: b926c1f7ed226a58ecd3a55d287f598e1d0ab00d. Dispatcher: [45715276679](https://github.com/Eretikstas/Apex/actions/runs/45715276679). Replay: [45715301756](https://github.com/Eretikstas/Apex/actions/runs/45715301756), one plan + one replay job.
+- Synthetic replay itself passed: 16,128 ticks, 0 failed. The exported CSV was extracted from the Gradle log and uploaded as `out/dump.csv`, 3,226 five-minute rows. Artifact `aimi-replay-result-0`, ID 15068719425: [download](https://github.com/Eretikstas/Apex/actions/runs/45715301756/artifacts/15068719425). Artifact contains `dump.csv` and encrypted `result.enc`; no real patient data.
+- Report-only invariant: public synthetic summary exactly matches Step 13a seed 1: BG <70 6.0%, BG <54 0.5%, BG >180 5.7%, CV 29.7%, hypo treatment 33.21 g/day, insulin 11.78 U/day.
+- Overall GitHub job is FAILURE only because the comparison unit-test step could not import NumPy: `ModuleNotFoundError: No module named 'numpy'`. The test did not execute; this is an environment/dependency setup defect, not a failing comparison assertion. Fix CI to install numpy before rerunning the unit test. Do not claim the comparison tool test passed.
+- DUMPCSV did not alter replay metrics. This side task does not advance or modify RULES §5 chain.
 
 
 ### Progress checklist — chain §5 (updated 2026-11-25 17:28 CET)
