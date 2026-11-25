@@ -207,6 +207,10 @@ jobs:
           grep -E "^e: " "$W/gradle.log" | head -40 || true
           exit $code
 
+      - name: Install NumPy for synthetic day comparison tool
+        if: ${{ always() && contains(matrix.prefs, 'DUMPCSV') }}
+        run: python3 -m pip install --disable-pip-version-check numpy
+
       - name: Test synthetic day comparison tool
         if: ${{ always() && contains(matrix.prefs, 'DUMPCSV') }}
         run: python3 -m unittest discover -s lab/aimi-replay/tools -p 'test_compare_days.py' -v
@@ -384,3 +388,19 @@ jobs:
             echo "Replay failed with exit code $REPLAY_EXIT_CODE"
             exit 1
           fi
+  comparison-test:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout replay branch
+        uses: actions/checkout@v5
+        with:
+          ref: aimi-replay
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install NumPy
+        run: python3 -m pip install --disable-pip-version-check numpy
+      - name: Test synthetic day comparison tool
+        run: python3 -m unittest discover -s lab/aimi-replay/tools -p 'test_compare_days.py' -v
