@@ -75,6 +75,10 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # By default only the default branch (main) writes the Gradle cache: this branch never did, so every run
+          # downloaded everything again and Maven Central answered 429.
+          cache-read-only: false
 
       # Robolectric fetches its Android jars from Maven Central while the tests run; Central answered 429 (too many
       # requests) and tests failed. The jars only change with the Robolectric version, so they are kept in a cache.
@@ -226,6 +230,10 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # By default only the default branch (main) writes the Gradle cache: this branch never did, so every run
+          # downloaded everything again and Maven Central answered 429.
+          cache-read-only: false
 
       # Robolectric fetches its Android jars from Maven Central while the tests run; Central answered 429 (too many
       # requests) and tests failed. The jars only change with the Robolectric version, so they are kept in a cache.
