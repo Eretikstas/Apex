@@ -803,3 +803,19 @@ Log-count follow-up for run 45296311819: the full job log contains 935 Android r
 - Fixed the matcher in commit `f34a1c520826c447e42f13a152d73b2756ebc65c` to `grep -Eq 'OK \\([1-9][0-9]* tests?\\)' out/instrument.txt`. The workflow file change should trigger a fresh smoke run; confirm its final status before claiming the workflow passes.
 - The smoke test remains a Ring UI test only. It does not validate AutoISF settings rendering or persistence.
 - Confirmed the AutoISF settings tree is nested under `openapsautoisf_settings` with child screen key `auto_isf_settings`, containing master toggle, min/max, six weights, and IOB threshold. Dedicated AutoISF instrumentation coverage remains pending.
+
+### 2026-11-25, Claude: control run of the open summary — PASS
+
+Run 45620155708 (code be928e7f51, `sim=true`, `algo=autoisf`, 1 job: base / APP / seed 1). Public summary:
+`<70 2.7 % | <54 0.0 | >180 8.2 | CV 28.4 | hypo 27.64 g/day | insulin 14.83 U/day`. Identical to Claude's own
+decryption of the same job in run 45099362646 (2.7 / 0.0 / 8.2 / 28.4 / 27.6 / 14.8): the summary is correct, TDD in
+the expected 14–17 range, and "no token = old result" holds. From now on ChatGPT reads results from the summary.
+
+Review of LAPROTECT (code be928e7f51): the interlock and dura part are right and well tested. **One approved point is
+not done:** with LAPROTECT, "percentage down" must use the all-cause protection low rate (`protectionLowPct`), not
+`percentageLearningLowPct` (fasting / meal_bolus only). Fix: in `learnAllCheck`, the `pct-` branch condition becomes
+`(if (laProtect) protectionLowPct else percentageLearningLowPct) > 4.0`. Rebound lows counted as protection lows:
+accepted (more cautious than the spec).
+
+Rules (see COORDINATION.md): APP23 used `algo=aimi` — not comparable, discard; lab runs are `algo=autoisf` only. No new
+workflows, no code outside `HistoryReplayTest.kt` and `lab/` without Claude and the user.
