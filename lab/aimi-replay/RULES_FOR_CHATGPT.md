@@ -17,7 +17,7 @@ Breaking a rule = stop, write in STATUS.md "Task" what you wanted to do and why,
 1. The code is at a commit with a green compile check (`aimi-replay-compile.yml`).
 2. Write ONE batch line into `lab/aimi-replay/RUN.txt` (under the comment line) and commit. That commit starts it.
 3. Every job has `SYNTH_<days>`; the run is always `algo=autoisf`, `sim=true` (fixed by the workflow — AIMI runs are
-   not about the child and are not comparable). At most 120 jobs; at most 3 starts in 24 h; not while another lab run
+   not about the child and are not comparable). At most 120 jobs; at most 6 starts in 24 h; not while another lab run
    goes (the workflow refuses, it does not queue).
 4. Token lists come from `lab/aimi-replay/app22_batch.json` (APP per scenario and seed) plus your test tokens. Never
    guess a token; never drop the scenario tokens (`CHG_28,CHGISF_x`, `MEALX_x`, `DAYNEED_x`, ...).

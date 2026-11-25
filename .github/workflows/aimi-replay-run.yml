@@ -1,6 +1,6 @@
 # The only way ChatGPT starts lab runs: commit one batch line to lab/aimi-replay/RUN.txt.
 # Checks: every job is the virtual child (SYNTH_), algo is autoisf, at most 120 jobs, no other lab run going,
-# at most 3 starts in 24 h. The batch is read from the file into a variable, never put into the script text.
+# at most 6 starts in 24 h. The batch is read from the file into a variable, never put into the script text.
 name: AIMI replay from RUN.txt
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
           SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
           STARTS=$(gh api "repos/$REPO/actions/workflows/aimi-replay-run.yml/runs?per_page=30&status=success" \
             --jq "[.workflow_runs[] | select(.created_at > \"$SINCE\")] | length")
-          [ "$STARTS" -lt 3 ] || { echo "3 starts in 24 h already: refused"; exit 1; }
+          [ "$STARTS" -lt 6 ] || { echo "6 starts in 24 h already: refused"; exit 1; }
           gh workflow run aimi-replay.yml --repo "$REPO" --ref aimi-replay \
             -f sim=true -f algo=autoisf -f learn=false -f batch="$BATCH"
           echo "started: $JOBS jobs (algo autoisf, sim true). Results: the public summary of the aimi-replay.yml run."
