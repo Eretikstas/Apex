@@ -60,12 +60,31 @@ Do NOT stop for anything else. In particular:
 - Waiting for a run is not a reason to ask: check it again later and go on.
 - At the end of a task: write the report, then STOP (that is the normal end, not a question).
 
-## 5. Your next task (updated by Claude 25.11, evening)
+## 5. Your next tasks: ONE CHAIN, go from step to step without asking (Claude + user 25.11)
 
-Task 9 run is reviewed (see Results). **Task 9b**: one run, 54 jobs, start it now without asking.
-- Base: the same APP base prefs as in Task 9, `LACAUSE` on, `TREAT_5`, seeds 1–3.
-- Grid: `MEALX_0.7 / 0.8 / 0.9` x `CHGISF_1.0 / 1.1 / 1.2` x `SBIAS_0.30 / 0.45` (one SBIAS token per job, replace
-  the base one; one MEALX per job). 3 x 3 x 2 x 3 seeds = 54 jobs.
-- Report in STATUS "Task": table (mean of 3 seeds): <70, <54, >180, CV, hypo g/day, insulin U/day, and the distance
-  to the private target T the user gives in the chat (T now also has a daily-insulin band). Rank the top 3. STOP.
-- No pass rule for this task. Stop earlier only for RULES 4a items 2–4.
+Goal: a learner that really lowers the lows of the real child, proven on a model that looks like the child, before
+the phone bench. Work through the chain. After each step write its table to STATUS "Task" and go on. Stop only by
+RULES 4a, or at the end of the chain. One run per step (no daily limit any more).
+
+**Step 9b — calibration** (as in the user's chat text). Then pick the calibration yourself: the combination with the
+smallest distance to T whose <54 is at most the T band; on a tie take the one with insulin closer to T. Call its
+model tokens `CAL` (the MEALX / CHGISF / SBIAS / TREAT tokens of that combination). Write which one you took.
+If the best distance is still large (more than 3), still go on, but say so in big letters.
+
+**Step 10 — baseline on the calibrated model ("virtual child").** 6 scenarios x seeds 1–3 x 2 variants = 36 jobs.
+Scenarios = APP base prefs + `CAL` + one of: nothing (usual), `MEALX` one step lower than CAL (eats even less),
+`CHGISF` one step higher (insulin stronger), `CHGISF` one step lower (weaker), `DRIFT_2`, `NOISE_0.12`.
+Variants: (a) APP as is; (b) APP without the learner cards (remove LEARNB5, LEARNDURA, PCTCARD and their helper
+tokens LBLOWMAX_*, LBFILL2, LBMIN_*, PCTMAX_*; keep everything else). Table: <70, <54, >180, CV, hypo g/day, insulin.
+This answers: does today's learner help this child or not.
+
+**Step 11 — what lowers the lows.** Take the existing tokens that act on lows (find them in HistoryReplayTest.kt
+and write their line numbers): at least `GUARDCHAIN`, `CHAIN_<pct>` (try 2 values), `SMARTL`, `LAPROTECT`, and, if
+a token exists for the SMB protection threshold or the hypo temp target, 2 values of it. Each one ALONE on top of
+variant (a), the 6 scenarios x 3 seeds. Max 120 jobs per run; split into 2 runs if needed.
+Pass rule here: <54 not higher than (a), <70 lower than (a) by at least 10 % relative, >180 at most +2 points.
+
+**Step 12 — the best together.** Combine the tokens that passed step 11 (all of them, and the best 2). Same table and
+pass rule. Then write a short final list: which tokens pass, how much they lower <70 on each scenario. STOP.
+
+Never in this chain: new learner formulas, src/main code, the app branch, real numbers of the child in the repo.
