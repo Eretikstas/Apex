@@ -43,8 +43,13 @@ counterfactual >= 50 % rule, "3 of 7 days", the 3 h window before a low, "opposi
 
 ## 2b. CR / ISF / basal: use the Autotune method (verified), not a new one
 
-- Reuse Autotune's categorization (AutotunePrep: CSF, UAM, ISF, basal) and its tuning (AutotuneCore) as the base of
-  the CR / ISF / basal cards. Do not invent new formulas for them.
+- WARNING (sources): Autotune is NOT valid while AutoISF changes ISF. AutoISF Quick Guide 3.2.0: fast ISF changes
+  "render the use of Autosense and Autotune useless"; use Autotune only with the ISF-changing AutoISF features off.
+  Tim Street / BerNie "Using Autotune V.1": with dynamic ISF, basal and ISF results are "likely incorrect".
+- So: (a) ISF / CR per part of the day by BerNie's signs ("ISF determination V.4.1"): roller coaster or TBR cycling
+  0 <-> high -> ISF too strong; does not reach target -> too weak; change 10–20 % for that part of the day; night by
+  IOB; CR by the AAPS post-meal rule; first rule out a blocked cannula for highs. (b) Autotune categorization only on
+  stretches where the AutoISF factor was 1.0 (OUR assumption; the authors say "switch the features off" - test it).
 - Known limits from the docs: one ISF and one CR per day only (no circadian tuning); carbs must be entered exactly
   (else basal is raised at meal times); hypo treatments must be entered (else UAM-as-basal makes an amplifying cycle).
 - Post-meal rule (AAPS docs): high after the meal AND still high after full absorption -> CR stronger; high while COB
