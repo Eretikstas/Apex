@@ -45,7 +45,8 @@ Breaking a rule = stop, write in STATUS.md "Task" what you wanted to do and why,
 The user wants you to finish a task without asking. Stops cost the user's time and Claude's limits.
 
 STOP and wait for Claude ONLY when:
-1. a LEARNER-variant run breaks the pass rule (section 4), or a control does not match its reference numbers.
+1. a control does not match its reference numbers, or a learner change MEANT FOR THE APP breaks the pass rule.
+   In screening / test steps (11, 11b, 13–18) a candidate that fails the pass rule is a RESULT: report it, go on.
    Calibration runs have NO pass rule (they are meant to have more lows): report the table and the ranking;
 2. the task needs something section 1 forbids (a workflow, the app branch, src/main code, a new learner behaviour
    that gives more insulin or weakens a protection);

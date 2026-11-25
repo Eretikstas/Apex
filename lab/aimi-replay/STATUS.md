@@ -626,6 +626,14 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude: step 11b reviewed — SMB protection threshold up does not help; go on with 13–18
+
+- Z2 126/139/150 (alone or with GUARDCHAIN): <70 5.0–5.3 vs APP 4.93, <54 0.20–0.27 vs 0.30, hypo grams about the
+  same. The differences are within seed noise; a higher threshold gives no clear gain on the calibrated model.
+  Decision: no Z2 change from the lab.
+- The stop was not needed: in a SCREENING step a candidate that fails is a result. RULES 4a item 1 now says so.
+- Go on now: step 13, then 14, 15, 16, 17, 18. Report after each step, STOP only at the end of 18.
+
 ### 2026-11-25, Claude: steps 10 and 11 reviewed
 
 - Step 10 is the main result: on the virtual child the app learner (APP) clearly lowers lows against no learner
