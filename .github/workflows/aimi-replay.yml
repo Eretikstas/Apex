@@ -239,6 +239,26 @@ jobs:
           if not isinstance(rows, list) or not rows:
               raise SystemExit("synthetic replay output is empty or invalid")
 
+          # DUMPCSV is an explicit opt-in. The CSV contains only the synthetic virtual-child
+          # series and is published separately; real replay inputs/results remain encrypted.
+          pref_tokens = [token for token in re.split(r"[,\\s]+", prefs) if token]
+          if "DUMPCSV" in pref_tokens:
+              log_lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines() if log_path.is_file() else []
+              stripped = [line.strip() for line in log_lines]
+              try:
+                  begin = stripped.index("AIMI_DUMPCSV_BEGIN")
+                  end = stripped.index("AIMI_DUMPCSV_END", begin + 1)
+              except ValueError:
+                  raise SystemExit("DUMPCSV token was set but CSV markers are missing from the replay log")
+              csv_lines = stripped[begin + 1:end]
+              if len(csv_lines) < 2 or not csv_lines[0].startswith("time_min,"):
+                  raise SystemExit("DUMPCSV output is empty or has an invalid header")
+              dump_dir = Path("out")
+              dump_dir.mkdir(exist_ok=True)
+              dump_path = dump_dir / "dump.csv"
+              dump_path.write_text("\\n".join(csv_lines) + "\\n", encoding="utf-8")
+              print(f"DUMPCSV artifact ready: {dump_path} ({len(csv_lines) - 1} 5-minute rows)")
+
           timed = [row for row in rows if isinstance(row, dict) and isinstance(row.get("t"), (int, float))]
           if not timed:
               raise SystemExit("synthetic replay output has no tick timestamps")
@@ -346,7 +366,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aimi-replay-result-${{ matrix.i }}
-          path: out/result.enc
+          path: |
+            out/result.enc
+            out/dump.csv
           if-no-files-found: ignore
           retention-days: 7
       - name: Preserve replay failure status
