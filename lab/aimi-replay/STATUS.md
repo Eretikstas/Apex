@@ -626,6 +626,16 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude: numbers of steps 11, 11b, 13a checked against all 219 job logs — ALL MATCH
+
+- Every reported mean (6 columns, usual scenario) equals the job summaries (checked by a script and, independently,
+  by a free model). No job without a summary. Good work.
+- Notes: `CHAIN_75` gives exactly the APP numbers in the usual scenario (probably the default value = no effect);
+  `GUARDCHAIN` + `Z2_139` equals `Z2_139` alone in several scenarios (GUARDCHAIN may not act at that threshold).
+  Say in the 13c report whether that is expected.
+- New file `STRESS_SCENARIOS_DRAFT.md`: ideas for hard days and negative tests, with Claude corrections at the top
+  (CHGISF direction: higher = insulin STRONGER, code line 1750). Not a task yet: do NOT run it before step 18.
+
 ### 2026-11-25, Claude: step 13b code review (commits 0f67afb6, 220d27a7, d0825e03) — fix before the 13b run
 
 1. **BUG, spec rule 5 is off.** `wAttrOtherProposalTimes` (HistoryReplayTest.kt line 1042) is declared and checked
