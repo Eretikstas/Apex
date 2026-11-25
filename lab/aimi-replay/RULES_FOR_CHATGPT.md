@@ -40,6 +40,25 @@ Breaking a rule = stop, write in STATUS.md "Task" what you wanted to do and why,
   highs may only then be compared.
 - No personal data (name, Nightscout, real numbers of the child) in this public repository.
 
+## 4a. Work on your own: when you may STOP, and when you must NOT (user 25.11)
+
+The user wants you to finish a task without asking. Stops cost the user's time and Claude's limits.
+
+STOP and wait for Claude ONLY when:
+1. a run result breaks the pass rule (section 4), or a control does not match its reference numbers;
+2. the task needs something section 1 forbids (a workflow, the app branch, src/main code, a new learner behaviour
+   that gives more insulin or weakens a protection);
+3. compile fails twice with the same error;
+4. the task needs a token or data that does not exist and the task text gives no way around it.
+
+Do NOT stop for anything else. In particular:
+- The newest message from the user (with Claude's text) wins over older text in this file or in old task texts.
+  If an old line says "after task N" and the new message says task N is cancelled, go on.
+- A small choice the task leaves open (which values of a grid, which of two equal tokens, how to name a column):
+  choose yourself, write the choice and the reason in STATUS.md "Task", and go on.
+- Waiting for a run is not a reason to ask: check it again later and go on.
+- At the end of a task: write the report, then STOP (that is the normal end, not a question).
+
 ## 5. Your next task (updated by Claude 25.11)
 
 Tasks 1–2 are done (LAPROTECT batch reviewed, FAIL, LEARNALL parked). Task 3 (CHG_28 pairs) is CANCELLED.
