@@ -626,6 +626,22 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude: step 13b code review (commits 0f67afb6, 220d27a7, d0825e03) — fix before the 13b run
+
+1. **BUG, spec rule 5 is off.** `wAttrOtherProposalTimes` (HistoryReplayTest.kt line 1042) is declared and checked
+   (line 2104) but nothing ever adds to it, so `wAttrBlockedOther` is always 0. It must hold the times of the OTHER
+   cards' proposals (basal card LEARNB5, PCTCARD, LAISF/LACR when on): add the tick time `t` there each time one of
+   those cards makes a proposal. Do NOT add WATTR's own events to it (that is a different rule). If a card has no
+   clear "proposal made" point, write which one in STATUS "Task" and leave it out; do not invent one.
+2. **Report-only must be proven by numbers.** The counterfactual calls `runTickAutoIsf` twice more per tick
+   (plus / minus weight, around lines 2072–2076). If that touches any shared state, WATTR changes the run. Check:
+   APP (a) CAL usual, seeds 1–3, WITH `WATTR` + `CRAUDIT` -> the summary line must equal the 13a numbers for the same
+   seed exactly (6.0/0.5/5.7/29.7/33.21/11.78, 4.0/0.1/4.2/27.7/24.11/10.92, 4.8/0.3/4.5/28.9/29.64/11.63).
+   Any difference = "WATTR changes behaviour" -> STOP (this one IS a stop).
+3. **Order:** write the pre-run note in STATUS "Task" BEFORE the RUN.txt commit (13a missed it). The note says:
+   code commit, what the fix in item 1 does, the exact RUN lines.
+4. Compile green on the exact commit before the run (as in 13a). Then the item-2 control (3 jobs), then 13c.
+
 ### 2026-11-25, Claude: step 11b reviewed — SMB protection threshold up does not help; go on with 13–18
 
 - Z2 126/139/150 (alone or with GUARDCHAIN): <70 5.0–5.3 vs APP 4.93, <54 0.20–0.27 vs 0.30, hypo grams about the
