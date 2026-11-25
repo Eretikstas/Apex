@@ -1026,10 +1026,39 @@ class HistoryReplayTest {
         val replayTokens = prefsText.split(Regex("[,\\s]+")).filter { it.isNotBlank() }.toSet()
         val causalFilter = replayTokens.contains("LACAUSE")
         val crAudit = replayTokens.contains("CRAUDIT")
+        val wAttr = replayTokens.contains("WATTR")
+        val laProtect = replayTokens.contains("LAPROTECT")
+        require(!wAttr || causalFilter) { "WATTR requires LACAUSE for causal-window exclusions" }
+        class WAttrTick(
+            val t: Long, val day: Int, val weight: String?, val impactPct: Double, val clamped: Boolean,
+            val actualUnits: Double, val plusUnits: Double, val minusUnits: Double, val isf: Double,
+            val afterHypo: Boolean, val afterManual: Boolean, val afterMeal: Boolean, val mealBolus: Boolean,
+            val oldCannula: Boolean, val sensorGap: Boolean, val falseLow: Boolean, val illness: Boolean,
+            val activity: Boolean, val tempTarget: Boolean, val noisy: Boolean
+        )
+        class WAttrEvent(val t: Long, val day: Int, val weight: String, val direction: String, val miss: String, val explainedPct: Double)
+        val wAttrTicks = ArrayList<WAttrTick>()
+        val wAttrEvents = ArrayList<WAttrEvent>()
+        val wAttrOtherProposalTimes = ArrayList<Long>()
+        var wAttrBlockedClean = 0; var wAttrBlockedOther = 0; var wAttrCrossings = 0
+        var lastWAttrBg: Double? = null
         val laProtect = replayTokens.contains("LAPROTECT")
         val require3Days = prefsText.contains("LADAYS")
         val pctBack = prefsText.contains("LAPCTBACK")
         fun rowDay(r: JSONObject) = ((r.getLong("t") - t0) / 86_400_000L).toInt()
+        fun weightValue(w: AisfWeights, name: String): Double = when (name) {
+            "acce" -> w.acce; "brake" -> w.brake; "pp" -> w.pp; "dura" -> w.dura; "lower" -> w.lower; else -> w.higher
+        }
+        fun withWeight(w: AisfWeights, name: String, value: Double): AisfWeights = when (name) {
+            "acce" -> w.copy(acce = value); "brake" -> w.copy(brake = value); "pp" -> w.copy(pp = value);
+            "dura" -> w.copy(dura = value); "lower" -> w.copy(lower = value); else -> w.copy(higher = value)
+        }
+        fun weightStep(name: String) = when (name) { "acce" -> 0.01; "brake" -> 0.02; "pp" -> 0.001; "dura" -> 0.10; else -> 0.02 }
+        fun sensitivityWith(weights: AisfWeights, bg: List<GV>, bgTimes: LongArray, at: Long, tick: JSONObject): Double {
+            val saved = aw
+            aw = weights
+            return try { autoIsf321Sens(bg, bgTimes, at, tick) } finally { aw = saved }
+        }
         fun distinctDays(rows: List<JSONObject>) = rows.map { rowDay(it) }.distinct().size
         fun enoughDays(rows: List<JSONObject>, minimum: Int = 3) = !require3Days || distinctDays(rows) >= minimum
         fun priorEvent(now: Long, minutes: Long, key: String): Boolean {
