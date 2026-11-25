@@ -149,6 +149,10 @@ class HistoryReplayTest {
     private fun protectionBlocksInsulinIncrease(validDays: Int, lowPct: Double): Boolean =
         validDays < 3 || lowPct > 3.0
 
+    // Test oracle for the LAPROTECT pct- source switch.
+    private fun percentageDecreaseGate(laProtect: Boolean, protectionLowPct: Double, percentageLearningLowPct: Double): Boolean =
+        (if (laProtect) protectionLowPct else percentageLearningLowPct) > 4.0
+
     private fun percentageRestoreReady(
         pctBack: Boolean, blocked: Boolean, pctNow: Double, eligibleLowPct: Double, consecutiveChecks: Int,
     ): Boolean = pctBack && !blocked && pctNow < 0.9999 && eligibleLowPct <= 2.0 && consecutiveChecks >= 2
@@ -280,6 +284,14 @@ class HistoryReplayTest {
         assertEquals("false-low", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
         assertEquals("sensor-gap", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
         assertEquals("missing-bg", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute), start))
+    }
+
+    @Test
+    fun `LAPROTECT pct decrease uses all cause protection lows while legacy uses learning lows`() {
+        assertEquals(true, percentageDecreaseGate(true, 4.01, 0.0))
+        assertEquals(false, percentageDecreaseGate(true, 4.0, 9.0))
+        assertEquals(false, percentageDecreaseGate(false, 9.0, 4.0))
+        assertEquals(true, percentageDecreaseGate(false, 0.0, 4.01))
     }
 
     @Test
@@ -1619,7 +1631,7 @@ class HistoryReplayTest {
             val duraBefore = aw.dura; val basalBefore = profBasal.copyOf()
             when {
                 // The percentage card moves down only for fasting or meal-bolus lows accepted by the causal filter.
-                percentageLearningLowPct > 4.0 && pctNow > 0.8001 -> { pctRestoreStreak = 0; setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
+                (if (laProtect) protectionLowPct else percentageLearningLowPct) > 4.0 && pctNow > 0.8001 -> { pctRestoreStreak = 0; setPct(maxOf(0.8, pctNow - 0.1)); card = "pct-" }
                 // Restoring percentage or making any other insulin-increasing proposal is blocked above 3 %.
                 percentageRestoreReady(pctBack, blockInsulinIncrease, pctNow, lo3Eligible, pctRestoreStreak) -> { pctRestoreStreak = 0; setPct(minOf(1.0, pctNow + 0.1)); card = "pct+" }
                 isf != null && isf.first > isfP * 1.10 && isfP < isfStart * 1.25 -> { isfP = minOf(isfStart * 1.25, isfP * 1.07); card = "isf+" }
