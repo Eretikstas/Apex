@@ -1289,6 +1289,7 @@ class HistoryReplayTest {
                     if (dir != 0 && upCount[h] >= need) {
                         val target = if (lb5) profBasal[h] + 0.5 * (v - profBasal[h]) else v
                         val nv = Math.round(target.coerceIn(profBasal[h] * 0.8, profBasal[h] * 1.2) * 100) / 100.0
+                        if (lb5 && nv != profBasal[h]) wAttrOtherProposalTimes.add(t)
                         sb.append(" %02d:%.2f->%.2f".format(h, profBasal[h], nv)); profBasal[h] = nv; changed++; lastDir[h] = 0; upCount[h] = 0
                     } else lastDir[h] = dir
                 }
@@ -1375,6 +1376,7 @@ class HistoryReplayTest {
             if (downNow && pctNow > 0.8001) { pctNow = maxOf(0.8, pctNow - pctStep); pctDown++; pctLowStreak = 0 }
             else if (upOk && hi > 8.0 && lo <= 3.0 && (rise >= 0.15 || hi > 12.0) && pctNow < pctMax - 0.0001) { pctNow = minOf(pctMax, pctNow + pctStep); pctUp++ }
             if (pctNow != old) {
+                wAttrOtherProposalTimes.add(t)
                 val f = pctNow / old
                 for (i in 0 until 24) profBasal[i] = Math.round(profBasal[i] * f * 100) / 100.0
                 isfP /= f; icNow /= f; lastPctDay = day
@@ -1675,7 +1677,10 @@ class HistoryReplayTest {
                         else -> if (learnDura) { learnDuraCard(day, blockInsulinIncrease); if (aw.dura != duraBefore) card = "dura" }
                     }                }
             }
-            if (card != "") { laLast = day; laNote(card) }
+            if (card != "") {
+                if ((laIsf && card.startsWith("isf")) || (laCr && card.startsWith("cr"))) wAttrOtherProposalTimes.add(t)
+                laLast = day; laNote(card)
+            }
             println("AIMI replay: learner ALL day $day: lows3 ${"%.1f".format(lo3)} % eligible lows ${"%.1f".format(lo3Eligible)} % isf seen ${isf?.let { "%.0f (n=%d)".format(it.first, it.second) } ?: "-"} profile ${"%.0f".format(isfP)} cr ${cr.joinToString("/")} x${crBlock.joinToString("/") { "%.2f".format(it) }} -> ${if (card == "") "no change" else card}")
         }
         fun basalIob(now: Long): Double {
