@@ -903,3 +903,12 @@ accepted (more cautious than the spec).
 
 Rules (see COORDINATION.md): APP23 used `algo=aimi` — not comparable, discard; lab runs are `algo=autoisf` only. No new
 workflows, no code outside `HistoryReplayTest.kt` and `lab/` without Claude and the user.
+
+
+### 2026-11-25, Task 9 hypo-model calibration — completed run, STOP: safety pass NOT met
+
+- Replay run [45640419812](https://github.com/Eretikstas/Apex/actions/runs/45640419812) finished: all 73 workflow jobs completed successfully (1 plan + 72 replay). Each replay job uploaded its encrypted result and emitted a public synthetic summary. No replay job failures.
+- Read public summary rows from completed replay job logs. The validated APP control remains: BG <70 2.7%, BG <54 0.0%, BG >180 8.2%, CV 28.4%, hypo treatment 27.64 g/day, insulin 14.83 U/day.
+- **STOP condition from RULES_FOR_CHATGPT.md §§4 and 4a is met:** at least one calibration replay result violates the required pass rule against APP. Example: CHGISF_1.0 / SBIAS_0.15 / TREATL / seed 1 produced BG <70 = 3.0% (>2.7%) and hypo treatment = 29.46 g/day (>27.64). Other observed jobs also exceed APP on one or both gates; some runs have BG <54 >0.0% as well.
+- Because the pass rule is broken, do not calculate/select a top-three calibration, do not claim calibration, do not start another batch, and do not modify model/learner code. Hand off the failed safety result to Claude for review. The private target bands remain chat-only and are not copied here.
+- This note records the stop trigger and representative public numeric evidence; it is not a full aggregate calibration report.
