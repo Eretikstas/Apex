@@ -2035,7 +2035,85 @@ class HistoryReplayTest {
                     if (gs == null) throw IllegalStateException("no glucose")
                     val chained = chainedInputs(chain, tick, t)
                     lastAct = chained.iobArray[0].activity
-                    val rt = runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbOk, liveVs = autoIsf321Sens(winV, winT, t, tick))
+                    val liveVs = autoIsf321Sens(winV, winT, t, tick)
+                    val rt = runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbOk, liveVs = liveVs)
+                    if (wAttr) {
+                        val profileIsf = tick.getJSONObject("prof").getDouble("isf")
+                        val actualFactor = profileIsf / liveVs
+                        val clamped = actualFactor <= aw.min + 0.0001 || actualFactor >= aw.max - 0.0001
+                        val names = listOf("acce", "brake", "pp", "dura", "lower", "higher")
+                        val effects = names.map { name ->
+                            val without = sensitivityWith(withWeight(aw, name, 0.0), winV, winT, t, tick)
+                            val withoutFactor = profileIsf / without
+                            name to (Math.abs(actualFactor - withoutFactor) / maxOf(0.0001, Math.abs(withoutFactor)) * 100.0)
+                        }
+                        val winner = effects.maxByOrNull { it.second }
+                        val activeName = if (winner != null && winner.second >= 5.0 && !clamped) winner.first else null
+                        val impactPct = if (activeName != null) winner!!.second else 0.0
+                        val basalNow = profBasal[h]
+                        fun delivered(r: RT): Double {
+                            var candidateRate: Double? = if (guardHold && capOn && (r.rate ?: 0.0) > basalNow * capMult) basalNow * capMult else r.rate
+                            if (noiseGuard && noisy && (candidateRate ?: 0.0) > basalNow) candidateRate = basalNow
+                            var candidateDuration = r.duration
+                            if (lateB > 0.0 && !guardHold && devStreak >= 2 && gs.glucose > 140.0 && gs.delta > 0 &&
+                                mealLog.any { (t - it.first) / minute in 90L..240L } && r.rate != 0.0) {
+                                val floor = minOf(basalNow * lateB, meta.getDouble("maxBasal"))
+                                val current = candidateRate ?: (chain.activeTemp(t)?.rate ?: basalNow)
+                                if (current < floor) { candidateRate = floor; candidateDuration = 30 }
+                            }
+                            return (r.units ?: 0.0) + ((candidateRate ?: basalNow) - basalNow) * (candidateDuration ?: 0).toDouble() / 60.0
+                        }
+                        val actualUnits = delivered(rt)
+                        var plusUnits = actualUnits; var minusUnits = actualUnits
+                        if (activeName != null) {
+                            val currentWeight = weightValue(aw, activeName)
+                            val step = weightStep(activeName)
+                            val plusWeight = minOf(1.0, currentWeight + step)
+                            val minusWeight = maxOf(0.0, currentWeight - step)
+                            if (plusWeight != currentWeight) {
+                                val plusSens = sensitivityWith(withWeight(aw, activeName, plusWeight), winV, winT, t, tick)
+                                plusUnits = delivered(runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbOk, liveVs = plusSens))
+                            }
+                            if (minusWeight != currentWeight) {
+                                val minusSens = sensitivityWith(withWeight(aw, activeName, minusWeight), winV, winT, t, tick)
+                                minusUnits = delivered(runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbOk, liveVs = minusSens))
+                            }
+                        }
+                        wAttrTicks.add(WAttrTick(
+                            t, day, activeName, impactPct, clamped, actualUnits, plusUnits, minusUnits, liveVs,
+                            row.optBoolean("afterHypo"), row.optBoolean("afterManual"), row.optBoolean("afterMeal"), row.optBoolean("mealBolus"),
+                            row.optBoolean("oldCannula"), row.optBoolean("sensorGap"), row.optBoolean("falseLow"), row.optBoolean("illness"),
+                            row.optBoolean("activity"), !tick.isNull("tt"), noiseSd > 0.07 || noisy
+                        ))
+                        val previousBg = lastWAttrBg
+                        val lowCross = gs.glucose < 70.2 && (previousBg == null || previousBg >= 70.2)
+                        val highCross = gs.glucose > 180.0 && (previousBg == null || previousBg <= 180.0)
+                        if (lowCross || highCross) {
+                            wAttrCrossings++
+                            val missType = if (lowCross) "low" else "high"
+                            val fullWindow = wAttrTicks.filter { it.t in (t - 180 * minute) until t }
+                            val candidates = wAttrTicks.filter { it.t in (t - 90 * minute)..(t - 30 * minute) && it.weight != null && it.impactPct >= 5.0 && !it.clamped }
+                            val targetNow = if (tick.isNull("tt")) tick.getJSONObject("prof").getDouble("target") else tick.getDouble("tt")
+                            val missMg = if (lowCross) maxOf(0.0, 70.2 - gs.glucose) else maxOf(0.0, gs.glucose - targetNow)
+                            val explained = candidates.mapNotNull { candidate ->
+                                val name = candidate.weight!!
+                                val clean = fullWindow.size >= 36 && fullWindow.all { x ->
+                                    !x.afterHypo && !x.oldCannula && !x.sensorGap && !x.falseLow && !x.illness && !x.activity &&
+                                        !x.tempTarget && !x.noisy && (!x.afterManual || (name == "pp" && x.mealBolus))
+                                }
+                                if (!clean || (name == "pp" && !candidate.afterMeal)) { wAttrBlockedClean++; return@mapNotNull null }
+                                if (wAttrOtherProposalTimes.any { it in (t - 7 * 86_400_000L)..t }) { wAttrBlockedOther++; return@mapNotNull null }
+                                val plusEffect = if (lowCross) (candidate.actualUnits - candidate.plusUnits) * candidate.isf else (candidate.plusUnits - candidate.actualUnits) * candidate.isf
+                                val minusEffect = if (lowCross) (candidate.actualUnits - candidate.minusUnits) * candidate.isf else (candidate.minusUnits - candidate.actualUnits) * candidate.isf
+                                val direction = if (plusEffect >= minusEffect) "increase" else "decrease"
+                                val effect = maxOf(plusEffect, minusEffect)
+                                if (missMg > 0.0 && effect >= missMg * 0.5) Triple(candidate, direction, effect) else null
+                            }
+                            val best = explained.maxByOrNull { it.third }
+                            if (best != null) wAttrEvents.add(WAttrEvent(t, day, best.first.weight!!, best.second, missType, best.third / maxOf(1.0, missMg) * 100.0))
+                        }
+                        lastWAttrBg = gs.glucose
+                    }
                     val smb = rt.units ?: 0.0
                     if (smb > 0.0) { chain.ownSmb.add(Pair(t, smb)); doses.add(Pair(t, smb)) }
                     val capRate = profBasal[h] * capMult
