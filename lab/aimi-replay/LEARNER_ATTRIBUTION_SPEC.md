@@ -20,6 +20,13 @@ A card for weight W may propose ONE step (the existing step size of W) only if A
    1/3 as many days.
 5. **No better explanation.** No pending basal, CR, ISF or percentage proposal for the same hours (those go first),
    and the miss is not explained by a planted / known cause (food, cannula, sensor).
+**With carbs (meals):** a meal window is NOT excluded for weight cards. Instead the card works per meal phase (see
+`AUTOISF_WEIGHTS_GUIDE.md` section 3): for every SMB/TBR in the window it logs WHICH effect won (acce / brake / pp /
+dura / range / autosens / clamp). Only the weight of the winning effect in the phase that led to the miss can be
+blamed: a low 2–4 h after a meal -> the effects that won during the SMBs given in the 3 h before the low (too much
+insulin); a high peak -> the effect that won during the rise (too little insulin). CR is blamed instead when the
+miss scales with the carbs of the meal on 3 days and the counterfactual of the weight does not explain >= 50 %.
+Weights come after basal/CR/ISF: no weight proposal in a week with a pending basal/CR/ISF proposal.
 6. **Report first.** The card writes: W, old -> new, the days, the counterfactual insulin and glucose numbers, and
    which checks passed. It changes nothing by itself (report-only until the user approves).
 
