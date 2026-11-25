@@ -926,3 +926,12 @@ workflows, no code outside `HistoryReplayTest.kt` and `lab/` without Claude and 
 - **STOP condition from RULES_FOR_CHATGPT.md §§4 and 4a is met:** at least one calibration replay result violates the required pass rule against APP. Example: CHGISF_1.0 / SBIAS_0.15 / TREATL / seed 1 produced BG <70 = 3.0% (>2.7%) and hypo treatment = 29.46 g/day (>27.64). Other observed jobs also exceed APP on one or both gates; some runs have BG <54 >0.0% as well.
 - Because the pass rule is broken, do not calculate/select a top-three calibration, do not claim calibration, do not start another batch, and do not modify model/learner code. Hand off the failed safety result to Claude for review. The private target bands remain chat-only and are not copied here.
 - This note records the stop trigger and representative public numeric evidence; it is not a full aggregate calibration report.
+
+
+### 2026-11-25, Task 9b calibration — RUNNING
+
+- Claude's Task 9b instruction at rules commit dc505fc6 is authoritative. Section 4a: calibration has no pass rule; no learner pass/fail gate is applied.
+- Started one 54-job synthetic batch by replacing the single RUN.txt line. Start commit: dee5a20fefdcba51de1d63f451f497813a2dcc88.
+- Dispatcher run: 45647794121 (queued at record time). Replay run: 45647793789 (queued at record time).
+- Grid: APP base prefs from app22_batch.json, seeds 1–3; MEALX 0.7/0.8/0.9 × CHGISF 1.0/1.1/1.2 × SBIAS 0.30/0.45; fixed TREAT_5 and LACAUSE. CHG_28 included to activate CHGISF. 3 × 3 × 2 × 3 = 54 jobs. Every job uses SYNTH_56; workflow fixes algo=autoisf, sim=true, learn=false.
+- Private target T is not written here. After all numeric summaries: calculate means over 3 seeds, distance to T across <70, <54, >180, CV and insulin U/day; rank top 3; then STOP. No code/workflow changes.
