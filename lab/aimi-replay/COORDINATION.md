@@ -1,3 +1,5 @@
+> **25.11: `RULES_FOR_CHATGPT.md` wins over this file where they differ.** Runs start only via `RUN.txt`.
+
 # Lab coordination: two assistants, one repository
 
 Two assistants work on this repository for the same user: **ChatGPT** (lab code) and **Claude** (app, tests, runs).
