@@ -563,6 +563,20 @@ Weights/controls explicitly present in the source:
 - Claude review after completion: compare all six metrics with APP and apply the hard pass rule (lows <54, lows <70, hypo grams cannot increase); verify insulin and highs/CV only after the safety gate. Confirm that LAPROTECT protection-low accounting and pct-down decisions are represented in learner/audit logs.
 - Next task (CHG_28 matched pairs) is blocked until this batch completes and is assessed.
 
+
+### 2026-11-25, Task 9 hypo-model calibration — Step 0 static token inventory ONLY
+
+Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits and no replay started.
+
+- **Insulin action / effective strength:** `CHG_<day>` + `CHGISF_<x>` (both required; actual action multiplier applies from the selected day; lines 885–887 and 1699–1720); `ACT_<day>` (activity multiplier: 1.3 during 10–21 h and 1.2 in the specified night; lines 1705–1715); `ILL_<day>` + `ILLD_<n>` + `ILLF_<x>` (illness weakens action; lines 1711–1717); `CANCH_<h>` (cannula age reduces action after 60 h; lines 967, 1702–1704); `CANFAIL_<n>` (periodic half-action window; lines 1707–1717). `DRIFT_<pct>` changes modeled insulin need over weeks, not the insulin action curve itself (lines 1705–1710). `CHGKCR_<x>` changes liver counter-regulation after lows, not insulin action (lines 885–887, 1699–1700).
+- **Actual eaten vs entered:** `UNLOG_<pct>` makes a percentage of meals eaten but not entered (no logged carbs and no meal bolus), not a partial-eating mismatch (lines 971–972, 1757–1760). `MEALX_<x>` scales the generated meal amount used for both logged and eaten values (lines 935–938); it does not independently change eaten relative to recorded. The model has a built-in random partial-eating event for 15% of meals, with eaten amount 60–80% of generated amount, but no dedicated token was found to tune that ratio (lines 935–938). `CARBS_<pct>` enlarges recorded meals and supplies the corresponding meal bolus too; it is not an eaten-vs-recorded mismatch (lines 532–545).
+- **Low-end sensor error:** `SBIAS_<x>` controls low-end downward sensor bias (default 0.3; lines 853–855, 1722–1726); `NOISE_<x>` controls noise amplitude and `NOISEPHI_<x>` its temporal persistence (lines 850–855, 1700–1701); `COMPRESS_<n>` injects false night lows, about 40 mg/dL for 20 min at a frequency set by n (lines 971–972, 1727–1730). No separate token named as a low-only random error multiplier was found.
+- **Hypo treatment amount:** `TREAT_<g>` sets fixed treatment grams (default 6); `TREATL` switches to a dynamically calculated 4–10 g treatment (lines 974 and 1735–1749).
+- **Cause annotation:** `LACAUSE` enables causal classification/audit (lines 1025–1028; classifier at lines 120–139). It annotates causes; it does not itself create or alter hypoglycemia.
+- **Missing capability relevant to requested grid:** no existing token independently controls partial eating relative to the recorded meal amount. Do not invent one. Any grid using `MEALX` or `UNLOG` must be described accurately as changing meal size or unlogged-meal frequency, not partial-eating ratio.
+
+**Prerequisite gate:** Task 9 was specified to start only after Rules §5 tasks 1–3. Tasks 1–2 are complete, but task 3 (the matched `CHG_28` pairs) is explicitly blocked by Claude's review in the Results section (2026-11-25: “Do NOT run the CHG_28 pairs (task 3)”; LEARNALL parked). Task 2 also failed the learner safety pass. Therefore Task 9's calibration grid is NOT authorized to start yet under the stated sequence. No `RUN.txt` change, no batch commit, and no new run. Await Claude's decision on reopening task 3 / the prerequisite gate.
+
 ## Results (written by Claude)
 
 ### 2026-11-25, Claude review of LAPROTECT batch 45629646841 — FAIL confirmed, LEARNALL parked
