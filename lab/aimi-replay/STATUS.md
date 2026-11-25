@@ -526,6 +526,19 @@ Weights/controls explicitly present in the source:
 - Compile check is pending; commit status currently reports `pending` with no checks yet. Do not write RUN.txt or start replay until this exact commit has a green compile result.
 - The next 24-job batch remains as specified in RULES_FOR_CHATGPT.md. Before starting it, re-check the exact base / APP / seed 1 control against `2.7 / 0.0 / 8.2 / 28.4 / 27.64 / 14.83`, check that no replay is in progress, and verify the 24-hour start limit. No replay has been started by this task.
 
+
+### 2026-11-25, LAPROTECT 24-job synthetic batch — running
+
+- Code fix commit: `ed1085154d72f3dab1d27edc58f827c61629a947`; dedicated compile check `45624674552` completed `success`.
+- Control checked before launch against Claude's completed control run `45620155708` (base / APP / seed 1): <70 **2.7%**, <54 **0.0%**, >180 **8.2%**, CV **28.4%**, hypo treatment **27.64 g/day**, insulin **14.83 U/day**. These match the required six control values exactly; APP does not enable LAPROTECT, so the pct- branch correction does not alter this control path.
+- Pre-launch gate: no `aimi-replay.yml` run was queued/in progress; one actual lab start was recorded in the preceding 24 h, below the maximum of three.
+- Started only by committing the 24-job line to `RUN.txt`: commit `48eeab78656121ca7c6c295827f2a3a21ec0fee8`.
+- Dispatcher run `45629598681` completed successfully; replay run `45629646841` was dispatched with `sim=true`, `algo=autoisf`, `learn=false`. Plan produced 24 replay matrix jobs; at last check 19 were in progress and 5 queued.
+- Scenarios: base, calm, dawn1.3, meals1.3, ins+20, ins-20, start+30, growth2%; seeds 1–3. Each job uses its APP token set plus `LEARNALL,LAISF,LACR,LACAUSE,LAPCTBACK,LADAYS,LAPROTECT`.
+- Public result table: pending; do not claim a pass until all 24 jobs finish and their summaries are read.
+- Claude review after completion: compare all six metrics with APP and apply the hard pass rule (lows <54, lows <70, hypo grams cannot increase); verify insulin and highs/CV only after the safety gate. Confirm that LAPROTECT protection-low accounting and pct-down decisions are represented in learner/audit logs.
+- Next task (CHG_28 matched pairs) is blocked until this batch completes and is assessed.
+
 ## Results (written by Claude)
 
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
