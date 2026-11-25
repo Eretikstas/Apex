@@ -7,7 +7,7 @@
 - [x] Step 9b — calibration completed: 54/54 jobs; CAL accepted by Claude/user: `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`; ranking and distance recorded.
 - [x] Step 10 batch definition — 36 jobs assembled to match the six §5 scenarios, three seeds, and two variants; launched through RUN.txt commit `e997ab29b152abf2a8ae7f0bbd2ae45d82866991`.
 - [x] Step 10 execution/results — replay run `45653668453`: 1 plan + 36/36 replay jobs completed successfully; all 36 public summaries extracted from job logs. APP vs no-learner comparison and scenario means recorded below.
-- [ ] Step 11 — first batch in preparation; 6 low-protection token variants, 6 scenarios x 3 seeds = 108 jobs (second 18-job batch reserved for the second Z2 threshold).
+- [ ] Step 11 — batch 1/2 launched: run `45659070340`, 108 replay jobs + plan; plan succeeded, replay jobs queued/running at first status check. Variants: GUARDCHAIN, CHAIN_25, CHAIN_75, SMARTL, LAPROTECT (with required LEARNALL), Z2_108. Batch 2/2 (Z2_126, 18 jobs) waits for batch 1 safety gate.
 - [ ] Step 12 — not started; depends on Step 11 pass-gate results.
 
 
@@ -29,6 +29,13 @@
 - Trade-off: APP had higher `>180` in every scenario mean and higher CV in most scenarios. The low-reduction benefit is accompanied by more hyperglycemia/variability; this is a synthetic replay comparison, not a clinical recommendation.
 - Public summary code labels each job with the first three fixed preference tokens only; scenario mapping was reconstructed from the committed RUN.txt order (six scenarios × three seeds × APP/no-card pair). The numeric rows themselves were read from each job's emitted summary.
 - Step 10 complete; proceed to Step 11 per §5.
+
+
+### 2026-11-25, Step 11 — low-protection token screen — RUNNING
+
+- Step 10 completed and passed the existing APP-vs-no-learner low/hypo comparison. Step 11 candidates were identified in `HistoryReplayTest.kt`: `GUARDCHAIN` (line 1004), `CHAIN_<pct>` (line 988; tested 25 and 75), `SMARTL` (line 1000), `LAPROTECT` (line 1027; requires `LEARNALL` and `LACAUSE`, lines 1457–1458), and `Z2_<mg/dL>` (line 558; default 117). The hypo low threshold / 90-minute SMB-off window is fixed in code (lines 556–557), with no separate token found for it.
+- Batch 1/2 contains six token variants × six Step 10 scenarios × seeds 1–3 = 108 jobs. Each token is tested alone on top of APP variant (a); LAPROTECT includes only its mandatory prerequisites. Threshold choice for the first Z2 run: 108 mg/dL (below default 117); the second run will test 126 mg/dL (above default).
+- RUN.txt start commit: `3d07adb53878e68f1a1aa4ad19a5d918f5b7e774`; dispatcher run `45659023419` succeeded; replay run `45659070340`. First check: plan success, 108 replay jobs queued/in progress. Apply §4 pass rule to every learner variant before starting batch 2 or Step 12.
 
 
 ### 2026-11-25, Task 9 hypo-model calibration — RUNNING
