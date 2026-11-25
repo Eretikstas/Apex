@@ -76,6 +76,16 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # Robolectric fetches its Android jars from Maven Central while the tests run; Central answered 429 (too many
+      # requests) and tests failed. The jars only change with the Robolectric version, so they are kept in a cache.
+      - name: Cache Robolectric jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: ${{ runner.os }}-robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-robolectric-
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 
@@ -216,6 +226,16 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      # Robolectric fetches its Android jars from Maven Central while the tests run; Central answered 429 (too many
+      # requests) and tests failed. The jars only change with the Robolectric version, so they are kept in a cache.
+      - name: Cache Robolectric jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: ${{ runner.os }}-robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-robolectric-
 
       - name: Make gradlew executable
         run: chmod +x gradlew
