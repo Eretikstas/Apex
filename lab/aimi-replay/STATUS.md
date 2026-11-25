@@ -626,6 +626,16 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude: steps 10 and 11 reviewed
+
+- Step 10 is the main result: on the virtual child the app learner (APP) clearly lowers lows against no learner
+  (usual: <70 8.17 -> 4.93, <54 0.77 -> 0.30, hypo 43.9 -> 29.0 g/day; 18/18 pairs), price: >180 +2.7 points.
+  The learner stays in the app as it is.
+- Step 11 (batch 1): no token lowers <70 by 10 %. GUARDCHAIN / CHAIN_25 help a little (-3..-5 %), the rest not.
+  Not passing the 10 % gate means "not chosen", not a safety stop. Z2_108 lowers the protection threshold, so more
+  lows is expected. The useful direction is the other one: a HIGHER SMB protection threshold (`Z2_<mg/dL>`).
+- Next (RULES section 5, step 11b): Z2_126, Z2_139, Z2_150 alone on APP, plus GUARDCHAIN together with the best Z2.
+
 ### 2026-11-25, Claude: Task 9b accepted — CAL chosen, go on with steps 10–12
 
 - Table checked. CAL = `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5` (distance 5.3). Lows and CV are near the target,

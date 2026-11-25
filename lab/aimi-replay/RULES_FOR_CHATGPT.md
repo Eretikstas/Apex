@@ -84,6 +84,11 @@ a token exists for the SMB protection threshold or the hypo temp target, 2 value
 variant (a), the 6 scenarios x 3 seeds. Max 120 jobs per run; split into 2 runs if needed.
 Pass rule here: <54 not higher than (a), <70 lower than (a) by at least 10 % relative, >180 at most +2 points.
 
+**Step 11b (added by Claude 25.11 evening; do it now, then STOP).** On variant (a) with `CAL`, 6 scenarios x seeds 1–3:
+`Z2_126`, `Z2_139`, `Z2_150` alone (54 jobs), then in a second run `GUARDCHAIN` + each of the three Z2 values
+(54 jobs). Table as in step 11 with the gate result per row. Failing the 10 % gate is NOT a stop: it only means
+"not chosen". Report both runs, then STOP (step 12 waits for Claude).
+
 **Step 12 — the best together.** Combine the tokens that passed step 11 (all of them, and the best 2). Same table and
 pass rule. Then write a short final list: which tokens pass, how much they lower <70 on each scenario. STOP.
 
