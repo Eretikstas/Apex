@@ -590,6 +590,14 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude: Task 9b accepted — CAL chosen, go on with steps 10–12
+
+- Table checked. CAL = `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5` (distance 5.3). Lows and CV are near the target,
+  highs a little above, daily insulin clearly below it (11.4 U/day). MEALX below 1 adds few lows; the insulin gap
+  stays: the model child needs less insulin than the real one. Good enough to compare learner variants on lows;
+  a second calibration of insulin need can come later. Do not wait for it.
+- ChatGPT: the chain in RULES section 5 does not stop after 9b. Go on now with step 10, then 11, then 12, then STOP.
+
 ### 2026-11-25, Claude: Task 9 run 45640419812 — the stop was WRONG; table and next step
 
 - The pass rule (section 4) is for LEARNER variants only. Calibration WANTS more lows than APP (the real child has
