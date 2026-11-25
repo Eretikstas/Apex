@@ -938,3 +938,39 @@ workflows, no code outside `HistoryReplayTest.kt` and `lab/` without Claude and 
 
 - Dispatcher run 45647794121 failed before starting replay: repository-enforced guard reported "3 starts in 24 h already". No replay jobs ran; replay push run 45647793789 was skipped. This is a hard repository limit and was not bypassed.
 - The three successful RUN.txt dispatcher starts in the rolling window were 45622075003 (2026-11-25 13:17:31Z), 45629598681 (14:01:41Z), and 45640354963 (15:00:54Z). Earliest possible retry after the oldest expires: 2026-11-26 13:17:31Z (14:17:31 Europe/Paris), assuming no additional start and no active run.
+
+
+### 2026-11-25, Task 9b calibration — COMPLETED, STOP
+
+- Restarted the unchanged 54-job batch by changing only the RUN.txt comment line. Start commit: 4464542b5218fa4daa8d31e457b0c35a12cde030. Dispatcher run 45648911216 succeeded; replay run 45648946435 completed successfully: 1 plan + 54 replay jobs, all 54 replay jobs concluded success.
+- Read each job's public synthetic summary row from its workflow log. Means below are over seeds 1–3. Distance is the sum of positive excursions outside the user's private target bands for BG <70, BG <54, BG >180, CV and daily insulin; the private bands are intentionally not copied into this repository.
+- No pass/fail gate applies to this calibration.
+
+| MEALX | CHGISF | SBIAS | BG <70 % | BG <54 % | BG >180 % | CV % | Hypo g/day | Insulin U/day | Distance |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.7 | 1.0 | 0.30 | 3.53 | 0.03 | 8.97 | 29.60 | 20.54 | 13.42 | 9.51 |
+| 0.7 | 1.0 | 0.45 | 3.87 | 0.13 | 8.97 | 29.97 | 22.50 | 13.47 | 9.50 |
+| 0.7 | 1.1 | 0.30 | 3.70 | 0.10 | 6.43 | 29.00 | 22.32 | 12.25 | 7.38 |
+| 0.7 | 1.1 | 0.45 | 4.37 | 0.17 | 6.37 | 28.93 | 24.94 | 12.36 | 6.54 |
+| 0.7 | 1.2 | 0.30 | 4.40 | 0.10 | 4.93 | 28.47 | 25.24 | 11.32 | 6.12 |
+| 0.7 | 1.2 | 0.45 | 4.93 | 0.30 | 4.80 | 28.77 | 28.99 | 11.44 | 5.32 |
+| 0.8 | 1.0 | 0.30 | 3.57 | 0.13 | 9.73 | 30.27 | 20.30 | 13.71 | 10.62 |
+| 0.8 | 1.0 | 0.45 | 3.87 | 0.10 | 9.73 | 30.33 | 21.85 | 13.79 | 10.31 |
+| 0.8 | 1.1 | 0.30 | 3.97 | 0.10 | 7.23 | 29.63 | 23.45 | 12.59 | 8.21 |
+| 0.8 | 1.1 | 0.45 | 4.30 | 0.23 | 7.07 | 29.40 | 25.77 | 12.65 | 7.42 |
+| 0.8 | 1.2 | 0.30 | 4.63 | 0.17 | 5.60 | 29.20 | 26.55 | 11.66 | 6.41 |
+| 0.8 | 1.2 | 0.45 | 5.07 | 0.23 | 5.53 | 29.00 | 28.33 | 11.69 | 5.67 |
+| 0.9 | 1.0 | 0.30 | 3.73 | 0.13 | 10.27 | 30.53 | 21.07 | 14.06 | 10.91 |
+| 0.9 | 1.0 | 0.45 | 3.87 | 0.10 | 10.57 | 30.60 | 22.02 | 14.09 | 11.11 |
+| 0.9 | 1.1 | 0.30 | 3.97 | 0.10 | 8.40 | 30.10 | 22.86 | 12.88 | 9.55 |
+| 0.9 | 1.1 | 0.45 | 4.33 | 0.20 | 8.53 | 29.97 | 24.70 | 12.94 | 9.13 |
+| 0.9 | 1.2 | 0.30 | 4.73 | 0.23 | 6.23 | 29.67 | 26.91 | 11.96 | 7.11 |
+| 0.9 | 1.2 | 0.45 | 4.87 | 0.27 | 6.30 | 29.43 | 28.09 | 12.01 | 6.75 |
+
+Top 3 by minimum distance:
+1. MEALX_0.7 / CHGISF_1.2 / SBIAS_0.45 — distance 5.32
+2. MEALX_0.8 / CHGISF_1.2 / SBIAS_0.45 — distance 5.67
+3. MEALX_0.7 / CHGISF_1.2 / SBIAS_0.30 — distance 6.12
+
+- All three-seed groups have n=3; no missing summaries. This is a synthetic calibration ranking, not a clinical dosing recommendation or proof of real-world safety.
+- Task 9b report complete. STOP. No additional runs or code/workflow changes.
