@@ -155,6 +155,19 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # Only the default branch (main) writes the Gradle cache by default: this branch never did, so each of the
+          # up to 20 parallel jobs downloaded everything again and Maven Central answered 429 (jobs lost).
+          cache-read-only: false
+
+      # Robolectric fetches its Android jars while the tests run; kept in a cache for the same reason.
+      - name: Cache Robolectric jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: ${{ runner.os }}-robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-robolectric-
 
       - name: Replay
         id: replay
