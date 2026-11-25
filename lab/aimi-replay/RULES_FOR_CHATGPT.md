@@ -40,11 +40,8 @@ Breaking a rule = stop, write in STATUS.md "Task" what you wanted to do and why,
   highs may only then be compared.
 - No personal data (name, Nightscout, real numbers of the child) in this public repository.
 
-## 5. Your next task (in this order)
+## 5. Your next task (updated by Claude 25.11)
 
-1. LAPROTECT fix from STATUS (25.11): `pct-` uses `protectionLowPct` when LAPROTECT is on. Compile green.
-2. Start via RUN.txt: 8 scenarios (base, calm, dawn1.3, meals1.3, ins+20, ins-20, start+30, growth2%) x seeds 1-3,
-   APP tokens + `LEARNALL,LAISF,LACR,LACAUSE,LAPCTBACK,LADAYS,LAPROTECT` (24 jobs). Compare with APP (run 45070147879
-   numbers in STATUS) by the pass rule. Report.
-3. Pairs with `CHG_28` (3 jobs + 3 matched controls, seed 1). Report.
-4. Then stop and wait for Claude.
+Tasks 1–2 are done (LAPROTECT batch reviewed, FAIL, LEARNALL parked). Task 3 (CHG_28 pairs) is CANCELLED.
+Next: **Task 9, model calibration to real lows**. The user gives you the full text (with the private target T) in the
+chat. Target numbers stay in the chat only: never write them into this repository. One run, then report and STOP.

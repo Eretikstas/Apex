@@ -565,6 +565,18 @@ Weights/controls explicitly present in the source:
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude review of LAPROTECT batch 45629646841 — FAIL confirmed, LEARNALL parked
+
+- ChatGPT's work is correct: fix `ed1085154d` is as asked (pct- uses `protectionLowPct` only with LAPROTECT, test for
+  the >4.0 boundary), compile green, control checked before the start, start limits kept, and it stopped on the gate.
+- Verdict: FAIL. base / seed 1 is worse than APP both ways (<70 3.0 vs 2.7, hypo 30.46 vs 27.64 g/day, >180 11.1 vs
+  8.2, CV 31.2 vs 28.4). The 8-scenario means show the same: highs are clearly up, lows are not down.
+- Why: the audit shows zero accepted CR and ISF candidates, so `LAISF`/`LACR` changed nothing. The difference from APP
+  comes from the other tokens (LACAUSE / LAPCTBACK / LADAYS on basal, dura and percentage). This stack gives no gain.
+- Decision: LEARNALL (CR/ISF learning) is PARKED. Nothing of it goes to the app. Do NOT run the CHG_28 pairs (task 3).
+- Main reason the learner cannot be judged now: the model's lows are far below the real child's. Next work = model
+  calibration (RULES section 5, new task). No full APP 8-scenario table is needed for this verdict.
+
 ### 2026-11-23, review of the causal filter fixes (commits up to 4dd3a09c30)
 
 Fixed since the first review: `priorEvent` now reads flags too (`mealBolus` works); a CR meal episode with any SMB is
