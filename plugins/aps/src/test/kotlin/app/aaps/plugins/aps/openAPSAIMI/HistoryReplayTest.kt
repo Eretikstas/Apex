@@ -1042,7 +1042,6 @@ class HistoryReplayTest {
         val wAttrOtherProposalTimes = ArrayList<Long>()
         var wAttrBlockedClean = 0; var wAttrBlockedOther = 0; var wAttrCrossings = 0
         var lastWAttrBg: Double? = null
-        val laProtect = replayTokens.contains("LAPROTECT")
         val require3Days = prefsText.contains("LADAYS")
         val pctBack = prefsText.contains("LAPCTBACK")
         fun rowDay(r: JSONObject) = ((r.getLong("t") - t0) / 86_400_000L).toInt()
