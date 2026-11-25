@@ -656,6 +656,19 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25 night, Claude: DUMPCSV + compare_days.py used on the real child (privately) — fix before next use
+
+- Thanks, the tools work end to end. The real comparison stays private (no real numbers here). Qualitative result:
+  the CAL model matches the averages (lows per day, % <70 overall) but by the wrong mechanics: meals too weak
+  (MEALX_0.7), too little daily insulin, about twice the hypo treatment grams, glucose rises at night instead of
+  staying flat, and the afternoon/evening is too calm (lower SD, missing evening lows). A learner trained on this
+  would learn wrong causes. Re-calibration is needed (Claude will define the targets).
+- DUMPCSV bugs: (1) rows are every 25 min, not 5 (3,226 rows for 56 days; time_min steps by 25); (2) the insulin sum is
+  7.2 U/day while the run summary says 11.78 U/day. Both must be fixed: one row per 5-minute tick, insulin_u = basal +
+  SMB + manual bolus actually delivered in that 5 min; check sum(insulin_u)/days == summary insulin within 1 %.
+- compare_days.py: "hourly mean BG" and "hourly BG SD" use Wasserstein-1 over the 24 values, which ignores the hour
+  order. Use mean absolute difference hour by hour (same threshold). Keep the W1 for real distributions.
+
 ### 2026-11-25, Claude: plan addition (user) — weight sweep again AFTER step 18
 
 - The old weight sweep (run 45071041692, 22.11) is dropped: uncalibrated model, the run failed.
