@@ -30,6 +30,26 @@ Weights come after basal/CR/ISF: no weight proposal in a week with a pending bas
 6. **Report first.** The card writes: W, old -> new, the days, the counterfactual insulin and glucose numbers, and
    which checks passed. It changes nothing by itself (report-only until the user approves).
 
+## 0. What is from sources and what is OUR assumption (user 25.11: nothing invented without saying so)
+
+FROM SOURCES (OpenAPS / AAPS Autotune docs and our AAPS Autotune code, see section 2b): point categories CSF / UAM /
+ISF / basal, deviation = avgDelta - BGI, ISF from the median of ISF-point ratios (>= 10 points), CR from meal periods
+(>= 60 min), 20 % step blending, limits by autosens min/max, basal 20 % into the 3 hours before, empty hours from
+neighbours, basal first then ISF/CR, the AAPS rules for post-meal highs. AutoISF weight formulas, precedence and meal
+phases: from the AutoISF Quick Guide and BerNie (AUTOISF_WEIGHTS_GUIDE.md).
+OUR ASSUMPTIONS (not in any source; the lab must test them, not trust them): the 5 % "really acting" threshold, the
+counterfactual >= 50 % rule, "3 of 7 days", the 3 h window before a low, "opposite <= 1/3". The planted-cause test
+(section 3) decides if they work; change them if the score is bad.
+
+## 2b. CR / ISF / basal: use the Autotune method (verified), not a new one
+
+- Reuse Autotune's categorization (AutotunePrep: CSF, UAM, ISF, basal) and its tuning (AutotuneCore) as the base of
+  the CR / ISF / basal cards. Do not invent new formulas for them.
+- Known limits from the docs: one ISF and one CR per day only (no circadian tuning); carbs must be entered exactly
+  (else basal is raised at meal times); hypo treatments must be entered (else UAM-as-basal makes an amplifying cycle).
+- Post-meal rule (AAPS docs): high after the meal AND still high after full absorption -> CR stronger; high while COB
+  > 0 but low after absorption -> CR weaker / pre-bolus timing; check basal first with no-carb periods.
+
 ## 2. CR and ISF — token `CRAUDIT`
 
 The CR/ISF learner accepted ZERO changes in run 45629646841. Before any new rule: count every meal (CR) and every
