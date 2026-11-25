@@ -2,6 +2,30 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-25, LAPROTECT batch 45629646841 — completed; safety pass NOT met; stop before CHG_28
+
+- Fix commit: `ed1085154d72f3dab1d27edc58f827c61629a947`; compile run `45624674552` green.
+- APP control run `45620155708`: base / APP / seed 1 = `<70 2.7 | <54 0.0 | >180 8.2 | CV 28.4 | hypo 27.64 g/day | insulin 14.83 U/day`.
+- LAPROTECT batch started by RUN.txt commit `48eeab78656121ca7c6c295827f2a3a21ec0fee8`; workflow run `45629646841`. All 24 replay jobs and all 24 public synthetic-summary steps completed successfully. Replay exit code was 0. A post-job git cleanup warning about `.tmp-juggluco` lacking a .gitmodules URL occurred after upload and did not fail replay.
+- Public summary means across seeds 1–3 (columns: `<70 / <54 / >180 / CV / hypo g/day / insulin U/day`):
+
+| Scenario | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day |
+|---|---:|---:|---:|---:|---:|---:|
+| base | 2.77 | 0.00 | 11.43 | 30.80 | 25.38 | 14.57 |
+| calm | 1.53 | 0.00 | 1.70 | 23.03 | 18.00 | 14.12 |
+| dawn1.3 | 2.83 | 0.00 | 10.87 | 30.13 | 25.45 | 15.05 |
+| meals1.3 | 3.13 | 0.03 | 13.87 | 33.17 | 27.27 | 15.63 |
+| ins+20 | 3.37 | 0.03 | 7.07 | 29.20 | 28.60 | 12.29 |
+| ins-20 | 2.33 | 0.00 | 13.97 | 31.57 | 23.59 | 18.14 |
+| start+30 | 3.83 | 0.00 | 8.97 | 31.37 | 29.70 | 14.81 |
+| growth2% | 2.30 | 0.00 | 12.97 | 30.90 | 23.84 | 17.14 |
+
+- Direct base / seed 1 comparison against the validated APP control: LAPROTECT `3.0 / 0.0 / 11.1 / 31.2 / 30.46 / 15.00` vs APP `2.7 / 0.0 / 8.2 / 28.4 / 27.64 / 14.83`. **Fail:** <70 is higher (3.0 > 2.7) and hypo treatment is higher (30.46 > 27.64); highs and CV are also higher. The pass rule requires <54, <70 and hypo grams not to exceed APP.
+- The current STATUS Results section does not contain the requested APP scenario-by-scenario values for run `45070147879`; its artifacts are encrypted. Per rule, no key was requested and no encrypted artifact was decrypted. The public APP control above is the verified base seed-1 reference only.
+- Audit observation: CR and ISF candidates were all rejected in the sampled logs (zero accepted); LAPROTECT correctly blocked increases on days where all-cause low rate exceeded 3%. Claude should inspect why the protection does not prevent the base seed-1 deterioration and whether the summary's APP comparator set is adequate.
+- **Stop condition:** Task 2 does not meet the safety pass rule. Do not start Task 3 / CHG_28 pairs. Do not make further replay starts or change learner behavior. Claude review required before any continuation.
+
+
 ### User approval and handoff to Claude — 2026-11-23
 
 User explicitly approved items 1–3. Claude's approval of items 1–5 is acknowledged; items 4–5 are also approved for the planned audit visibility and corrected matched-pair checks.
