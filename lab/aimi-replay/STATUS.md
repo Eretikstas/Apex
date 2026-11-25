@@ -1094,3 +1094,12 @@ Top 3 by minimum distance:
 - The mean replay metrics exactly match the Step 10 APP usual reference; CRAUDIT made no CR/ISF parameter writes. No dosing or learner behavior changed in this substep.
 - The source compile step and preceding helper/unit tests passed; full compile workflow [`45689360655`](https://github.com/Eretikstas/Apex/actions/runs/45689360655) was still assembling the laboratory APK when this note was written.
 - Next: Step 13b WATTR implementation and no-token APP control; then Step 13c planted positive/negative tests.
+
+
+**Step 13a audit/procedure addendum (25.11):**
+
+- Per-seed top rejection reasons required by RULES §5: ISF seed 1 = meal 10/25; seed 2 = meal 24/37; seed 3 = meal 28/53. All have <5 accepted: **Audit too strict for ISF; top reason = meal (62 of 115 overall)**. CR seed 1 = prior-insulin 9/14; seed 2 = prior-insulin 8/15; seed 3 = prior-insulin 9/14. All have <5 accepted: **Audit too strict for CR; top reason = prior-insulin (26 of 43 overall)**. Do not loosen the audit.
+- Exact RUN construction verified against the first job of Step 11b run 2: removing `GUARDCHAIN` and `Z2_126`, then adding `CRAUDIT`, gives the three run entries (with seed changed only to 2 and 3). No other scenario token changed.
+- Same-seed Step 10 APP usual summaries were independently fetched from run `45653668453`: seed 1 `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78`; seed 2 `4.0 / 0.1 / 4.2 / 27.7 / 24.11 / 10.92`; seed 3 `4.8 / 0.3 / 4.5 / 28.9 / 29.64 / 11.63`. Exact match to 13a for every seed: **CRAUDIT changes behaviour = NO**.
+- Required pre-run STATUS note was omitted and is recorded here after the run (procedural ordering deviation). The exact changes in commit `cbe6f1b6` are: ISF window `k-48..k+36` → `k-72..k+72`; reject any other SMB within 6 h as `smb-within-6h`; CR post-meal SMB/correction exclusion 2 h → 6 h. `isfSeen` / `crBlockVerdict` also drive LAISF/LACR under LEARNALL; prior LEARNALL/LAISF/LACR results are not comparable to results after this commit. APP variant (a) used in 13a does not use those cards.
+- Compile workflow `45689360655` had source compilation, weight-boundary tests, audit-helper tests, adaptation tests and APSResult tests green before replay, but full workflow/APK assembly had not yet completed when the RUN commit was made. Replay run `45690200848` itself succeeded 3/3. Wait for full compile workflow green before the next code commit.
