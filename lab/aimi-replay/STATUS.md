@@ -7,7 +7,7 @@
 - [x] Step 9b — calibration completed: 54/54 jobs; CAL accepted by Claude/user: `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`; ranking and distance recorded.
 - [x] Step 10 batch definition — 36 jobs assembled to match the six §5 scenarios, three seeds, and two variants; launched through RUN.txt commit `e997ab29b152abf2a8ae7f0bbd2ae45d82866991`.
 - [x] Step 10 execution/results — replay run `45653668453`: 1 plan + 36/36 replay jobs completed successfully; all 36 public summaries extracted from job logs. APP vs no-learner comparison and scenario means recorded below.
-- [ ] Step 11 — batch 1/2 launched: run `45659070340`, 108 replay jobs + plan; plan succeeded, replay jobs queued/running at first status check. Variants: GUARDCHAIN, CHAIN_25, CHAIN_75, SMARTL, LAPROTECT (with required LEARNALL), Z2_108. Batch 2/2 (Z2_126, 18 jobs) waits for batch 1 safety gate.
+- [x] Step 11 — batch 1/2 completed: run `45659070340`, 108/108 replay jobs + plan succeeded. Numeric review found learner variants breaching the §4 low gate and none meeting the stricter §5 requirement of at least 10% relative reduction in <70 on the usual scenario. STOP under §4a; batch 2 (`Z2_126`) and Step 12 were not started. Claude review required.
 - [ ] Step 12 — not started; depends on Step 11 pass-gate results.
 
 
@@ -1018,3 +1018,23 @@ Top 3 by minimum distance:
 
 - All three-seed groups have n=3; no missing summaries. This is a synthetic calibration ranking, not a clinical dosing recommendation or proof of real-world safety.
 - Task 9b report complete. STOP. No additional runs or code/workflow changes.
+
+
+### 2026-11-25, Step 11 — first batch COMPLETE; STOP under §4a
+
+- RUN.txt start commit: `3d07adb53878e68f1a1aa4ad19a5d918f5b7e774`; dispatcher run `45659023419` succeeded; replay run [`45659070340`](https://github.com/Eretikstas/Apex/actions/runs/45659070340) concluded `success`. GitHub API confirms 109/109 jobs completed successfully: 1 plan + 108 replay jobs. All 108 public synthetic summaries were read from job logs.
+- Mapping verified from the committed RUN.txt order: six candidates × six scenarios × three seeds. Candidates were tested individually on APP variant (a): GUARDCHAIN, CHAIN_25, CHAIN_75, SMARTL, LAPROTECT (with mandatory LEARNALL), Z2_108.
+- Decisive usual-scenario means over seeds 1–3 (columns: `<70 / <54 / >180 / CV / hypo g/day / insulin U/day`); APP reference from Step 10 is `4.93 / 0.30 / 4.80 / 28.77 / 28.99 / 11.44`. Step 11 requires <70 to fall by at least 10% relative, i.e. to `≤4.44%`, while <54 must not rise and >180 may rise by no more than 2 points.
+
+| Candidate | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day | <70 gate (≤4.44) |
+|---|---:|---:|---:|---:|---:|---:|---|
+| GUARDCHAIN | 4.77 | 0.17 | 4.83 | 28.53 | 28.16 | 11.43 | FAIL |
+| CHAIN_25 | 4.70 | 0.20 | 5.10 | 28.53 | 27.98 | 11.40 | FAIL |
+| CHAIN_75 | 4.93 | 0.30 | 4.80 | 28.77 | 28.99 | 11.44 | FAIL |
+| SMARTL | 4.97 | 0.30 | 5.07 | 28.53 | 28.04 | 11.42 | FAIL |
+| LAPROTECT | 5.27 | 0.17 | 5.00 | 28.83 | 30.12 | 11.53 | FAIL |
+| Z2_108 | 5.07 | 0.27 | 4.93 | 28.53 | 27.68 | 11.41 | FAIL |
+
+- None of the six candidates achieves the required ≥10% relative reduction in <70 on the usual scenario. In addition, SMARTL, LAPROTECT and Z2_108 increase <70 versus the APP reference (4.97, 5.27 and 5.07 vs 4.93); LAPROTECT also increases hypo treatment (30.12 vs 28.99 g/day). These are learner-variant §4 safety-gate breaches.
+- **STOP per RULES_FOR_CHATGPT.md §4a.** Do not launch batch 2 (`Z2_126`) or Step 12. Do not select or combine candidates. Claude review is required before any continuation. The 108 successful jobs prove execution only; the candidate results do not pass the low-reduction/safety criteria.
+- Scope: synthetic replay only (`algo=autoisf`, `sim=true`); no clinical dosing or real-world safety conclusion.
