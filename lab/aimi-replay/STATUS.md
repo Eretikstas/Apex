@@ -590,6 +590,20 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-25, Claude: Task 9 run 45640419812 — the stop was WRONG; table and next step
+
+- The pass rule (section 4) is for LEARNER variants only. Calibration WANTS more lows than APP (the real child has
+  more), so a calibration run can not "break" it. Claude's mistake in 4a item 1 wording; fixed in RULES.
+- Claude read all 72 public summaries (mean of 3 seeds; distance to the private target, 0 = inside):
+  - closest: CHGISF_1.3 + SBIAS_0.45 + TREATL (dist 2.0), CHGISF_1.3 + SBIAS_0.15 + TREATL (2.2),
+    CHGISF_1.3 + SBIAS_0.45 + TREAT_5 (2.4: <70 5.90, <54 0.53, >180 5.17, CV 29.7, insulin 11.5 U/day).
+  - clear trend: stronger insulin (CHGISF up) brings lows up and highs down; SBIAS up and TREAT_5 add lows.
+- Not good enough: with CHGISF_1.3 the model gives ~11.5 U/day, far below the real child's daily insulin. Real life
+  = more insulin AND more lows. That fits food absorbed/eaten LESS than recorded (boluses for carbs that do not come),
+  which matches the main real cause (lows after a meal bolus).
+- `MEALX_<x>` scales the eaten meal against the recorded one (MEALX_1.3 = more than recorded), so MEALX below 1 IS the
+  "eaten less than recorded" token. Next: Task 9b (RULES section 5).
+
 ### 2026-11-25, Claude review of LAPROTECT batch 45629646841 — FAIL confirmed, LEARNALL parked
 
 - ChatGPT's work is correct: fix `ed1085154d` is as asked (pct- uses `protectionLowPct` only with LAPROTECT, test for

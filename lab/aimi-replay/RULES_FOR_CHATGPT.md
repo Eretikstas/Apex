@@ -45,7 +45,8 @@ Breaking a rule = stop, write in STATUS.md "Task" what you wanted to do and why,
 The user wants you to finish a task without asking. Stops cost the user's time and Claude's limits.
 
 STOP and wait for Claude ONLY when:
-1. a run result breaks the pass rule (section 4), or a control does not match its reference numbers;
+1. a LEARNER-variant run breaks the pass rule (section 4), or a control does not match its reference numbers.
+   Calibration runs have NO pass rule (they are meant to have more lows): report the table and the ranking;
 2. the task needs something section 1 forbids (a workflow, the app branch, src/main code, a new learner behaviour
    that gives more insulin or weakens a protection);
 3. compile fails twice with the same error;
@@ -59,8 +60,12 @@ Do NOT stop for anything else. In particular:
 - Waiting for a run is not a reason to ask: check it again later and go on.
 - At the end of a task: write the report, then STOP (that is the normal end, not a question).
 
-## 5. Your next task (updated by Claude 25.11)
+## 5. Your next task (updated by Claude 25.11, evening)
 
-Tasks 1–2 are done (LAPROTECT batch reviewed, FAIL, LEARNALL parked). Task 3 (CHG_28 pairs) is CANCELLED.
-Next: **Task 9, model calibration to real lows**. The user gives you the full text (with the private target T) in the
-chat. Target numbers stay in the chat only: never write them into this repository. One run, then report and STOP.
+Task 9 run is reviewed (see Results). **Task 9b**: one run, 54 jobs, start it now without asking.
+- Base: the same APP base prefs as in Task 9, `LACAUSE` on, `TREAT_5`, seeds 1–3.
+- Grid: `MEALX_0.7 / 0.8 / 0.9` x `CHGISF_1.0 / 1.1 / 1.2` x `SBIAS_0.30 / 0.45` (one SBIAS token per job, replace
+  the base one; one MEALX per job). 3 x 3 x 2 x 3 seeds = 54 jobs.
+- Report in STATUS "Task": table (mean of 3 seeds): <70, <54, >180, CV, hypo g/day, insulin U/day, and the distance
+  to the private target T the user gives in the chat (T now also has a daily-insulin band). Rank the top 3. STOP.
+- No pass rule for this task. Stop earlier only for RULES 4a items 2–4.
