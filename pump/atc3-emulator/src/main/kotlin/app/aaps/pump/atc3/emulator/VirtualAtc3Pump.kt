@@ -174,6 +174,7 @@ class VirtualAtc3Pump(
         if (length != frame.size) return true
         val crc = Crc16.modbusLeBytes(frame, frame.size - 2)
         if (crc[0] != frame[frame.size - 2] || crc[1] != frame[frame.size - 1]) return true
+        endTbrIfOver()
         // §2.1 says the marker is 0x35 for the official app; the driver also uses 0x55 for some
         // reads and the cancel, which it was bench tested with. Both are taken.
         val marker = frame[0].toInt() and 0xFF
@@ -440,9 +441,19 @@ class VirtualAtc3Pump(
         tbr = Tbr(minuteOf(pumpNow()), fromApp = true, absolute = absolute, durationSteps = durationSteps, value = value, delivered = 0)
     }
 
-    private fun endTbr(how: Int) {
+    /**
+     * A temp basal ends by itself when its time is over, as on the real pump (end code 1 = ran to its end, at its
+     * planned end time). Call before anything reads [tbr]: a frame from the phone, a heartbeat, a test state read.
+     */
+    fun endTbrIfOver() {
+        val running = tbr?.takeIf { it.durationSteps > 0 } ?: return
+        val plannedEnd = running.startMs + running.durationSteps * TBR_STEP_MS
+        if (pumpNow() >= plannedEnd) endTbr(how = 1, atMs = plannedEnd)
+    }
+
+    private fun endTbr(how: Int, atMs: Long = pumpNow()) {
         val running = tbr ?: return
-        val done = FinishedTbr(running, pumpNow(), how)
+        val done = FinishedTbr(running, atMs, how)
         lastFinishedTbr = done
         tbrLog.add(0, done)
         tbr = null
@@ -542,6 +553,7 @@ class VirtualAtc3Pump(
 
     /** Send the heartbeat `a5/03`, §2.5: its length field is the size without the CRC. */
     fun heartbeat() {
+        endTbrIfOver()
         val body = byteArrayOf(0xAA.toByte(), 0x06, 0x00, 0xA5.toByte(), heartbeatMinutes.toByte(), 0x00)
         send(body + Crc16.modbusLeBytes(body))
     }
@@ -616,6 +628,8 @@ class VirtualAtc3Pump(
         /** How many old boluses [seedBolusHistory] puts in the journal. */
         const val SEEDED_BOLUSES = 128
         private const val SEED_STEP_MS = 4 * 3_600_000L
+        /** One temp basal duration step is 15 min. */
+        private const val TBR_STEP_MS = 15 * 60_000L
         private const val SEED_RAW = 40
 
         private fun calendar(ms: Long): Calendar = Calendar.getInstance(TimeZone.getDefault()).apply { timeInMillis = ms }

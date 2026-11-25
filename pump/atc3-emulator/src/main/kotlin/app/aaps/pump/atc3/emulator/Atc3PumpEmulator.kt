@@ -135,6 +135,7 @@ class Atc3PumpEmulator(val pump: VirtualAtc3Pump) : PumpEmulatorControl {
     }
 
     override fun state(): EmulatedPumpState {
+        pump.endTbrIfOver()
         val tbr = pump.tbr
         val profile = pump.profiles[pump.activeProfile]
         return EmulatedPumpState(

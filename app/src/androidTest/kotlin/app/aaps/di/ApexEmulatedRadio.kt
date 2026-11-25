@@ -74,9 +74,17 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
 
     override fun connect(address: String): Boolean {
         val emulator = emulator ?: return super.connect(address)
-        if (emulator.isLinkUp || connecting) return true
+        if (connecting) return true
+        if (emulator.isLinkUp && upAt != 0L) return true
         emulator.onNotification = { chunk -> callback?.onDataReceived(chunk) }
         emulator.onLinkLost = { events.execute { callback?.onDisconnected() } }
+        if (emulator.isLinkUp) {
+            // The link was opened by the radio of an earlier AAPS start (a test restart keeps the same pump). A new
+            // process gets its own link, so this radio takes it over and tells its driver, or the driver waits forever.
+            upAt = System.currentTimeMillis()
+            events.execute { callback?.onConnected() }
+            return true
+        }
         connecting = true
         events.execute {
             if (emulator.connect()) {
