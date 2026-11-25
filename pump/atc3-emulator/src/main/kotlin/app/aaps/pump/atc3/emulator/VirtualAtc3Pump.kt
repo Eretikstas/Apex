@@ -76,7 +76,21 @@ class VirtualAtc3Pump(
 
     class Tbr(val startMs: Long, val fromApp: Boolean, val absolute: Boolean, val durationSteps: Int, val value: Int, var delivered: Int)
 
-    var tbr: Tbr? = null
+    /**
+     * The temporary basal running now, null when none. A temporary basal that ran its whole length is ended here, at
+     * its end minute, as the pump does on its own: before, it ran until a command ended it, and a test that left the
+     * pump alone past the end found it still running.
+     */
+    var tbr: Tbr?
+        get() {
+            endTbrIfOver()
+            return runningTbr
+        }
+        set(value) {
+            runningTbr = value
+        }
+
+    @Volatile private var runningTbr: Tbr? = null
 
     class FinishedTbr(val tbr: Tbr, val endMs: Long, val how: Int)
 
@@ -440,6 +454,18 @@ class VirtualAtc3Pump(
         tbr = Tbr(minuteOf(pumpNow()), fromApp = true, absolute = absolute, durationSteps = durationSteps, value = value, delivered = 0)
     }
 
+    /** The running temporary basal is over by its length: it is ended at its end, as "completed" (§4.8). */
+    private fun endTbrIfOver() {
+        val running = runningTbr ?: return
+        if (running.durationSteps <= 0) return
+        val endMs = running.startMs + running.durationSteps * TBR_STEP_MS
+        if (pumpNow() < endMs) return
+        val done = FinishedTbr(running, endMs, TBR_COMPLETED)
+        lastFinishedTbr = done
+        tbrLog.add(0, done)
+        runningTbr = null
+    }
+
     private fun endTbr(how: Int) {
         val running = tbr ?: return
         val done = FinishedTbr(running, pumpNow(), how)
@@ -612,6 +638,12 @@ class VirtualAtc3Pump(
     companion object {
 
         const val CHUNK = 20
+
+        /** One step of a temporary basal's length: 15 min. */
+        private const val TBR_STEP_MS = 15 * 60_000L
+
+        /** How a temporary basal ended (§4.8): it ran its whole length. */
+        private const val TBR_COMPLETED = 1
 
         /** How many old boluses [seedBolusHistory] puts in the journal. */
         const val SEEDED_BOLUSES = 128

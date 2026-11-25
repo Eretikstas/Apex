@@ -6,6 +6,8 @@ import app.aaps.pump.apex.link.ApexBLE
 import app.aaps.pump.apex.link.ApexBleCallback
 import app.aaps.pump.apex.trace.ApexTrace
 import app.aaps.pump.atc3.emulator.Atc3PumpEmulator
+import java.util.Collections
+import java.util.WeakHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -24,6 +26,18 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
     private val emulator: Atc3PumpEmulator?
         get() = pinned ?: Atc3Emulation.emulator?.also { pinned = it }
 
+    /**
+     * A newer radio was made over the same pump: this one belongs to an app that is gone (a test restarts AAPS by
+     * making a new graph). The old graph's queue still ran for a while after the restart: it linked again, the link
+     * was its own, and the new driver was told "already linked" and never set the link up. On a phone the old app is
+     * dead: here its radio is dead too - it never links, writes or drops the new link.
+     */
+    private val retired: Boolean get() = pinned != null && newest[pinned] !== this
+
+    init {
+        pinned?.let { newest[it] = this }
+    }
+
     /** Set by the first pump seen (normally at construction, which comes after the test set its pump). */
     @Volatile private var pinned: Atc3PumpEmulator? = Atc3Emulation.emulator
 
@@ -35,8 +49,8 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
     @Volatile private var heardAt = 0L
     @Volatile private var upAt = 0L
 
-    override val isConnected: Boolean get() = emulator?.isLinkUp ?: super.isConnected
-    override val isConnecting: Boolean get() = if (emulator != null) connecting else super.isConnecting
+    override val isConnected: Boolean get() = if (retired) false else emulator?.let { it.isLinkUp && upAt != 0L } ?: super.isConnected
+    override val isConnecting: Boolean get() = if (emulator != null) connecting && !retired else super.isConnecting
     override val isBluetoothOn: Boolean get() = if (emulator != null) true else super.isBluetoothOn
     override val hasBluetooth: Boolean get() = if (emulator != null) true else super.hasBluetooth
     override val backoffRemainingMs: Long get() = if (emulator != null) 0L else super.backoffRemainingMs
@@ -74,9 +88,17 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
 
     override fun connect(address: String): Boolean {
         val emulator = emulator ?: return super.connect(address)
-        if (emulator.isLinkUp || connecting) return true
+        if (retired) return false
+        newest[emulator] = this
+        if (connecting) return true
+        // Up and ours: nothing to do. Up and not ours (left by a radio of a gone app): it is taken over as a new link.
+        if (emulator.isLinkUp && upAt != 0L) return true
+        emulator.disconnect()
         emulator.onNotification = { chunk -> callback?.onDataReceived(chunk) }
-        emulator.onLinkLost = { events.execute { callback?.onDisconnected() } }
+        emulator.onLinkLost = {
+            upAt = 0L
+            events.execute { callback?.onDisconnected() }
+        }
         connecting = true
         events.execute {
             if (emulator.connect()) {
@@ -95,16 +117,20 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
 
     override fun disconnect() {
         val emulator = emulator ?: return super.disconnect()
+        if (retired) return
         val wasUp = emulator.isLinkUp
         emulator.disconnect()
         upAt = 0L
         if (wasUp) events.execute { callback?.onDisconnected() }
     }
 
-    override fun write(data: ByteArray): Boolean = emulator?.write(data) ?: super.write(data)
+    override fun write(data: ByteArray): Boolean = if (retired) false else emulator?.write(data) ?: super.write(data)
 
     private companion object {
 
         const val OUT_OF_RANGE_GIVE_UP_MS = 3_000L
+
+        /** The newest radio made over each pump: the radio of the app that runs now. */
+        private val newest: MutableMap<Atc3PumpEmulator, EmulatedApexBLE> = Collections.synchronizedMap(WeakHashMap())
     }
 }
