@@ -16,6 +16,13 @@
 - This side task does not alter RULES §5, the chain's next step, learner formulas, clinical settings, or app source.
 
 
+### DUMPCSV comparison CI fix — 2026-11-25 — PASS
+
+- Workflow commit: 56fd0eb436c28c135344008d482bb4b286148c8f. Added NumPy installation before the replay-job unit test and a standalone push-triggered `comparison-test` job so the synthetic tool can be tested without starting another replay.
+- Standalone CI run [45719091659](https://github.com/Eretikstas/Apex/actions/runs/45719091659): SUCCESS. Python setup, NumPy installation, and `python3 -m unittest discover -s lab/aimi-replay/tools -p 'test_compare_days.py' -v` all passed. This includes the same-file-twice assertion that every feature verdict is SIMILAR.
+- No replay was repeated; no RUN.txt change and no clinical or §5 chain action. Existing DUMPCSV replay artifact and exact Step 13a metrics remain as recorded below.
+
+
 ### DUMPCSV execution — 2026-11-25 — REPLAY OK; TOOL TEST BLOCKED
 
 - RUN commit: b926c1f7ed226a58ecd3a55d287f598e1d0ab00d. Dispatcher: [45715276679](https://github.com/Eretikstas/Apex/actions/runs/45715276679). Replay: [45715301756](https://github.com/Eretikstas/Apex/actions/runs/45715301756), one plan + one replay job.
