@@ -97,6 +97,20 @@ Pass rule here: <54 not higher than (a), <70 lower than (a) by at least 10 % rel
      Report the score table per card. This is a test of the learner's judgement: a bad score is a RESULT, not a stop.
 Then STOP. Do not apply any weight change in the model; WATTR only reports.
 
+**Steps 14–18 (after step 13; one chain, go on without asking; Claude reviews only at the END).** Build the
+learner of `LEARNER_CURRICULUM.md` in HistoryReplayTest.kt, each part behind its own token, OFF by default, compile
+green after each part, "no token = old numbers" checked (base / APP / seed 1 control) after each part.
+14. Token `LSTAGE0`: the stage-0 data filter (cannula, COB minimum-rate meals, untreated-hypo check, calibration
+    window). Report how many days / meals each rule drops on CAL usual, 3 seeds. No behaviour change otherwise.
+15. Token `LISF2`: stage-2 ISF card by part of the day (BerNie signs, 10–20 % step, night by IOB), report-only.
+    Planted test: CHGISF one step up and down -> right direction; MEALX_0.7 / NOISE_0.12 / CANCH_96 -> silent.
+16. Token `LCR3`: stage-3 CR card (AAPS post-meal rule, 60 g, COB minimum-rate meals excluded), report-only.
+    Planted test: CRT one step up and down -> right direction; MEALX_0.7 / TREAT_15 -> silent.
+17. Token `LEXPL`: stage-5 explanations: per low its cause, per card the rules it passed; output a short table.
+18. One final run: APP + LSTAGE0 + LISF2 + LCR3 + WATTR + LEXPL (all report-only) on 6 scenarios x 3 seeds:
+    numbers must equal APP (report-only changes nothing) + the score table of every card. Then report and STOP.
+Report format for every step: commit, run id, table, which assumptions failed. Never "passed" without numbers.
+
 **Step 12 — the best together.** Combine the tokens that passed step 11 (all of them, and the best 2). Same table and
 pass rule. Then write a short final list: which tokens pass, how much they lower <70 on each scenario. STOP.
 
