@@ -1048,3 +1048,23 @@ Top 3 by minimum distance:
 - None of the six candidates achieves the required ≥10% relative reduction in <70 on the usual scenario. In addition, SMARTL, LAPROTECT and Z2_108 increase <70 versus the APP reference (4.97, 5.27 and 5.07 vs 4.93); LAPROTECT also increases hypo treatment (30.12 vs 28.99 g/day). These are learner-variant §4 safety-gate breaches.
 - **STOP per RULES_FOR_CHATGPT.md §4a.** Do not launch batch 2 (`Z2_126`) or Step 12. Do not select or combine candidates. Claude review is required before any continuation. The 108 successful jobs prove execution only; the candidate results do not pass the low-reduction/safety criteria.
 - Scope: synthetic replay only (`algo=autoisf`, `sim=true`); no clinical dosing or real-world safety conclusion.
+
+
+### 2026-11-25, Step 11b — both runs complete; STOP under §4a
+
+- Step 11b run 1 (three Z2 thresholds alone): start commit `4346695dc6db673bc12f33017162a1bca5f722ae`; dispatcher `45679265898`; replay [`45679294097`](https://github.com/Eretikstas/Apex/actions/runs/45679294097). All 55 jobs succeeded (1 plan + 54 replay); all 54 public synthetic summaries were read.
+- Step 11b run 2 (GUARDCHAIN + each Z2 threshold): start commit `ab7a58f5bf19ac8cb3b4c8f5ae27bf5b1e48df48`; dispatcher `45682900288`; replay [`45682956033`](https://github.com/Eretikstas/Apex/actions/runs/45682956033). All 55 jobs succeeded (1 plan + 54 replay); all 54 public synthetic summaries were read.
+- Grid in each run: 3 thresholds × 6 scenarios × 3 seeds. Means below are the decisive usual-scenario results across seeds 1–3. Columns: BG <70 / BG <54 / BG >180 / CV / hypo g/day / insulin U/day. APP usual reference from Step 10: 4.93 / 0.30 / 4.80 / 28.77 / 28.99 / 11.44. The 10% reduction threshold is ≤4.44; per the user's instruction, failure of that threshold alone is not a stop.
+
+| Run | Candidate | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day | 10% gate | §4 safety gate |
+|---|---|---:|---:|---:|---:|---:|---:|---|---|
+| 1: alone | Z2_126 | 5.17 | 0.27 | 4.93 | 28.80 | 28.75 | 11.47 | FAIL | FAIL: <70 > APP |
+| 1: alone | Z2_139 | 5.20 | 0.27 | 5.17 | 28.90 | 29.64 | 11.50 | FAIL | FAIL: <70 and hypo > APP |
+| 1: alone | Z2_150 | 5.23 | 0.20 | 5.20 | 29.07 | 29.47 | 11.49 | FAIL | FAIL: <70 and hypo > APP |
+| 2: + GUARDCHAIN | Z2_126 | 5.00 | 0.27 | 5.03 | 28.93 | 28.04 | 11.45 | FAIL | FAIL: <70 > APP |
+| 2: + GUARDCHAIN | Z2_139 | 5.20 | 0.27 | 5.17 | 28.90 | 29.64 | 11.50 | FAIL | FAIL: <70 and hypo > APP |
+| 2: + GUARDCHAIN | Z2_150 | 5.30 | 0.20 | 5.07 | 28.87 | 29.53 | 11.47 | FAIL | FAIL: <70 and hypo > APP |
+
+- **§4a stop condition is met independently of the 10% gate:** every Z2 candidate, alone and with GUARDCHAIN, has usual-scenario BG <70 above the APP reference (4.93%). Z2_139 and Z2_150 also increase hypo-treatment grams. <54 does not increase. Thus these learner-variant candidates break the §4 safety pass rule (<70 and hypo grams must not exceed APP).
+- Result: no Z2 threshold selected; GUARDCHAIN combination does not repair the <70 safety-gate breach. Do not proceed to Step 13 or Steps 14–18 until Claude reviews this §4a stop. No learner code or clinical settings changed in Step 11b.
+- Scope: synthetic replay only (`algo=autoisf`, `sim=true`); no clinical dosing or real-world safety conclusion.
