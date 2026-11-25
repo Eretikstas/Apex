@@ -92,6 +92,23 @@ Pass rule here: <54 not higher than (a), <70 lower than (a) by at least 10 % rel
 
 **Step 13 (after 11b, go on without asking): learner attribution, see `LEARNER_ATTRIBUTION_SPEC.md`.**
 13a. Implement token `CRAUDIT` (counting only, no behaviour change) and run the CR/ISF audit on CAL usual, 3 seeds.
+     **13a details (Claude 25.11 night, after commit cbe6f1b6):**
+     1. Wait for compile run 45689360655. If red: fix ONLY the compile error, push, wait for green. No replay before
+        a green compile on the exact commit you run.
+     2. Before the run, write in STATUS.md (block "Step 13a"): cbe6f1b6 is NOT only counting, it changed audit rules
+        (ISF window k-48..k+36 -> k-72..k+72; ISF any other SMB in 6 h -> reject `smb-within-6h`; CR post-meal SMB /
+        correction exclusion 2 h -> 6 h). `isfSeen` / `crBlockVerdict` also drive LAISF / LACR cards, so old
+        LEARNALL / LAISF / LACR results are not comparable with new ones. APP variant (a) does not use them.
+     3. Start by RUN.txt only, ONE start, 3 jobs: take the first job line of the 11b run 2 RUN.txt (SEED_1, base CAL),
+        remove `GUARDCHAIN` and `Z2_126`, add `CRAUDIT`; copies for SEED_2 and SEED_3. Nothing else changes.
+     4. From public job logs only, per seed copy exactly: the `AIMI audit CRAUDIT` line, the `AIMI audit ISF` line,
+        the CR audit line(s), the summary line.
+     5. Table, one row per seed: (a) candidates == accepted + rejected for ISF AND CR (if CR has no such check or it
+        does not add up: write "CR reconcile: MISSING/FAIL", do not fix silently); (b) accepted count — if < 5 for
+        ISF or CR in all seeds write "Audit too strict: top reason = <reason> (<n> of <total>)", do NOT loosen rules;
+        (c) summary metrics must equal APP (a) usual of step 10 for the same seed; any difference = FAIL
+        "CRAUDIT changes behaviour" -> STOP and wait for Claude (this one IS a stop).
+     6. Then go on to 13b. Do not change audit windows or rules. "not run" + reason for any check that did not run.
 13b. Implement token `WATTR` (weight cards, report-only, rules 1–6 of the spec) in HistoryReplayTest.kt, OFF by
      default; compile green; check that without the token the APP control numbers are unchanged.
 13c. Run the planted-cause test (spec section 3) with `WATTR` and `CRAUDIT`: positive and negative cases, 3 seeds.
