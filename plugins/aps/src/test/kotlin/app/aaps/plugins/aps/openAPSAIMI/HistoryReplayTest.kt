@@ -1023,8 +1023,10 @@ class HistoryReplayTest {
         var lastLoopBg: Double? = null; var lastAct = 0.0
         var mealPtr = 0
         val out = JSONArray()
-        val causalFilter = prefsText.contains("LACAUSE")
-        val laProtect = prefsText.split(Regex("[,\\s]+")).contains("LAPROTECT")
+        val replayTokens = prefsText.split(Regex("[,\\s]+")).filter { it.isNotBlank() }.toSet()
+        val causalFilter = replayTokens.contains("LACAUSE")
+        val crAudit = replayTokens.contains("CRAUDIT")
+        val laProtect = replayTokens.contains("LAPROTECT")
         val require3Days = prefsText.contains("LADAYS")
         val pctBack = prefsText.contains("LAPCTBACK")
         fun rowDay(r: JSONObject) = ((r.getLong("t") - t0) / 86_400_000L).toInt()
@@ -1484,14 +1486,14 @@ class HistoryReplayTest {
                 ins[i] = num(nx, "deliv") * 5 / 60 + num(r, "units") + num(r, "man")
             }
             val act = DoubleArray(w) { k -> var a = 0.0; for (j in 0..minOf(60, k)) a += ins[k - j] * kern5[j]; a }
-            val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); val isfRejected = linkedMapOf<String, Int>(); var auditCandidates = 0; var k = 48
-            while (k < w - 36) {
+            val seen = ArrayList<Double>(); val seenDays = HashSet<Int>(); val isfRejected = linkedMapOf<String, Int>(); var auditCandidates = 0; var k = 72
+            while (k < w - 72) {
                 // A correction may be a manual bolus or an SMB; the SMB at k is the event being measured.
                 val correction = (rows[k].optBoolean("manualCorrection") || num(rows[k], "units") > 0.0) &&
                     !bg[k].isNaN() && bg[k] > 180.0
                 if (!correction) { k++; continue }
                 auditCandidates++
-                val window = k - 48..k + 36
+                val window = k - 72..k + 72
                 val windowRows = window.map { rows[it] }
                 val rejection = when {
                     causalFilter && hasSensorGap(windowRows) -> "sensor-gap"
@@ -1501,11 +1503,11 @@ class HistoryReplayTest {
                     window.any { rows[it].optBoolean("activity") } -> "activity"
                     window.any { rows[it].optBoolean("illness") } -> "illness"
                     window.any { rows[it].optBoolean("falseLow") } -> "false-low"
-                    // Restrict meal contamination to the relevant 3 h pre / 2 h post window.
                     (k - 36..k + 24).any { meal[it] > 0.0 } -> "meal"
-                    // The correction's own insulin is modeled in act[]; reject only a separate close bolus.
-                    (k - 12 until k).any { num(rows[it], "man") > 0.0 || num(rows[it], "units") > 0.0 } -> "prior-insulin"
-                    window.any { it != k && (num(rows[it], "man") > 0.0 || num(rows[it], "units") > 0.0) } -> "overlapping-bolus"
+                    // A distinct SMB in the six-hour causal window contaminates a correction candidate.
+                    window.any { it != k && num(rows[it], "units") > 0.0 } -> "smb-within-6h"
+                    // The candidate insulin is modeled in act[]; other manual boluses overlap it.
+                    window.any { it != k && num(rows[it], "man") > 0.0 } -> "overlapping-bolus"
                     bg[k] - bg[k - 3] >= 18.0 -> "rising-glucose"
                     else -> null
                 }
@@ -1563,9 +1565,9 @@ class HistoryReplayTest {
                         hasRecentHypoEvidence(it.optDouble("bg", Double.NaN), it.optDouble("hypo", 0.0)) }) { reject("prior-hypo-rebound"); continue }
                     if (causalFilter && allRows.any { it.getLong("t") in (tm - 120 * minute) until tm &&
                         (it.optDouble("units", 0.0) > 0.0 || it.optDouble("man", 0.0) > 0.0) }) { reject("prior-insulin"); continue }
-                    // Later boluses invalidate only the first 2 h, not the entire 6 h meal tail.
-                    if (causalFilter && allWindow.any { it.getLong("t") in tm..(tm + 120 * minute) && it.optDouble("units", 0.0) > 0.0 }) { reject("post-meal-smb-2h"); continue }
-                    if (causalFilter && allWindow.any { it.getLong("t") in tm..(tm + 120 * minute) && it.optBoolean("manualCorrection") }) { reject("post-meal-correction-2h"); continue }
+                    // Preserve the full six-hour post-meal SMB exclusion for CR attribution.
+                    if (causalFilter && allWindow.any { it.getLong("t") in tm..(tm + 360 * minute) && it.optDouble("units", 0.0) > 0.0 }) { reject("smb-within-6h"); continue }
+                    if (causalFilter && allWindow.any { it.getLong("t") in tm..(tm + 360 * minute) && it.optBoolean("manualCorrection") }) { reject("correction-within-6h"); continue }
                     if (causalFilter && !m.optBoolean("mealBolus")) { reject("missing-meal-bolus"); continue }
                     val w4 = window.filter { it.getLong("t") <= tm + 240 * minute }
                     val lowRows = w4.filter { it.getDouble("bg") < 70.2 }
@@ -2070,6 +2072,11 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
+        if (crAudit) {
+            println("AIMI audit CRAUDIT: counting-only; no CR/ISF parameter writes")
+            isfSeen()
+            crBlockVerdict()
+        }
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, unlogged meals $nUnlog, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
