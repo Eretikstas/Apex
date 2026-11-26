@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -51,11 +52,19 @@ def jobs(run_id: str):
         page += 1
 
 
-def log_lines(job_id: int):
-    try:
-        text = get(f"{API}/jobs/{job_id}/logs", raw=True)
-    except Exception as e:  # a missing log is reported, not fatal
-        return [f"(log not readable: {e})"]
+def log_lines(job_id: int, marker: str = ""):
+    """GitHub makes a job log readable some time after the job ends: ask again for up to about 10 minutes."""
+    text, err = "", ""
+    for _ in range(20):
+        try:
+            text = get(f"{API}/jobs/{job_id}/logs", raw=True)
+            if text.strip() and (not marker or marker in text):
+                break
+        except Exception as e:  # a missing log is retried, then reported
+            err = str(e)
+        time.sleep(30)
+    if not text.strip():
+        return [f"(LOG NOT READY: {err or 'empty'})"]
     # Each line starts with an ISO time stamp and a space.
     return [re.sub(r"^\S+Z ", "", line).strip() for line in text.splitlines()]
 
@@ -74,12 +83,12 @@ def replay(run_id: str) -> Path:
              f"- Commit: `{run['head_sha'][:8]}`, started {run['created_at']}, result: **{overall(all_jobs)}**", "",
              "| # | Job | Result | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day | Control |",
              "|---:|---|---|---:|---:|---:|---:|---:|---:|---|"]
-    details, controls_failed = [], 0
+    details, controls_failed, missing = [], 0, 0
     rjobs = sorted((j for j in all_jobs if j["name"].startswith("replay")), key=lambda j: int(re.sub(r"\D.*", "", j["name"][8:]) or 0))
     for j in rjobs:
         m = re.match(r"replay \((\d+),", j["name"])
         idx = m.group(1) if m else "?"
-        log = log_lines(j["id"])
+        log = log_lines(j["id"], "AIMI_REPLAY_PREFS")
         prefs = next((l.split("AIMI_REPLAY_PREFS:", 1)[1].strip() for l in log if "AIMI_REPLAY_PREFS:" in l), "")
         tokens = [t for t in re.split(r"[,\s]+", prefs) if t]
         row = next((l for l in log if l.startswith("| SYNTH")), None)
@@ -94,13 +103,17 @@ def replay(run_id: str) -> Path:
             else:
                 control = "PASS"
         short = ",".join(t for t in tokens if not t.startswith("SYNTH_"))
+        if len(nums) != 6:
+            missing += 1
         cells = nums if len(nums) == 6 else ["-"] * 6
         lines.append(f"| {idx} | {seed} | {j['conclusion']} | " + " | ".join(cells) + f" | {control} |")
         keep = [l for l in log if l.startswith(KEEP) and "AIMI_REPLAY_PREFS" not in l]
         seen = set()
         keep = [l for l in keep if not (l in seen or seen.add(l))]
         details += ["", f"## Job {idx}", "", f"Tokens: `{short}`", "", "```text"] + keep[:200] + ["```"]
-    verdict = "CONTROL FAIL: STOP and call Claude" if controls_failed else "controls: none failed"
+    verdict = "CONTROL FAIL: STOP and ask the user" if controls_failed else "controls: none failed"
+    if missing:
+        verdict += f"; **INCOMPLETE: {missing} job(s) without numbers (log not ready or job failed) - do not use them**"
     lines[4:4] = [f"- Jobs: {len(rjobs)}; {verdict}"]
     OUT.mkdir(parents=True, exist_ok=True)
     path = OUT / f"run-{run_id}.md"
