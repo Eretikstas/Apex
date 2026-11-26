@@ -1908,7 +1908,7 @@ class HistoryReplayTest {
                     val dev = (gs.glucose - lastLoopBg!!) + lastAct * isfP * 5
                     lastDev = dev; devStreak = if (dev > 6.0) devStreak + 1 else 0
                     val minRateFallback = dev < 4.0
-                var absorbed = maxOf(dev, 4.0) / csfP
+                    var absorbed = maxOf(dev, 4.0) / csfP
                     for (l in logged) {
                         if (absorbed <= 0) break
                         val x = minOf(l.left, absorbed)
