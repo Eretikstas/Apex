@@ -1034,6 +1034,7 @@ class HistoryReplayTest {
         val wAttr = replayTokens.contains("WATTR")
         val laProtect = replayTokens.contains("LAPROTECT")
         val stage0 = replayTokens.contains("LSTAGE0")
+        val lisf2 = replayTokens.contains("LISF2")
         require(!wAttr || causalFilter) { "WATTR requires LACAUSE for causal-window exclusions" }
         class WAttrTick(
             val t: Long, val day: Int, val weight: String?, val impactPct: Double, val clamped: Boolean,
@@ -2057,10 +2058,11 @@ class HistoryReplayTest {
                     val chained = chainedInputs(chain, tick, t)
                     lastAct = chained.iobArray[0].activity
                     val liveVs = autoIsf321Sens(winV, winT, t, tick)
+                    val profileIsf = tick.getJSONObject("prof").getDouble("isf")
+                    val actualFactor = profileIsf / liveVs
+                    row.put("autoIsfFactor", actualFactor)
                     val rt = runTickAutoIsf(autoIsf, tick, meta, t, chained, gs, smbOk, liveVs = liveVs)
                     if (wAttr) {
-                        val profileIsf = tick.getJSONObject("prof").getDouble("isf")
-                        val actualFactor = profileIsf / liveVs
                         val clamped = actualFactor <= aw.min + 0.0001 || actualFactor >= aw.max - 0.0001
                         val names = listOf("acce", "brake", "pp", "dura", "lower", "higher")
                         val effects = names.map { name ->
@@ -2247,6 +2249,99 @@ class HistoryReplayTest {
                 "low-without-hypo-carbs-in-next-15m episodes=${untreatedLowRows.size} days=${untreatedHypoDays.size}; " +
                 "calibration-window=UNAVAILABLE(no calibration-event field); " +
                 "medical-procedure=UNAVAILABLE(no procedure field); report-only")
+        }
+        // LISF2 is a report-only BerNie-sign ISF card. It never changes isfP or insulin delivery.
+        // Autotune categorization is restricted to windows where the recorded AutoISF factor stayed at 1.0.
+        if (lisf2) {
+            val rows = (0 until out.length()).map { out.getJSONObject(it) }
+            fun num(r: JSONObject, key: String) = r.optDouble(key, 0.0).let { if (it.isFinite()) it else 0.0 }
+            val n = rows.size
+            val insulin = DoubleArray(n) { i ->
+                val r = rows[i]
+                val next = rows.getOrNull(i + 1) ?: r
+                num(next, "deliv") * 5.0 / 60.0 + num(r, "units") + num(r, "man")
+            }
+            val activity = DoubleArray(n) { k ->
+                var total = 0.0
+                for (j in 0..minOf(60, k)) total += insulin[k - j] * kern5[j]
+                total
+            }
+            val names = listOf("morning", "day", "evening", "night")
+            val samples = names.associateWith { ArrayList<Pair<Int, Double>>() }
+            val rejects = names.associateWith { linkedMapOf<String, Int>() }
+            val candidates = names.associateWith { intArrayOf(0) }
+            var k = 72
+            while (k < n - 36) {
+                val r = rows[k]
+                val bg = r.optDouble("bg", Double.NaN)
+                val isCorrection = (num(r, "units") > 0.0 || r.optBoolean("manualCorrection")) &&
+                    bg.isFinite() && bg > 180.0
+                if (!isCorrection) { k++; continue }
+                val hour = hourOf(r.getLong("t"))
+                val block = when (hour) {
+                    in 5..10 -> "morning"
+                    in 11..16 -> "day"
+                    in 17..21 -> "evening"
+                    else -> "night"
+                }
+                candidates.getValue(block)[0]++
+                val window = (k - 72)..(k + 36)
+                val windowRows = window.map { rows[it] }
+                val rejection = when {
+                    windowRows.any { !it.has("bg") || !it.optDouble("bg", Double.NaN).isFinite() } -> "missing-bg"
+                    windowRows.any { it.optBoolean("sensorGap") || it.optBoolean("falseLow") } -> "sensor"
+                    windowRows.any { it.optBoolean("oldCannula") } -> "cannula"
+                    windowRows.any { it.optBoolean("illness") || it.optBoolean("activity") } -> "illness-activity"
+                    windowRows.any { num(it, "meal") > 0.0 || num(it, "hypo") > 0.0 } -> "meal-hypo"
+                    windowRows.any { it.optBoolean("manualCorrection") && it !== r } -> "overlapping-manual"
+                    windowRows.any { kotlin.math.abs(num(it, "autoIsfFactor") - 1.0) > 0.01 } -> "autoisf-not-1"
+                    block == "night" && num(r, "iob") < 0.30 -> "night-iob<0.30"
+                    else -> null
+                }
+                if (rejection != null) {
+                    val counts = rejects.getValue(block)
+                    counts[rejection] = (counts[rejection] ?: 0) + 1
+                    k++
+                    continue
+                }
+                var netActivity = 0.0
+                for (j in k until k + 36) netActivity += activity[j] - num(rows[j], "prof") / 12.0
+                if (netActivity < 0.30) {
+                    val counts = rejects.getValue(block)
+                    counts["insufficient-net-iob"] = (counts["insufficient-net-iob"] ?: 0) + 1
+                    k++
+                    continue
+                }
+                val endBg = rows[k + 36].optDouble("bg", Double.NaN)
+                val estimate = (bg - endBg) / netActivity
+                if (!estimate.isFinite() || estimate <= 0.0) {
+                    val counts = rejects.getValue(block)
+                    counts["no-positive-response"] = (counts["no-positive-response"] ?: 0) + 1
+                    k++
+                    continue
+                }
+                samples.getValue(block).add(Pair(rowDay(r), estimate))
+                k += 36
+            }
+            for (block in names) {
+                val accepted = samples.getValue(block)
+                val dayCount = accepted.map { it.first }.distinct().size
+                val values = accepted.map { it.second }.sorted()
+                val median = if (values.isEmpty()) Double.NaN else values[values.size / 2]
+                val gate = values.size >= 5 && dayCount >= 3
+                val direction = when {
+                    !gate -> "silent"
+                    median > isfStart * 1.10 -> "ISF+"
+                    median < isfStart * 0.90 -> "ISF-"
+                    else -> "silent"
+                }
+                val proposed = when (direction) {
+                    "ISF+" -> isfStart * 1.10
+                    "ISF-" -> isfStart / 1.10
+                    else -> isfStart
+                }
+                println("AIMI audit LISF2: block=$block candidates=${candidates.getValue(block)[0]} accepted=${values.size} rejected=${candidates.getValue(block)[0] - values.size} days=$dayCount median=${if (median.isFinite()) "%.1f".format(median) else "-"} profile=${"%.1f".format(isfStart)} proposal=$direction proposed=${"%.1f".format(proposed)} step=10% gate=${if (gate) "PASS" else "FAIL"} rejects=${rejects.getValue(block).entries.joinToString(",") { "${it.key}:${it.value}" }} night-IOB-gate=0.30 report-only")
+            }
         }
         // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
         // Export exactly one CSV row per tick; deliv is the basal rate for the following 5-minute interval.
