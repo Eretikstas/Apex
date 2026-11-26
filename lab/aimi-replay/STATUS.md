@@ -43,6 +43,35 @@ SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20
 - Therefore the batch from `fbf44207` is **not a valid WATTR control** and must not be used for any metric comparison or to authorize Step 13c. Whether its dispatcher/replay has already started is not exposed by the available run-list actions; any such run must be classified invalid.
 - Corrective action: restore the exact verified `SPLITMIN_20` token, keeping all other APP(a)+CAL tokens and WATTR/CRAUDIT/LACAUSE unchanged. The corrected RUN commit is a retry of this same control, not a new §5 step. If the first dispatch is still active, the repository busy guard should prevent overlap; do not bypass it.
 
+### Step 13c — planted-cause exam; RESULT recorded (2026-11-26)
+
+- RUN commit: `38687ae1`; replay run [45877944190](https://github.com/Eretikstas/Apex/actions/runs/45877944190); WATTR report-only print commit `7c8530b07bd608f882bb327fff20630e442a5959`; exact-code compile run [45874912845](https://github.com/Eretikstas/Apex/actions/runs/45874912845) was green.
+- Claude review: 30/30 replay jobs succeeded; each completed 16,128 ticks. The required isolated control (13b seed 1 + WATTR, without LEARNALL/LAISF/LACR) was omitted from this batch; add it to each following step batch as a separate control job.
+- Score (Claude counted from public logs):
+
+| Planted case / card | Correct proposals |
+|---|---:|
+| WPP_0.005 → pp increase | 0/3 |
+| WBRK_0.6 → brake decrease | 0/3 |
+| WACC_0 → acce increase | 0/3 |
+| CRT_26.4 → CR card | 0/3 |
+| CHGISF_1.2 → ISF card | Not scorable: the final ISF summary value is confounded by percentage-card compensation; no independently accepted ISF evidence |
+
+- Negative cases: 15 jobs = 840 synthetic days; 9 WATTR weight events, or 1 event per 93.3 days (below the limit of 1 per 28 days). Events included dura/lower and also occurred in negatives. Some `explained_pct` values exceeded 100%; label these **overshoot**.
+- Main WATTR limitation: `blocked-clean` was about 1,300–3,700 per job while events were 0–2. The 180-minute clean window rarely exists in this virtual child (about 30 g/day hypo treatment). This explains the very low event yield; it does not validate the proposed weights.
+- Verdict: no weight, CR or ISF card passes the planted-cause exam. No card goes to the app. Bad scores are recorded as results, not stops; no learner formula or production code changed in 13c.
+
+### Step 14 — ISF summary audit from Step 13c logs (read-only; no ISF-card change)
+
+- The aggregate `ISF 162 -> 203` (or `162 -> 180`) is **not evidence of an ISF-card proposal**. The source path shows it is the side effect of the `pct-` card:
+  1. `learnAllCheck(day)` runs at 06:00 on daily checks; `laGap` defaults to 3 days and the first eligible check is day 7.
+  2. The first-priority rule allows `pct-` when the selected low percentage is >4% and `pctNow > 0.8001`: it sets `pctNow` down by 0.10 and labels the card `pct-`.
+  3. `setPct(np)` scales basal by `f = np / pctNow`, and explicitly rescales `isfP /= f` (and `icNow /= f`) to preserve the profile's percentage semantics.
+  4. Thus one step gives `162 / 0.9 = 180`; two steps give `162 / 0.8 = 202.5`, printed as 203. The final log card counts show `pct-=1` or `pct-=2`, with `pct=90` or `pct=80`.
+- The independent ISF card is later in the same priority chain and requires `isfSeen()` evidence; its gate requires at least 5 accepted observations across at least 3 days. Public `AIMI audit ISF` lines in these jobs show zero accepted observations, so that ISF-card branch did not pass its gate.
+- Exact daily day-index lines (`AIMI replay: learner ALL day ...`) are not present in the public job-log output available for this run; therefore the exact check-day indices cannot be verified from these logs. The code establishes only that the checks are at 06:00, begin no earlier than day 7, and are spaced by at least 3 days. Do not invent exact days.
+- No ISF card logic is changed in Step 14. Keep this as a read-only explanation; the Stage-0 implementation remains report-only.
+
 ### Step 13b WATTR-on control — corrected RUN commit submitted (2026-11-26)
 
 - Corrected RUN.txt commit: `c0c6fb722a6a653c18d46703ba220c4a972ba0b7`. Read-back confirms the three-job batch is APP(a)+CAL usual, seeds 1–3, with `LACAUSE,CRAUDIT,WATTR` and the verified `SPLITMIN_20`; no DUMPCSV or other token.
