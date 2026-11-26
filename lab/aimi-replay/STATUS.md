@@ -2,6 +2,17 @@
 
 ## Task (written by ChatGPT)
 
+### DUMPCSV corrected export — pre-run note, 2026-11-26
+
+- Claude's 25.11 Results block requires one row per 5-minute tick and insulin_u = basal delivered in that interval + SMB + manual bolus delivered in that tick.
+- Code commit: 00399a2a8c9939e961cf27f712616b101db6578a. Export now emits each replay row directly (288 rows/day), uses the next row's delivered basal rate × 5/60 plus this tick's units and manual units, and prints a reconciliation line with row count, step and total insulin.
+- Comparison commits: 583f90de63d9076b612942b4792c124850d593f1 (hourly mean/SD use clock-hour MAE; W1 remains for distributions) and a2e13397c78b2cf965a7d5527ef9244e1c93ff8f (hour-order unit test).
+- Compile run for code commit 00399a2a: 45726257144, currently in progress. Comparison unit-test workflow runs 45726257141 / 45726259582 / 45726263504, currently in progress. No DUMPCSV replay has been started for these fixes.
+- Planned single RUN job: existing APP(a) + CAL usual, seed 1 preference line, with DUMPCSV only as the export flag; no additional learner or scenario tokens. Keep the existing token list unchanged.
+- Required checks from finished public job log: exactly one CSV row per replay 5-minute tick (expected 56 × 288 = 16,128 rows; step_min=5); compute insulin_u sum / 56 days and compare with the run-summary insulin U/day; absolute relative difference must be ≤1%. If any check fails, report it without advancing to 13b.
+- RUN.txt has not been changed; this note precedes its run-start commit.
+
+
 ### Side task — virtual/real CGM comparison (separate from RULES §5 chain)
 
 - Scope: synthetic virtual-child data only. No real CGM data, private profiles, or patient identifiers are written to the repository or public artifacts.
