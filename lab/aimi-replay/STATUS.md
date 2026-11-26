@@ -2,6 +2,25 @@
 
 ## Task (written by ChatGPT)
 
+### Step 14 — results reconstructed from workflow job logs (2026-11-26)
+
+- Replay run: `45889976040`; RUN commit `b6a1155c`; code commit `8f83af45`; compile gate GREEN.
+- The generated `run-45889976040.md` is malformed: the report job read job logs before the public summary lines were available, leaving all four rows as `?` / `-` and omitting control verdicts. This is a report-generation race, not a replay failure. Reconstructed directly from the four completed replay job logs.
+- Exact six-metric results (BG <70 / BG <54 / BG >180 / CV / hypo g/day / insulin U/day):
+  - LSTAGE0 seed 1 + CTRL13A: `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` — exact reference match.
+  - LSTAGE0 seed 2: `4.0 / 0.1 / 4.2 / 27.7 / 24.11 / 10.92` — exact reference match.
+  - LSTAGE0 seed 3: `4.8 / 0.3 / 4.5 / 28.9 / 29.64 / 11.63` — exact reference match.
+  - WATTR-only seed 1 + CTRL13A (no LSTAGE0): `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` — exact reference match.
+- Both controls are therefore numerically PASS against the published CTRL13A reference, despite the report file omitting its automatic PASS label. No mismatch.
+- LSTAGE0 per seed:
+  - Seed 1: cannula 0d/0 meals; sensor/false-low 0d/0 meals; illness 0d/0 meals; activity 0d/0 meals; COB-min-rate 43 meals / 26 days; untreated low 36 episodes / 24 days.
+  - Seed 2: cannula 0d/0 meals; sensor/false-low 0d/0 meals; illness 0d/0 meals; activity 0d/0 meals; COB-min-rate 58 meals / 38 days; untreated low 29 episodes / 21 days.
+  - Seed 3: cannula 0d/0 meals; sensor/false-low 0d/0 meals; illness 0d/0 meals; activity 0d/0 meals; COB-min-rate 57 meals / 36 days; untreated low 38 episodes / 26 days.
+  - Calibration and medical-procedure windows unavailable in replay schema.
+- WATTR-only control: 360 crossings, 0 events, blocked-clean 2255, blocked-other 73; all six cards 0 proposals. LSTAGE0 is report-only and does not change the six metrics.
+- Decision: Step 14 complete; continue to Step 15. The report script/workflow is outside the permitted edit scope, so preserve this manual log reconstruction and do not modify workflow files.
+
+
 ### Step 14 — LSTAGE0 completed (2026-11-26)
 
 - Code commit: `8f83af4536868c85a648a7c6328dea31e339effd`; compile run `45888261389` **SUCCESS**.
