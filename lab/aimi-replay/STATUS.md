@@ -11,6 +11,21 @@
 - Step 16 final code `ba5517c0` compile check is GREEN (all 11 build/test/upload steps success). RUN commit `2f3c9286` started replay `45902096158`; six replay jobs are currently running. No Step-16 verdict until the completed report and control metrics are checked.
 - LCR3 implementation is report-only and OFF unless token `LCR3` is present. Final code tracks when COB reaches zero; it does not use the earlier 90%-absorption draft. The 13 g minimum meal, six-hour observation window, >=50% minimum-rate exclusion, acceptance gate and direction cutoffs are lab assumptions unless separately sourced. CRT_26.4/17.6 are ±20% perturbations of CRT_22, not yet proven to be the curriculum's exact meaning of “one step”. MEALX_0.7 repeats CAL and is not an independent negative.
 
+### Step 16 — LCR3 attempt 1 (replay complete; card screen failed)
+
+- Replay `45902096158`: all 6/6 jobs succeeded. Control without LCR3 matches the exact seed-1 reference `6.0/0.5/5.7/29.7/33.21/11.78`; do not confuse successful jobs with a passed card screen.
+- Metrics order is BG<70 / BG<54 / BG>180 / CV / hypo-treatment g/day / insulin U/day:
+  - CTRL13A, no LCR3: `6.0/0.5/5.7/29.7/33.21/11.78`
+  - CRT_26.4 + LCR3: `6.4/0.3/4.7/30.2/35.89/11.32`; 53 accepted / 34 days; low rate 0.23, high-after-absorption rate 0.38; silent.
+  - CRT_17.6 + LCR3: `4.3/0.2/7.2/29.5/26.79/12.26`; 67 accepted / 44 days; low rate 0.31, high rate 0.46; proposed CR+.
+  - CAL + LCR3: `6.0/0.5/5.7/29.7/33.21/11.78`; 60 accepted / 39 days; low rate 0.30, high rate 0.43; proposed CR+ (baseline false positive).
+  - MEALX_0.7 + LCR3: duplicate CAL, same metrics and CR+; not an independent negative.
+  - TREAT_15 + LCR3: `3.3/0.2/6.4/26.6/75.54/13.51`; 69 accepted / 42 days; low rate 0.48, high rate 0.32; proposed CR+ (negative test FAIL).
+- Thus the initial LCR3 screen FAILS: CAL baseline and TREAT_15 are not silent. CRT_17.6 produced CR+; CRT_26.4 remained silent, so the upper perturbation did not demonstrate the opposite direction.
+- Root cause: the first LCR3 draft omitted causal exclusions already implemented by `crBlockVerdict`. Fix in source commit `c9ee2b34`: require LACAUSE; reject prior 120-minute hypo/rebound and insulin, SMB/manual corrections in the six-hour window, missing exact meal-bolus marker, sensor gaps/false lows, cannula/illness/activity and ambiguous low causes. LCR3 remains report-only.
+- Compile run `45906547105` for the corrected source is in progress. Do not rerun until its compile gate is green and the previous report job has finished.
+- DUMPCSV validation was strengthened in workflow commits `0bc02ddf` / `0dc64d56`: require one row per 5-minute tick and compare exported insulin/day with the replay summary within 1%. The next Step-16 rerun will add DUMPCSV only to the no-LCR3 control job to generate the corrected virtual CSV artifact.
+
 ### Step 16 — LCR3 implementation and batch in progress (2026-11-26)
 
 - Added token `LCR3` in the permitted replay test source. It is OFF by default and report-only: no writes to `icNow`, `icP`, profile values, or insulin delivery.
