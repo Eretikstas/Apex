@@ -2,6 +2,16 @@
 
 ## Task (written by ChatGPT)
 
+### Step 16 — LCR3 implementation and batch in progress (2026-11-26)
+
+- Added token `LCR3` in the permitted replay test source. It is OFF by default and report-only: no writes to `icNow`, `icP`, profile values, or insulin delivery.
+- Screening uses logged meals of 13–60 g, a recorded meal bolus, a complete six-hour BG window, no sensor/cannula/illness/activity contamination, at least 90% logged-carb COB absorption, and excludes meals where at least 50% of COB absorption was attributed to minimum-rate fallback. These operational thresholds are lab assumptions except the 60 g cap and Stage-0 minimum-rate exclusion, which come from the curriculum.
+- Direction thresholds (low-meal rate >=30% => CR+, high-after-meal rate >=40% with lows <=10% => CR-) reuse the existing CR audit's screening thresholds; this remains a report-only screening heuristic, not an applied learner formula.
+- Initial code commit `97294e36` had escaped Kotlin interpolation in the audit line; corrected in `6cccef74` before treating the batch as valid. Initial RUN commit `40160e34` was superseded by corrected RUN commit `1e0b0523`, which points to the corrected source.
+- Six jobs: CAL seed-1 CTRL13A without LCR3; CAL baseline with LCR3; CRT_26.4 and CRT_17.6 (±20% from CRT_22); MEALX_0.7 baseline negative; TREAT_15 negative. The MEALX_0.7 negative is identical to CAL because MEALX_0.7 is itself part of the calibrated model; this limitation is explicit.
+- Awaiting compile/dispatch/replay result files for code `6cccef74` and RUN `1e0b0523`. No Step 16 verdict until raw job logs and control metrics are checked.
+
+
 ### Step 15 — LISF2 batch dispatched (2026-11-26)
 
 - Step 14 completed from raw job logs; both CTRL13A controls numerically matched all six reference metrics exactly. The generated run report had a log-availability race; no mismatch was observed.
