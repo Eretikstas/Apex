@@ -29,11 +29,11 @@
 ### Step 16 — LCR3 implementation and batch in progress (2026-11-26)
 
 - Added token `LCR3` in the permitted replay test source. It is OFF by default and report-only: no writes to `icNow`, `icP`, profile values, or insulin delivery.
-- Screening uses logged meals of 13–60 g, a recorded meal bolus, a complete six-hour BG window, no sensor/cannula/illness/activity contamination, at least 90% logged-carb COB absorption, and excludes meals where at least 50% of COB absorption was attributed to minimum-rate fallback. These operational thresholds are lab assumptions except the 60 g cap and Stage-0 minimum-rate exclusion, which come from the curriculum.
+- Screening uses logged meals of 13–60 g, an exact meal-bolus marker, a complete six-hour BG window, COB reaching zero within six hours, and excludes meals with at least 50% of COB absorption attributed to minimum-rate fallback. The 13 g floor, six-hour window, 50% cutoff, acceptance gate and direction thresholds are lab assumptions unless separately sourced; the 60 g cap and Stage-0 minimum-rate exclusion are curriculum-based.
 - Direction thresholds (low-meal rate >=30% => CR+, high-after-meal rate >=40% with lows <=10% => CR-) reuse the existing CR audit's screening thresholds; this remains a report-only screening heuristic, not an applied learner formula.
-- Initial code commit `97294e36` had escaped Kotlin interpolation; corrected in `6cccef74`. A further spec review added per-meal `absorbedAt` tracking and applies the AAPS distinction: a high persisting after COB reaches zero supports stronger CR, while a high resolving after absorption is classified as timing/COB-related and stays silent. Final code commit is `ba5517c0`. Initial RUN commit `40160e34` was superseded by `1e0b0523`; its six-job batch is unchanged and the dispatcher is expected to gate against the newest code commit.
+- Initial code commits `97294e36`, `6cccef74` and `ba5517c0` are historical drafts. The first-run source was `ba5517c0`; corrected causal-filter source is `c9ee2b34`.
 - Six jobs: CAL seed-1 CTRL13A without LCR3; CAL baseline with LCR3; CRT_26.4 and CRT_17.6 (±20% from CRT_22); MEALX_0.7 baseline negative; TREAT_15 negative. The MEALX_0.7 negative is identical to CAL because MEALX_0.7 is itself part of the calibrated model; this limitation is explicit.
-- Final compile `ba5517c0` is GREEN; RUN `2f3c9286` started replay `45902096158` (six jobs). Await the completed run report and verify CTRL13A before Step 16 verdict.
+- First RUN `2f3c9286` / replay `45902096158` completed 6/6 jobs but LCR3 screening FAILED; see the Step 16 attempt-1 table above. Corrected compile run `45906547105` is in progress; rerun Step 16 only after green compile and report-job completion.
 
 
 ### Step 15 — LISF2 batch dispatched (2026-11-26)
