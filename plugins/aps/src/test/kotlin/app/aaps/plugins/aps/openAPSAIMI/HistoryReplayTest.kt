@@ -1037,6 +1037,7 @@ class HistoryReplayTest {
         val stage0 = replayTokens.contains("LSTAGE0")
         val lisf2 = replayTokens.contains("LISF2")
         val lcr3 = replayTokens.contains("LCR3")
+        require(!lcr3 || causalFilter) { "LCR3 requires LACAUSE for causal exclusions" }
         require(!wAttr || causalFilter) { "WATTR requires LACAUSE for causal-window exclusions" }
         class WAttrTick(
             val t: Long, val day: Int, val weight: String?, val impactPct: Double, val clamped: Boolean,
@@ -2346,16 +2347,12 @@ class HistoryReplayTest {
                 println("AIMI audit LISF2: block=$block candidates=${candidates.getValue(block)[0]} accepted=${values.size} rejected=${candidates.getValue(block)[0] - values.size} days=$dayCount median=${if (median.isFinite()) "%.1f".format(median) else "-"} profile=${"%.1f".format(isfStart)} proposal=$direction proposed=${"%.1f".format(proposed)} step=10% gate=${if (gate) "PASS" else "FAIL"} rejects=${rejects.getValue(block).entries.joinToString(",") { "${it.key}:${it.value}" }} night-IOB-gate=0.30 report-only")
             }
         }
-        // LCR3 is a report-only Stage-3 CR card. It never changes icNow, icP, profile or insulin delivery.
-        // A meal is eligible only when logged (13-60 g), its meal bolus is recorded, the full six-hour
-        // post-meal window is present, and its logged COB reaches zero within that window.
-        // Meals with >=50% of COB absorption attributed to min_5m_carbimpact are excluded (Stage 0).
-        // A high that persists after absorption supports stronger CR; a high that resolves after absorption
-        // is classified as timing/COB-related and does not propose a CR change (AAPS post-meal rule).
-        // Direction thresholds reuse the existing CR audit screening thresholds; report-only.
+        // LCR3 is report-only. Match the established CR audit's causal exclusions before judging post-meal direction.
+        // It never changes icNow, icP, profile values or insulin delivery.
         if (lcr3) {
-            val rows = (0 until out.length()).map { out.getJSONObject(it) }
-            val endTime = rows.lastOrNull()?.getLong("t") ?: t0
+            val allRows = (0 until out.length()).map { out.getJSONObject(it) }
+            val rows = allRows.filter { it.has("bg") && it.optDouble("bg", Double.NaN).isFinite() }
+            val endTime = allRows.lastOrNull()?.getLong("t") ?: t0
             val candidates = meals.filter { it.logged >= 13.0 && it.t <= endTime - 360 * minute }
             val rejected = linkedMapOf<String, Int>()
             fun reject(reason: String) { rejected[reason] = (rejected[reason] ?: 0) + 1 }
@@ -2375,29 +2372,54 @@ class HistoryReplayTest {
                 }
                 val absorbedAt = provenance.absorbedAt
                 if (absorbedAt == null || absorbedAt > tm + 360 * minute) { reject("not-fully-absorbed"); continue }
+
+                val allWindow = allRows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
                 val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
-                if (window.size < 72 || window.any { !it.has("bg") || !it.optDouble("bg", Double.NaN).isFinite() }) {
+                if (allWindow.size < 72 || window.size < 72 || allWindow.any { !it.has("bg") }) {
                     reject("incomplete-bg-window"); continue
                 }
-                if (window.any { it.optBoolean("sensorGap") || it.optBoolean("falseLow") }) {
+                if (hasSensorGap(allWindow) || allWindow.any { it.optBoolean("falseLow") }) {
                     reject("sensor-fault"); continue
                 }
-                if (window.any { it.optBoolean("oldCannula") || it.optBoolean("illness") || it.optBoolean("activity") }) {
+                if (allWindow.any { it.optBoolean("oldCannula") || it.optBoolean("illness") || it.optBoolean("activity") }) {
                     reject("cannula-illness-activity"); continue
                 }
-                val mealBolusRecorded = window.take(5).any { it.optBoolean("mealBolus") }
-                if (!mealBolusRecorded) { reject("missing-meal-bolus"); continue }
+
+                val priorWindow = allRows.filter { it.getLong("t") in (tm - 120 * minute) until tm }
+                if (priorWindow.any {
+                        hasRecentHypoEvidence(it.optDouble("bg", Double.NaN), it.optDouble("hypo", 0.0))
+                    }) {
+                    reject("prior-hypo-rebound"); continue
+                }
+                if (priorWindow.any { it.optDouble("units", 0.0) > 0.0 || it.optDouble("man", 0.0) > 0.0 }) {
+                    reject("prior-insulin"); continue
+                }
+                if (allWindow.any { it.optDouble("units", 0.0) > 0.0 }) {
+                    reject("smb-within-6h"); continue
+                }
+                if (allWindow.any { it.optBoolean("manualCorrection") }) {
+                    reject("manual-correction-within-6h"); continue
+                }
+                val mealTick = allRows.firstOrNull { it.getLong("t") == tm }
+                if (mealTick?.optBoolean("mealBolus") != true) {
+                    reject("missing-meal-bolus"); continue
+                }
+
                 val early = window.filter { it.getLong("t") <= tm + 240 * minute }
-                val low = early.any { it.getDouble("bg") < 70.2 }
+                val lowRows = early.filter { it.getDouble("bg") < 70.2 }
+                if (lowRows.any { it.optString("hypoCause") != "meal_bolus" }) {
+                    reject("ambiguous-low-cause"); continue
+                }
                 val preAbsorptionHigh = window.any {
                     it.getLong("t") < absorbedAt && it.getDouble("bg") > 180.0
                 }
                 val afterAbsorption = window.filter { it.getLong("t") >= absorbedAt }
                 if (afterAbsorption.isEmpty()) { reject("no-post-absorption-data"); continue }
                 val persistentHigh = afterAbsorption.any { it.getDouble("bg") > 180.0 }
+
                 accepted++
-                acceptedDays.add(rowDay(window.first()))
-                if (low) lowMeals++
+                acceptedDays.add(rowDay(allWindow.first()))
+                if (lowRows.isNotEmpty()) lowMeals++
                 else if (persistentHigh) highAfterAbsorption++
                 else if (preAbsorptionHigh) highResolvedAfterAbsorption++
             }
@@ -2410,13 +2432,15 @@ class HistoryReplayTest {
                 highRate >= 0.40 && lowRate <= 0.10 -> "CR-"
                 else -> "silent"
             }
-            println("AIMI audit LCR3: candidates=${candidates.size} accepted=$accepted rejected=${candidates.size - accepted} " +
+            val rejectedCount = rejected.values.sum()
+            assertAuditReconciles("LCR3", candidates.size, accepted, rejectedCount)
+            println("AIMI audit LCR3: candidates=${candidates.size} accepted=$accepted rejected=$rejectedCount " +
                 "days=${acceptedDays.size} low-meals=$lowMeals low-rate=${"%.2f".format(lowRate)} " +
                 "high-after-absorption=$highAfterAbsorption high-rate=${"%.2f".format(highRate)} " +
                 "high-resolved-after-absorption=$highResolvedAfterAbsorption " +
                 "proposal=$direction gate=${if (gate) "PASS" else "FAIL"} " +
                 "rejects=${rejected.entries.joinToString(",") { "${it.key}:${it.value}" }} " +
-                "max-meal=60g COB-zero-within-6h COB-min-rate-exclusion=50% report-only")
+                "max-meal=60g COB-zero-within-6h COB-min-rate-exclusion=50% causal-exclusions=CRAUDIT report-only")
         }
         // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
         // Export exactly one CSV row per tick; deliv is the basal rate for the following 5-minute interval.
