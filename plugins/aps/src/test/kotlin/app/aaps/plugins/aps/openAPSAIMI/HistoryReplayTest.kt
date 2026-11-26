@@ -2202,8 +2202,8 @@ class HistoryReplayTest {
                 println("$timeMin,$trueBg,$sensorBg,$insulinU,${r.optDouble("meal", 0.0)},${r.optDouble("hypo", 0.0)}")
             }
             val daysFromRows = out.length() / 288.0
-            println("AIMI_DUMPCSV_CHECK rows=${out.length()} step_min=5 insulin_total_u=${"%.4f".format(insulinTotal)} days=${"%.4f".format(daysFromRows)} insulin_u_day=${"%.4f".format(insulinTotal / daysFromRows)}")
             println("AIMI_DUMPCSV_END")
+            println("AIMI_DUMPCSV_CHECK rows=${out.length()} step_min=5 insulin_total_u=${"%.4f".format(insulinTotal)} days=${"%.4f".format(daysFromRows)} insulin_u_day=${"%.4f".format(insulinTotal / daysFromRows)}")
         }
         if (crAudit) {
             println("AIMI audit CRAUDIT: counting-only; no CR/ISF parameter writes")
