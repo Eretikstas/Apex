@@ -2183,6 +2183,18 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
+        // WATTR is report-only. Emit its accumulated evidence so planted-cause runs can be scored.
+        if (wAttr) {
+            val cards = listOf("acce", "brake", "pp", "dura", "lower", "higher")
+            val cardCounts = cards.joinToString(",") { card ->
+                val events = wAttrEvents.filter { it.weight == card }
+                "$card:${events.size}(increase=${events.count { it.direction == "increase" }},decrease=${events.count { it.direction == "decrease" }})"
+            }
+            println("AIMI audit WATTR: crossings=$wAttrCrossings events=${wAttrEvents.size} blocked-clean=$wAttrBlockedClean blocked-other=$wAttrBlockedOther cards=$cardCounts")
+            wAttrEvents.forEach { event ->
+                println("AIMI audit WATTR event: day=${event.day} card=${event.weight} direction=${event.direction} miss=${event.miss} explained_pct=${"%.1f".format(event.explainedPct)}")
+            }
+        }
         // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
         // Export exactly one CSV row per tick; deliv is the basal rate for the following 5-minute interval.
         if (prefsText.split(Regex("[,\\s]+")).contains("DUMPCSV")) {
