@@ -958,6 +958,7 @@ class HistoryReplayTest {
         class Logged(val t: Long, val g: Double, var left: Double) {
             var absorbedByCob = 0.0
             var absorbedByMinRate = 0.0
+            var absorbedAt: Long? = null
         }
         val logged = ArrayList<Logged>()
         // Keep meal-level absorption provenance for the report-only Stage-0 COB filter.
@@ -1917,6 +1918,7 @@ class HistoryReplayTest {
                         l.left -= x
                         absorbed -= x
                         l.absorbedByCob += x
+                        if (l.left <= 0.0001 && l.absorbedAt == null) l.absorbedAt = t
                         if (minRateFallback) l.absorbedByMinRate += x
                     }
                 }
@@ -2346,9 +2348,11 @@ class HistoryReplayTest {
         }
         // LCR3 is a report-only Stage-3 CR card. It never changes icNow, icP, profile or insulin delivery.
         // A meal is eligible only when logged (13-60 g), its meal bolus is recorded, the full six-hour
-        // post-meal window is present, and at least 90% of logged carbs were absorbed by COB.
+        // post-meal window is present, and its logged COB reaches zero within that window.
         // Meals with >=50% of COB absorption attributed to min_5m_carbimpact are excluded (Stage 0).
-        // Direction thresholds intentionally reuse the existing CR audit screening thresholds.
+        // A high that persists after absorption supports stronger CR; a high that resolves after absorption
+        // is classified as timing/COB-related and does not propose a CR change (AAPS post-meal rule).
+        // Direction thresholds reuse the existing CR audit screening thresholds; report-only.
         if (lcr3) {
             val rows = (0 until out.length()).map { out.getJSONObject(it) }
             val endTime = rows.lastOrNull()?.getLong("t") ?: t0
@@ -2358,6 +2362,7 @@ class HistoryReplayTest {
             var accepted = 0
             var lowMeals = 0
             var highAfterAbsorption = 0
+            var highResolvedAfterAbsorption = 0
             val acceptedDays = HashSet<Int>()
             for (meal in candidates) {
                 val tm = meal.t
@@ -2368,7 +2373,8 @@ class HistoryReplayTest {
                     provenance.absorbedByMinRate / provenance.absorbedByCob >= 0.5) {
                     reject("cob-min-rate"); continue
                 }
-                if (provenance.absorbedByCob < meal.logged * 0.90) { reject("not-fully-absorbed"); continue }
+                val absorbedAt = provenance.absorbedAt
+                if (absorbedAt == null || absorbedAt > tm + 360 * minute) { reject("not-fully-absorbed"); continue }
                 val window = rows.filter { it.getLong("t") in tm..(tm + 360 * minute) }
                 if (window.size < 72 || window.any { !it.has("bg") || !it.optDouble("bg", Double.NaN).isFinite() }) {
                     reject("incomplete-bg-window"); continue
@@ -2383,13 +2389,17 @@ class HistoryReplayTest {
                 if (!mealBolusRecorded) { reject("missing-meal-bolus"); continue }
                 val early = window.filter { it.getLong("t") <= tm + 240 * minute }
                 val low = early.any { it.getDouble("bg") < 70.2 }
-                val highAfterFullAbsorption = window.any {
-                    it.getLong("t") >= tm + 120 * minute && it.getDouble("bg") > 180.0
+                val preAbsorptionHigh = window.any {
+                    it.getLong("t") < absorbedAt && it.getDouble("bg") > 180.0
                 }
+                val afterAbsorption = window.filter { it.getLong("t") >= absorbedAt }
+                if (afterAbsorption.isEmpty()) { reject("no-post-absorption-data"); continue }
+                val persistentHigh = afterAbsorption.any { it.getDouble("bg") > 180.0 }
                 accepted++
                 acceptedDays.add(rowDay(window.first()))
                 if (low) lowMeals++
-                else if (highAfterFullAbsorption) highAfterAbsorption++
+                else if (persistentHigh) highAfterAbsorption++
+                else if (preAbsorptionHigh) highResolvedAfterAbsorption++
             }
             val lowRate = if (accepted == 0) 0.0 else lowMeals.toDouble() / accepted
             val highRate = if (accepted == 0) 0.0 else highAfterAbsorption.toDouble() / accepted
@@ -2403,9 +2413,10 @@ class HistoryReplayTest {
             println("AIMI audit LCR3: candidates=${candidates.size} accepted=$accepted rejected=${candidates.size - accepted} " +
                 "days=${acceptedDays.size} low-meals=$lowMeals low-rate=${"%.2f".format(lowRate)} " +
                 "high-after-absorption=$highAfterAbsorption high-rate=${"%.2f".format(highRate)} " +
+                "high-resolved-after-absorption=$highResolvedAfterAbsorption " +
                 "proposal=$direction gate=${if (gate) "PASS" else "FAIL"} " +
                 "rejects=${rejected.entries.joinToString(",") { "${it.key}:${it.value}" }} " +
-                "max-meal=60g full-absorption=90% COB-min-rate-exclusion=50% report-only")
+                "max-meal=60g COB-zero-within-6h COB-min-rate-exclusion=50% report-only")
         }
         // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
         // Export exactly one CSV row per tick; deliv is the basal rate for the following 5-minute interval.
