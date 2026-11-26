@@ -256,3 +256,42 @@ jobs:
             emu-out/
             androidtest-build.log
           if-no-files-found: ignore
+
+  # Writes a short public report of this run to the branch `ci-results` (run-<id>.md and LATEST.md), so an
+  # assistant that cannot see GitHub Actions can read the result in the repository. A push made with GITHUB_TOKEN
+  # starts no other workflow. The app branch itself gets no commits from here.
+  report:
+    needs: [driver, emulator]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Get the report script
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+          fetch-depth: 1
+      - name: Write and push the report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/ci_report.py "$RUN_ID" "$RUNNER_TEMP/out"
+          for i in 1 2 3 4 5; do
+            D="$RUNNER_TEMP/results$i"; rm -rf "$D"; mkdir "$D"; cd "$D"
+            git init -q
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+            if git fetch -q --depth 1 origin ci-results; then git checkout -q -b ci-results FETCH_HEAD; else git checkout -q --orphan ci-results; fi
+            cp "$RUNNER_TEMP"/out/*.md .
+            git add -A
+            git commit -q -m "CI result: run $RUN_ID" || exit 0
+            if git push -q origin HEAD:ci-results; then exit 0; fi
+            sleep $((i * 10))
+          done
+          echo "could not push the report"; exit 1
