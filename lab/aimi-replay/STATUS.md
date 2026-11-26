@@ -2,6 +2,23 @@
 
 ## Task (written by ChatGPT)
 
+### Step 13b — WATTR-on control completed; exact no-behaviour-change gate PASS (2026-11-26)
+
+- Corrected retry RUN commit: `5f34b201565939236a93c252d3b5c53a08be034d`; dispatcher run [45853235877](https://github.com/Eretikstas/Apex/actions/runs/45853235877); replay run [45853284220](https://github.com/Eretikstas/Apex/actions/runs/45853284220), concluded SUCCESS.
+- The replay plan and all 3/3 jobs succeeded. Each job used the verified APP(a)+CAL usual batch with `SPLITMIN_20,LACAUSE,CRAUDIT,WATTR`; each replay completed 16,128 ticks with 0 failed ticks. The invalid `SPLITMIN_60` run [45839851602](https://github.com/Eretikstas/Apex/actions/runs/45839851602) remains excluded.
+- Public summaries compared against Step 13a, in column order BG <70 / BG <54 / BG >180 / CV / hypo treatment g/day / insulin U/day:
+
+| Seed | <70 % | <54 % | >180 % | CV % | Hypo g/day | Insulin U/day | Step 13a gate |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 | Exact match |
+| 2 | 4.0 | 0.1 | 4.2 | 27.7 | 24.11 | 10.92 | Exact match |
+| 3 | 4.8 | 0.3 | 4.5 | 28.9 | 29.64 | 11.63 | Exact match |
+| Mean | 4.93 | 0.30 | 4.80 | 28.77 | 28.99 | 11.44 | Exact match |
+
+- Therefore the explicit Step 13b gate is PASS: all six summary metrics match Step 13a exactly for all three seeds. **WATTR did not change replay behaviour.** CRAUDIT remained counting-only; its ISF and CR accepted counts remained zero, as in Step 13a.
+- Next: Step 13c planted-cause test, positive and negative cases, three seeds, using WATTR + CRAUDIT. Source inspection found that WATTR accumulates event objects but does not currently print or serialize them, so the test cannot produce the required per-card score table yet. Add report-only event/count logging in the permitted HistoryReplayTest.kt, compile green on the exact code commit, then run the 13c grid. No learner formula or production code change is planned.
+
+
 ### RUN.txt correction — invalid token variant detected (2026-11-26)
 
 - Post-commit read-back of RUN commit `fbf4420702a97de76d884b244c14bcb56157a25a` exposed a transcription error: the batch line contains `SPLITMIN_60`, while the verified Step 13a / current RUN reference is `SPLITMIN_20`.
