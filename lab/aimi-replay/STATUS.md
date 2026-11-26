@@ -2,6 +2,22 @@
 
 ## Task (written by ChatGPT)
 
+### Step 13b — WATTR report-only control, pre-run (2026-11-26)
+
+- The previous Step 13b no-token control is complete: APP(a) + CAL usual, seeds 1–3, with `CRAUDIT` and without `WATTR`; all six summary metrics exactly matched the corresponding Step 13a seed references. This establishes the no-token invariant only.
+- Claude's Step 13b review item 1 is implemented in code commit `a6557873c0b13e4028b5e37d32264f3fa9155ece`: record tick `t` in `wAttrOtherProposalTimes` when LEARNB5 changes a basal hour, when PCTCARD changes percentage, and when LAISF/LACR makes an ISF/CR proposal; WATTR's own events are not added. Read-back of the current source confirms these three sites at lines 1292, 1379 and 1681.
+- Current replay source head: `631fa8fcaaa1bd9f7d46b11883b3199fe79623fc`. Exact-code compile gate: run [45799076606](https://github.com/Eretikstas/Apex/actions/runs/45799076606), SUCCESS; all 11 substantive steps completed successfully, including replay test compilation, weight boundaries, audit helpers, adaptation status, APSResult status, FullDebug APK assembly and upload.
+- No replay was active before this handoff; the latest prior control run [45813107701](https://github.com/Eretikstas/Apex/actions/runs/45813107701) has its plan and both replay jobs completed successfully.
+- Following Claude's Step 13b review item 2, this is the WATTR-on report-only control: APP(a) + CAL usual, seeds 1–3, same tokens as the no-token control with only `WATTR` added. No DUMPCSV or other scenario/learner token is added. Exact single batch line for the following RUN.txt commit:
+
+```text
+SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100,SBIAS_0.45,TREAT_5,CHG_28,CHGISF_1.2,MEALX_0.7,LACAUSE,CRAUDIT,WATTR|SYNTH_56,SEED_2,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100,SBIAS_0.45,TREAT_5,CHG_28,CHGISF_1.2,MEALX_0.7,LACAUSE,CRAUDIT,WATTR|SYNTH_56,SEED_3,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20,LEARNG3,NOIOB,SMBMIN_60,UAMMIN_60,LATECOB,LATEPCT_50,LATEB_2,LEARNB5,LBLOWMAX_6,LBFILL2,LBMIN_2,LEARNDURA,NOISE_0.07,CANCH_72,PCTCARD,PCTMAX_100,SBIAS_0.45,TREAT_5,CHG_28,CHGISF_1.2,MEALX_0.7,LACAUSE,CRAUDIT,WATTR
+```
+
+- Gate: compare each seed's six public summary metrics (<70, <54, >180, CV, hypo g/day, insulin U/day) with Step 13a: seed 1 `6.0/0.5/5.7/29.7/33.21/11.78`; seed 2 `4.0/0.1/4.2/27.7/24.11/10.92`; seed 3 `4.8/0.3/4.5/28.9/29.64/11.63`. Every value must match exactly. Any difference means **WATTR changes behaviour**: STOP under Claude's instruction. If all match, continue to Step 13c as §5 directs.
+- This is a pre-run note; no Step 13c batch is authorized until the WATTR-on control has completed and its exact per-seed comparison is recorded.
+
+
 ### Step 13b — pre-run gates confirmed, APP control queued for RUN.txt
 
 - Compile gate for code head `631fa8fc`: GREEN. GitHub Actions run [45799076606](https://github.com/Eretikstas/Apex/actions/runs/45799076606) concluded SUCCESS; all checks passed: replay test-source compilation, AutoISF weight boundaries, replay audit helpers, adaptation status builder, in-memory AIMI status through APSResult, laboratory FullDebug APK assembly and upload.
