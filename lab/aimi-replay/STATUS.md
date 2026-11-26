@@ -2,6 +2,15 @@
 
 ## Task (written by ChatGPT)
 
+### Handoff §13 re-audit — corrected result files (2026-11-26)
+
+- The three run reports have now been regenerated with actual job summaries; earlier statements that they were empty/malformed are superseded. Use the report tables and audit lines, not the older manual reconstructions.
+- Step 14: replay `45889976040`, 4/4 jobs successful. Both CTRL13A jobs PASS. LSTAGE0 seed 1–3 metrics: `6.0/0.5/5.7/29.7/33.21/11.78`, `4.0/0.1/4.2/27.7/24.11/10.92`, `4.8/0.3/4.5/28.9/29.64/11.63`. WATTR-only control exactly matches seed 1. Stage-0 counts are printed in the report; calibration and medical-procedure fields are unavailable.
+- Step 15: official six-job replay `45894508242`, 6/6 successful; CTRL13A PASS with exact seed-1 reference `6.0/0.5/5.7/29.7/33.21/11.78`. LISF2 had zero accepted observations in every block and remained silent; planted CHGISF direction was not demonstrated. NOISE_0.12 and CANCH_96 remained silent. The MEALX_0.7 slot is not an independent negative because CAL already contains that setting.
+- Additional replay `45893257489`: report is populated, 18/18 jobs successful, and its single CTRL13A control PASS. It is supplementary only, not the official Step-15 batch: its 18-job token matrix differs from the specified six-job matrix (in particular it lacks the specified CHGISF_1.35 upper test). Do not describe this report as empty or as the official Step-15 result.
+- Step 16 final code `ba5517c0` compile check is GREEN (all 11 build/test/upload steps success). RUN commit `2f3c9286` started replay `45902096158`; six replay jobs are currently running. No Step-16 verdict until the completed report and control metrics are checked.
+- LCR3 implementation is report-only and OFF unless token `LCR3` is present. Final code tracks when COB reaches zero; it does not use the earlier 90%-absorption draft. The 13 g minimum meal, six-hour observation window, >=50% minimum-rate exclusion, acceptance gate and direction cutoffs are lab assumptions unless separately sourced. CRT_26.4/17.6 are ±20% perturbations of CRT_22, not yet proven to be the curriculum's exact meaning of “one step”. MEALX_0.7 repeats CAL and is not an independent negative.
+
 ### Step 16 — LCR3 implementation and batch in progress (2026-11-26)
 
 - Added token `LCR3` in the permitted replay test source. It is OFF by default and report-only: no writes to `icNow`, `icP`, profile values, or insulin delivery.
@@ -9,7 +18,7 @@
 - Direction thresholds (low-meal rate >=30% => CR+, high-after-meal rate >=40% with lows <=10% => CR-) reuse the existing CR audit's screening thresholds; this remains a report-only screening heuristic, not an applied learner formula.
 - Initial code commit `97294e36` had escaped Kotlin interpolation; corrected in `6cccef74`. A further spec review added per-meal `absorbedAt` tracking and applies the AAPS distinction: a high persisting after COB reaches zero supports stronger CR, while a high resolving after absorption is classified as timing/COB-related and stays silent. Final code commit is `ba5517c0`. Initial RUN commit `40160e34` was superseded by `1e0b0523`; its six-job batch is unchanged and the dispatcher is expected to gate against the newest code commit.
 - Six jobs: CAL seed-1 CTRL13A without LCR3; CAL baseline with LCR3; CRT_26.4 and CRT_17.6 (±20% from CRT_22); MEALX_0.7 baseline negative; TREAT_15 negative. The MEALX_0.7 negative is identical to CAL because MEALX_0.7 is itself part of the calibrated model; this limitation is explicit.
-- Awaiting compile/dispatch/replay result files for code `6cccef74` and RUN `1e0b0523`. No Step 16 verdict until raw job logs and control metrics are checked.
+- Final compile `ba5517c0` is GREEN; RUN `2f3c9286` started replay `45902096158` (six jobs). Await the completed run report and verify CTRL13A before Step 16 verdict.
 
 
 ### Step 15 — LISF2 batch dispatched (2026-11-26)
@@ -18,7 +27,7 @@
 - Source review: the report-only `LISF2` card implementation already exists in `HistoryReplayTest.kt` at code commit `8f83af45`; it is OFF unless the `LISF2` token is present and makes no `isfP` or insulin-delivery writes. Reuse that compiled code; no source edit was necessary for this step.
 - Step 15 RUN commit correction: initial batch construction accidentally copied the entire Step 14 pipe-delimited batch as one job template. Corrected immediately in RUN commit `4106bc48` to six individual jobs (one CTRL13A seed-1 control; CHGISF_1.35 and CHGISF_0.8 planted cases; MEALX_0.7, NOISE_0.12 and CANCH_96 negative cases). The first malformed RUN commit `c116a400` is superseded; if it dispatches, its outcome is not used for Step 15.
 - All jobs retain the CAL usual APP(a) settings and report-only audit tokens. CHGISF values are taken from existing `app22_batch.json` variants; CANCH_96 and NOISE_0.12 are the specified negative cases.
-- Await the dispatcher/result file for RUN commit `4106bc48`; no Step 15 verdict until the six individual jobs and control result are available.
+- Step 15 is complete: see the re-audit above and `run-45894508242.md` for the six-job result.
 
 
 ### Step 14 — results reconstructed from workflow job logs (2026-11-26)
