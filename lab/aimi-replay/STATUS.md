@@ -8,7 +8,18 @@
 - DUMPCSV gate: PASS per Claude review of replay run [45732148887](https://github.com/Eretikstas/Apex/actions/runs/45732148887): 16,128 rows, 5-minute spacing, and second-half CSV metrics exactly match the public summary (BG <70 6.0%, BG <54 0.5%, BG >180 5.7%, CV 29.7%, hypo 33.21 g/day, insulin 11.78 U/day).
 - Step 13b control intent: APP(a) + CAL usual, seeds 1–3, with `LACAUSE,CRAUDIT` retained and `WATTR` deliberately absent. Dispatcher inspection after start showed it reads only the first non-comment RUN.txt line; therefore this first launch contains seed 1 only. Seeds 2–3 are not yet started and must be sent together on one `|`-separated batch line after seed 1 completes. Compare each seed with the Step 13a APP reference; do not infer a three-seed result from the first job.
 - Seed 1 completed in replay run [45812102680](https://github.com/Eretikstas/Apex/actions/runs/45812102680): 1/1 replay job success, 16,128 ticks, 0 failed ticks. Public summary = `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` (<70 / <54 / >180 / CV / hypo g/day / insulin U/day), exactly matching Step 13a seed 1.
-- No workflow files or Results section changed. After all three seed summaries are recorded, stop for Claude review; do not start 13c.
+- RUN dispatch detail: commit `50a06354` launched seed 1 only because the dispatcher reads the first non-comment line. After that run completed, commit `6bb2be14` submitted seeds 2 and 3 together with `|`; both jobs completed successfully. This used RUN.txt only; no workflow or source files were changed.
+- Step 13b APP control results (all public summaries; columns: BG <70 / BG <54 / BG >180 / CV / hypo treatment g/day / insulin U/day):
+
+| Seed | <70 % | <54 % | >180 % | CV % | Hypo g/day | Insulin U/day | Step 13a same-seed control |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 | Exact match |
+| 2 | 4.0 | 0.1 | 4.2 | 27.7 | 24.11 | 10.92 | Exact match |
+| 3 | 4.8 | 0.3 | 4.5 | 28.9 | 29.64 | 11.63 | Exact match |
+| Mean | 4.93 | 0.30 | 4.80 | 28.77 | 28.99 | 11.44 | Exact match |
+
+- Replay runs: seed 1 [45812102680](https://github.com/Eretikstas/Apex/actions/runs/45812102680), seed 2–3 [45813107701](https://github.com/Eretikstas/Apex/actions/runs/45813107701); both concluded SUCCESS, all 3/3 replay jobs successful. Each replay emitted 16,128 ticks with 0 failed ticks. CRAUDIT was present and logged as counting-only; WATTR was absent as required for the no-token control.
+- Result: no-token APP control is unchanged for all three seeds versus Step 13a. Step 13b control complete. **STOP for Claude review. Do not start Step 13c or any later step.**
 
 
 ### DUMPCSV corrected export — pre-run note, 2026-11-26
