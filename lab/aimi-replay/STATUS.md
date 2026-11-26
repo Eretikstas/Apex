@@ -55,11 +55,20 @@ SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20
 | WBRK_0.6 → brake decrease | 0/3 |
 | WACC_0 → acce increase | 0/3 |
 | CRT_26.4 → CR card | 0/3 |
-| CHGISF_1.2 → ISF card | Not scorable: the final ISF summary value is confounded by percentage-card compensation; no independently accepted ISF evidence |
+| CHGISF_1.2 → ISF card | 0/3 (ISF card silent; 0 accepted observations in every job) |
 
-- Negative cases: 15 jobs = 840 synthetic days; 9 WATTR weight events, or 1 event per 93.3 days (below the limit of 1 per 28 days). Events included dura/lower and also occurred in negatives. Some `explained_pct` values exceeded 100%; label these **overshoot**.
+- Negative cases: 15 jobs = 840 synthetic days; 9 WATTR weight events, or 1 event per 93.3 days (below the limit of 1 per 28 days). Events included dura/lower and also occurred in negatives. ISF card false proposals: **0**. Some `explained_pct` values exceeded 100%; label these **overshoot**.
+- Correction after Claude's source review: the apparent ISF 162 → 203 shift was caused by the percentage card's `pct-` steps via `setPct()` (`isfP /= f)), not by an ISF-card proposal. The CHGISF_1.2 planted case therefore scores **ISF card 0/3**; the ISF card was silent with zero accepted observations in every job. The percentage card's 1–2 downward steps in all 30 jobs were expected under its low-percentage rule. The overall verdict remains unchanged: no card found its planted cause.
 - Main WATTR limitation: `blocked-clean` was about 1,300–3,700 per job while events were 0–2. The 180-minute clean window rarely exists in this virtual child (about 30 g/day hypo treatment). This explains the very low event yield; it does not validate the proposed weights.
 - Verdict: no weight, CR or ISF card passes the planted-cause exam. No card goes to the app. Bad scores are recorded as results, not stops; no learner formula or production code changed in 13c.
+
+### Step 14 — Claude review clarifications and pre-run gate (2026-11-26)
+
+- Claude reviewed code commit `4a8eff367683d4861fb6716df336873902c4323d`: the `LSTAGE0` audit is print-only, but its row-flag block (afterMeal/afterHypo/other row flags) now executes when `LSTAGE0` is present even without `LACAUSE`. To detect any unintended behaviour coupling, the Step 14 batch must include both controls: (1) APP(a)+CAL usual seeds 1–3 with `LSTAGE0`; (2) the exact Step 13b seed 1 APP(a)+CAL line with `WATTR`, but without `LSTAGE0`.
+- Cosmetic source fix still required: restore indentation on `var absorbed = ...` in the next permitted code commit. Do not make that commit or start Step 14 until Claude confirms compile run `45886787811` is green on exact code commit `4a8eff36`.
+- After green confirmation, make the indentation-only source correction, compile that exact commit, then prepare one RUN batch containing four jobs: APP(a)+CAL usual seeds 1–3 with `LSTAGE0`, plus the isolated Step 13b seed 1 + `WATTR` control without `LSTAGE0`. The three LSTAGE0 jobs also supply the per-rule drop counts. Compare all six summary metrics exactly to Step 13a for each matching seed; the WATTR-only control must exactly match seed 1. Any mismatch is STOP.
+- Required APP(a)+CAL usual references (BG <70 / BG <54 / BG >180 / CV / hypo g/day / insulin U/day): seed 1 `6.0/0.5/5.7/29.7/33.21/11.78`; seed 2 `4.0/0.1/4.2/27.7/24.11/10.92`; seed 3 `4.8/0.3/4.5/28.9/29.64/11.63`.
+- Step 14 report must list drop counts per Stage-0 rule. Continue to Step 15 only if both control comparisons match exactly; otherwise STOP. The current compile is still running, so no Step 14 RUN line has been committed.
 
 ### Step 14 — ISF summary audit from Step 13c logs (read-only; no ISF-card change)
 
