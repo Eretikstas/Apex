@@ -119,6 +119,14 @@ def _hour_stats(d):
     return mean, sd
 
 
+def _hourly_mae(a, b):
+    """Mean absolute difference at matching clock hours; missing hours cannot be compared."""
+    x, y = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    if x.shape != y.shape or not np.isfinite(x).all() or not np.isfinite(y).all():
+        return math.inf
+    return float(np.mean(np.abs(x - y)))
+
+
 def _blocks(d):
     t, bg = _bg(d)
     b = (np.floor(t).astype(int) % 1440) // 360
@@ -233,10 +241,12 @@ def compare(real, virtual):
             "|---|---:|---:|---:|---:|---|"]
     rm, rs = _hour_stats(real)
     vm, vs = _hour_stats(virtual)
+    mean_distance = _hourly_mae(rm, vm)
+    sd_distance = _hourly_mae(rs, vs)
     rows.append(_line("Hourly mean BG by hour 00–23, mg/dL", _arr(rm), _arr(vm),
-                      w1(rm, vm), THRESHOLDS["hourly mean BG (mg/dL)"], "Wasserstein-1"))
+                      mean_distance, THRESHOLDS["hourly mean BG (mg/dL)"], "mean absolute hour-by-hour difference"))
     rows.append(_line("Hourly BG SD by hour 00–23, mg/dL", _arr(rs), _arr(vs),
-                      w1(rs, vs), THRESHOLDS["hourly BG SD (mg/dL)"], "Wasserstein-1"))
+                      sd_distance, THRESHOLDS["hourly BG SD (mg/dL)"], "mean absolute hour-by-hour difference"))
     _, rbg = _bg(real); _, vbg = _bg(virtual)
     rcv = 100 * np.std(rbg) / np.mean(rbg)
     vcv = 100 * np.std(vbg) / np.mean(vbg)
