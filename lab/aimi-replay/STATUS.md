@@ -1283,3 +1283,11 @@ Top 3 by minimum distance:
 - Public synthetic summary: BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day = `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78`; this exactly matches Step 13a seed 1.
 - The public log labels the export as 5-minute rows, but does not print a separately measured `step_min` or CSV-integrated insulin/day. Those two CSV-specific checks therefore remain **unverified** from the available public output; do not infer them from the summary.
 - Because the required row-count check failed, the DUMPCSV gate is **FAIL**. Do not launch 13b, 13c, or Steps 14–18. STOP pending correction/review. No workflow files changed.
+
+
+### 2026-11-26, Step 13b WATTR control — retry submitted
+
+- Claude's check: commit `fbf44207` / replay `45839851602` (SPLITMIN_60) is **INVALID**; ignore its metrics.
+- Corrected batch commit `c0c6fb72` did not run: dispatcher `45840014311` refused it because another lab run was still active. Claude verified its batch line is exactly the intended 13b APP(a) + CAL usual + WATTR + SPLITMIN_20 batch, seeds 1–3.
+- Re-submitted by changing only the RUN.txt comment; the batch line was copied byte-for-byte from `c0c6fb72` (885 bytes): retry commit `5f34b201565939236a93c252d3b5c53a08be034d`.
+- Await Claude's run-results report. Do not start 13c before those results are reviewed.
