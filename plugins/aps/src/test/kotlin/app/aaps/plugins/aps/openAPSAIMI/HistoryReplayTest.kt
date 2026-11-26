@@ -955,8 +955,13 @@ class HistoryReplayTest {
         // AAPS side.
         val chain = Chain(startMs = t0, manual = ArrayList(), realBefore = emptyList(), realTempsBefore = emptyList(),
             basalAt = { t -> profBasal[hourOf(t)] })
-        class Logged(val t: Long, val g: Double, var left: Double)
+        class Logged(val t: Long, val g: Double, var left: Double) {
+            var absorbedByCob = 0.0
+            var absorbedByMinRate = 0.0
+        }
         val logged = ArrayList<Logged>()
+        // Keep meal-level absorption provenance for the report-only Stage-0 COB filter.
+        val allLogged = ArrayList<Logged>()
         val readT = ArrayList<Long>(); val readV = ArrayList<Double>()
         val autoIsf = DetermineBasalAutoISF(mockk(relaxed = true))
         var smbState = true; var smbOffAt = Long.MIN_VALUE / 2
@@ -1028,6 +1033,7 @@ class HistoryReplayTest {
         val crAudit = replayTokens.contains("CRAUDIT")
         val wAttr = replayTokens.contains("WATTR")
         val laProtect = replayTokens.contains("LAPROTECT")
+        val stage0 = replayTokens.contains("LSTAGE0")
         require(!wAttr || causalFilter) { "WATTR requires LACAUSE for causal-window exclusions" }
         class WAttrTick(
             val t: Long, val day: Int, val weight: String?, val impactPct: Double, val clamped: Boolean,
@@ -1781,7 +1787,8 @@ class HistoryReplayTest {
                     Math.round((needMg / (isfP / icP)).coerceIn(4.0, 10.0)).toDouble()
                 } else treatFix
                 treatSum += tg
-                eatenList.add(Meal(t, tg, tg, 10.0, 30.0)); logged.add(Logged(t, tg, tg)); hypoThisTick += tg
+                eatenList.add(Meal(t, tg, tg, 10.0, 30.0))
+                Logged(t, tg, tg).also { logged.add(it); allLogged.add(it) }; hypoThisTick += tg
                 val last = episodes.lastOrNull()
                 if (last == null || last.done || t - last.t0 > 45 * minute) episodes.add(Episode(t).also { it.treatBg = reading })
                 lastTreat = t; nTreat++; corrAsked = false; treatBg = reading; treatTimes.add(t)
@@ -1792,7 +1799,9 @@ class HistoryReplayTest {
                 // UNLOG_<pct>: pct % of meals are eaten but not entered (no carbs logged, no bolus).
                 if (stUnlog > 0 && unRnd.nextDouble() * 100 < stUnlog) { eatenList.add(Meal(t, 0.0, ml.eaten, ml.a, ml.b)); nUnlog++; continue }
                 if (ml.logged >= 13.0) mealLog.add(Pair(t, ml.logged))
-                eatenList.add(Meal(t, ml.logged, ml.eaten, ml.a, ml.b)); logged.add(Logged(t, ml.logged, ml.logged)); nMeals++; mealThisTick += ml.logged
+                eatenList.add(Meal(t, ml.logged, ml.eaten, ml.a, ml.b))
+                Logged(t, ml.logged, ml.logged).also { logged.add(it); allLogged.add(it) }
+                nMeals++; mealThisTick += ml.logged
                 var iobAll = 0.0
                 for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                 val bIob = basalIob(t)
@@ -1898,8 +1907,16 @@ class HistoryReplayTest {
                 if (gs != null && lastLoopBg != null) {
                     val dev = (gs.glucose - lastLoopBg!!) + lastAct * isfP * 5
                     lastDev = dev; devStreak = if (dev > 6.0) devStreak + 1 else 0
-                    var absorbed = maxOf(dev, 4.0) / csfP
-                    for (l in logged) { if (absorbed <= 0) break; val x = minOf(l.left, absorbed); l.left -= x; absorbed -= x }
+                    val minRateFallback = dev < 4.0
+                var absorbed = maxOf(dev, 4.0) / csfP
+                    for (l in logged) {
+                        if (absorbed <= 0) break
+                        val x = minOf(l.left, absorbed)
+                        l.left -= x
+                        absorbed -= x
+                        l.absorbedByCob += x
+                        if (minRateFallback) l.absorbedByMinRate += x
+                    }
                 }
                 // LATE: late meal tail. 90-240 min after a meal of 13 g or more, when absorption is SEEN (deviation > 6 in
                 // two cycles), glucose > 7.8 and rising: one small extra bolus per meal = what is above target minus all
@@ -2002,7 +2019,7 @@ class HistoryReplayTest {
                 row.put("man", manThisTick).put("deliv", rateNow)
                 row.put("meal", mealThisTick).put("hypo", hypoThisTick).put("prof", profBasal[h]).put("lbg", gs?.glucose ?: JSONObject.NULL)
                 if (canEvery > 0) row.put("can", ((t - t0) / 3_600_000.0) % canEvery)
-                if (causalFilter || laProtect) {
+                if (causalFilter || laProtect || stage0) {
                     val canAgeNow = if (canEvery > 0) ((t - t0) / 3_600_000.0) % canEvery else 0.0
                     val afterMeal = mealThisTick > 0.0 || priorEvent(t, 300, "meal")
                     val afterHypo = hypoThisTick > 0.0 || priorEvent(t, 180, "hypo")
@@ -2194,6 +2211,42 @@ class HistoryReplayTest {
             wAttrEvents.forEach { event ->
                 println("AIMI audit WATTR event: day=${event.day} card=${event.weight} direction=${event.direction} miss=${event.miss} explained_pct=${"%.1f".format(event.explainedPct)}")
             }
+        }
+        // LSTAGE0 is a report-only data-quality audit. It does not gate or alter replay behaviour.
+        if (stage0) {
+            val rows = (0 until out.length()).map { out.getJSONObject(it) }
+            fun dayOf(ts: Long) = ((ts - t0) / 86_400_000L).toInt()
+            fun affectedDays(flag: (JSONObject) -> Boolean) =
+                rows.filter(flag).map { dayOf(it.getLong("t")) }.toSet()
+            fun mealCount(days: Set<Int>) = meals.count { it.logged > 12.0 && dayOf(it.t) in days }
+            val cannulaDays = affectedDays { it.optBoolean("oldCannula") }
+            val sensorDays = affectedDays { it.optBoolean("sensorGap") || it.optBoolean("falseLow") }
+            val illnessDays = affectedDays { it.optBoolean("illness") }
+            val activityDays = affectedDays { it.optBoolean("activity") }
+            val minRateMeals = allLogged.filter { it.g > 12.0 && it.absorbedByCob > 0.0 &&
+                it.absorbedByMinRate / it.absorbedByCob >= 0.5 }
+            val minRateDays = minRateMeals.map { dayOf(it.t) }.toSet()
+            val untreatedLowRows = rows.indices.filter { i ->
+                val r = rows[i]
+                val bg = r.optDouble("bg", Double.NaN)
+                if (!bg.isFinite() || bg >= 70.0) false
+                else {
+                    val previous = if (i > 0) rows[i - 1].optDouble("bg", Double.NaN) else Double.NaN
+                    val crossing = !previous.isFinite() || previous >= 70.0
+                    crossing && (i..minOf(rows.lastIndex, i + 3)).none { j ->
+                        rows[j].optDouble("hypo", 0.0) > 0.0
+                    }
+                }
+            }
+            val untreatedHypoDays = untreatedLowRows.map { dayOf(rows[it].getLong("t")) }.toSet()
+            println("AIMI audit LSTAGE0: cannula-age>72h days=${cannulaDays.size} meals=${mealCount(cannulaDays)}; " +
+                "sensor-gap/false-low days=${sensorDays.size} meals=${mealCount(sensorDays)}; " +
+                "illness days=${illnessDays.size} meals=${mealCount(illnessDays)}; " +
+                "activity days=${activityDays.size} meals=${mealCount(activityDays)}; " +
+                "COB-min-rate meals=${minRateMeals.size} days=${minRateDays.size}; " +
+                "low-without-hypo-carbs-in-next-15m episodes=${untreatedLowRows.size} days=${untreatedHypoDays.size}; " +
+                "calibration-window=UNAVAILABLE(no calibration-event field); " +
+                "medical-procedure=UNAVAILABLE(no procedure field); report-only")
         }
         // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
         // Export exactly one CSV row per tick; deliv is the basal rate for the following 5-minute interval.
