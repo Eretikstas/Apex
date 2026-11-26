@@ -2400,11 +2400,11 @@ class HistoryReplayTest {
                 highRate >= 0.40 && lowRate <= 0.10 -> "CR-"
                 else -> "silent"
             }
-            println("AIMI audit LCR3: candidates=\${candidates.size} accepted=$accepted rejected=\${candidates.size - accepted} " +
-                "days=\${acceptedDays.size} low-meals=$lowMeals low-rate=\${"%.2f".format(lowRate)} " +
-                "high-after-absorption=$highAfterAbsorption high-rate=\${"%.2f".format(highRate)} " +
-                "proposal=$direction gate=\${if (gate) "PASS" else "FAIL"} " +
-                "rejects=\${rejected.entries.joinToString(",") { "\${it.key}:\${it.value}" }} " +
+            println("AIMI audit LCR3: candidates=${candidates.size} accepted=$accepted rejected=${candidates.size - accepted} " +
+                "days=${acceptedDays.size} low-meals=$lowMeals low-rate=${"%.2f".format(lowRate)} " +
+                "high-after-absorption=$highAfterAbsorption high-rate=${"%.2f".format(highRate)} " +
+                "proposal=$direction gate=${if (gate) "PASS" else "FAIL"} " +
+                "rejects=${rejected.entries.joinToString(",") { "${it.key}:${it.value}" }} " +
                 "max-meal=60g full-absorption=90% COB-min-rate-exclusion=50% report-only")
         }
         // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
