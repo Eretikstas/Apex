@@ -2183,33 +2183,26 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
-        // DUMPCSV is report-only and OFF by default. Export the virtual child's 1-minute
-        // model rows as 5-minute bins; no replay state or decisions are changed.
+        // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
+        // Export exactly one CSV row per tick; deliv is the basal rate for the following 5-minute interval.
         if (prefsText.split(Regex("[,\\s]+")).contains("DUMPCSV")) {
             val localMidnight = Instant.ofEpochMilli(t0).atZone(tz).toLocalDate().atStartOfDay(tz).toInstant().toEpochMilli()
             println("AIMI_DUMPCSV_BEGIN")
             println("time_min,bg_true_mgdl,bg_sensor_mgdl,insulin_u,carbs_g,hypo_treat_g")
-            var first = 0
-            while (first < out.length()) {
-                val endExclusive = minOf(first + 5, out.length())
-                val last = out.getJSONObject(endExclusive - 1)
-                var insulinU = 0.0
-                var carbsG = 0.0
-                var hypoG = 0.0
-                for (k in first until endExclusive) {
-                    val r = out.getJSONObject(k)
-                    // deliv is the delivered basal rate in U/hour; rows are one minute apart.
-                    insulinU += r.optDouble("deliv", 0.0) / 60.0 +
-                        r.optDouble("units", 0.0) + r.optDouble("man", 0.0)
-                    carbsG += r.optDouble("meal", 0.0)
-                    hypoG += r.optDouble("hypo", 0.0)
-                }
-                val timeMin = (last.getLong("t") - localMidnight) / minute
-                val trueBg = if (last.has("bgTrue")) last.optDouble("bgTrue", Double.NaN).toString() else ""
-                val sensorBg = if (last.has("bg")) last.optDouble("bg", Double.NaN).takeIf { it.isFinite() }?.toString() ?: "" else ""
-                println("$timeMin,$trueBg,$sensorBg,$insulinU,$carbsG,$hypoG")
-                first = endExclusive
+            var insulinTotal = 0.0
+            for (i in 0 until out.length()) {
+                val r = out.getJSONObject(i)
+                val next = if (i + 1 < out.length()) out.getJSONObject(i + 1) else r
+                val insulinU = next.optDouble("deliv", 0.0) * 5.0 / 60.0 +
+                    r.optDouble("units", 0.0) + r.optDouble("man", 0.0)
+                insulinTotal += insulinU
+                val timeMin = (r.getLong("t") - localMidnight) / minute
+                val trueBg = if (r.has("bgTrue")) r.optDouble("bgTrue", Double.NaN).takeIf { it.isFinite() }?.toString() ?: "" else ""
+                val sensorBg = if (r.has("bg")) r.optDouble("bg", Double.NaN).takeIf { it.isFinite() }?.toString() ?: "" else ""
+                println("$timeMin,$trueBg,$sensorBg,$insulinU,${r.optDouble("meal", 0.0)},${r.optDouble("hypo", 0.0)}")
             }
+            val daysFromRows = out.length() / 288.0
+            println("AIMI_DUMPCSV_CHECK rows=${out.length()} step_min=5 insulin_total_u=${"%.4f".format(insulinTotal)} days=${"%.4f".format(daysFromRows)} insulin_u_day=${"%.4f".format(insulinTotal / daysFromRows)}")
             println("AIMI_DUMPCSV_END")
         }
         if (crAudit) {
