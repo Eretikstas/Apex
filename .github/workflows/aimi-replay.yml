@@ -404,3 +404,36 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check numpy
       - name: Test synthetic day comparison tool
         run: python3 -m unittest discover -s lab/aimi-replay/tools -p 'test_compare_days.py' -v
+
+  # Writes the public result into lab/aimi-replay/results/ so ChatGPT can read it in the repository (it cannot see
+  # GitHub Actions). Only public synthetic lines; a push made with GITHUB_TOKEN starts no other workflow.
+  report:
+    needs: [plan, replay]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout replay branch
+        uses: actions/checkout@v5
+        with:
+          ref: aimi-replay
+          fetch-depth: 20
+      - name: Write and push the result file
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          FILE=$(python3 .github/scripts/aimi_lab_report.py replay "$RUN_ID")
+          git add lab/aimi-replay/results
+          git commit -q -m "Lab result: replay run $RUN_ID" || exit 0
+          for i in 1 2 3 4 5; do
+            if git pull -q --rebase origin aimi-replay && git push -q origin HEAD:aimi-replay; then echo "written: $FILE"; exit 0; fi
+            sleep $((i * 10))
+          done
+          echo "could not push the result file"; exit 1

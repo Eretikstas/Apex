@@ -2,6 +2,28 @@
 
 Breaking a rule = stop, write in STATUS.md "Task" what you wanted to do and why, wait for Claude.
 
+## 0. You work ON YOUR OWN now (user 26.11). Do not wait for Claude.
+
+The user said: ChatGPT must not stop and wait for Claude at every step. So:
+- **You can see every result yourself, in this repository** (you do not need GitHub Actions):
+  - `lab/aimi-replay/results/compile-<commit8>.md` - the compile check of a code commit (written when it ends).
+  - `lab/aimi-replay/results/dispatch-<RUN commit8>.md` - what happened to your RUN.txt commit (started / refused + why).
+  - `lab/aimi-replay/results/run-<run id>.md` - every job's six numbers + its "AIMI audit" lines (written when it ends).
+  Pull the branch and read them. A file appears some minutes after the event; if it is not there yet, wait and pull again.
+- **You do not wait for a green compile before the RUN commit.** Commit the code, then commit RUN.txt: the dispatcher
+  itself waits for the compile check of the newest code commit (up to 60 min) and starts only when it is green. If the
+  compile is red, the dispatch note says so: read `compile-<commit8>.md`, fix the code, commit RUN.txt again.
+- **A busy lab is no longer a refusal**: the dispatcher waits up to 120 min for the other run to end.
+- **Controls are checked automatically.** Put the token `CTRL13A` into a control job (APP(a) + CAL usual, seed 1, 2
+  or 3, plus only the tokens that must not change anything). `run-<id>.md` then shows `PASS` or `**FAIL**` for it.
+  One control job per batch is enough (seed 1). The CTRL13A token itself does nothing in the replay.
+- **When to STOP and call Claude** (write it at the top of STATUS.md "Task", then wait):
+  a CONTROL **FAIL**; a compile you cannot fix after 2 tries; a replay job that failed and you do not know why;
+  the end of step 18; or anything in section 4 ("needs Claude and the user first").
+- **Everything else: decide yourself and go on.** Small mistakes (a typo in a batch, a missing control job, a
+  cosmetic code issue): fix them, write one line in STATUS.md, and continue. A bad score is a RESULT, not a stop.
+- Sections 2.1, 2.3 ("not while another lab run goes") and 2.5 below are replaced by this section.
+
 ## 1. Where you may write
 
 - Repository `Eretikstas/Apex`, branch `aimi-replay` ONLY. Never `main`, never `autoisf-atc3`, never `Eretikstas/My-apps`.

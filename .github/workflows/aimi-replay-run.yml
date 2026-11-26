@@ -1,13 +1,18 @@
 # The only way ChatGPT starts lab runs: commit one batch line to lab/aimi-replay/RUN.txt.
-# Checks: every job is the virtual child (SYNTH_), algo is autoisf, at most 120 jobs, no other lab run going,
-# no daily start limit (user 25.11). The batch is read from the file into a variable, never put into the script text.
+# Checks: every job is the virtual child (SYNTH_), at most 120 jobs. Algo is always autoisf.
+# It WAITS instead of refusing (user 26.11: ChatGPT must not wait for Claude):
+#   - for the compile check of the newest code commit to finish (up to 60 min); it starts only when that is green;
+#   - for another lab run to end (up to 120 min).
+# What happened is written to lab/aimi-replay/results/dispatch-<RUN.txt commit>.md, which ChatGPT can read; the lab
+# run then writes results/run-<run id>.md and the compile check writes results/compile-<commit>.md.
+# The batch is read from the file into a variable, never put into the script text.
 name: AIMI replay from RUN.txt
 on:
   push:
     branches: [aimi-replay]
     paths: ['lab/aimi-replay/RUN.txt']
 permissions:
-  contents: read
+  contents: write
   actions: write
 concurrency:
   group: aimi-replay-run
@@ -15,24 +20,91 @@ concurrency:
 jobs:
   start:
     runs-on: ubuntu-latest
+    timeout-minutes: 200
     steps:
-      - uses: actions/checkout@v4
-      - name: Check RUN.txt and start the batch
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 300
+      - name: Check RUN.txt, wait for compile and a free lab, start the batch
+        id: start
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          OUT=lab/aimi-replay/results/dispatch-${SHA:0:8}.md
+          mkdir -p lab/aimi-replay/results
+          say() { printf '%s\n' "$1" | tee -a "$OUT"; }
+          stop() { say "**REFUSED:** $1"; echo "refused=1" >> "$GITHUB_OUTPUT"; exit 0; }
+          printf '# Dispatch of RUN.txt commit `%s`\n\n' "${SHA:0:8}" > "$OUT"
           BATCH="$(grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' lab/aimi-replay/RUN.txt | head -n 1 | tr -d '\r' || true)"
-          [ -n "$BATCH" ] || { echo "RUN.txt has no batch line: nothing started"; exit 0; }
-          [ "${#BATCH}" -lt 65000 ] || { echo "batch too long"; exit 1; }
+          [ -n "$BATCH" ] || stop "RUN.txt has no batch line: nothing started"
+          [ "${#BATCH}" -lt 65000 ] || stop "batch too long"
           JOBS=$(printf '%s' "$BATCH" | awk -F'|' '{print NF}')
-          [ "$JOBS" -le 120 ] || { echo "too many jobs: $JOBS (max 120)"; exit 1; }
+          [ "$JOBS" -le 120 ] || stop "too many jobs: $JOBS (max 120)"
           BAD=$(printf '%s' "$BATCH" | tr '|' '\n' | grep -vc 'SYNTH_' || true)
-          [ "$BAD" -eq 0 ] || { echo "$BAD job(s) without SYNTH_: refused (real history is never run from here)"; exit 1; }
-          BUSY=$(gh api "repos/$REPO/actions/workflows/aimi-replay.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.event=="workflow_dispatch" and (.status=="queued" or .status=="in_progress"))] | length')
-          [ "$BUSY" -eq 0 ] || { echo "another lab run is going: refused, commit again later"; exit 1; }
+          [ "$BAD" -eq 0 ] || stop "$BAD job(s) without SYNTH_ (real history is never run from here)"
+
+          # The newest commit that changed the code the compile check covers.
+          CODE=$(git log -1 --format=%H -- \
+            'plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAIMI' \
+            'plugins/aps/src/test/kotlin/app/aaps/plugins/aps/openAPSAutoISF' \
+            'plugins/aps/src/main/kotlin/app/aaps/plugins/aps/openAPSAIMI' \
+            'plugins/main/src/main/kotlin/app/aaps/plugins/main/general/dashboard' \
+            'implementation/src/test/kotlin/app/aaps/implementation/aps/DetermineBasalResultTest.kt' \
+            'plugins/aps/build.gradle' 'plugins/aps/build.gradle.kts' \
+            '.github/workflows/aimi-replay-compile.yml' '.github/workflows/aimi-replay.yml')
+          [ -n "$CODE" ] || stop "no code commit found in the last 300 commits"
+          say "- Code commit: \`${CODE:0:8}\`; jobs: $JOBS"
+          for i in $(seq 1 60); do
+            # A check of the code commit itself or of any later commit counts: no code changed after the code commit.
+            # (One push of several commits runs the check only on the last of them.)
+            C="none"
+            while read -r RSHA RSTATE; do
+              [ -n "$RSHA" ] || continue
+              if git cat-file -e "$RSHA^{commit}" 2>/dev/null && git merge-base --is-ancestor "$CODE" "$RSHA"; then C="$RSTATE"; break; fi
+            done < <(gh api "repos/$REPO/actions/workflows/aimi-replay-compile.yml/runs?branch=aimi-replay&per_page=30" \
+              --jq '.workflow_runs | sort_by(.created_at) | reverse | .[] | "\(.head_sha) \(.status) \(.conclusion // "")"')
+            C="${C% }"
+            case "$C" in
+              "completed success") break ;;
+              completed*) stop "compile check of ${CODE:0:8} is '$C': fix the code, see results/compile-${CODE:0:8}.md" ;;
+            esac
+            [ "$i" -eq 60 ] && stop "compile check of ${CODE:0:8} did not finish in 60 min (state: $C)"
+            sleep 60
+          done
+          say "- Compile check of \`${CODE:0:8}\`: green"
+          for i in $(seq 1 120); do
+            BUSY=$(gh api "repos/$REPO/actions/workflows/aimi-replay.yml/runs?per_page=20" \
+              --jq '[.workflow_runs[] | select(.event=="workflow_dispatch" and (.status=="queued" or .status=="in_progress"))] | length')
+            [ "$BUSY" -eq 0 ] && break
+            [ "$i" -eq 120 ] && stop "another lab run was still going after 120 min"
+            sleep 60
+          done
+          SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           gh workflow run aimi-replay.yml --repo "$REPO" --ref aimi-replay \
-            -f sim=true -f algo=autoisf -f learn=false -f batch="$BATCH"
-          echo "started: $JOBS jobs (algo autoisf, sim true). Results: the public summary of the aimi-replay.yml run."
+            -f sim=true -f algo=autoisf -f learn=false -f batch="$BATCH" || stop "GitHub refused to start the run"
+          RUN=""
+          for i in $(seq 1 12); do
+            sleep 10
+            RUN=$(gh api "repos/$REPO/actions/workflows/aimi-replay.yml/runs?event=workflow_dispatch&per_page=5" \
+              --jq "[.workflow_runs[] | select(.created_at >= \"$SINCE\")] | sort_by(.created_at) | first | .id // empty")
+            [ -n "$RUN" ] && break
+          done
+          say "- **STARTED** lab run ${RUN:-unknown}: https://github.com/$REPO/actions/runs/${RUN:-}"
+          say "- When it ends, its result is in \`lab/aimi-replay/results/run-${RUN:-<id>}.md\`."
+      - name: Push the dispatch note
+        if: ${{ always() }}
+        run: |
+          set -u
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lab/aimi-replay/results || exit 0
+          git commit -q -m "Lab dispatch note for ${GITHUB_SHA:0:8}" || exit 0
+          for i in 1 2 3 4 5; do
+            if git pull -q --rebase origin aimi-replay && git push -q origin HEAD:aimi-replay; then exit 0; fi
+            sleep $((i * 10))
+          done
+          echo "could not push the dispatch note"; exit 1
