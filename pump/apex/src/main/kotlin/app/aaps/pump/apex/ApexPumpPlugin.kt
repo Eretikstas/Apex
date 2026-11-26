@@ -65,7 +65,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.IntKey as MetroIntKey
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -149,13 +148,7 @@ class ApexPumpPlugin(
         // A new link is set up once, in its turn on the queue, before the first heartbeat is answered.
         linkWatch = rxBus.toFlow(EventPumpStatusChanged::class)
             .filter { it.status == EventPumpStatusChanged.Status.CONNECTED }
-            .collectResilient(pluginScope, aapsLogger, LTag.PUMP, start = CoroutineStart.UNDISPATCHED) { commandQueue.customCommand(ApexLinkSetup()) }
-        // The link can be up before the watch above began: the queue may connect while the plugins still start (seen
-        // after an AAPS restart over an open link). Its CONNECTED went by unseen, so the link is set up here, once.
-        if (connection.isConnected && !commandQueue.isCustomCommandInQueue(ApexLinkSetup::class)) {
-            aapsLogger.debug(LTag.PUMP, "Apex: the link was up before the driver started, link setup queued")
-            pluginScope.launch { commandQueue.customCommand(ApexLinkSetup()) }
-        }
+            .collectResilient(pluginScope, aapsLogger, LTag.PUMP) { commandQueue.customCommand(ApexLinkSetup()) }
         heartbeatOverdue.start(System.currentTimeMillis())
         beatWatch = pluginScope.launch {
             while (isActive) {

@@ -63,7 +63,6 @@ the tests named next to it.
 | `ui/src/androidHostTest/.../main/MenuScreenshotTest.kt` (new) | screenshots of the menu with our entries | `:ui` host tests |
 | `pump/apex/.../link/ApexBLE.kt` + new `ApexRadioBindings.kt` (our edits in the vendored v4 driver) | ApexBLE open and made by a provider, so a device test can put our software pump in place of the radio (`ApexRadioSwap`); the app never sets it | VirtualBenchTest |
 | `pump/apex/.../manager/ApexManager.kt` (our edit in the vendored v4 driver) | basal profile and settings writes with a LOST answer read back instead of failing at once (our ATC3 findings 3 and 4, still in v4) | virtual pump scenarios (to port) |
-| `pump/apex/.../ApexPumpPlugin.kt` (our edit in the vendored v4 driver) | `onStart`: the CONNECTED watch starts at once (`UNDISPATCHED`) and a link that is already up gets its LINK SETUP queued; before, a link raised while the plugins still started was never set up and the driver stayed not initialized (bench restart tests, 26.11) | ApexScenarioTest restart_* |
 | `.github/workflows/*` | blaqone workflows removed on this branch | - |
 
 ## Rules
