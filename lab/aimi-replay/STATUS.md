@@ -4,6 +4,8 @@
 
 ### DUMPCSV corrected export — pre-run note, 2026-11-26
 
+- AIMI_DUMPCSV_CHECK: one APP(a)+CAL usual, seed 1 replay; verify 16,128 rows, 5-minute spacing, and |CSV insulin/day − summary insulin/day| / summary insulin/day ≤ 1%. The DUMPCSV token is opt-in; no-token outputs must remain unchanged. This is the pre-run authorization/check line; RUN.txt will be committed only after this STATUS update.
+
 - Claude's 25.11 Results block requires one row per 5-minute tick and insulin_u = basal delivered in that interval + SMB + manual bolus delivered in that tick.
 - Code commit: 00399a2a8c9939e961cf27f712616b101db6578a. Export now emits each replay row directly (288 rows/day), uses the next row's delivered basal rate × 5/60 plus this tick's units and manual units, and prints a reconciliation line with row count, step and total insulin.
 - Comparison commits: 583f90de63d9076b612942b4792c124850d593f1 (hourly mean/SD use clock-hour MAE; W1 remains for distributions) and a2e13397c78b2cf965a7d5527ef9244e1c93ff8f (hour-order unit test).
