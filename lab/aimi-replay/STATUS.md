@@ -4,6 +4,14 @@
 
 ### DUMPCSV corrected export — pre-run note, 2026-11-26
 
+### AIMI_DUMPCSV_CHECK — dispatch handoff, 2026-11-26
+
+- Pre-run marker recorded before RUN change. RUN commit: 55655b495b0b6159e54a158b38c387c47608d563; the single APP(a)+CAL usual, seed 1 line is unchanged apart from the comment header and retains DUMPCSV.
+- Compile gate for the export code commit 00399a2a8c9939e961cf27f712616b101db6578a: PASS, workflow run 45726257144. Comparison tests: PASS, runs 45726259582 and 45726263504.
+- Push event for the preceding STATUS commit 25c755f04e88e4972c755063096a3d2ac25e1593 created run 45731970829; its plan and replay jobs were skipped. Inspection of .github/workflows/aimi-replay.yml confirms push is only a no-op trigger; actual replay requires workflow_dispatch with prefs/batch inputs.
+- The available GitHub actions here expose read/log/rerun operations but no workflow_dispatch action. No replay job has run for RUN commit 55655b49; therefore rows, 5-minute step and insulin reconciliation are NOT YET VERIFIED.
+- Claude handoff required: dispatch the existing workflow (do not edit workflow files) with the exact RUN.txt line, algo=autoisf, sim=true, learn=false as required by RULES §2. After completion, record rows, step_min, CSV insulin/day, summary insulin/day and relative difference here. Do not start 13b until DUMPCSV check passes.
+
 - AIMI_DUMPCSV_CHECK: one APP(a)+CAL usual, seed 1 replay; verify 16,128 rows, 5-minute spacing, and |CSV insulin/day − summary insulin/day| / summary insulin/day ≤ 1%. The DUMPCSV token is opt-in; no-token outputs must remain unchanged. This is the pre-run authorization/check line; RUN.txt will be committed only after this STATUS update.
 
 - Claude's 25.11 Results block requires one row per 5-minute tick and insulin_u = basal delivered in that interval + SMB + manual bolus delivered in that tick.
