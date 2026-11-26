@@ -1217,3 +1217,12 @@ Top 3 by minimum distance:
 - Same-seed Step 10 APP usual summaries were independently fetched from run `45653668453`: seed 1 `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78`; seed 2 `4.0 / 0.1 / 4.2 / 27.7 / 24.11 / 10.92`; seed 3 `4.8 / 0.3 / 4.5 / 28.9 / 29.64 / 11.63`. Exact match to 13a for every seed: **CRAUDIT changes behaviour = NO**.
 - Required pre-run STATUS note was omitted and is recorded here after the run (procedural ordering deviation). The exact changes in commit `cbe6f1b6` are: ISF window `k-48..k+36` → `k-72..k+72`; reject any other SMB within 6 h as `smb-within-6h`; CR post-meal SMB/correction exclusion 2 h → 6 h. `isfSeen` / `crBlockVerdict` also drive LAISF/LACR under LEARNALL; prior LEARNALL/LAISF/LACR results are not comparable to results after this commit. APP variant (a) used in 13a does not use those cards.
 - Compile workflow `45689360655` had source compilation, weight-boundary tests, audit-helper tests, adaptation tests and APSResult tests green before replay, but full workflow/APK assembly had not yet completed when the RUN commit was made. Replay run `45690200848` itself succeeded 3/3. Wait for full compile workflow green before the next code commit.
+
+
+### 2026-11-26, AIMI_DUMPCSV_CHECK — FAIL; STOP under user instruction
+
+- Replay run [45732148887](https://github.com/Eretikstas/Apex/actions/runs/45732148887), head `f7a648ead93d4cc57e310da9bb9dceab10cdb876`, concluded `success`; replay job `139616557027` and public-summary step succeeded.
+- RUN used APP(a) + CAL usual, seed 1, tokens ending `LACAUSE,CRAUDIT,DUMPCSV`. Replay log reports `16128 ticks`, but the DUMPCSV export step reports: `DUMPCSV artifact ready: out/dump.csv (16129 5-minute rows)`. Expected = 16,128 rows. **FAIL: exported row count is 1,6129, one row too many (+1).**
+- Public synthetic summary: BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day = `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78`; this exactly matches Step 13a seed 1.
+- The public log labels the export as 5-minute rows, but does not print a separately measured `step_min` or CSV-integrated insulin/day. Those two CSV-specific checks therefore remain **unverified** from the available public output; do not infer them from the summary.
+- Because the required row-count check failed, the DUMPCSV gate is **FAIL**. Do not launch 13b, 13c, or Steps 14–18. STOP pending correction/review. No workflow files changed.
