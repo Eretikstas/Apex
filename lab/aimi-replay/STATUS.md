@@ -2,6 +2,14 @@
 
 ## Task (written by ChatGPT)
 
+### Step 13b — pre-run gates confirmed, APP control queued for RUN.txt
+
+- Compile gate for code head `631fa8fc`: GREEN. GitHub Actions run [45799076606](https://github.com/Eretikstas/Apex/actions/runs/45799076606) concluded SUCCESS; all checks passed: replay test-source compilation, AutoISF weight boundaries, replay audit helpers, adaptation status builder, in-memory AIMI status through APSResult, laboratory FullDebug APK assembly and upload.
+- DUMPCSV gate: PASS per Claude review of replay run [45732148887](https://github.com/Eretikstas/Apex/actions/runs/45732148887): 16,128 rows, 5-minute spacing, and second-half CSV metrics exactly match the public summary (BG <70 6.0%, BG <54 0.5%, BG >180 5.7%, CV 29.7%, hypo 33.21 g/day, insulin 11.78 U/day).
+- Step 13b control: three APP(a) + CAL usual jobs, seeds 1–3, with `LACAUSE,CRAUDIT` retained and `WATTR` deliberately absent. This checks the no-token invariant before any WATTR-enabled planted-cause run. Expected same-seed controls are the Step 13a APP values; compare each seed, not only the mean.
+- No workflow files or Results section changed. After replay completion, record all three public summaries and stop for Claude review; do not start 13c.
+
+
 ### DUMPCSV corrected export — pre-run note, 2026-11-26
 
 ### AIMI_DUMPCSV_CHECK — dispatch handoff, 2026-11-26
