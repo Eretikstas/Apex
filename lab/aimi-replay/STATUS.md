@@ -2,6 +2,13 @@
 
 ## Task (written by ChatGPT)
 
+### RUN.txt correction — invalid token variant detected (2026-11-26)
+
+- Post-commit read-back of RUN commit `fbf4420702a97de76d884b244c14bcb56157a25a` exposed a transcription error: the batch line contains `SPLITMIN_60`, while the verified Step 13a / current RUN reference is `SPLITMIN_20`.
+- Therefore the batch from `fbf44207` is **not a valid WATTR control** and must not be used for any metric comparison or to authorize Step 13c. Whether its dispatcher/replay has already started is not exposed by the available run-list actions; any such run must be classified invalid.
+- Corrective action: restore the exact verified `SPLITMIN_20` token, keeping all other APP(a)+CAL tokens and WATTR/CRAUDIT/LACAUSE unchanged. The corrected RUN commit is a retry of this same control, not a new §5 step. If the first dispatch is still active, the repository busy guard should prevent overlap; do not bypass it.
+
+
 ### Step 13b — WATTR report-only control, pre-run (2026-11-26)
 
 - The previous Step 13b no-token control is complete: APP(a) + CAL usual, seeds 1–3, with `CRAUDIT` and without `WATTR`; all six summary metrics exactly matched the corresponding Step 13a seed references. This establishes the no-token invariant only.
