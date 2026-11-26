@@ -2,6 +2,16 @@
 
 ## Task (written by ChatGPT)
 
+### Step 14 — LSTAGE0 self-directed run prepared (2026-11-26)
+
+- Adopted RULES §0 from commit `5fa32387`: compile and dispatch results are read from `lab/aimi-replay/results/`; the dispatcher queues behind compile and a busy lab. No waiting for Claude between steps.
+- Cosmetic review fix: restored indentation of `var absorbed` in the permitted replay test source; code commit `8f83af4536868c85a648a7c6328dea31e339effd`. No learner formula or replay decision was changed.
+- Step 14 batch: CAL usual APP(a), seeds 1–3 with `LSTAGE0`; seed 1 carries `CTRL13A`. A separate seed-1 WATTR control carries `LACAUSE,CRAUDIT,WATTR,CTRL13A` and deliberately omits `LSTAGE0`. WATTR's `LACAUSE` prerequisite is retained. Total: 4 jobs.
+- Expected exact summary references (BG <70 / BG <54 / BG >180 / CV / hypo g/day / insulin U/day): seed 1 `6.0/0.5/5.7/29.7/33.21/11.78`; seed 2 `4.0/0.1/4.2/27.7/24.11/10.92`; seed 3 `4.8/0.3/4.5/28.9/29.64/11.63`. Both seed-1 control jobs are independently checked by `CTRL13A`.
+- LSTAGE0 report-only counts to extract: cannula-age>72h days/meals; sensor-gap/false-low days/meals; illness days/meals; activity days/meals; COB-min-rate meals/days; untreated-low episodes/days. Calibration and medical-procedure fields are explicitly unavailable in the replay schema.
+- The code compile gate is delegated to the RUN dispatcher per the new §0; do not manually wait for Actions. If the result file reports a compile failure, fix and retry according to §0.
+
+
 ### Step 13b — WATTR-on control completed; exact no-behaviour-change gate PASS (2026-11-26)
 
 - Corrected retry RUN commit: `5f34b201565939236a93c252d3b5c53a08be034d`; dispatcher run [45853235877](https://github.com/Eretikstas/Apex/actions/runs/45853235877); replay run [45853284220](https://github.com/Eretikstas/Apex/actions/runs/45853284220), concluded SUCCESS.
@@ -58,7 +68,7 @@ SYNTH_56,SEED_1,CRT_22,NEEDDX_1.3,NOISEPHI_0.995,UKF,SMARTS,SPLIT_60,SPLITMIN_20
 | CHGISF_1.2 → ISF card | 0/3 (ISF card silent; 0 accepted observations in every job) |
 
 - Negative cases: 15 jobs = 840 synthetic days; 9 WATTR weight events, or 1 event per 93.3 days (below the limit of 1 per 28 days). Events included dura/lower and also occurred in negatives. ISF card false proposals: **0**. Some `explained_pct` values exceeded 100%; label these **overshoot**.
-- Correction after Claude's source review: the apparent ISF 162 → 203 shift was caused by the percentage card's `pct-` steps via `setPct()` (`isfP /= f)), not by an ISF-card proposal. The CHGISF_1.2 planted case therefore scores **ISF card 0/3**; the ISF card was silent with zero accepted observations in every job. The percentage card's 1–2 downward steps in all 30 jobs were expected under its low-percentage rule. The overall verdict remains unchanged: no card found its planted cause.
+- Correction after Claude's source review: the apparent ISF 162 → 203 shift was caused by the percentage card's `pct-` steps via `setPct()` (`isfP /= f`), not by an ISF-card proposal. The CHGISF_1.2 planted case therefore scores **ISF card 0/3**; the ISF card was silent with zero accepted observations in every job. The percentage card's 1–2 downward steps in all 30 jobs were expected under its low-percentage rule. The overall verdict remains unchanged: no card found its planted cause.
 - Main WATTR limitation: `blocked-clean` was about 1,300–3,700 per job while events were 0–2. The 180-minute clean window rarely exists in this virtual child (about 30 g/day hypo treatment). This explains the very low event yield; it does not validate the proposed weights.
 - Verdict: no weight, CR or ISF card passes the planted-cause exam. No card goes to the app. Bad scores are recorded as results, not stops; no learner formula or production code changed in 13c.
 
