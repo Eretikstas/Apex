@@ -1,10 +1,10 @@
 name: AutoISF ATC3 CI follow-up chain
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/autoisf-ci-followups.yml"
+  workflow_run:
+    workflows: ["AutoISF fork + ATC3 driver"]
+    types: [completed]
+    branches: [autoisf-atc3]
 
 permissions:
   actions: write
@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   followups:
+    if: ${{ github.event.workflow_run.id == 45901734749 && github.event.workflow_run.head_sha == '258a94d5bde6174151b60bce6aa573d4af06bd89' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
