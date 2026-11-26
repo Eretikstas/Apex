@@ -15,8 +15,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:
-      GH_TOKEN: \${{ github.token }}
-      REPO: \${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
       WORKFLOW_ID: "424429165"
       WORKFLOW_FILE: "autoisf-atc3-ci.yml"
       TARGET_SHA: "258a94d5bde6174151b60bce6aa573d4af06bd89"
@@ -33,10 +33,12 @@ jobs:
           test "$conclusion" = "success"
 
           # Required outputs: bench APK artifact and the exact virtual-bench test count.
-          gh api "repos/$REPO/actions/runs/$RUN1_ID/artifacts" \
-            --jq '.artifacts[] | select(.name == "autoisf-atc3-bench-apk" and .expired == false and .size_in_bytes > 0) | .id' \
-            | grep -q .
-          gh run view "$RUN1_ID" --log | grep -F "OK (22 tests)" >/dev/null
+          artifact_id=$(gh api "repos/$REPO/actions/runs/$RUN1_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "autoisf-atc3-bench-apk" and .expired == false and .size_in_bytes > 0) | .id' | head -1)
+          test -n "$artifact_id"
+          run_log=$(gh run view "$RUN1_ID" --log)
+          grep -Fq "Build the app" <<<"$run_log"
+          grep -Fq "OK (22 tests)" <<<"$run_log"
           echo "Run 1 passed: $RUN1_ID (app + bench APK + vbench 22/22)." | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Dispatch longbench, wait, and verify
