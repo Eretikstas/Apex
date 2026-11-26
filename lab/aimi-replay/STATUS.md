@@ -2,6 +2,32 @@
 
 ## Task (written by ChatGPT)
 
+### Step 14 — LSTAGE0 completed (2026-11-26)
+
+- Code commit: `8f83af4536868c85a648a7c6328dea31e339effd`; compile run `45888261389` **SUCCESS**.
+- RUN commit: `b6a1155c`; dispatcher `45888296710`; replay run `45889976040` **SUCCESS**, 4/4 jobs, 16,128 ticks and 0 failed ticks per job.
+- Six metrics (BG <70 / BG <54 / BG >180 / CV / hypo g/day / insulin U/day) from public job logs:
+  - LSTAGE0 seed 1: `6.0/0.5/5.7/29.7/33.21/11.78`
+  - LSTAGE0 seed 2: `4.0/0.1/4.2/27.7/24.11/10.92`
+  - LSTAGE0 seed 3: `4.8/0.3/4.5/28.9/29.64/11.63`
+  - WATTR-only seed 1 (without LSTAGE0): `6.0/0.5/5.7/29.7/33.21/11.78`
+- Both `CTRL13A` controls **PASS** by exact comparison with Step 13a: LSTAGE0 seed 1 and WATTR-only seed 1. The generated `run-45889976040.md` currently has empty job-token/metric cells ("?"); exact metrics and audit lines were therefore extracted from the completed public job logs, not inferred from the generated table. Dispatcher note confirms compile green and run started.
+- LSTAGE0 report-only counts:
+  | Seed | Cannula days/meals | Sensor/false-low days/meals | Illness days/meals | Activity days/meals | COB-min-rate meals/days | Untreated-low episodes/days |
+  |---:|---:|---:|---:|---:|---:|---:|
+  | 1 | 0/0 | 0/0 | 0/0 | 0/0 | 43/26 | 36/24 |
+  | 2 | 0/0 | 0/0 | 0/0 | 0/0 | 58/38 | 29/21 |
+  | 3 | 0/0 | 0/0 | 0/0 | 0/0 | 57/36 | 38/26 |
+- Calibration-window and medical-procedure exclusions remain unavailable in the synthetic replay schema. No replay behaviour changed; controls match exactly.
+
+### Step 15 — LISF2 implementation and test batch (2026-11-26)
+
+- Added token `LISF2` in the permitted replay test source, OFF by default and report-only. It records the AutoISF factor per tick and evaluates clean correction-response windows where the factor remained 1.0; samples are grouped into morning (05–10), day (11–16), evening (17–21), and night (22–04). Night samples additionally require IOB >= 0.30 U. Each block reports candidate/accepted/rejected counts, distinct days, median observed ISF, direction and 10% proposed step. It does not modify ISF, profile, basal, CR, or insulin delivery.
+- This is an explicit test implementation of the curriculum's BerNie sign/10–20% direction and night-by-IOB requirements; the clean-window and factor=1.0 filters remain conservative lab assumptions. No accepted evidence means silent, never a proposal.
+- Planned planted cases: `CHGISF_1.2` (stronger insulin -> ISF+), `CHGISF_0.8` (weaker insulin -> ISF-), and negatives `MEALX_0.7`, `NOISE_0.12`, `CANCH_96`; 3 seeds each. Include one CAL-usual seed-1 `CTRL13A` with LISF2 plus CAL-usual seeds 2–3. Expected CAL metrics remain the Step 13a references; any mismatch is STOP. Report-only proposal scores are results, not stops.
+- Code commit is recorded separately below; dispatcher will gate the exact commit's compile before running the RUN batch.
+
+
 ### Step 14 — LSTAGE0 self-directed run prepared (2026-11-26)
 
 - Adopted RULES §0 from commit `5fa32387`: compile and dispatch results are read from `lab/aimi-replay/results/`; the dispatcher queues behind compile and a busy lab. No waiting for Claude between steps.
