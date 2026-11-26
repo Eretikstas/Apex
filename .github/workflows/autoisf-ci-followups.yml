@@ -1,0 +1,78 @@
+name: AutoISF ATC3 CI follow-up chain
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/autoisf-ci-followups.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  followups:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      GH_TOKEN: \${{ github.token }}
+      REPO: \${{ github.repository }}
+      WORKFLOW_ID: "424429165"
+      WORKFLOW_FILE: "autoisf-atc3-ci.yml"
+      TARGET_SHA: "258a94d5bde6174151b60bce6aa573d4af06bd89"
+      RUN1_ID: "45901734749"
+    steps:
+      - name: Verify and wait for app + bench + vbench run
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run view "$RUN1_ID" --json headSha,event -q \
+            'select(.headSha == env.TARGET_SHA and .event == "workflow_dispatch")' >/dev/null
+          gh run watch "$RUN1_ID" --exit-status
+          conclusion=$(gh run view "$RUN1_ID" --json conclusion -q .conclusion)
+          test "$conclusion" = "success"
+
+          # Required outputs: bench APK artifact and the exact virtual-bench test count.
+          gh api "repos/$REPO/actions/runs/$RUN1_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "autoisf-atc3-bench-apk" and .expired == false and .size_in_bytes > 0) | .id' \
+            | grep -q .
+          gh run view "$RUN1_ID" --log | grep -F "OK (22 tests)" >/dev/null
+          echo "Run 1 passed: $RUN1_ID (app + bench APK + vbench 22/22)." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch longbench, wait, and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run "$WORKFLOW_ID" --ref "$TARGET_SHA" -f longbench=true
+          id=""
+          for attempt in $(seq 1 60); do
+            id=$(gh run list --workflow "$WORKFLOW_FILE" --limit 20 \
+              --json databaseId,headSha,event \
+              --jq "[.[] | select(.event == \"workflow_dispatch\" and .headSha == \"$TARGET_SHA\")] | .[0].databaseId")
+            if [ -n "$id" ] && [ "$id" != "$RUN1_ID" ] && [ "$id" != "null" ]; then break; fi
+            sleep 10
+          done
+          test -n "$id" && test "$id" != "null" && test "$id" != "$RUN1_ID"
+          gh run watch "$id" --exit-status
+          test "$(gh run view "$id" --json conclusion -q .conclusion)" = "success"
+          echo "Longbench passed: $id." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "$id" > "$RUNNER_TEMP/longbench_id"
+
+      - name: Dispatch screens, wait, and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous=$(cat "$RUNNER_TEMP/longbench_id")
+          gh workflow run "$WORKFLOW_ID" --ref "$TARGET_SHA" -f screens=true
+          id=""
+          for attempt in $(seq 1 60); do
+            id=$(gh run list --workflow "$WORKFLOW_FILE" --limit 20 \
+              --json databaseId,headSha,event \
+              --jq "[.[] | select(.event == \"workflow_dispatch\" and .headSha == \"$TARGET_SHA\")] | .[0].databaseId")
+            if [ -n "$id" ] && [ "$id" != "null" ] && [ "$id" != "$RUN1_ID" ] && [ "$id" != "$previous" ]; then break; fi
+            sleep 10
+          done
+          test -n "$id" && test "$id" != "null" && test "$id" != "$RUN1_ID" && test "$id" != "$previous"
+          gh run watch "$id" --exit-status
+          test "$(gh run view "$id" --json conclusion -q .conclusion)" = "success"
+          echo "Russian screens passed: $id." | tee -a "$GITHUB_STEP_SUMMARY"
