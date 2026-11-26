@@ -6,8 +6,8 @@
 
 - Compile gate for code head `631fa8fc`: GREEN. GitHub Actions run [45799076606](https://github.com/Eretikstas/Apex/actions/runs/45799076606) concluded SUCCESS; all checks passed: replay test-source compilation, AutoISF weight boundaries, replay audit helpers, adaptation status builder, in-memory AIMI status through APSResult, laboratory FullDebug APK assembly and upload.
 - DUMPCSV gate: PASS per Claude review of replay run [45732148887](https://github.com/Eretikstas/Apex/actions/runs/45732148887): 16,128 rows, 5-minute spacing, and second-half CSV metrics exactly match the public summary (BG <70 6.0%, BG <54 0.5%, BG >180 5.7%, CV 29.7%, hypo 33.21 g/day, insulin 11.78 U/day).
-- Step 13b control: three APP(a) + CAL usual jobs, seeds 1–3, with `LACAUSE,CRAUDIT` retained and `WATTR` deliberately absent. This checks the no-token invariant before any WATTR-enabled planted-cause run. Expected same-seed controls are the Step 13a APP values; compare each seed, not only the mean.
-- No workflow files or Results section changed. After replay completion, record all three public summaries and stop for Claude review; do not start 13c.
+- Step 13b control intent: APP(a) + CAL usual, seeds 1–3, with `LACAUSE,CRAUDIT` retained and `WATTR` deliberately absent. Dispatcher inspection after start showed it reads only the first non-comment RUN.txt line; therefore this first launch contains seed 1 only. Seeds 2–3 are not yet started and must be sent together on one `|`-separated batch line after seed 1 completes. Compare each seed with the Step 13a APP reference; do not infer a three-seed result from the first job.
+- No workflow files or Results section changed. After all three seed summaries are recorded, stop for Claude review; do not start 13c.
 
 
 ### DUMPCSV corrected export — pre-run note, 2026-11-26
