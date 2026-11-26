@@ -9,6 +9,15 @@ import compare_days
 
 
 class CompareDaysTest(unittest.TestCase):
+
+    def test_hourly_mae_preserves_clock_hour_order(self):
+        real = [100.0 + i for i in range(24)]
+        same = list(real)
+        shifted = list(reversed(real))
+        self.assertEqual(compare_days._hourly_mae(real, same), 0.0)
+        self.assertGreater(compare_days._hourly_mae(real, shifted), 0.0)
+        self.assertTrue(math.isinf(compare_days._hourly_mae(real[:-1], same[:-1] + [math.nan])))
+
     def test_same_synthetic_csv_is_all_similar(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "synthetic.csv"
