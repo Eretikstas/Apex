@@ -221,6 +221,7 @@ jobs:
           AIMI_REPLAY_PREFS: ${{ matrix.prefs }}
         run: |
           python3 - <<'PY'
+          import csv
           import gzip
           import json
           import math
@@ -314,9 +315,12 @@ jobs:
           if not 1.0 <= step_minutes <= 15.0:
               raise SystemExit(f"unexpected synthetic row interval: {step_minutes:.2f} min")
 
+          selected.sort(key=lambda row: row["t"])
           insulin_units = 0.0
-          for row in selected:
-              basal_rate = row.get("deliv", 0.0)
+          for index, row in enumerate(selected):
+              # deliv belongs to the following 5-minute interval; mirror DUMPCSV exactly.
+              next_row = selected[index + 1] if index + 1 < len(selected) else row
+              basal_rate = next_row.get("deliv", 0.0)
               smb = row.get("units", 0.0)
               manual = row.get("man", 0.0)
               if isinstance(basal_rate, (int, float)) and math.isfinite(float(basal_rate)):
@@ -326,7 +330,26 @@ jobs:
               if isinstance(manual, (int, float)) and math.isfinite(float(manual)):
                   insulin_units += float(manual)
 
-          pref_tokens = [token for token in re.split(r"[,\s]+", prefs) if token]
+          pref_tokens = [token for token in re.split(r"[,\\s]+", prefs) if token]
+          if "DUMPCSV" in pref_tokens:
+              dump_rows = list(csv.reader(csv_lines))
+              if len(dump_rows) < 2:
+                  raise SystemExit("DUMPCSV artifact has no data rows")
+              dump_header = dump_rows[0]
+              time_col, insulin_col = dump_header.index("time_min"), dump_header.index("insulin_u")
+              dump_data = dump_rows[1:]
+              dump_times = [int(row[time_col]) for row in dump_data]
+              if len(dump_data) != len(rows) or any(b - a != 5 for a, b in zip(dump_times, dump_times[1:])):
+                  raise SystemExit("DUMPCSV must contain one row per 5-minute tick")
+              split_time_min = dump_times[0] + split_day * 1440
+              dump_selected = [row for row in dump_data if int(row[time_col]) >= split_time_min]
+              dump_insulin_day = sum(float(row[insulin_col]) for row in dump_selected) / day_count
+              summary_insulin_day = insulin_units / day_count
+              relative_error = abs(dump_insulin_day - summary_insulin_day) / max(abs(summary_insulin_day), 1e-9)
+              print(f"DUMPCSV_CHECK rows={len(dump_data)} step_min=5 dump_insulin_u_day={dump_insulin_day:.4f} summary_insulin_u_day={summary_insulin_day:.4f} delta_pct={100*relative_error:.3f}")
+              if relative_error > 0.01:
+                  raise SystemExit("DUMPCSV insulin_u does not reconcile with replay summary within 1%")
+
           task_name = " ".join(pref_tokens[:3]) or "synthetic"
           table = [
               "| Task | BG <70 (%) | BG <54 (%) | BG >180 (%) | CV (%) | Hypo treatment (g/day) | Daily insulin (U/day) |",
