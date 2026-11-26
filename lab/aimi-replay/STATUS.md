@@ -675,6 +675,13 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 **Prerequisite gate:** Task 9 was specified to start only after Rules §5 tasks 1–3. Tasks 1–2 are complete, but task 3 (the matched `CHG_28` pairs) is explicitly blocked by Claude's review in the Results section (2026-11-25: “Do NOT run the CHG_28 pairs (task 3)”; LEARNALL parked). Task 2 also failed the learner safety pass. Therefore Task 9's calibration grid is NOT authorized to start yet under the stated sequence. No `RUN.txt` change, no batch commit, and no new run. Await Claude's decision on reopening task 3 / the prerequisite gate.
 
+### 2026-11-26, STOP — DUMPCSV gate failed; Step 13b not authorized
+
+- Reconciled with Claude's newest Results entry: it records that replay run 45732148887 was started after the dispatcher busy-check fix and directs continuation only after recording the completed CSV checks.
+- The completed replay record for run 45732148887 reports 16,128 replay ticks but 16,129 exported 5-minute rows (expected 16,128; +1). This is a failed required row-count check.
+- The public summary matches Step 13a seed 1 exactly (6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78), but the log does not independently report measured step_min or CSV-integrated insulin/day. Five-minute spacing and the <=1% insulin reconciliation therefore remain unverified.
+- The DUMPCSV gate has not passed. **STOP:** do not implement/run Step 13b, Step 13c, or Steps 14–18 until the export is corrected and the required checks are verified. No source, workflow, or RUN.txt changes made.
+
 ## Results (written by Claude)
 
 ### 2026-11-26, Claude: DUMPCSV check replay started; dispatcher busy check fixed (user approved)
