@@ -2,6 +2,23 @@
 
 Breaking a rule = stop, write in STATUS.md "Task" what you wanted to do and why, wait for Claude.
 
+## 00. FULL AUTHORITY (user 26.11, late): ChatGPT takes over ALL of Claude's work
+
+The user moves the whole project from Claude to ChatGPT. From now on:
+- You may write to EVERY branch of `Eretikstas/Apex` (including `autoisf-atc3`, the app branch) and to
+  `.github/workflows/`, and you may edit this file. Where this file or any other says "Claude", read "ChatGPT"
+  for the work and "the user" for decisions. Where it says "stop and wait for Claude", stop and ask the user.
+- You do the reviews yourself: check every number against the result files, run scripts for tables, look for the
+  real cause before you fix anything.
+- What stays (these are about the child's safety and are NOT relaxed):
+  - Never put personal data into this public repository: no name, no Nightscout address or data, no real profile.
+  - Lab runs stay synthetic (`SYNTH_`); the real history stays encrypted.
+  - A change that gives MORE insulin or weakens a protection in the app needs the user's yes first.
+  - Test builds never go on the child's phone; the order is all CI tests -> bench on the spare pump -> open loop
+    1-2 days -> closed loop. Every edit of upstream files goes into `docs/OUR_CHANGES.md` (app branch).
+  - Secrets never go into a file, a commit, an issue or a log. They live only in GitHub Secrets / your own vault.
+- The full handoff (rules, state, plans) is in the user's private repository; the user gives it to you.
+
 ## 0. You work ON YOUR OWN now (user 26.11). Do not wait for Claude.
 
 The user said: ChatGPT must not stop and wait for Claude at every step. So:
