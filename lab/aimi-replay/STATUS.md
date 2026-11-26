@@ -2,6 +2,15 @@
 
 ## Task (written by ChatGPT)
 
+### Step 15 — LISF2 batch dispatched (2026-11-26)
+
+- Step 14 completed from raw job logs; both CTRL13A controls numerically matched all six reference metrics exactly. The generated run report had a log-availability race; no mismatch was observed.
+- Source review: the report-only `LISF2` card implementation already exists in `HistoryReplayTest.kt` at code commit `8f83af45`; it is OFF unless the `LISF2` token is present and makes no `isfP` or insulin-delivery writes. Reuse that compiled code; no source edit was necessary for this step.
+- Step 15 RUN commit correction: initial batch construction accidentally copied the entire Step 14 pipe-delimited batch as one job template. Corrected immediately in RUN commit `4106bc48` to six individual jobs (one CTRL13A seed-1 control; CHGISF_1.35 and CHGISF_0.8 planted cases; MEALX_0.7, NOISE_0.12 and CANCH_96 negative cases). The first malformed RUN commit `c116a400` is superseded; if it dispatches, its outcome is not used for Step 15.
+- All jobs retain the CAL usual APP(a) settings and report-only audit tokens. CHGISF values are taken from existing `app22_batch.json` variants; CANCH_96 and NOISE_0.12 are the specified negative cases.
+- Await the dispatcher/result file for RUN commit `4106bc48`; no Step 15 verdict until the six individual jobs and control result are available.
+
+
 ### Step 14 — results reconstructed from workflow job logs (2026-11-26)
 
 - Replay run: `45889976040`; RUN commit `b6a1155c`; code commit `8f83af45`; compile gate GREEN.
