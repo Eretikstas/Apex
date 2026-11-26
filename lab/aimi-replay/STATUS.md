@@ -1428,3 +1428,25 @@ Top 3 by minimum distance:
 - Corrected batch commit `c0c6fb72` did not run: dispatcher `45840014311` refused it because another lab run was still active. Claude verified its batch line is exactly the intended 13b APP(a) + CAL usual + WATTR + SPLITMIN_20 batch, seeds 1–3.
 - Re-submitted by changing only the RUN.txt comment; the batch line was copied byte-for-byte from `c0c6fb72` (885 bytes): retry commit `5f34b201565939236a93c252d3b5c53a08be034d`.
 - Await Claude's run-results report. Do not start 13c before those results are reviewed.
+
+
+### 2026-11-26, Step 15 — LISF2 report-only — COMPLETE
+
+- RUN commit: `4106bc48`; dispatch confirmed compile green for code `278cbe20`; replay `45894508242` completed 6/6 jobs successfully.
+- The generated `run-45894508242.md` is malformed (all jobs rendered as `?` with empty metrics/tokens). Metrics and audit lines below were reconstructed directly from each of the six public job logs; do not treat the generated markdown table as valid.
+- Columns: BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day.
+
+| Case | Metrics | LISF2 result |
+|---|---|---|
+| CTRL13A, CAL usual (CHGISF_1.2) | 6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78 | exact match to Step 13a seed-1 reference; numeric PASS |
+| CHGISF_0.8 | 3.3 / 0.0 / 17.4 / 31.9 / 18.75 / 16.96 | all blocks silent |
+| CHGISF_1.35 | 7.6 / 0.8 / 3.9 / 29.8 / 41.07 / 10.78 | all blocks silent |
+| NOISE_0.12 | 12.9 / 3.0 / 15.5 / 41.1 / 59.29 / 13.04 | all blocks silent |
+| CANCH_96 | 5.1 / 0.1 / 8.1 / 30.4 / 28.57 / 12.18 | all blocks silent |
+| Duplicate CAL usual (no extra perturbation) | 6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78 | all blocks silent |
+
+- LISF2 in every run: morning/day/evening/night each had **0 accepted observations**, 0 eligible days, profile ISF 162.0, proposal=silent, proposed=162.0, step=10%, gate=FAIL. Dominant rejection was meal-hypo; additional AutoISF-not-1, overlapping-manual, or cannula rejections occurred in some cases. Thus the planted CHGISF direction tests did **not** demonstrate direction: the card had no accepted evidence and remained silent. This is a screening result, not a stop.
+- Negative-test coverage caveat: the intended MEALX_0.7 case was not independent because CAL already contains MEALX_0.7; the corresponding batch slot was a duplicate CAL job. NOISE_0.12 and CANCH_96 were tested and remained silent.
+- No-token control numeric match: **PASS**. LISF2 is report-only; no delivery/profile writes observed in the audit.
+- Report-generator defect remains: public run markdown has empty fields despite populated job summaries/logs. Reconstructing from raw logs is the evidence source for this step.
+- Next: Step 16, implement token-gated report-only LCR3 and its CRT up/down plus MEALX_0.7/TREAT_15 planted tests. Continue the chain; screening failures alone do not stop.
