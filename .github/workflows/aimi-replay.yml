@@ -330,7 +330,7 @@ jobs:
               if isinstance(manual, (int, float)) and math.isfinite(float(manual)):
                   insulin_units += float(manual)
 
-          pref_tokens = [token for token in re.split(r"[,\\s]+", prefs) if token]
+          pref_tokens = [token for token in re.split(r"[,\s]+", prefs) if token]
           if "DUMPCSV" in pref_tokens:
               dump_rows = list(csv.reader(csv_lines))
               if len(dump_rows) < 2:
