@@ -29,7 +29,7 @@ CTRL13A = {
     "SEED_2": ["4.0", "0.1", "4.2", "27.7", "24.11", "10.92"],
     "SEED_3": ["4.8", "0.3", "4.5", "28.9", "29.64", "11.63"],
 }
-KEEP = ("AIMI audit ", "AIMI replay: learner ALL", "AIMI replay: ")
+KEEP = ("AIMI audit ", "AIMI replay: learner ALL", "AIMI replay: ", "AIMI_DUMPCSV_CHECK", "DUMPCSV_CHECK")
 
 
 def get(url: str, raw: bool = False):
