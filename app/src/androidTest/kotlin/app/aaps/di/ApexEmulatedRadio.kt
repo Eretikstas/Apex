@@ -35,7 +35,12 @@ class EmulatedApexBLE(aapsLogger: AAPSLogger, context: Context, trace: ApexTrace
     @Volatile private var heardAt = 0L
     @Volatile private var upAt = 0L
 
-    override val isConnected: Boolean get() = emulator?.isLinkUp ?: super.isConnected
+    /**
+     * Connected only over a link THIS radio holds. The pump's link flag alone is not enough: after a test restart the
+     * radio of the earlier AAPS start, not quite stopped, can raise the link again. The new radio then saw "connected",
+     * never connected itself, and its driver never heard the link was up (no link setup, driver not initialized).
+     */
+    override val isConnected: Boolean get() = emulator?.let { it.isLinkUp && upAt != 0L } ?: super.isConnected
     override val isConnecting: Boolean get() = if (emulator != null) connecting else super.isConnecting
     override val isBluetoothOn: Boolean get() = if (emulator != null) true else super.isBluetoothOn
     override val hasBluetooth: Boolean get() = if (emulator != null) true else super.hasBluetooth
