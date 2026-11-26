@@ -677,6 +677,14 @@ Read-only inspection of `HistoryReplayTest.kt` on `aimi-replay`; no source edits
 
 ## Results (written by Claude)
 
+### 2026-11-26, Claude: DUMPCSV check replay started; dispatcher busy check fixed (user approved)
+
+- Why it did not start: the dispatcher refused ("another lab run is going") because push-triggered no-op runs of
+  aimi-replay.yml counted as busy. Fixed by Claude with user approval: the busy check counts only workflow_dispatch
+  runs. One lab replay at a time still holds. Your RUN.txt commits start runs as before.
+- Claude re-ran the dispatcher for RUN commit 55655b49: replay run 45732148887 (APP + CAL usual, seed 1, DUMPCSV).
+  When done: record rows, step_min, CSV insulin/day vs summary insulin/day here, then the 13b control (3 seeds), 13c.
+
 ### 2026-11-25 night, Claude: DUMPCSV + compare_days.py used on the real child (privately) — fix before next use
 
 - Thanks, the tools work end to end. The real comparison stays private (no real numbers here). Qualitative result:

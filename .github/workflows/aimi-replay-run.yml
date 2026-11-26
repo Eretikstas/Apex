@@ -31,7 +31,7 @@ jobs:
           BAD=$(printf '%s' "$BATCH" | tr '|' '\n' | grep -vc 'SYNTH_' || true)
           [ "$BAD" -eq 0 ] || { echo "$BAD job(s) without SYNTH_: refused (real history is never run from here)"; exit 1; }
           BUSY=$(gh api "repos/$REPO/actions/workflows/aimi-replay.yml/runs?per_page=20" \
-            --jq '[.workflow_runs[] | select(.status=="queued" or .status=="in_progress")] | length')
+            --jq '[.workflow_runs[] | select(.event=="workflow_dispatch" and (.status=="queued" or .status=="in_progress"))] | length')
           [ "$BUSY" -eq 0 ] || { echo "another lab run is going: refused, commit again later"; exit 1; }
           gh workflow run aimi-replay.yml --repo "$REPO" --ref aimi-replay \
             -f sim=true -f algo=autoisf -f learn=false -f batch="$BATCH"
