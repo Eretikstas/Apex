@@ -2,6 +2,26 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — ownership split and Step 16 attempt-2 evidence
+
+- User split learner item 7: ChatGPT owns lab steps 16–18, shape recalibration, REBOUND GUARD on a new `learner-rebound` branch based on frozen `autoisf-atc3`, then food-first smart calculator and split bolus (each lab-first). Claude owns no-insulin hints 7c on its existing branch. Do not edit or merge that hints branch. Keep `autoisf-atc3` frozen at `6f578b5b`.
+- Attempt 2 replay `45957311944`, code `0dc64d56`, 6/6 jobs succeeded. Evidence read directly from the six completed job logs while the generated report job was still waiting. Metrics columns: BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day.
+
+| Case | Metrics | LCR3 |
+|---|---|---|
+| CTRL13A, no LCR3 | 6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78 | PASS, exact Step 13a control |
+| CAL + LCR3 | 6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78 | silent; 0/122 accepted |
+| CRT_26.4 + LCR3 | 6.4 / 0.3 / 4.7 / 30.2 / 35.89 / 11.32 | silent; 0/122 accepted |
+| CRT_17.6 + LCR3 | 4.3 / 0.2 / 7.2 / 29.5 / 26.79 / 12.26 | silent; 0/122 accepted |
+| MEALX_0.7 + LCR3 | 6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78 | silent; 0/122; not independent (MEALX_0.7 is already in CAL) |
+| TREAT_15 + LCR3 | 3.3 / 0.2 / 6.4 / 26.6 / 75.54 / 13.51 | silent; 0/122 accepted |
+
+- Attempt-2 rejection counts: CAL = prior-insulin 65, COB-min-rate 43, prior-hypo-rebound 14; CRT_26.4 = COB-min-rate 59, prior-insulin 53, prior-hypo-rebound 10; CRT_17.6 = prior-insulin 72, COB-min-rate 36, prior-hypo-rebound 14; TREAT_15 = prior-insulin 62, COB-min-rate 40, prior-hypo-rebound 17, SMB within 6 h 3.
+- Diagnostic split in `f051dd99` distinguishes prior SMB from prior manual correction. It did NOT run in attempt 2: `dispatch-a4c4de27.md` records code `0dc64d56`; `f051dd99` was committed later. Compile `45958813071` for `f051dd99` is green.
+- Attempt 3 RUN commit `7fcf5d94` contains the same six-job matrix and runs the diagnostic code. Dispatcher `45959189491` is waiting for the prior workflow-dispatch run/report to finish; its queued duplicate `45960043127` is also waiting. No attempt-3 replay ID yet. This is the final permitted Step 16 attempt. Continue to Step 17 after its results; no CTRL13A failure occurred.
+- No app branch or hint branch was changed.
+
+
 ### Step 16 — LCR3 attempt 3 submitted (2026-11-27)
 
 - Attempt 1 replay `45902096158`: 6/6 jobs succeeded, but LCR3 screening failed: CAL and TREAT_15 proposed CR+; see the detailed attempt-1 table below.
