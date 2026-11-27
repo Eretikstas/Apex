@@ -2,6 +2,12 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — shape calibration screen submitted
+
+- RUN commit [`720089ec`](https://github.com/Eretikstas/Apex/commit/720089ec8010f467067c3e54016724a634e002c1) contains 16 synthetic jobs: unchanged seed-1 control plus five existing-token candidates across seeds 1–3. Dispatcher [46058359316](https://github.com/Eretikstas/Apex/actions/runs/46058359316) confirms source compile `6f883d7c` green and **STARTED** replay [46058383247](https://github.com/Eretikstas/Apex/actions/runs/46058383247).
+- Candidate groups: `MEALX_1.0`, `MEALX_1.4`, `DAWN_0.9`, `DAWN_0.8`, and `MEALX_1.0+DAWN_0.9`; all retain the same APP/CAL base and `SHAPEAUDIT`. `CTRL13A` is only on the unchanged seed-1 control.
+- No new source code or model parameter was added. Candidate values are labelled **our estimates**; no clinical range is asserted. Run is active; no candidate score or calibration pass is claimed yet.
+
 ### 2026-11-27 — SHAPEAUDIT baseline complete
 
 - Exact source commit `6f883d7c5d6644fc6ec6aa878313927d979c02a1`; compile run [46055486474](https://github.com/Eretikstas/Apex/actions/runs/46055486474) **SUCCESS**, all 11 checks green. RUN retry `80fd2aaf`; dispatcher [46056094075](https://github.com/Eretikstas/Apex/actions/runs/46056094075) **STARTED**; replay [46057061061](https://github.com/Eretikstas/Apex/actions/runs/46057061061) **SUCCESS**, 3/3 replay jobs, 0 failed ticks; `CTRL13A` seed 1 **PASS**.
