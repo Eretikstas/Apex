@@ -23,6 +23,7 @@ enum class GuardOff { NO_HYPO_TREATMENT, MEAL, HIGH }
  * - It lets go at once when a meal is logged (any other carb entry from 30 minutes before the first hypo treatment of the
  *   window): the rise is food then, and the loop must cover it. All carb entries of the family are real.
  * - It lets go when the glucose is [RELEASE_MGDL] (13.9 mmol/L) or more: a long high must not be left alone.
+ * - The glucose is the smoothed value the loop uses (see `LearnerHistory.reboundInputs`), not the raw reading.
  */
 object ReboundGuardEngine {
 

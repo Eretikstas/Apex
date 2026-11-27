@@ -81,19 +81,27 @@ class LearnerHistory(
     }
 
     /**
-     * For the rebound guard: the carb entries of the last [ReboundGuardEngine.WINDOW_MS] + 30 minutes with the sensor
-     * glucose at each (the newest reading not more than 10 minutes before it, else the first one up to 10 minutes after),
-     * and the last sensor glucose of the last 15 minutes (null if none).
+     * For the rebound guard: the carb entries of the last [ReboundGuardEngine.WINDOW_MS] + 30 minutes with the glucose at
+     * each (the newest value not more than 10 minutes before it, else the first one up to 10 minutes after), and the last
+     * glucose of the last 15 minutes (null if none).
+     *
+     * The glucose is the SMOOTHED value the loop itself uses (the status data of the autosens store, `recalculated` =
+     * smoothed when a smoothing plugin such as UKF runs), so one noisy reading does not let the guard go. When the store
+     * has no values yet (just after a start), the raw readings of the database are used.
      */
     suspend fun reboundInputs(now: Long): Pair<List<CarbEntry>, Double?> {
         val from = now - ReboundGuardEngine.WINDOW_MS - ReboundGuardEngine.MEAL_BEFORE_MS
-        val bgs = persistenceLayer.getBgReadingsDataFromTimeToTime(from - 600_000L, now, true)
-        val carbs = persistenceLayer.getCarbsFromTimeToTimeExpanded(from, now, true).filter { it.amount > 0 }.map { c ->
-            val before = bgs.lastOrNull { it.timestamp <= c.timestamp && c.timestamp - it.timestamp <= 600_000L }
-            val after = bgs.firstOrNull { it.timestamp > c.timestamp && it.timestamp - c.timestamp <= 600_000L }
-            CarbEntry(c.timestamp, c.amount, (before ?: after)?.value)
+        val smoothed = iobCobCalculator.ads.getStatusDataCopy().orEmpty()
+            .filter { it.timestamp in (from - 600_000L)..now }.map { it.timestamp to it.recalculated }.sortedBy { it.first }
+        val values = smoothed.ifEmpty {
+            persistenceLayer.getBgReadingsDataFromTimeToTime(from - 600_000L, now, true).map { it.timestamp to it.value }
         }
-        val bgNow = bgs.lastOrNull()?.takeIf { now - it.timestamp <= 900_000L }?.value
+        val carbs = persistenceLayer.getCarbsFromTimeToTimeExpanded(from, now, true).filter { it.amount > 0 }.map { c ->
+            val before = values.lastOrNull { it.first <= c.timestamp && c.timestamp - it.first <= 600_000L }
+            val after = values.firstOrNull { it.first > c.timestamp && it.first - c.timestamp <= 600_000L }
+            CarbEntry(c.timestamp, c.amount, (before ?: after)?.second)
+        }
+        val bgNow = values.lastOrNull()?.takeIf { now - it.first <= 900_000L }?.second
         return Pair(carbs, bgNow)
     }
 
