@@ -72,7 +72,7 @@
     <string name="learner_split_cancelled">The rest is cancelled; nothing more is given for this meal.</string>
     <string name="learner_split_started" comment="%1$.2f=given U, %2$.2f=rest U">Given %1$.2f U; the rest (up to %2$.2f U) waits.</string>
     <string name="learner_split_rest_given" comment="%1$.2f=rest U">The rest %1$.2f U was given (food seen).</string>
-    <string name="learner_split_covered">The rest is not needed: the loop's SMB covered it.</string>
+    <string name="learner_split_covered">The rest is not needed: the loop\'s SMB covered it.</string>
     <string name="learner_split_dropped">Split bolus: the food was not seen in time, the rest is cancelled.</string>
     <string name="learner_split_failed" comment="%1$s=reason">Split bolus: not given (%1$s).</string>
     <string name="learner_split_no_profile">No running profile: nothing calculated.</string>
