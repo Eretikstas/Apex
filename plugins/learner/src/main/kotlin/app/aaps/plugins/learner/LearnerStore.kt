@@ -155,6 +155,11 @@ class LearnerStore(private val preferences: Preferences) {
         get() = read().optBoolean(KEY_SENSOR_HINTS, false)
         set(value) = edit { put(KEY_SENSOR_HINTS, value) }
 
+    /** The low meal hint is on (the user's switch). Off by default. */
+    var lowMealHints: Boolean
+        get() = read().optBoolean(KEY_LOW_MEAL, false)
+        set(value) = edit { put(KEY_LOW_MEAL, value) }
+
     /** The cannula hint is on (the user's switch on the learner screen). Off by default. */
     var cannulaHints: Boolean
         get() = read().optBoolean(KEY_CANNULA_HINTS, false)
@@ -257,6 +262,7 @@ class LearnerStore(private val preferences: Preferences) {
         const val KEY_EVAL_PENDING = "eval_pending"
         const val KEY_EVAL_LAST = "eval_last"
         const val KEY_CANNULA_HINTS = "cannula_hints"
+        const val KEY_LOW_MEAL = "low_meal_hints"
         const val KEY_SENSOR_HINTS = "sensor_hints"
         const val KEY_LAST_CARD = "last_card_at"
         const val KEY_DIR = "card_dir"

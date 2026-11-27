@@ -79,6 +79,7 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         blockName = plugin::blockName,
         onSensorHints = plugin::setSensorHints,
         onCannulaHints = plugin::setCannulaHints,
+        onLowMealHints = plugin::setLowMealHints,
         onEval = plugin::setEvalOn,
         onDigest = plugin::setDigestOn
     )
@@ -99,6 +100,7 @@ internal fun LearnerScreenContent(
     blockName: (String) -> String = { it },
     onSensorHints: (Boolean) -> Unit = {},
     onCannulaHints: (Boolean) -> Unit = {},
+    onLowMealHints: (Boolean) -> Unit = {},
     onEval: (Boolean) -> Unit = {},
     onDigest: (Boolean) -> Unit = {}
 ) {
@@ -155,6 +157,7 @@ internal fun LearnerScreenContent(
         DuraSection(status, onAcceptDura, onRefuseDura)
         SensorSection(status, onSensorHints)
         CannulaSection(status, onCannulaHints)
+        LowMealSection(status, onLowMealHints)
         EvalSection(status, onEval)
         DigestSection(status, onDigest)
 
@@ -413,6 +416,20 @@ private fun CrSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Unit
                     dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
                 )
             }
+        }
+    }
+}
+
+/** The low meal hint: the switch (off by default) and its rule. Only text, nothing is changed. */
+@Composable
+private fun LowMealSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_low_meal_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.lowMealHints, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_low_meal_rule), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

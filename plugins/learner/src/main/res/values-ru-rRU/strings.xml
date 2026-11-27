@@ -106,4 +106,7 @@
     <string name="learner_why_cr_applied">Ученик: CR, %1$s, теперь на 10 %% слабее; оценка через 3 дня.</string>
     <string name="learner_eval_label_cr">CR, %1$s</string>
     <string name="learner_switch_note_cr">Ученик: CR одного приёма еды</string>
+    <string name="learner_low_meal_title">Еда при низкой глюкозе</string>
+    <string name="learner_low_meal_rule" formatted="false">По умолчанию выключена. Если записана еда от 13 г при глюкозе ниже 4,5 — заметка «сначала быстрые углеводы». Такая еда часто всё равно заканчивается низким, с болюсом и без: еда поднимает слишком медленно. Только заметка.</string>
+    <string name="learner_why_low_meal">Ученик: еда при глюкозе ниже 4,5 — сначала 4–6 г быстрых углеводов; одна еда поднимает слишком медленно.</string>
 </resources>

@@ -102,6 +102,16 @@ class LearnerHistory(
         return Pair(change, readings)
     }
 
+    /** For the low meal hint: carb entries of the last 30 minutes with the sensor glucose at each (raw, as the family sees it). */
+    suspend fun recentCarbs(now: Long): List<MealEntry> {
+        val from = now - LowMealHintEngine.SHOW_MS
+        val bgs = persistenceLayer.getBgReadingsDataFromTimeToTime(from - 600_000L, now, true)
+        return persistenceLayer.getCarbsFromTimeToTimeExpanded(from, now, true).filter { it.amount > 0 }.map { c ->
+            val before = bgs.lastOrNull { it.timestamp <= c.timestamp && c.timestamp - it.timestamp <= 600_000L }
+            MealEntry(c.timestamp, c.amount, before?.value)
+        }
+    }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0

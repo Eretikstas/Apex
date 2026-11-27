@@ -100,6 +100,8 @@ class LearnerPlugin(
         /** The cannula hint switch (off by default) and the hint shown now. */
         val cannulaHints: Boolean = false,
         val cannulaHint: CannulaHint? = null,
+        /** The low meal hint switch (off by default). */
+        val lowMealHints: Boolean = false,
         /** The change evaluation switch (off by default), the change waiting for its verdict, and the last verdict. */
         val evalOn: Boolean = false,
         val evalPending: PendingEval? = null,
@@ -127,6 +129,7 @@ class LearnerPlugin(
                 runCatching { maybeRunPctCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: percentage card failed", it) }
                 runCatching { checkSensor() }.onFailure { aapsLogger.error(LTag.APS, "Learner: sensor hint failed", it) }
                 runCatching { checkCannula() }.onFailure { aapsLogger.error(LTag.APS, "Learner: cannula hint failed", it) }
+                runCatching { checkLowMeal() }.onFailure { aapsLogger.error(LTag.APS, "Learner: low meal hint failed", it) }
                 runCatching { checkEval() }.onFailure { aapsLogger.error(LTag.APS, "Learner: change evaluation failed", it) }
                 runCatching { maybeDigest() }.onFailure { aapsLogger.error(LTag.APS, "Learner: weekly digest failed", it) }
                 delay(TICK_MS)
@@ -438,6 +441,22 @@ class LearnerPlugin(
         refresh()
     }
 
+    /** The low meal hint (advisor, off by default, `LowMealHintEngine`): a note "fast carbs first". Only text. */
+    private suspend fun checkLowMeal() {
+        if (!store.lowMealHints) return
+        val now = dateUtil.now()
+        val at = LowMealHintEngine.check(now, history.recentCarbs(now)) ?: return
+        loopNotes.put(LoopNote(LOW_MEAL_NOTE_SOURCE, rh.gs(R.string.learner_why_low_meal), at, at + LowMealHintEngine.SHOW_MS))
+    }
+
+    /** The user's switch for the low meal hint. Off also removes its note. */
+    fun setLowMealHints(on: Boolean) {
+        store.lowMealHints = on
+        if (!on) loopNotes.clear(LOW_MEAL_NOTE_SOURCE)
+        refresh()
+        if (on) scope.launch { runCatching { checkLowMeal() }.onFailure { aapsLogger.error(LTag.APS, "Learner: low meal hint failed", it) } }
+    }
+
     /** The user's switch for the cannula hint. Off also removes a hint that is shown now. */
     fun setCannulaHints(on: Boolean) {
         store.cannulaHints = on
@@ -632,6 +651,7 @@ class LearnerPlugin(
             sensorHints = store.sensorHints,
             sensorHint = _status.value.sensorHint,
             cannulaHints = store.cannulaHints,
+            lowMealHints = store.lowMealHints,
             cannulaHint = _status.value.cannulaHint,
             evalOn = store.evalOn,
             evalPending = store.evalPending,
@@ -680,6 +700,7 @@ class LearnerPlugin(
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
         const val SENSOR_NOTE_SOURCE = "learner_sensor"
         const val CANNULA_NOTE_SOURCE = "learner_cannula"
+        const val LOW_MEAL_NOTE_SOURCE = "learner_low_meal"
         const val EVAL_NOTE_SOURCE = "learner_eval"
         const val DIGEST_NOTE_SOURCE = "learner_digest"
         const val DIGEST_EVERY_MS = 7 * 86_400_000L

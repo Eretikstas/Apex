@@ -106,4 +106,7 @@
     <string name="learner_why_cr_applied" comment="%1$s=meal block">Learner: CR of %1$s is 10 %% weaker now; it is judged in 3 days.</string>
     <string name="learner_eval_label_cr" comment="%1$s=meal block">CR %1$s</string>
     <string name="learner_switch_note_cr">Learner: CR of one meal</string>
+    <string name="learner_low_meal_title">Meal at a low glucose</string>
+    <string name="learner_low_meal_rule" formatted="false">Off by default. A meal of 13 g or more logged at a glucose under 4.5: a note "fast carbs first". Such a meal often ends low anyway, with or without a bolus, because the food lifts too slowly. Only a note.</string>
+    <string name="learner_why_low_meal">Learner: meal at a glucose under 4.5 - give 4-6 g of fast carbs first; the food alone lifts too slowly.</string>
 </resources>
