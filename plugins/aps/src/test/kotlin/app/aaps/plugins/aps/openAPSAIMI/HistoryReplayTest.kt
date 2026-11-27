@@ -2391,8 +2391,14 @@ class HistoryReplayTest {
                     }) {
                     reject("prior-hypo-rebound"); continue
                 }
-                if (priorWindow.any { it.optDouble("units", 0.0) > 0.0 || it.optDouble("man", 0.0) > 0.0 }) {
-                    reject("prior-insulin"); continue
+                val priorSmb = priorWindow.any { it.optDouble("units", 0.0) > 0.0 }
+                val priorManual = priorWindow.any { it.optDouble("man", 0.0) > 0.0 }
+                if (priorSmb || priorManual) {
+                    reject(when {
+                        priorSmb && priorManual -> "prior-smb+manual"
+                        priorSmb -> "prior-smb"
+                        else -> "prior-manual"
+                    }); continue
                 }
                 if (allWindow.any { it.optDouble("units", 0.0) > 0.0 }) {
                     reject("smb-within-6h"); continue
