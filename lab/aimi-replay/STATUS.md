@@ -2,6 +2,21 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — Pre-recalibration RGNOMEAL diagnostic (not guard acceptance)
+
+- Replay [46025386328](https://github.com/Eretikstas/Apex/actions/runs/46025386328), RUN commit `85b99609`, source `74c2ee9f`: 7/7 jobs succeeded; seed-1 `CTRL13A` PASS; no failed replay jobs.
+- The six combined `RGAPP2 + SPLITAPP + RGNOMEAL` jobs averaged (180-min window / 120-min window; <70 / <54 / >180 / CV / hypo g/day / insulin U/day):
+  - 180 min: 4.57 / 0.20 / 4.77 / 28.43 / 26.67 / 11.40.
+  - 120 min: 4.77 / 0.23 / 4.57 / 28.07 / 27.68 / 11.39.
+- Against the earlier 460221 best (4.67 / 0.17 / 4.77 / 28.20 / 26.67 / 11.36), neither window is uniformly better. This was a combined diagnostic on the pre-recalibration model; it does not select a guard setting and is not the required post-recalibration validation.
+- No app code, frozen bench branch, hints branch, phone, or Nightscout was touched.
+
+### 2026-11-27 — Step 17 LEXPL implementation committed; compile pending
+
+- Test-only commit [`cc98bd29`](https://github.com/Eretikstas/Apex/commit/cc98bd29a6d402d12fef8c9ecb59f537d2238dff) adds `LEXPL`, OFF unless explicitly tokened: one line per low episode with cause/evidence, plus stage/card passed/blocked summaries. Added pure helper tests. No learner formula, profile, or insulin-delivery logic changed.
+- Compile run [46027080361](https://github.com/Eretikstas/Apex/actions/runs/46027080361) is still in progress. No Step-17 replay has been submitted. Next: confirm compile, then run seed-1 without/with `LEXPL` under identical CAL + report-only tokens and compare all six metrics.
+
+
 ### 2026-11-27 — Step 16 LCR3 attempt 3 complete
 
 - Source commit: `f4a6c9bc5d6a02c52f54a40ebf68ad1a26ad7b5e`; RUN commit: `382554b9061755f1b0c7d22200b40a81f5d7ecf9`; replay head: `e63a48b1`; run [46023317575](https://github.com/Eretikstas/Apex/actions/runs/46023317575). All 6/6 jobs succeeded; `CTRL13A` PASS; no replay failures.
