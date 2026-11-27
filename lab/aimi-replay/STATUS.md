@@ -2,6 +2,26 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — Step 16 attempt 2 audited; attempt 3 submitted
+
+- Attempt 2 replay [45965576265](https://github.com/Eretikstas/Apex/actions/runs/45965576265), source `f051dd99`: 6/6 jobs succeeded; the no-LCR3 `CTRL13A` control exactly matched the Step-13a seed-1 reference and is PASS.
+- Metrics (BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day):
+
+| Case | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day |
+|---|---:|---:|---:|---:|---:|---:|
+| CTRL13A, no LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| CAL + LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| CRT_26.4 + LCR3 | 6.4 | 0.3 | 4.7 | 30.2 | 35.89 | 11.32 |
+| CRT_17.6 + LCR3 | 4.3 | 0.2 | 7.2 | 29.5 | 26.79 | 12.26 |
+| MEALX_0.7 + LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| TREAT_15 + LCR3 | 3.3 | 0.2 | 6.4 | 26.6 | 75.54 | 13.51 |
+
+- LCR3 audit: all five LCR3 jobs had 122 candidates, 0 accepted, 122 rejected, 0 eligible days, proposal=silent. Rejection reasons were dominated by prior-SMB (49–66), COB-min-rate (36–59), and prior-hypo-rebound (10–17); the diagnostic split also showed prior-SMB+manual (4–6), and TREAT_15 had 3 additional SMB-within-6h rejects. No planted CR direction was demonstrated. This is a screening result, not a §4a stop; do not loosen filters. `MEALX_0.7` duplicates CAL because that token is already part of CAL, so it is not an independent negative.
+- Attempt-3 commit `7fcf5d94` was cancelled before any replay job started; no run ID exists. Reuse its six-job matrix. Add `DUMPCSV` only to the no-LCR3 `CTRL13A` job to regenerate the corrected synthetic CSV artifact; keep all five LCR3 jobs unchanged.
+- Separate run [46022123724](https://github.com/Eretikstas/Apex/actions/runs/46022123724) from RUN commit `934287dc` is active (12 replay jobs; source `f4a6c9bc`, compile green). It is the MEALAUDIT/SPLITRISK diagnostic, not Step 16. The Step-16 attempt-3 dispatcher will queue behind it; no overlapping replay is started.
+- Scope: synthetic replay only. No app branch, bench build, no-insulin-hints branch, or personal data changed.
+
+
 ### 2026-11-27 — Claude: lab check of the APP rules (DONE)
 
 - Tokens (OFF unless present; CTRL13A PASS in every run with them in the code): `RGAPP` = app rebound guard
