@@ -12,6 +12,7 @@
 - No app code, frozen bench branch, hints branch, phone, or Nightscout was touched.
 
 ### 2026-11-27 — Step 17 LEXPL implementation committed; compile pending
+- Step-17 RUN commit [`3d6f1bae`](https://github.com/Eretikstas/Apex/commit/3d6f1bae1c03bd3780b37ce23654dfdbddeca329) submitted: two identical seed-1 jobs, first without `LEXPL`, second with `LEXPL`; both include `CTRL13A`. Dispatcher [46027602840](https://github.com/Eretikstas/Apex/actions/runs/46027602840) and replay workflow [46027602903](https://github.com/Eretikstas/Apex/actions/runs/46027602903) have started and are waiting on compile [46027080361](https://github.com/Eretikstas/Apex/actions/runs/46027080361). No Step-17 metrics yet.
 
 - Test-only commit [`cc98bd29`](https://github.com/Eretikstas/Apex/commit/cc98bd29a6d402d12fef8c9ecb59f537d2238dff) adds `LEXPL`, OFF unless explicitly tokened: one line per low episode with cause/evidence, plus stage/card passed/blocked summaries. Added pure helper tests. No learner formula, profile, or insulin-delivery logic changed.
 - Compile run [46027080361](https://github.com/Eretikstas/Apex/actions/runs/46027080361) is still in progress. No Step-17 replay has been submitted. Next: confirm compile, then run seed-1 without/with `LEXPL` under identical CAL + report-only tokens and compare all six metrics.
