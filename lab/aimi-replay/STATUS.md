@@ -20,14 +20,20 @@
 - Against the earlier 460221 best (4.67 / 0.17 / 4.77 / 28.20 / 26.67 / 11.36), neither window is uniformly better. This was a combined diagnostic on the pre-recalibration model; it does not select a guard setting and is not the required post-recalibration validation.
 - No app code, frozen bench branch, hints branch, phone, or Nightscout was touched.
 
-### 2026-11-27 — Step 17 LEXPL implementation committed; compile pending
-- Step-17 RUN commit [`3d6f1bae`](https://github.com/Eretikstas/Apex/commit/3d6f1bae1c03bd3780b37ce23654dfdbddeca329) submitted: two identical seed-1 jobs, first without `LEXPL`, second with `LEXPL`; both include `CTRL13A`. Dispatcher [46027602840](https://github.com/Eretikstas/Apex/actions/runs/46027602840) and replay workflow [46027602903](https://github.com/Eretikstas/Apex/actions/runs/46027602903) have started and are waiting on compile [46027080361](https://github.com/Eretikstas/Apex/actions/runs/46027080361). No Step-17 metrics yet.
+### 2026-11-27 — Step 17 LEXPL complete
 
-- Test-only commit [`cc98bd29`](https://github.com/Eretikstas/Apex/commit/cc98bd29a6d402d12fef8c9ecb59f537d2238dff) adds `LEXPL`, OFF unless explicitly tokened: one line per low episode with cause/evidence, plus stage/card passed/blocked summaries. Added pure helper tests. No learner formula, profile, or insulin-delivery logic changed.
-- Compile run [46027080361](https://github.com/Eretikstas/Apex/actions/runs/46027080361) is still in progress.
-- Compile progress: replay test-source compilation, AutoISF weight-boundary tests, replay audit helper tests (including the new LEXPL helper test), adaptation-status/dashboard tests, and APSResult wrapper tests are all PASS. FullDebug APK assembly is still running; the compile gate is not yet green.
- No Step-17 replay has been submitted. Next: confirm compile, then run seed-1 without/with `LEXPL` under identical CAL + report-only tokens and compare all six metrics.
+- Test-only source commit [`cc98bd29`](https://github.com/Eretikstas/Apex/commit/cc98bd29a6d402d12fef8c9ecb59f537d2238dff): `LEXPL` is OFF unless tokened, emits one explanation per low episode plus passed/blocked card summaries, and has pure helper tests. It changes no learner formula, profile, or insulin-delivery state.
+- Exact-source compile [46027080361](https://github.com/Eretikstas/Apex/actions/runs/46027080361) completed SUCCESS. The later public-repository privacy cleanup commit [`a1d93913`](https://github.com/Eretikstas/Apex/commit/a1d93913d9a18e613dc7fd68c6cca197685095a8) did not change replay logic; its exact compile [46044690002](https://github.com/Eretikstas/Apex/actions/runs/46044690002) also completed SUCCESS.
+- RUN commit [`3d6f1bae`](https://github.com/Eretikstas/Apex/commit/3d6f1bae1c03bd3780b37ce23654dfdbddeca329); replay [46029516923](https://github.com/Eretikstas/Apex/actions/runs/46029516923): 2/2 jobs successful, 0 replay failures. No-token and LEXPL jobs both returned exactly `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` (BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day); both `CTRL13A` controls PASS. **No-token = old numbers: PASS.**
+- LEXPL raw job log (the generated Markdown report omitted the card-summary lines, so these are taken directly from the public job log): 300 low episodes — rebound 270, SMB 18, COB-min-rate 6, ambiguous 5, other 1. Overlapping evidence: after-hypo 270, after-SMB 172, after-meal 191, after-manual 118, COB-min-rate meal 79; these evidence counts are not mutually exclusive.
+- Card screen: WATTR 0 events (2,255 clean-window and 73 other blocks); LSTAGE0 day/meal audit ran, with calibration-window and medical-procedure unavailable (0 cannula/sensor/illness/activity days, 43 minimum-rate meals, 36 untreated lows); LISF2 all four blocks silent (0 accepted; meal-hypo dominated); LCR3 silent (0/122 accepted; prior-SMB 59, COB-min-rate 43, prior-hypo-rebound 14, prior-SMB+manual 6); basal audit 43/3,960 accepted, 10 days, 9 eligible + 15 estimated hours, gate PASS; PCT 3 up / 5 down, final 80%; DURA final 0.50. Ten card summaries emitted. No learner or insulin writes.
+- Latest RUN before this step was Claude's separate v7 NIGHTT diagnostic, replay [46038542283](https://github.com/Eretikstas/Apex/actions/runs/46038542283), 7/7 successful; its result remains in Claude's Results and is not the Step-18 matrix. No app branch, frozen bench build, hints branch, phone, or Nightscout was touched.
 
+### 2026-11-27 — Step 18 pre-run definition
+
+- Current branch head at pre-run audit: `abf91644`; current `RUN.txt` was the completed Claude v7 NIGHTT batch from RUN commit `c4ec6ce8`. Latest branch CI: privacy-cleanup compile [46044690002](https://github.com/Eretikstas/Apex/actions/runs/46044690002) SUCCESS; latest replay [46044690034](https://github.com/Eretikstas/Apex/actions/runs/46044690034) completed SUCCESS. No queued or running replay was present.
+- Step-18 matrix: 18 APP-variant jobs (even-index jobs from the original Step-10 RUN commit `e997ab29`), six scenarios × seeds 1–3: CAL usual; `MEALX_0.6`; `CHGISF_1.3`; `CHGISF_1.1`; `DRIFT_2`; `NOISE_0.12`. Retain the exact APP tokens and CAL `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`; add only `LACAUSE,CRAUDIT,LSTAGE0,LISF2,LCR3,WATTR,LEXPL`. Add `CTRL13A` only to the CAL usual seed-1 control. All added audits are report-only; no app or learner formula is changed.
+- Compare all six replay metrics per job against the exact APP per-seed references in Step 10 above; collect each card's passed/blocked score from raw public job logs because the Step-17 Markdown report omitted LEXPL card lines. No personal records or real-child statistics are to be copied into public Apex.
 
 ### 2026-11-27 — Step 16 LCR3 attempt 3 complete
 
@@ -52,7 +58,7 @@
 ### 2026-11-27 — Step 16 attempt 3 DUMPCSV control check (job 0 complete)
 
 - Run [46023317575](https://github.com/Eretikstas/Apex/actions/runs/46023317575), job 0, seed-1 `CTRL13A,DUMPCSV`: completed successfully; replay summary remained exactly the Step-13a control (6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78).
-- The workflow's independent CSV validation reports `rows=16128`, `step_min=5`, `dump_insulin_u_day=11.7795`, `summary_insulin_u_day=11.7795`, `delta_pct=0.000`. This passes the one-row-per-5-minute-tick and insulin-reconciliation checks; artifact `aimi-replay-result-0` is ready. Overall six-job Step-16 run is still in progress; no Step-16 conclusion yet.
+- The workflow's independent CSV validation reports `rows=16128`, `step_min=5`, `dump_insulin_u_day=11.7795`, `summary_insulin_u_day=11.7795`, `delta_pct=0.000`. This passes the one-row-per-5-minute-tick and insulin-reconciliation checks; artifact `aimi-replay-result-0` is ready. The overall six-job Step-16 run later completed 6/6 successfully; see the Step-16 attempt-3 completion block above.
 
 
 ### Step 10 — exact APP per-seed reference recovered from public job logs
