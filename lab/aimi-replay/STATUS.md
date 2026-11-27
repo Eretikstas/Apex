@@ -2,6 +2,13 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — SHAPEAUDIT baseline RUN committed (awaiting dispatcher)
+
+- Code commit: `d83d79ca214ff03c72deeea7c6602f4a2f1814c0` (test source only). RUN commit: `b55c429b63a016367fec4cb78b3e5008242ddc53`.
+- RUN contains three APP + CAL-usual `SYNTH_56` jobs, seeds 1–3, each with `SHAPEAUDIT`; `CTRL13A` is present only on seed 1. The source jobs were copied from the usual rows of Step 18; no scenario or calibration tokens were changed.
+- At this check, neither `compile-d83d79ca.md` nor `dispatch-b55c429b.md` is published. No compile result, replay run ID, or shape score is claimed. The dispatcher is expected to gate the exact source commit before replay.
+
+
 ### 2026-11-27 — SHAPEAUDIT implementation committed (pre-run)
 
 - Test-source commit: `d83d79ca214ff03c72deeea7c6602f4a2f1814c0`; commit diff contains only `HistoryReplayTest.kt`.
