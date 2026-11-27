@@ -1,14 +1,13 @@
-# App CI run 45959414575
+# App CI run 45962443418
 
-- Link: https://github.com/Eretikstas/Apex/actions/runs/45959414575
-- Branch `claude/check-stand-45699126024-sh3epe`, commit `74eb27d9`, event `workflow_dispatch`, started 2026-11-27T07:34:42Z
-- Result: **FAILURE: driver**
+- Link: https://github.com/Eretikstas/Apex/actions/runs/45962443418
+- Branch `learner-rebound`, commit `c6b6f516`, event `workflow_dispatch`, started 2026-11-27T08:00:55Z
+- Result: **success**
 
-## Job `driver`: failure
-- Failed steps: Native Sibionics source tests (and the new SourceSensor entry), Ring overview tests (and the preference key list), Build the app
+## Job `driver`: success
 
 ## Job `emulator`: skipped
 
 ## Artifacts (download from the run page)
-- `autoisf-atc3-ring-shots` (1340 KB)
-- `autoisf-atc3-test-reports` (831 KB)
+- `autoisf-atc3-ring-shots` (2579 KB)
+- `autoisf-atc3-test-reports` (851 KB)
