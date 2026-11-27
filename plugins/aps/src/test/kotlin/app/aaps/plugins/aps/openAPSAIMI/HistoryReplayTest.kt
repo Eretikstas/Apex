@@ -879,8 +879,12 @@ class HistoryReplayTest {
         var lowsByLoop = 0; var lowsAnyway = 0; var overAvoidable = 0; var loosenScore = 0
         var guardW = if (learnG) 0.0 else guardMin.toDouble()
         // CAPX_<x>: a fixed temp basal cap on a rebound, x times the profile basal (with TEMPCAP), e.g. what a learner chose.
-        var capMult = if (learnG) 2.0 else tok("CAPX", 1.0)
-        val capOn = tempCap || learnG
+        // RGAPP: the APP's rebound guard exactly (branch learner-rebound, ReboundGuardEngine): 120 min after the last hypo
+        // treatment no SMB and the temp basal at most 1.5x the profile basal; lets go on a logged meal (from 30 min before
+        // the first treatment of the window) or at a loop (smoothed) glucose of 250 or more. Fixed, no learning.
+        val rgApp = prefsText.contains("RGAPP")
+        var capMult = if (learnG) 2.0 else if (rgApp) 1.5 else tok("CAPX", 1.0)
+        val capOn = tempCap || learnG || rgApp
         var overStreak = 0; var tighten = 0; var loosen = 0
         // Eva changes (CHG_<day>): from that day insulin acts CHGISF_<x> as strongly, the liver answers a low CHGKCR_<x> times.
         val chgDay = tok("CHG", 9999.0).toInt()
@@ -990,6 +994,13 @@ class HistoryReplayTest {
         val splitAbs = prefsText.contains("SPLITABS")
         var lastDev = 0.0; var devStreak = 0
         val splits = ArrayList<Split>(); var nSplit = 0; var nSplitGiven = 0; var nSplitDrop = 0
+        // SPLITAPP: the APP's split meal bolus exactly (branch learner-split, SplitBolusEngine): a meal of 13 g or more
+        // marked fast (right 85 % of the time) gets the whole dose now, any other 60 % of the whole calculator dose now
+        // (SPLITAPPSLOW: 50 %, dropped after 180 min). The rest is checked every loop run from 20 min: covered when the SMB
+        // since the meal reach it; dropped after 90 min; waits under 4.5 or while the smoothed glucose fell over 15 min;
+        // given at 5.5 or more with a 15 min rise of 9 mg/dL or more, or a deviation of 2 or more.
+        val splitApp = prefsText.contains("SPLITAPP"); val splitAppSlow = prefsText.contains("SPLITAPPSLOW")
+        val appSplits = ArrayList<Split>(); var nSplitCovered = 0; var nRgHold = 0
         var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
         // CHAIN_<pct>: a meal within 3 h after a hypo treatment gets only <pct> % of its meal part now (default 50); the rest
         // waits as a split part (seen rise, from SPLITMIN, dropped after 120 min). Breaks "low -> meal bolus -> low".
@@ -1823,7 +1834,16 @@ class HistoryReplayTest {
                     // SPLITTYPE: the family marks the meal fast or slow in the calculator (right 85 % of the time);
                     // a fast meal gets the whole bolus now, only a slow one is split.
                     val markedFast = splitType && (if (markRnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0)
-                    if (afterHypo) {
+                    if (splitApp && ml.logged >= 13.0) {
+                        val total = Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05
+                        val fastMark = if (markRnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0
+                        val share = if (fastMark) 1.0 else if (splitAppSlow) 0.5 else 0.6
+                        val first = Math.floor(total * share / 0.05 + 1e-9) * 0.05
+                        giveBolus(t, first)
+                        if (total - first >= 0.05) {
+                            appSplits.add(Split(t, total - first, chain.ownSmb.sumOf { it.second }, if (splitAppSlow) 180L else 90L)); nSplit++
+                        }
+                    } else if (afterHypo) {
                         // CHAIN: after a recent hypo treatment only chainP of the meal part now, the rest on a seen rise.
                         val nowP = minOf(chainP, splitP)
                         val now1 = maxOf(wiz - ml.logged / icM * (1 - nowP), 0.0)
@@ -1941,6 +1961,19 @@ class HistoryReplayTest {
                         break
                     }
                 }
+                // SPLITAPP: the rest of a split meal bolus, decided like the app (see the token above).
+                if (splitApp && gs != null) appSplits.removeAll { sp ->
+                    val m = (t - sp.t) / minute
+                    val rest = Math.floor((sp.u - (chain.ownSmb.sumOf { it.second } - sp.smb0)) / 0.05 + 1e-9) * 0.05
+                    val delta15 = gs.shortAvgDelta * 3
+                    when {
+                        rest < 0.05 -> { nSplitCovered++; true }
+                        m > sp.maxMin -> { nSplitDrop++; true }
+                        m < 20 || gs.glucose < 81.0 || delta15 < 0.0 -> false
+                        gs.glucose >= 99.0 && (delta15 >= 9.0 || lastDev >= 2.0) -> { giveBolus(t, rest); nSplitGiven++; true }
+                        else -> false
+                    }
+                }
                 logged.removeAll { t - it.t > 6 * 3_600_000L || it.left <= 0.0 }
                 lastLoopBg = gs?.glucose
                 val tick = JSONObject().put("t", t)
@@ -1970,6 +2003,11 @@ class HistoryReplayTest {
                         if (meal) episodes.lastOrNull()?.meal = true
                         if (!meal && !strongRise && !release) guardHold = true
                         else if (release && !meal && !strongRise) episodes.lastOrNull()?.takeIf { !it.done && !it.released }?.let { it.released = true; releases++ }
+                    }
+                    if (rgApp && t - lastTreat < 120 * minute) {
+                        val first = treatTimes.filter { t - it < 120 * minute }.minOrNull() ?: lastTreat
+                        val meal = allLogged.any { it.t >= first - 30 * minute && it.t <= t && treatTimes.binarySearch(it.t) < 0 }
+                        if (!meal && gs.glucose < 250.0) { guardHold = true; nRgHold++ }
                     }
                 }
                 val noisy = noiseGuard && readV.size > 16 && t - readT[readT.size - 16] <= 20 * minute && (readV.size - 15 until readV.size).sumOf { Math.abs(readV[it] - 2 * readV[it - 1] + readV[it - 2]) } / 15.0 > noiseThr
@@ -2476,6 +2514,7 @@ class HistoryReplayTest {
             crBlockVerdict()
         }
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, unlogged meals $nUnlog, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
+        if (rgApp || splitApp) println("AIMI replay: app rules: rebound guard held $nRgHold loop runs; app split $nSplit, rest given $nSplitGiven, covered by SMB $nSplitCovered, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
         if (noiseGuard) println("AIMI replay: NOISEGUARD noisy ${noisyMin / 60} h")
