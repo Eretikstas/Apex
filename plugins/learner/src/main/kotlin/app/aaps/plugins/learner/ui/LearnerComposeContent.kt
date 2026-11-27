@@ -38,6 +38,8 @@ import app.aaps.plugins.learner.BasalChange
 import app.aaps.plugins.learner.LearnerPlugin.Status
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin
+import app.aaps.plugins.learner.EvalStats
+import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.R
 import app.aaps.plugins.learner.SensorHintKind
 
@@ -72,7 +74,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onAcceptPct = plugin::acceptPct,
         onRefusePct = plugin::refusePct,
         onSensorHints = plugin::setSensorHints,
-        onCannulaHints = plugin::setCannulaHints
+        onCannulaHints = plugin::setCannulaHints,
+        onEval = plugin::setEvalOn
     )
 }
 
@@ -87,7 +90,8 @@ internal fun LearnerScreenContent(
     onAcceptPct: () -> Unit = {},
     onRefusePct: () -> Unit = {},
     onSensorHints: (Boolean) -> Unit = {},
-    onCannulaHints: (Boolean) -> Unit = {}
+    onCannulaHints: (Boolean) -> Unit = {},
+    onEval: (Boolean) -> Unit = {}
 ) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
@@ -141,6 +145,7 @@ internal fun LearnerScreenContent(
         DuraSection(status, onAcceptDura, onRefuseDura)
         SensorSection(status, onSensorHints)
         CannulaSection(status, onCannulaHints)
+        EvalSection(status, onEval)
 
         if (status.hours.isNotEmpty()) {
             Text(stringResource(R.string.learner_hours_title), style = MaterialTheme.typography.titleMedium)
@@ -281,4 +286,54 @@ private fun CannulaSection(status: Status, onSwitch: (Boolean) -> Unit) {
             }
         }
     }
+}
+
+/** The change evaluation: the switch (off by default), its rule, a change waiting for its verdict, and the last verdict. */
+@Composable
+private fun EvalSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_eval_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.evalOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_eval_rule), style = MaterialTheme.typography.bodySmall)
+            if (!status.evalOn) return@Column
+            status.evalPending?.let { p ->
+                Text(
+                    stringResource(R.string.learner_eval_pending, p.label, dateUtil.dateAndTimeString(p.at), dateUtil.dateAndTimeString(p.at + 3 * 86_400_000L)),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (p.warned) Text(stringResource(R.string.learner_eval_warned), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            }
+            status.lastEval?.let { d ->
+                Text(
+                    stringResource(
+                        R.string.learner_eval_done, d.label, dateUtil.dateAndTimeString(d.at),
+                        stringResource(
+                            when {
+                                d.eval.rollback                            -> R.string.learner_eval_verdict_rollback
+                                d.eval.verdict == EvalVerdict.BETTER       -> R.string.learner_eval_verdict_better
+                                d.eval.verdict == EvalVerdict.WORSE        -> R.string.learner_eval_verdict_worse
+                                d.eval.verdict == EvalVerdict.SAME         -> R.string.learner_eval_verdict_same
+                                else                                       -> R.string.learner_eval_verdict_no_data
+                            }
+                        )
+                    ),
+                    fontWeight = FontWeight.SemiBold
+                )
+                StatsLine(R.string.learner_eval_before, d.eval.before)
+                StatsLine(R.string.learner_eval_after, d.eval.after)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsLine(label: Int, s: EvalStats) {
+    Text(
+        stringResource(R.string.learner_eval_stats, stringResource(label), s.low39Pct, s.low30Pct, s.high10Pct, s.cvPct, s.minMgdl / 18.0),
+        style = MaterialTheme.typography.bodySmall
+    )
 }

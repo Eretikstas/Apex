@@ -10,6 +10,12 @@ data class BasalProposal(val profileName: String, val madeAt: Long, val changes:
 /** A proposal of the percentage card: the profile percentage now, the one proposed, and what the card saw. */
 data class PctProposal(val from: Int, val to: Int, val madeAt: Long, val highPct: Double, val lowPct: Double)
 
+/** A change waiting for its verdict: [label] says what changed, [warned] = the early rollback note was given. */
+data class PendingEval(val label: String, val at: Long, val before: EvalStats, val warned: Boolean = false)
+
+/** A change with its verdict. */
+data class DoneEval(val label: String, val at: Long, val judgedAt: Long, val eval: ChangeEval)
+
 /** A proposal for the AutoISF weight dura: the weight now, the weight proposed, and what the card saw. */
 data class DuraProposal(val from: Double, val to: Double, val madeAt: Long, val flatHighPct: Double, val lowPct: Double)
 
@@ -151,8 +157,50 @@ class LearnerStore(private val preferences: Preferences) {
         get() = read().optBoolean(KEY_CANNULA_HINTS, false)
         set(value) = edit { put(KEY_CANNULA_HINTS, value) }
 
+    /** The change evaluation is shown (the user's switch). Off by default; the numbers are kept also when it is off. */
+    var evalOn: Boolean
+        get() = read().optBoolean(KEY_EVAL_ON, false)
+        set(value) = edit { put(KEY_EVAL_ON, value) }
+
+    /** A change waiting for its 3 day verdict: what it was, when, and the numbers of the 3 days before it. */
+    var evalPending: PendingEval?
+        get() = read().optJSONObject(KEY_EVAL_PENDING)?.let { o ->
+            runCatching { PendingEval(o.getString("label"), o.getLong("at"), statsOf(o.getJSONObject("before")), o.optBoolean("warned", false)) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_EVAL_PENDING)
+            else put(KEY_EVAL_PENDING, JSONObject().put("label", value.label).put("at", value.at).put("before", json(value.before)).put("warned", value.warned))
+        }
+
+    /** The last verdict. */
+    var lastEval: DoneEval?
+        get() = read().optJSONObject(KEY_EVAL_LAST)?.let { o ->
+            runCatching {
+                DoneEval(
+                    o.getString("label"), o.getLong("at"), o.getLong("judgedAt"),
+                    ChangeEval(statsOf(o.getJSONObject("before")), statsOf(o.getJSONObject("after")), EvalVerdict.valueOf(o.getString("verdict")), o.getBoolean("rollback"))
+                )
+            }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_EVAL_LAST)
+            else put(
+                KEY_EVAL_LAST, JSONObject().put("label", value.label).put("at", value.at).put("judgedAt", value.judgedAt)
+                    .put("before", json(value.eval.before)).put("after", json(value.eval.after))
+                    .put("verdict", value.eval.verdict.name).put("rollback", value.eval.rollback)
+            )
+        }
+
+    private fun json(s: EvalStats) = JSONObject().put("l39", s.low39Pct).put("l30", s.low30Pct).put("h10", s.high10Pct)
+        .put("cv", s.cvPct).put("min", s.minMgdl).put("n", s.readings)
+
+    private fun statsOf(o: JSONObject) = EvalStats(o.getDouble("l39"), o.getDouble("l30"), o.getDouble("h10"), o.getDouble("cv"), o.getDouble("min"), o.getInt("n"))
+
     private companion object {
 
+        const val KEY_EVAL_ON = "eval_on"
+        const val KEY_EVAL_PENDING = "eval_pending"
+        const val KEY_EVAL_LAST = "eval_last"
         const val KEY_CANNULA_HINTS = "cannula_hints"
         const val KEY_SENSOR_HINTS = "sensor_hints"
         const val KEY_LAST_CARD = "last_card_at"

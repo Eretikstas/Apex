@@ -97,12 +97,17 @@ class LearnerPlugin(
         /** The cannula hint switch (off by default) and the hint shown now. */
         val cannulaHints: Boolean = false,
         val cannulaHint: CannulaHint? = null,
+        /** The change evaluation switch (off by default), the change waiting for its verdict, and the last verdict. */
+        val evalOn: Boolean = false,
+        val evalPending: PendingEval? = null,
+        val lastEval: DoneEval? = null,
     )
 
     private val store = LearnerStore(prefs)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
     private val applying = AtomicBoolean(false)
+    @Volatile private var lastRollbackCheck = 0L
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
 
@@ -116,6 +121,7 @@ class LearnerPlugin(
                 runCatching { maybeRunPctCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: percentage card failed", it) }
                 runCatching { checkSensor() }.onFailure { aapsLogger.error(LTag.APS, "Learner: sensor hint failed", it) }
                 runCatching { checkCannula() }.onFailure { aapsLogger.error(LTag.APS, "Learner: cannula hint failed", it) }
+                runCatching { checkEval() }.onFailure { aapsLogger.error(LTag.APS, "Learner: change evaluation failed", it) }
                 delay(TICK_MS)
             }
         }
@@ -236,6 +242,7 @@ class LearnerPlugin(
         ) else null
         store.proposal = null
         store.lastAppliedAt = now
+        startEval(rh.gs(R.string.learner_eval_label_basal, proposal.changes.size), now)
         note(rh.gs(R.string.learner_why_applied, proposal.changes.size), now, NOTE_LONG_MS)
         aapsLogger.debug(LTag.APS, "Learner: basal proposal applied to ${proposal.profileName} at $percentage %, switch=${switch != null}")
         finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
@@ -251,6 +258,7 @@ class LearnerPlugin(
         }
         prefs.put(DoubleKey.ApsAutoIsfDuraWeight, p.to)
         store.lastAppliedAt = dateUtil.now()
+        scope.launch { runCatching { startEval(rh.gs(R.string.learner_eval_label_dura, p.from, p.to), dateUtil.now()) } }
         note(rh.gs(R.string.learner_why_dura_applied, p.from, p.to), dateUtil.now(), NOTE_LONG_MS)
         aapsLogger.debug(LTag.APS, "Learner: dura ${p.from} -> ${p.to} applied")
         refresh(rh.gs(R.string.learner_dura_applied))
@@ -327,6 +335,61 @@ class LearnerPlugin(
         _status.value = _status.value.copy(cannulaHint = hint)
     }
 
+    /** A change was applied with "Внести": keep the numbers of the 3 days before it for the verdict 3 days later. */
+    private suspend fun startEval(label: String, now: Long) {
+        val before = ChangeEvalEngine.stats(history.steps(now, ChangeEvalEngine.DAYS))
+        store.evalPending = PendingEval(label, now, before)
+        aapsLogger.debug(LTag.APS, "Learner: evaluation started for $label, before $before")
+        refresh()
+    }
+
+    /**
+     * The change evaluation (advisor, `ChangeEvalEngine`): 3 days after a change applied with "Внести" a verdict in the
+     * overview "why" and on the learner screen. Before that, once an hour, the rollback rule (under 3.0 over 1 % two days
+     * in a row, or under 2.5) gives an early note "check whether to undo it". Nothing is undone by the learner.
+     */
+    private suspend fun checkEval() {
+        val pending = store.evalPending ?: return
+        val now = dateUtil.now()
+        val due = now - pending.at >= ChangeEvalEngine.DAYS * ChangeEvalEngine.DAY_MS
+        if (!due && (pending.warned || now - lastRollbackCheck < HOUR_MS)) return
+        lastRollbackCheck = now
+        val days = ((now - pending.at) / ChangeEvalEngine.DAY_MS + 1).toInt().coerceIn(1, ChangeEvalEngine.DAYS)
+        val after = history.steps(now, days)
+        if (!due) {
+            if (ChangeEvalEngine.rollback(pending.at, after, now)) {
+                store.evalPending = pending.copy(warned = true)
+                if (store.evalOn) note(rh.gs(R.string.learner_why_eval_rollback, pending.label), now, NOTE_LONG_MS, EVAL_NOTE_SOURCE)
+                aapsLogger.debug(LTag.APS, "Learner: rollback rule hit early for ${pending.label}")
+                refresh()
+            }
+            return
+        }
+        val eval = ChangeEvalEngine.evaluate(pending.before, after, pending.at, now)
+        store.lastEval = DoneEval(pending.label, pending.at, now, eval)
+        store.evalPending = null
+        aapsLogger.debug(LTag.APS, "Learner: evaluation of ${pending.label}: $eval")
+        if (store.evalOn) note(verdictText(pending.label, eval), now, NOTE_LONG_MS, EVAL_NOTE_SOURCE)
+        refresh()
+    }
+
+    private fun verdictText(label: String, e: ChangeEval) = rh.gs(
+        when {
+            e.rollback                                -> R.string.learner_why_eval_rollback
+            e.verdict == EvalVerdict.BETTER           -> R.string.learner_why_eval_better
+            e.verdict == EvalVerdict.WORSE            -> R.string.learner_why_eval_worse
+            e.verdict == EvalVerdict.SAME             -> R.string.learner_why_eval_same
+            else                                      -> R.string.learner_why_eval_no_data
+        }, label
+    )
+
+    /** The user's switch for the change evaluation. Off also removes its note. */
+    fun setEvalOn(on: Boolean) {
+        store.evalOn = on
+        if (!on) loopNotes.clear(EVAL_NOTE_SOURCE)
+        refresh()
+    }
+
     /** The user's switch for the cannula hint. Off also removes a hint that is shown now. */
     fun setCannulaHints(on: Boolean) {
         store.cannulaHints = on
@@ -377,6 +440,7 @@ class LearnerPlugin(
                 store.pctProposal = null
                 if (switch != null) {
                     store.lastPctAppliedAt = now
+                    startEval(rh.gs(R.string.learner_eval_label_pct, p.from, p.to), now)
                     note(rh.gs(R.string.learner_why_pct_applied, p.from, p.to), now, NOTE_LONG_MS)
                 }
                 aapsLogger.debug(LTag.APS, "Learner: percentage ${p.from} -> ${p.to}, switch=${switch != null}")
@@ -420,7 +484,7 @@ class LearnerPlugin(
     }
 
     /** A line for the "why" of the overview (one learner line at a time). */
-    private fun note(text: String, now: Long, keepMs: Long) = loopNotes.put(LoopNote(NOTE_SOURCE, text, now, now + keepMs))
+    private fun note(text: String, now: Long, keepMs: Long, source: String = NOTE_SOURCE) = loopNotes.put(LoopNote(source, text, now, now + keepMs))
 
     private fun refresh(message: String = "") {
         val last = store.lastCardAt
@@ -449,6 +513,9 @@ class LearnerPlugin(
             sensorHint = _status.value.sensorHint,
             cannulaHints = store.cannulaHints,
             cannulaHint = _status.value.cannulaHint,
+            evalOn = store.evalOn,
+            evalPending = store.evalPending,
+            lastEval = store.lastEval,
         )
     }
 
@@ -491,6 +558,7 @@ class LearnerPlugin(
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
         const val SENSOR_NOTE_SOURCE = "learner_sensor"
         const val CANNULA_NOTE_SOURCE = "learner_cannula"
+        const val EVAL_NOTE_SOURCE = "learner_eval"
         const val MGDL_PER_MMOL = 18.0
     }
 }

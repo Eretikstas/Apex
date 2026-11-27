@@ -31,8 +31,13 @@ import app.aaps.core.ui.compose.LocalProfileUtil
 import app.aaps.plugins.learner.BasalChange
 import app.aaps.plugins.learner.BasalProposal
 import app.aaps.plugins.learner.CannulaHint
+import app.aaps.plugins.learner.ChangeEval
+import app.aaps.plugins.learner.DoneEval
 import app.aaps.plugins.learner.DuraProposal
+import app.aaps.plugins.learner.EvalStats
+import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.PctProposal
+import app.aaps.plugins.learner.PendingEval
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin.Status
@@ -125,6 +130,18 @@ class LearnerScreenshotTest {
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
             sensorHints = true, sensorHint = SensorHint(SensorHintKind.JUMP, NOW - 10 * HOUR, NOW - 10 * 60_000L, 54.0, 81.0),
             cannulaHints = true, cannulaHint = CannulaHint(66.0, 47.0))
+    )
+
+    @Test
+    fun changeEval() = shoot(
+        "learner_change_eval",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            evalOn = true,
+            evalPending = PendingEval("dura 0.50 -> 0.75", NOW - DAY, EvalStats(5.1, 0.4, 9.0, 31.0, 55.0, 864)),
+            lastEval = DoneEval(
+                "percentage 100 -> 90 %", NOW - 5 * DAY, NOW - 2 * DAY,
+                ChangeEval(EvalStats(6.2, 0.8, 7.5, 33.0, 50.0, 864), EvalStats(4.1, 0.3, 8.0, 30.0, 59.0, 864), EvalVerdict.BETTER, false)
+            ))
     )
 
     private fun shoot(name: String, status: Status) {

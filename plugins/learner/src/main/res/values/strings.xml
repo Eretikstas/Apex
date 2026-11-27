@@ -66,4 +66,25 @@
     <string name="learner_cannula_rule" formatted="false">Off by default. A cannula of 60 hours or more and 40 % or more of the last 6 hours over 10 mmol/L: probably the cannula, consider a change. Only a note, nothing is changed. Rule from the real data: with an old cannula such hours were 3 to 5 times more often.</string>
     <string name="learner_cannula_now" comment="%1$.0f=cannula age in hours, %2$.0f=share over 10 mmol/L in the last 6 hours, percent">Cannula %1$.0f h, over 10 for %2$.0f %% of the last 6 h.</string>
     <string name="learner_why_cannula" comment="%1$.0f=cannula age in hours, %2$.0f=share over 10 mmol/L in the last 6 hours, percent">Learner: cannula %1$.0f h and over 10 for %2$.0f %% of 6 h - probably the cannula, consider a change.</string>
+    <string name="learner_eval_title">Change evaluation</string>
+    <string name="learner_eval_rule" formatted="false">Off by default. A change applied with the learner's "Apply" is judged 3 days later against the 3 days before it. Worse: under 3.9 up by 1.5 points or more, or under 3.0 up by 0.5 or more. Better: fewer lows (or 3 points fewer over 10) without more lows and swings. Rollback rule: under 3.0 more than 1 % two days in a row, or a value under 2.5 -> "check whether to undo it". Nothing is undone by itself. Days with a cannula failure, a new sensor or illness are not left out: judge them yourself.</string>
+    <string name="learner_eval_label_basal" comment="%1$d=number of hours changed">basal, %1$d h</string>
+    <string name="learner_eval_label_dura" comment="%1$.2f=old weight, %2$.2f=new weight">dura %1$.2f -> %2$.2f</string>
+    <string name="learner_eval_label_pct" comment="%1$d=old percentage, %2$d=new percentage">percentage %1$d -> %2$d %%</string>
+    <string name="learner_eval_pending" comment="%1$s=what changed, %2$s=when, %3$s=when the verdict comes">Waiting: %1$s, applied %2$s, verdict %3$s.</string>
+    <string name="learner_eval_warned">The rollback rule was hit already: check whether to undo the change.</string>
+    <string name="learner_eval_done" comment="%1$s=what changed, %2$s=when, %3$s=verdict">Last: %1$s (%2$s): %3$s</string>
+    <string name="learner_eval_verdict_better">better</string>
+    <string name="learner_eval_verdict_same">no clear difference</string>
+    <string name="learner_eval_verdict_worse">worse</string>
+    <string name="learner_eval_verdict_rollback">rollback rule hit, check whether to undo it</string>
+    <string name="learner_eval_verdict_no_data">not enough data</string>
+    <string name="learner_eval_before">Before</string>
+    <string name="learner_eval_after">After</string>
+    <string name="learner_eval_stats" comment="%1$s=Before or After, %2$.1f=under 3.9 percent, %3$.1f=under 3.0 percent, %4$.1f=over 10 percent, %5$.0f=CV percent, %6$.1f=lowest value mmol/L">%1$s: under 3.9 %2$.1f %%, under 3.0 %3$.1f %%, over 10 %4$.1f %%, CV %5$.0f %%, lowest %6$.1f</string>
+    <string name="learner_why_eval_better" comment="%1$s=what changed">Learner: 3 days after %1$s - better.</string>
+    <string name="learner_why_eval_same" comment="%1$s=what changed">Learner: 3 days after %1$s - no clear difference.</string>
+    <string name="learner_why_eval_worse" comment="%1$s=what changed">Learner: 3 days after %1$s - worse; check whether to undo it.</string>
+    <string name="learner_why_eval_rollback" comment="%1$s=what changed">Learner: after %1$s the rollback rule was hit (lows); check whether to undo it.</string>
+    <string name="learner_why_eval_no_data" comment="%1$s=what changed">Learner: 3 days after %1$s - not enough data for a verdict.</string>
 </resources>
