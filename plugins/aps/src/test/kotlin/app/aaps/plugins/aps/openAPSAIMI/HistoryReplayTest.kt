@@ -962,6 +962,9 @@ class HistoryReplayTest {
         // sum at start), the CR becomes icP / (1 + k * (r - 1)), kept within 0.75-1.25 of icP; both ways.
         val basalStart = profBasal.sum(); var icNow = icP; val learnCr = tok("LEARNCR", 0.0)
         val targetP = prof?.optDouble("target", cfg.getDouble("profTarget")) ?: cfg.getDouble("profTarget")
+        // NIGHTT_<mg/dL>: the LOOP's target from 21:00 to 06:00 (the wizard keeps the profile target), e.g. a night
+        // temporary target. Real data 27.11: nights with glucose 7-8 at 22:00 had fewer night lows than under 7.
+        val nightT = tok("NIGHTT", 0.0)
         val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / tok("CRT", cfg.getDouble("crTrue"))
         val peak = cfg.getDouble("peak"); val dia = cfg.getDouble("dia")
         val t0 = cfg.getLong("t0")
@@ -2060,7 +2063,7 @@ class HistoryReplayTest {
                 logged.removeAll { t - it.t > 6 * 3_600_000L || it.left <= 0.0 }
                 lastLoopBg = gs?.glucose
                 val tick = JSONObject().put("t", t)
-                    .put("prof", JSONObject().put("basal", profBasal[h]).put("isf", isfP).put("ic", icNow).put("target", targetP).put("peak", peak).put("dia", dia))
+                    .put("prof", JSONObject().put("basal", profBasal[h]).put("isf", isfP).put("ic", icNow).put("target", if (nightT > 0.0 && (h >= 21 || h < 6)) nightT else targetP).put("peak", peak).put("dia", dia))
                     .put("tt", JSONObject.NULL).put("aaps", JSONObject())
                     .put("cob", logged.sumOf { it.left })
                     .put("carbs3h", logged.filter { t - it.t <= 3 * 3_600_000L }.sumOf { it.g })
