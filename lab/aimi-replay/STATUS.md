@@ -2,14 +2,31 @@
 
 ## Task (written by ChatGPT)
 
-### Step 16 — LCR3 corrected-causal-filter rerun submitted (2026-11-27)
+### Step 16 — LCR3 attempt 3 submitted (2026-11-27)
 
-- Attempt 1 is a real screening failure, not an infrastructure failure: replay `45902096158` ran 6/6 jobs; CAL and TREAT_15 incorrectly proposed CR+, CRT_17.6 proposed CR+, CRT_26.4 stayed silent. CTRL13A numeric reference matched. Exact metrics and audit counts are preserved below.
-- Root cause recorded by the user: missing causal exclusions. Corrected source `c9ee2b34d21ac2b9daefefe37f7d636e5a366e35` compiled green in workflow `45905908416` (all test steps and FullDebug APK assembly/upload green).
-- Re-submitted the existing six-job Step-16 matrix by RUN commit `a4c4de271e0a83fdd34fcc4b33a1a273928801e6`; dispatcher/replay is pending. Matrix includes CTRL13A without LCR3, CAL, CRT_26.4, CRT_17.6, MEALX_0.7 (known duplicate of CAL), and TREAT_15.
-- Required screening outcome: CAL and TREAT_15 silent; CRT_17.6 CR+; CTRL13A PASS. Also inspect CRT_26.4 direction, noting that it is ±20% rather than a proven curriculum step. Maximum three attempts; after that record the result and proceed.
-- Bench branch `autoisf-atc3` is frozen at `6f578b5b`; no app code will be pushed there. Upcoming REBOUND GUARD and no-insulin hints go only on a new branch `learner-rebound` from that frozen head.
+- Attempt 1 replay `45902096158`: 6/6 jobs succeeded, but LCR3 screening failed: CAL and TREAT_15 proposed CR+; see the detailed attempt-1 table below.
+- Attempt 2 RUN commit `a4c4de27`, dispatcher/replay `45957311944`: all 6/6 replay jobs succeeded, 16,128 ticks each, 0 failed ticks. The no-LCR3 `CTRL13A` control exactly matched `6.0/0.5/5.7/29.7/33.21/11.78` and is PASS.
+- Attempt-2 metrics (BG <70 / BG <54 / BG >180 / CV / hypo g/day / insulin U/day), reconstructed from all six completed public job logs because `run-45957311944.md` is not yet present (the report job remains in progress):
 
+| Case | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day | LCR3 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| CTRL13A, no LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 | control PASS |
+| CAL + LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 | silent; 0/122 accepted |
+| CRT_26.4 + LCR3 | 6.4 | 0.3 | 4.7 | 30.2 | 35.89 | 11.32 | silent; 0/122 accepted |
+| CRT_17.6 + LCR3 | 4.3 | 0.2 | 7.2 | 29.5 | 26.79 | 12.26 | silent; 0/122 accepted |
+| MEALX_0.7 + LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 | silent; 0/122 accepted; duplicate CAL |
+| TREAT_15 + LCR3 | 3.3 | 0.2 | 6.4 | 26.6 | 75.54 | 13.51 | silent; 0/122 accepted |
+
+- LCR3 audit rejection counts in attempt 2:
+  - CAL: prior-insulin 65, COB minimum-rate 43, prior hypo/rebound 14.
+  - CRT_26.4: COB minimum-rate 59, prior-insulin 53, prior hypo/rebound 10.
+  - CRT_17.6: prior-insulin 72, COB minimum-rate 36, prior hypo/rebound 14.
+  - MEALX_0.7 duplicate: prior-insulin 65, COB minimum-rate 43, prior hypo/rebound 14.
+  - TREAT_15: prior-insulin 62, COB minimum-rate 40, prior hypo/rebound 17, SMB within 6 h 3.
+- Attempt 2 is a real screening failure (no accepted observations; no planted direction demonstrated), not a replay/infrastructure failure. It is NOT a §4a stop: candidate screening failures are results, and the CTRL13A control passed. MEALX_0.7 is not an independent negative because it is already part of CAL.
+- Procedure mismatch found: RUN.txt's comment said diagnostic source `f051dd99`, but dispatcher `dispatch-a4c4de27.md` records code commit `0dc64d56`. The six job logs confirm the old combined `prior-insulin` reason, so attempt 2 did not run the diagnostic split. Commit `f051dd99` (split prior-SMB vs prior-manual rejection reasons) was created at 07:29:31 UTC, after the attempt-2 replay jobs had completed around 07:23 UTC.
+- Attempt 3 now uses the same six-job matrix, with a new RUN commit created AFTER `f051dd99`; the dispatcher must compile that exact source before replay. This is the third and final attempt for Step 16. After its result, record the screen and proceed to Step 17 unless a §4a stop occurs.
+- Bench branch `autoisf-atc3` remains frozen at `6f578b5b`; no app code is pushed there.
 
 ### Handoff §13 re-audit — corrected result files (2026-11-26)
 
