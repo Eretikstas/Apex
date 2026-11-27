@@ -61,7 +61,7 @@
 
 - LCR3 audit: all five LCR3 jobs had 122 candidates, 0 accepted, 122 rejected, 0 eligible days, proposal=silent. Rejection reasons were dominated by prior-SMB (49–66), COB-min-rate (36–59), and prior-hypo-rebound (10–17); the diagnostic split also showed prior-SMB+manual (4–6), and TREAT_15 had 3 additional SMB-within-6h rejects. No planted CR direction was demonstrated. This is a screening result, not a §4a stop; do not loosen filters. `MEALX_0.7` duplicates CAL because that token is already part of CAL, so it is not an independent negative.
 - Attempt-3 commit `7fcf5d94` was cancelled before any replay job started; no run ID exists. Reuse its six-job matrix. Add `DUMPCSV` only to the no-LCR3 `CTRL13A` job to regenerate the corrected synthetic CSV artifact; keep all five LCR3 jobs unchanged.
-- Separate run [46022123724](https://github.com/Eretikstas/Apex/actions/runs/46022123724) from RUN commit `934287dc` is active (12 replay jobs; source `f4a6c9bc`, compile green). It is the MEALAUDIT/SPLITRISK diagnostic, not Step 16. The Step-16 attempt-3 dispatcher will queue behind it; no overlapping replay is started.
+- Separate MEALAUDIT/SPLITRISK run [46022123724](https://github.com/Eretikstas/Apex/actions/runs/46022123724) completed 12/12 successfully with its control PASS. The Step-16 attempt-3 dispatcher then started replay [46023317575](https://github.com/Eretikstas/Apex/actions/runs/46023317575): 6 jobs, source `f4a6c9bc`, compile green; replay is in progress and no result is claimed yet.
 - Scope: synthetic replay only. No app branch, bench build, no-insulin-hints branch, or personal data changed.
 
 
