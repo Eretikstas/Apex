@@ -159,6 +159,10 @@ class LearnerHistory(
         return Triple(carbs, newest?.second, delta)
     }
 
+    /** SMB given from [from] to [now], units. */
+    suspend fun smbSince(from: Long, now: Long): Double =
+        persistenceLayer.getBolusesFromTimeToTime(from, now, true).filter { it.type == BS.Type.SMB }.sumOf { it.amount }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0

@@ -379,6 +379,25 @@ class LearnerStore(private val preferences: Preferences) {
     private companion object {
 
         const val KEY_REBOUND_ON = "rebound_on"
+    /** The split bolus may be used (the user's switch, asked before it is turned on). Off by default. */
+    var splitOn: Boolean
+        get() = read().optBoolean(KEY_SPLIT_ON, false)
+        set(value) = edit { put(KEY_SPLIT_ON, value) }
+
+    /** A split meal waiting for its rest. */
+    var splitPlan: SplitPlan?
+        get() = read().optJSONObject(KEY_SPLIT)?.let { o ->
+            runCatching { SplitPlan(o.getLong("at"), MealType.valueOf(o.getString("type")), o.getDouble("total"), o.getDouble("first"), o.optDouble("carbs", 0.0)) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_SPLIT)
+            else put(KEY_SPLIT, JSONObject().put("at", value.madeAt).put("type", value.type.name).put("total", value.totalU).put("first", value.firstU).put("carbs", value.carbsG))
+        }
+
+    private companion object {
+
+        const val KEY_SPLIT_ON = "split_on"
+        const val KEY_SPLIT = "split_plan"
 
         const val KEY_LAST_CARD = "last_card_at"
         const val KEY_DIR = "card_dir"

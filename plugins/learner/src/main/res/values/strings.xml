@@ -157,4 +157,28 @@
     <string name="learner_guard_basal_reason" comment="%1$.2f=highest temp basal in U/h">Learner: rebound guard, temp basal at most %1$.2f U/h</string>
     <string name="learner_guard_percent_reason" comment="%1$d=highest temp basal in percent">Learner: rebound guard, temp basal at most %1$d %%</string>
     <string name="learner_why_guard" comment="%1$s=time the guard ends">Learner: after the hypo treatment no SMB and a lower temp basal until %1$s (rebound guard).</string>
+    <string name="learner_split_title">Split meal bolus</string>
+    <string name="learner_split_rule" formatted="false">Off by default. GIVES INSULIN. Dose = carbs / CR of now, minus the bolus insulin still active. Fast meal: all now. Normal: 60 % now. Slow: 50 % now. The rest is checked every minute from 20 min: given only when the smoothed glucose is 5.5 or more and rising (0.5 in 15 min); never under 4.5 or while falling; minus the SMB given meanwhile; dropped after 90 min (slow 180) with a notice. Every dose goes through the pump queue with all AAPS limits.</string>
+    <string name="learner_split_ask_on">The split bolus GIVES INSULIN by itself (the rest of a meal bolus). Use it on a test phone and the bench first, never on the child before that. Turn it on?</string>
+    <string name="learner_split_turn_on">Turn on</string>
+    <string name="learner_split_carbs">Carbs, g</string>
+    <string name="learner_split_type_fast">Fast</string>
+    <string name="learner_split_type_normal">Normal</string>
+    <string name="learner_split_type_slow">Slow</string>
+    <string name="learner_split_calc">Calculate</string>
+    <string name="learner_split_confirm" comment="%1$.0f=carbs g, %2$.2f=total U, %3$.2f=now U, %4$.2f=rest U">Carbs %1$.0f g. Dose %2$.2f U: now %3$.2f U, later up to %4$.2f U when the food is seen. Give the first part?</string>
+    <string name="learner_split_give">Give the first part</string>
+    <string name="learner_split_waiting" comment="%1$s=time of the meal, %2$.2f=given U, %3$.2f=rest U">Meal at %1$s: given %2$.2f U, the rest up to %3$.2f U waits for the food to be seen.</string>
+    <string name="learner_split_cancel">Cancel the rest</string>
+    <string name="learner_split_cancelled">The rest is cancelled; nothing more is given for this meal.</string>
+    <string name="learner_split_started" comment="%1$.2f=given U, %2$.2f=rest U">Given %1$.2f U; the rest (up to %2$.2f U) waits.</string>
+    <string name="learner_split_rest_given" comment="%1$.2f=rest U">The rest %1$.2f U was given (food seen).</string>
+    <string name="learner_split_covered">The rest is not needed: the loop\'s SMB covered it.</string>
+    <string name="learner_split_dropped">Split bolus: the food was not seen in time, the rest is cancelled.</string>
+    <string name="learner_split_failed" comment="%1$s=reason">Split bolus: not given (%1$s).</string>
+    <string name="learner_split_no_profile">No running profile: nothing calculated.</string>
+    <string name="learner_split_note_first">Learner: split bolus, first part</string>
+    <string name="learner_split_note_rest">Learner: split bolus, rest</string>
+    <string name="learner_why_split_wait" comment="%1$.2f=rest U">Learner: the rest of the meal bolus (up to %1$.2f U) waits for the food to be seen.</string>
+    <string name="learner_why_split_given" comment="%1$.2f=rest U">Learner: the rest of the meal bolus %1$.2f U was given.</string>
 </resources>
