@@ -887,7 +887,9 @@ class HistoryReplayTest {
         // short delta over 3.6), a rise the treatment does not explain (80 mg/dL over the glucose at the treatment and
         // still rising, short delta over 1), or a flat high (over 180, short delta -1..1) later than 45 min.
         val rgApp2 = prefsText.contains("RGAPP2")
-        var capMult = if (learnG) 2.0 else if (rgApp) 1.5 else tok("CAPX", 1.0)
+        // RGWIN_<min> / RGCAP_<x>: other window and temp basal cap for RGAPP (default 120 min, 1.5x), e.g. what LEARNG3 learns.
+        val rgWin = tok("RGWIN", 120.0).toLong()
+        var capMult = if (learnG) 2.0 else if (rgApp) tok("RGCAP", 1.5) else tok("CAPX", 1.0)
         val capOn = tempCap || learnG || rgApp
         var overStreak = 0; var tighten = 0; var loosen = 0
         // Eva changes (CHG_<day>): from that day insulin acts CHGISF_<x> as strongly, the liver answers a low CHGKCR_<x> times.
@@ -2008,8 +2010,8 @@ class HistoryReplayTest {
                         if (!meal && !strongRise && !release) guardHold = true
                         else if (release && !meal && !strongRise) episodes.lastOrNull()?.takeIf { !it.done && !it.released }?.let { it.released = true; releases++ }
                     }
-                    if (rgApp && t - lastTreat < 120 * minute) {
-                        val first = treatTimes.filter { t - it < 120 * minute }.minOrNull() ?: lastTreat
+                    if (rgApp && t - lastTreat < rgWin * minute) {
+                        val first = treatTimes.filter { t - it < rgWin * minute }.minOrNull() ?: lastTreat
                         val meal = allLogged.any { it.t >= first - 30 * minute && it.t <= t && treatTimes.binarySearch(it.t) < 0 }
                         val early = rgApp2 && ((gs.glucose > 162.0 && gs.shortAvgDelta > 3.6) ||
                             (gs.glucose > treatBg + 80.0 && gs.shortAvgDelta > 1.0) ||
