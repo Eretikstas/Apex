@@ -7,9 +7,9 @@ enum class MealType { FAST, NORMAL, SLOW }
 
 /**
  * A split meal bolus: [totalU] is what the calculator found for the meal, [firstU] was given at [madeAt], the rest waits
- * for the food to be seen.
+ * for the food to be seen. [carbsG] are the meal carbs.
  */
-data class SplitPlan(val madeAt: Long, val type: MealType, val totalU: Double, val firstU: Double) {
+data class SplitPlan(val madeAt: Long, val type: MealType, val totalU: Double, val firstU: Double, val carbsG: Double = 0.0) {
 
     val restU: Double get() = (totalU - firstU).coerceAtLeast(0.0)
 }
@@ -33,9 +33,9 @@ sealed class SplitDecision {
 enum class SplitWait { TOO_EARLY, LOW, FALLING, NO_FOOD_SEEN }
 
 /**
- * The learner's split meal bolus, the RULE ONLY (lab best set 19.11: 60 % now, the rest from 20 minutes; the body model
- * showed fewer lows after meals at a low glucose). This file decides; it gives no insulin by itself. Before it is
- * connected to the pump it must be checked on the body model and on the bench.
+ * The learner's split meal bolus rule (lab: 60 % now, the rest from 20 minutes; checked on the body model 27.11 against
+ * the lab split). This file only decides; `LearnerPlugin` gives the insulin through the command queue, OFF by default,
+ * after the family confirms. It goes to the child only after the bench.
  *
  * - FAST meal: the whole bolus now, no split ([firstShare] = 1).
  * - NORMAL: 60 % now; SLOW: 50 % now (the 50 % is an assumption, not yet tested on the model).

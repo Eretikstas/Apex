@@ -80,6 +80,21 @@ class LearnerHistory(
         return out
     }
 
+    /**
+     * For the split bolus: the newest SMOOTHED glucose of the last 15 minutes (the value the loop uses) and its change
+     * over the last 15 minutes, both mg/dL, or nulls.
+     */
+    fun smoothedNow(now: Long): Pair<Double?, Double?> {
+        val v = iobCobCalculator.ads.getStatusDataCopy().orEmpty().filter { it.timestamp <= now }.sortedBy { it.timestamp }
+        val newest = v.lastOrNull()?.takeIf { now - it.timestamp <= 900_000L } ?: return Pair(null, null)
+        val old = v.lastOrNull { newest.timestamp - it.timestamp in 840_000L..1_080_000L }
+        return Pair(newest.recalculated, old?.let { newest.recalculated - it.recalculated })
+    }
+
+    /** SMB given from [from] to [now], units. */
+    suspend fun smbSince(from: Long, now: Long): Double =
+        persistenceLayer.getBolusesFromTimeToTime(from, now, true).filter { it.type == BS.Type.SMB }.sumOf { it.amount }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0

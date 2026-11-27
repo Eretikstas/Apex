@@ -5,6 +5,12 @@ import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.aps.LoopNote
+import app.aaps.core.data.model.TE
+import app.aaps.core.objects.runningMode.RunningModeGuard
+import app.aaps.core.objects.runningMode.PumpCommandGate
+import app.aaps.core.interfaces.pump.DetailedBolusInfo
+import app.aaps.core.interfaces.iob.IobCobCalculator
+import app.aaps.core.interfaces.queue.CommandQueue
 import app.aaps.core.interfaces.aps.LoopNotes
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
@@ -66,6 +72,9 @@ class LearnerPlugin(
     private val profileRepository: ProfileRepository,
     private val dateUtil: DateUtil,
     private val loopNotes: LoopNotes,
+    private val commandQueue: CommandQueue,
+    private val runningModeGuard: RunningModeGuard,
+    private val iobCobCalculator: IobCobCalculator,
 ) : PluginBaseWithPreferences(
     PluginDescription()
         .mainType(PluginType.GENERAL)
@@ -91,18 +100,25 @@ class LearnerPlugin(
         val pctProposal: PctProposal? = null,
         /** The last percentage card: highs, lows (percent), hint to try more than 100 %. */
         val lastPct: Triple<Double, Double, Boolean>? = null,
+        /** Split meal bolus: switch (asked before on), a calculated preview, the meal waiting for its rest, a message. */
+        val splitOn: Boolean = false,
+        val splitPreview: SplitPlan? = null,
+        val splitPlan: SplitPlan? = null,
+        val splitMessage: String = "",
     )
 
     private val store = LearnerStore(prefs)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
     private val applying = AtomicBoolean(false)
+    private var splitJob: Job? = null
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
 
     override suspend fun onStart() {
         super.onStart()
         refresh()
+        if (store.splitPlan != null) watchSplit()
         ticker?.cancel()
         ticker = scope.launch {
             while (isActive) {
@@ -327,6 +343,138 @@ class LearnerPlugin(
         }
     }
 
+    /** The user's switch for the split bolus (the screen asks first). Off drops a waiting rest. */
+    fun setSplitOn(on: Boolean) {
+        store.splitOn = on
+        if (!on) {
+            store.splitPlan = null
+            splitJob?.cancel()
+            loopNotes.clear(SPLIT_NOTE_SOURCE)
+        }
+        refresh()
+    }
+
+    /**
+     * The split bolus dose for [carbs] g of a [type] meal: carbs / CR of now, minus the bolus insulin still active (never
+     * below 0), split by `SplitBolusEngine`. Shown to the family before anything is given.
+     */
+    fun previewSplit(carbs: Double, type: MealType) {
+        scope.launch {
+            val p = runCatching { splitPlanFor(carbs, type, dateUtil.now()) }.getOrNull()
+            _status.value = _status.value.copy(splitPreview = p, splitMessage = if (p == null) rh.gs(R.string.learner_split_no_profile) else "")
+        }
+    }
+
+    private suspend fun splitPlanFor(carbs: Double, type: MealType, now: Long): SplitPlan? {
+        val profile = profileFunction.getProfile() ?: return null
+        val iob = iobCobCalculator.calculateIobFromBolus().iob.coerceAtLeast(0.0)
+        val total = (carbs / profile.getIc() - iob).coerceAtLeast(0.0)
+        return SplitBolusEngine.plan(now, type, Math.round(total / SPLIT_STEP) * SPLIT_STEP, SPLIT_STEP).copy(carbsG = carbs)
+    }
+
+    /** "Give the first part": carbs and the first part as one meal bolus; the rest waits (`checkSplit`). */
+    fun startSplit() {
+        val preview = _status.value.splitPreview ?: return
+        if (!store.splitOn || store.splitPlan != null) return
+        if (!applying.compareAndSet(false, true)) return
+        setBusy(true)
+        scope.launch {
+            try {
+                runningModeGuard.rejectionMessage(PumpCommandGate.CommandKind.BOLUS)?.let { return@launch finish(it) }
+                val now = dateUtil.now()
+                // Recalculated now: the preview may be minutes old.
+                val plan = splitPlanFor(preview.carbsG, preview.type, now) ?: return@launch finish(rh.gs(R.string.learner_split_no_profile))
+                val dbi = DetailedBolusInfo().apply {
+                    insulin = plan.firstU
+                    carbs = plan.carbsG
+                    eventType = TE.Type.MEAL_BOLUS
+                    timestamp = now
+                    notes = rh.gs(R.string.learner_split_note_first)
+                }
+                val r = commandQueue.bolus(dbi)
+                if (!r.success) return@launch finish(rh.gs(R.string.learner_split_failed, r.comment))
+                if (plan.restU >= SplitBolusEngine.MIN_BOLUS_U) {
+                    store.splitPlan = plan
+                    note(rh.gs(R.string.learner_why_split_wait, plan.restU), now, SplitBolusEngine.SLOW_LIMIT_MS, SPLIT_NOTE_SOURCE)
+                    watchSplit()
+                }
+                aapsLogger.debug(LTag.APS, "Learner: split bolus started $plan")
+                _status.value = _status.value.copy(splitPreview = null)
+                finish(rh.gs(R.string.learner_split_started, plan.firstU, plan.restU))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                aapsLogger.error(LTag.APS, "Learner: split bolus failed", e)
+                finish(rh.gs(R.string.learner_split_failed, e.message.orEmpty()))
+            } finally {
+                applying.set(false)
+            }
+        }
+    }
+
+    /** "Cancel the rest": nothing more is given for this meal. */
+    fun cancelSplit() {
+        store.splitPlan = null
+        splitJob?.cancel()
+        loopNotes.clear(SPLIT_NOTE_SOURCE)
+        refresh(rh.gs(R.string.learner_split_cancelled))
+    }
+
+    private fun watchSplit() {
+        splitJob?.cancel()
+        splitJob = scope.launch {
+            while (isActive && store.splitPlan != null) {
+                runCatching { checkSplit() }.onFailure { aapsLogger.error(LTag.APS, "Learner: split check failed", it) }
+                delay(SPLIT_TICK_MS)
+            }
+        }
+    }
+
+    /**
+     * Every minute while a rest waits: `SplitBolusEngine.decide` on the smoothed glucose, its 15 minute change and the SMB
+     * given since the meal. The plan is removed BEFORE the rest is sent, so a crash can never give it twice.
+     */
+    private suspend fun checkSplit() {
+        val plan = store.splitPlan ?: return
+        if (!store.splitOn) return cancelSplit()
+        val now = dateUtil.now()
+        val (bg, delta15) = history.smoothedNow(now)
+        val smb = history.smbSince(plan.madeAt, now)
+        when (val d = SplitBolusEngine.decide(now, plan, bg, delta15, null, smb, SPLIT_STEP)) {
+            is SplitDecision.Give    -> {
+                if (runningModeGuard.rejectionMessage(PumpCommandGate.CommandKind.BOLUS) != null) return
+                store.splitPlan = null
+                val dbi = DetailedBolusInfo().apply {
+                    insulin = d.units
+                    eventType = TE.Type.MEAL_BOLUS
+                    timestamp = now
+                    notes = rh.gs(R.string.learner_split_note_rest)
+                }
+                val r = commandQueue.bolus(dbi)
+                loopNotes.clear(SPLIT_NOTE_SOURCE)
+                if (r.success) note(rh.gs(R.string.learner_why_split_given, d.units), now, NOTE_SHORT_MS)
+                else notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_failed, r.comment), level = NotificationLevel.URGENT)
+                aapsLogger.debug(LTag.APS, "Learner: split rest ${d.units} U, success=${r.success}")
+                refresh(if (r.success) rh.gs(R.string.learner_split_rest_given, d.units) else rh.gs(R.string.learner_split_failed, r.comment))
+            }
+
+            SplitDecision.Covered    -> {
+                store.splitPlan = null
+                loopNotes.clear(SPLIT_NOTE_SOURCE)
+                refresh(rh.gs(R.string.learner_split_covered))
+            }
+
+            SplitDecision.Dropped    -> {
+                store.splitPlan = null
+                loopNotes.clear(SPLIT_NOTE_SOURCE)
+                notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_dropped), level = NotificationLevel.NORMAL)
+                refresh(rh.gs(R.string.learner_split_dropped))
+            }
+
+            is SplitDecision.Wait    -> _status.value = _status.value.copy(splitPlan = plan)
+        }
+    }
+
     fun refusePct() {
         store.pctProposal = null
         loopNotes.clear(NOTE_SOURCE)
@@ -355,7 +503,7 @@ class LearnerPlugin(
     }
 
     /** A line for the "why" of the overview (one learner line at a time). */
-    private fun note(text: String, now: Long, keepMs: Long) = loopNotes.put(LoopNote(NOTE_SOURCE, text, now, now + keepMs))
+    private fun note(text: String, now: Long, keepMs: Long, source: String = NOTE_SOURCE) = loopNotes.put(LoopNote(source, text, now, now + keepMs))
 
     private fun refresh(message: String = "") {
         val last = store.lastCardAt
@@ -375,6 +523,9 @@ class LearnerPlugin(
             duraProposal = store.duraProposal,
             lastDura = store.lastDura,
             pctProposal = store.pctProposal,
+            splitOn = store.splitOn,
+            splitPreview = _status.value.splitPreview,
+            splitPlan = store.splitPlan,
             lastPct = store.lastPct,
             dura = prefs.get(DoubleKey.ApsAutoIsfDuraWeight),
             hours = store.lastHours,
@@ -420,6 +571,9 @@ class LearnerPlugin(
         const val PROPOSAL_MAX_AGE_MS = CARD_EVERY_MS
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
+        const val SPLIT_NOTE_SOURCE = "learner_split"
+        const val SPLIT_STEP = 0.05
+        const val SPLIT_TICK_MS = 60_000L
     }
 }
 

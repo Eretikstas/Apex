@@ -31,7 +31,9 @@ import app.aaps.core.ui.compose.LocalProfileUtil
 import app.aaps.plugins.learner.BasalChange
 import app.aaps.plugins.learner.BasalProposal
 import app.aaps.plugins.learner.DuraProposal
+import app.aaps.plugins.learner.MealType
 import app.aaps.plugins.learner.PctProposal
+import app.aaps.plugins.learner.SplitPlan
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin.Status
@@ -114,6 +116,13 @@ class LearnerScreenshotTest {
     fun duraProposal() = shoot(
         "learner_dura_proposal",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, DuraProposal(0.5, 0.75, NOW - 2 * HOUR, 3.4, 1.9), Pair(3.4, 1.9), 0.5, hours)
+    )
+
+    @Test
+    fun splitWaiting() = shoot(
+        "learner_split_waiting",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            splitOn = true, splitPlan = SplitPlan(NOW - 30 * 60_000L, MealType.NORMAL, 1.2, 0.7, 30.0))
     )
 
     private fun shoot(name: String, status: Status) {
