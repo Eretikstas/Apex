@@ -109,4 +109,16 @@
     <string name="learner_low_meal_title">Meal at a low glucose</string>
     <string name="learner_low_meal_rule" formatted="false">Off by default. A meal of 13 g or more logged at a glucose under 4.5: a note "fast carbs first". Such a meal often ends low anyway, with or without a bolus, because the food lifts too slowly. Only a note.</string>
     <string name="learner_why_low_meal">Learner: meal at a glucose under 4.5 - give 4-6 g of fast carbs first; the food alone lifts too slowly.</string>
+    <string name="learner_special_title">Special day</string>
+    <string name="learner_special_rule" formatted="false">Illness, a cannula failure, a party: for 24 hours the learner makes no cards, and the readings of that time are left out of every card and verdict later. It ends by itself after 24 h.</string>
+    <string name="learner_special_start">Start a special day (24 h)</string>
+    <string name="learner_special_end">End it now</string>
+    <string name="learner_special_on" comment="%1$s=date and time it ends">Special day until %1$s.</string>
+    <string name="learner_why_special">Learner: special day - no learning for 24 h.</string>
+    <string name="learner_hypo_title">Hypo treatment size</string>
+    <string name="learner_hypo_seen" comment="%1$.2f=rise in 30 min per gram, mmol/L, %2$d=number of treatments">1 g of fast carbs lifts about %1$.2f mmol/L in 30 min (from %2$d treatments).</string>
+    <string name="learner_hypo_suggest" comment="%1$d=grams at 3.5 mmol/L, %2$d=grams at 3.0 mmol/L">To reach about 5.5: at 3.5 about %1$d g, at 3.0 about %2$d g.</string>
+    <string name="learner_hypo_none">Not enough clean treatments yet (at least 5, without a meal around them).</string>
+    <string name="learner_hypo_rule" formatted="false">Learned with the basal card from the last 14 days. Never under 4 g and never over 10 g. Only a hint: a falling glucose or insulin on board can need more.</string>
+    <string name="learner_eval_failed_note">Changes judged worse are not proposed again for 14 days.</string>
 </resources>

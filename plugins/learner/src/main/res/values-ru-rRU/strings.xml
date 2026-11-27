@@ -109,4 +109,16 @@
     <string name="learner_low_meal_title">Еда при низкой глюкозе</string>
     <string name="learner_low_meal_rule" formatted="false">По умолчанию выключена. Если записана еда от 13 г при глюкозе ниже 4,5 — заметка «сначала быстрые углеводы». Такая еда часто всё равно заканчивается низким, с болюсом и без: еда поднимает слишком медленно. Только заметка.</string>
     <string name="learner_why_low_meal">Ученик: еда при глюкозе ниже 4,5 — сначала 4–6 г быстрых углеводов; одна еда поднимает слишком медленно.</string>
+    <string name="learner_special_title">Особый день</string>
+    <string name="learner_special_rule" formatted="false">Болезнь, сбой канюли, праздник: 24 часа «Ученик» не делает карточек, а значения этого времени потом не учитываются ни в карточках, ни в оценках. Само заканчивается через 24 ч.</string>
+    <string name="learner_special_start">Начать особый день (24 ч)</string>
+    <string name="learner_special_end">Закончить сейчас</string>
+    <string name="learner_special_on">Особый день до %1$s.</string>
+    <string name="learner_why_special">Ученик: особый день — 24 ч без обучения.</string>
+    <string name="learner_hypo_title">Размер лечения гипо</string>
+    <string name="learner_hypo_seen">1 г быстрых углеводов поднимает примерно на %1$.2f ммоль/л за 30 мин (по %2$d лечениям).</string>
+    <string name="learner_hypo_suggest">Чтобы выйти примерно на 5,5: при 3,5 около %1$d г, при 3,0 около %2$d г.</string>
+    <string name="learner_hypo_none">Пока мало «чистых» лечений (нужно не меньше 5, без еды рядом).</string>
+    <string name="learner_hypo_rule" formatted="false">Считается вместе с карточкой базала по последним 14 дням. Не меньше 4 г и не больше 10 г. Только подсказка: при падающей глюкозе или активном инсулине может понадобиться больше.</string>
+    <string name="learner_eval_failed_note">Изменения, оценённые как «хуже», 14 дней не предлагаются снова.</string>
 </resources>

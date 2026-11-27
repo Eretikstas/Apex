@@ -37,6 +37,7 @@ import app.aaps.plugins.learner.DoneEval
 import app.aaps.plugins.learner.DuraProposal
 import app.aaps.plugins.learner.EvalStats
 import app.aaps.plugins.learner.EvalVerdict
+import app.aaps.plugins.learner.HypoSize
 import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.PendingEval
 import app.aaps.plugins.learner.WeekStats
@@ -164,6 +165,13 @@ class LearnerScreenshotTest {
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
             crProposal = CrProposal("TestProfile", "DINNER", NOW - HOUR, 51.0, (16..20).associateWith { 25.83 }, (16..20).associateWith { 28.41 }),
             lastCr = mapOf("BREAKFAST" to 22.0, "LUNCH" to 24.0, "DINNER" to 51.0))
+    )
+
+    @Test
+    fun specialDayAndHypoSize() = shoot(
+        "learner_special_hypo",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            specialUntil = NOW + 20 * HOUR, hypoSize = HypoSize(6.0, 9))
     )
 
     private fun shoot(name: String, status: Status) {

@@ -40,6 +40,7 @@ import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin
 import app.aaps.plugins.learner.EvalStats
 import app.aaps.plugins.learner.EvalVerdict
+import app.aaps.plugins.learner.HypoSizeEngine
 import app.aaps.plugins.learner.R
 import app.aaps.plugins.learner.WeekStats
 import app.aaps.plugins.learner.SensorHintKind
@@ -74,6 +75,7 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onRefuseDura = plugin::refuseDura,
         onAcceptPct = plugin::acceptPct,
         onRefusePct = plugin::refusePct,
+        onSpecialDay = plugin::setSpecialDay,
         onAcceptCr = plugin::acceptCr,
         onRefuseCr = plugin::refuseCr,
         blockName = plugin::blockName,
@@ -95,6 +97,7 @@ internal fun LearnerScreenContent(
     onRefuseDura: () -> Unit,
     onAcceptPct: () -> Unit = {},
     onRefusePct: () -> Unit = {},
+    onSpecialDay: (Boolean) -> Unit = {},
     onAcceptCr: () -> Unit = {},
     onRefuseCr: () -> Unit = {},
     blockName: (String) -> String = { it },
@@ -120,6 +123,8 @@ internal fun LearnerScreenContent(
         )
         Text(stringResource(R.string.learner_next_card, dateUtil.dateAndTimeString(status.nextCardAt)), style = MaterialTheme.typography.bodyMedium)
         if (status.message.isNotEmpty()) Text(status.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+
+        SpecialSection(status, onSpecialDay)
 
         status.proposal?.let { p ->
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -153,6 +158,7 @@ internal fun LearnerScreenContent(
         } ?: Text(stringResource(R.string.learner_no_proposal), style = MaterialTheme.typography.bodyMedium)
 
         PctSection(status, onAcceptPct, onRefusePct)
+        HypoSizeSection(status)
         CrSection(status, onAcceptCr, onRefuseCr, blockName)
         DuraSection(status, onAcceptDura, onRefuseDura)
         SensorSection(status, onSensorHints)
@@ -313,6 +319,7 @@ private fun EvalSection(status: Status, onSwitch: (Boolean) -> Unit) {
                 Switch(checked = status.evalOn, onCheckedChange = onSwitch)
             }
             Text(stringResource(R.string.learner_eval_rule), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.learner_eval_failed_note), style = MaterialTheme.typography.bodySmall)
             if (!status.evalOn) return@Column
             status.evalPending?.let { p ->
                 Text(
@@ -430,6 +437,40 @@ private fun LowMealSection(status: Status, onSwitch: (Boolean) -> Unit) {
                 Switch(checked = status.lowMealHints, onCheckedChange = onSwitch)
             }
             Text(stringResource(R.string.learner_low_meal_rule), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** The special day button: 24 h without learning; the readings of that time are left out of the cards later. */
+@Composable
+private fun SpecialSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Text(stringResource(R.string.learner_special_title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.learner_special_rule), style = MaterialTheme.typography.bodySmall)
+            if (status.specialUntil > 0L) {
+                Text(stringResource(R.string.learner_special_on, dateUtil.dateAndTimeString(status.specialUntil)), color = MaterialTheme.colorScheme.primary)
+                OutlinedButton(onClick = { onSwitch(false) }) { Text(stringResource(R.string.learner_special_end)) }
+            } else Button(onClick = { onSwitch(true) }) { Text(stringResource(R.string.learner_special_start)) }
+        }
+    }
+}
+
+/** What the learner learned about hypo treatments: how much 1 g lifts, and how many grams for 3.5 and 3.0 mmol/L. */
+@Composable
+private fun HypoSizeSection(status: Status) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Text(stringResource(R.string.learner_hypo_title), style = MaterialTheme.typography.titleMedium)
+            status.hypoSize?.let { h ->
+                Text(stringResource(R.string.learner_hypo_seen, h.risePerGMgdl / 18.0, h.treatments), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(R.string.learner_hypo_suggest, HypoSizeEngine.suggest(h, 63.0), HypoSizeEngine.suggest(h, 54.0)),
+                    fontWeight = FontWeight.SemiBold
+                )
+            } ?: Text(stringResource(R.string.learner_hypo_none), style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.learner_hypo_rule), style = MaterialTheme.typography.bodySmall)
         }
     }
 }

@@ -109,6 +109,10 @@ class LearnerPlugin(
         /** The CR block card: a proposal (weaker CR of one block) and the last shares of meals ending low per block. */
         val crProposal: CrProposal? = null,
         val lastCr: Map<String, Double>? = null,
+        /** The special day: until when it runs (0 = not now). */
+        val specialUntil: Long = 0L,
+        /** What the learner learned about hypo treatments. */
+        val hypoSize: HypoSize? = null,
     )
 
     private val store = LearnerStore(prefs)
@@ -143,9 +147,15 @@ class LearnerPlugin(
         super.onStop()
     }
 
+    /** The history without the readings of special days (see `LearnerMemory`). */
+    private suspend fun cleanSteps(now: Long, days: Int): List<LearnerStep> = LearnerMemory.withoutSpecial(history.steps(now, days), store.specialDays)
+
+    private fun failed(kind: String) = LearnerMemory.failedRecently(dateUtil.now(), kind, store.failedKinds)
+
     /** The card runs at 06:00 local time, 4 days after the last one (the first one at the first 06:00). */
     private suspend fun maybeRunCard() {
         val now = dateUtil.now()
+        if (LearnerMemory.specialNow(now, store.specialDays)) return
         val hour = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).hour
         if (hour != CARD_HOUR) return
         val last = store.lastCardAt
@@ -167,7 +177,8 @@ class LearnerPlugin(
             peakMin = profile.iCfg.insulinPeakTime / 60_000.0,
             diaH = profile.iCfg.insulinEndTime / 3_600_000.0,
         )
-        val steps = history.steps(now, BasalCardEngine.NEED_DAYS)
+        val steps = cleanSteps(now, BasalCardEngine.NEED_DAYS)
+        store.hypoSize = HypoSizeEngine.learn(steps)
         val card = engine.card(steps, profileBasal, store.cardState)
         store.cardState = card.state
         store.lastCardAt = now
@@ -186,20 +197,20 @@ class LearnerPlugin(
         val judging = store.lastAppliedAt > 0 && now - store.lastAppliedAt < CARD_EVERY_MS - 2 * 3_600_000L
         when {
             judging                     -> note(rh.gs(R.string.learner_why_judging), now, NOTE_SHORT_MS)
-            card.changes.isNotEmpty()   -> {
+            card.changes.isNotEmpty() && !failed(KIND_BASAL) -> {
                 store.proposal = BasalProposal(name, now, card.changes)
                 store.duraProposal = null
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_proposal), level = NotificationLevel.INFO)
             }
 
-            duraCard.to != null         -> {
+            duraCard.to != null && !failed(duraKind(dura, duraCard.to)) -> {
                 // One proposal at a time.
                 store.proposal = null
                 store.duraProposal = DuraProposal(dura, duraCard.to, now, duraCard.flatHighPct, duraCard.lowPct)
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_dura), level = NotificationLevel.INFO)
             }
 
-            crCard.weaker != null       -> {
+            crCard.weaker != null && !failed(KIND_CR + crCard.weaker.name) -> {
                 val block = crCard.weaker
                 val icHours = hourly(single.ic)
                 store.proposal = null
@@ -268,7 +279,7 @@ class LearnerPlugin(
         ) else null
         store.proposal = null
         store.lastAppliedAt = now
-        startEval(rh.gs(R.string.learner_eval_label_basal, proposal.changes.size), now)
+        startEval(rh.gs(R.string.learner_eval_label_basal, proposal.changes.size), now, KIND_BASAL)
         note(rh.gs(R.string.learner_why_applied, proposal.changes.size), now, NOTE_LONG_MS)
         aapsLogger.debug(LTag.APS, "Learner: basal proposal applied to ${proposal.profileName} at $percentage %, switch=${switch != null}")
         finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
@@ -284,7 +295,7 @@ class LearnerPlugin(
         }
         prefs.put(DoubleKey.ApsAutoIsfDuraWeight, p.to)
         store.lastAppliedAt = dateUtil.now()
-        scope.launch { runCatching { startEval(rh.gs(R.string.learner_eval_label_dura, p.from, p.to), dateUtil.now()) } }
+        scope.launch { runCatching { startEval(rh.gs(R.string.learner_eval_label_dura, p.from, p.to), dateUtil.now(), duraKind(p.from, p.to)) } }
         note(rh.gs(R.string.learner_why_dura_applied, p.from, p.to), dateUtil.now(), NOTE_LONG_MS)
         aapsLogger.debug(LTag.APS, "Learner: dura ${p.from} -> ${p.to} applied")
         refresh(rh.gs(R.string.learner_dura_applied))
@@ -297,6 +308,7 @@ class LearnerPlugin(
      */
     private suspend fun maybeRunPctCard(force: Boolean = false) {
         val now = dateUtil.now()
+        if (LearnerMemory.specialNow(now, store.specialDays)) return
         val local = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault())
         if (!force && local.hour < CARD_HOUR) return
         val today = local.toLocalDate().toEpochDay()
@@ -307,11 +319,11 @@ class LearnerPlugin(
         if (store.proposal != null || store.duraProposal != null || store.pctProposal != null || store.crProposal != null) return
         if (now - store.lastPctAppliedAt < PCT_GAP_MS) return
         val nowPct = running?.percentage ?: 100
-        val card = PctCardEngine.card(history.steps(now, PctCardEngine.DAYS), nowPct)
+        val card = PctCardEngine.card(cleanSteps(now, PctCardEngine.DAYS), nowPct)
         store.lastPct = Triple(card.highPct, card.lowPct, card.hintUp)
         aapsLogger.debug(LTag.APS, "Learner: percentage card $card")
         when {
-            card.to != null -> {
+            card.to != null && !failed(pctKind(nowPct, card.to)) -> {
                 store.pctProposal = PctProposal(nowPct, card.to, now, card.highPct, card.lowPct)
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_pct), level = NotificationLevel.INFO)
             }
@@ -362,9 +374,9 @@ class LearnerPlugin(
     }
 
     /** A change was applied with "Внести": keep the numbers of the 3 days before it for the verdict 3 days later. */
-    private suspend fun startEval(label: String, now: Long) {
-        val before = ChangeEvalEngine.stats(history.steps(now, ChangeEvalEngine.DAYS))
-        store.evalPending = PendingEval(label, now, before)
+    private suspend fun startEval(label: String, now: Long, kind: String) {
+        val before = ChangeEvalEngine.stats(cleanSteps(now, ChangeEvalEngine.DAYS))
+        store.evalPending = PendingEval(label, now, before, kind = kind)
         aapsLogger.debug(LTag.APS, "Learner: evaluation started for $label, before $before")
         refresh()
     }
@@ -381,10 +393,11 @@ class LearnerPlugin(
         if (!due && (pending.warned || now - lastRollbackCheck < HOUR_MS)) return
         lastRollbackCheck = now
         val days = ((now - pending.at) / ChangeEvalEngine.DAY_MS + 1).toInt().coerceIn(1, ChangeEvalEngine.DAYS)
-        val after = history.steps(now, days)
+        val after = cleanSteps(now, days)
         if (!due) {
             if (ChangeEvalEngine.rollback(pending.at, after, now)) {
                 store.evalPending = pending.copy(warned = true)
+                rememberFailed(pending.kind, now)
                 if (store.evalOn) note(rh.gs(R.string.learner_why_eval_rollback, pending.label), now, NOTE_LONG_MS, EVAL_NOTE_SOURCE)
                 aapsLogger.debug(LTag.APS, "Learner: rollback rule hit early for ${pending.label}")
                 refresh()
@@ -393,6 +406,7 @@ class LearnerPlugin(
         }
         val eval = ChangeEvalEngine.evaluate(pending.before, after, pending.at, now)
         store.lastEval = DoneEval(pending.label, pending.at, now, eval)
+        if (eval.rollback || eval.verdict == EvalVerdict.WORSE) rememberFailed(pending.kind, now)
         store.evalPending = null
         aapsLogger.debug(LTag.APS, "Learner: evaluation of ${pending.label}: $eval")
         if (store.evalOn) note(verdictText(pending.label, eval), now, NOTE_LONG_MS, EVAL_NOTE_SOURCE)
@@ -418,7 +432,7 @@ class LearnerPlugin(
             if (Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).hour < CARD_HOUR) return
             if (now - last < DIGEST_EVERY_MS - 2 * HOUR_MS) return
         }
-        val digest = WeeklyDigestEngine.digest(history.steps(now, WeeklyDigestEngine.DAYS))
+        val digest = WeeklyDigestEngine.digest(cleanSteps(now, WeeklyDigestEngine.DAYS))
         store.lastDigest = now to digest
         val w = digest.thisWeek
         note(rh.gs(R.string.learner_why_digest, w.inRangePct, w.low39Pct, w.high10Pct, w.cvPct, digest.goalsMet, digest.goals), now, NOTE_LONG_MS, DIGEST_NOTE_SOURCE)
@@ -432,6 +446,26 @@ class LearnerPlugin(
         if (!on) loopNotes.clear(DIGEST_NOTE_SOURCE)
         refresh()
         if (on) scope.launch { runCatching { maybeDigest(force = true) }.onFailure { aapsLogger.error(LTag.APS, "Learner: weekly digest failed", it) } }
+    }
+
+    /** "What did not work": this kind of change is not proposed again for 14 days. */
+    private fun rememberFailed(kind: String, now: Long) {
+        if (kind.isEmpty()) return
+        store.failedKinds = store.failedKinds.filterValues { now - it < LearnerMemory.FAILED_MS } + (kind to now)
+        aapsLogger.debug(LTag.APS, "Learner: $kind judged worse, not proposed again for 14 days")
+    }
+
+    private fun duraKind(from: Double, to: Double) = KIND_DURA + if (to > from) "up" else "down"
+    private fun pctKind(from: Int, to: Int) = KIND_PCT + if (to < from) "down" else "up"
+
+    /** The special day button: on = 24 h without learning (and its readings left out later); off = it ends now. */
+    fun setSpecialDay(on: Boolean) {
+        val now = dateUtil.now()
+        val kept = store.specialDays.filter { now - it.second < 30 * 86_400_000L }
+        store.specialDays = if (on) kept + Pair(now, now + LearnerMemory.SPECIAL_MS)
+        else kept.map { if (now >= it.first && now < it.second) Pair(it.first, now) else it }
+        if (on) note(rh.gs(R.string.learner_why_special), now, LearnerMemory.SPECIAL_MS, SPECIAL_NOTE_SOURCE) else loopNotes.clear(SPECIAL_NOTE_SOURCE)
+        refresh()
     }
 
     /** The user's switch for the change evaluation. Off also removes its note. */
@@ -507,7 +541,7 @@ class LearnerPlugin(
                 store.pctProposal = null
                 if (switch != null) {
                     store.lastPctAppliedAt = now
-                    startEval(rh.gs(R.string.learner_eval_label_pct, p.from, p.to), now)
+                    startEval(rh.gs(R.string.learner_eval_label_pct, p.from, p.to), now, pctKind(p.from, p.to))
                     note(rh.gs(R.string.learner_why_pct_applied, p.from, p.to), now, NOTE_LONG_MS)
                 }
                 aapsLogger.debug(LTag.APS, "Learner: percentage ${p.from} -> ${p.to}, switch=${switch != null}")
@@ -576,7 +610,7 @@ class LearnerPlugin(
         store.crProposal = null
         store.lastAppliedAt = now
         val label = rh.gs(R.string.learner_eval_label_cr, blockName(p.block))
-        startEval(label, now)
+        startEval(label, now, KIND_CR + p.block)
         note(rh.gs(R.string.learner_why_cr_applied, blockName(p.block)), now, NOTE_LONG_MS)
         aapsLogger.debug(LTag.APS, "Learner: CR of ${p.block} ${p.from} -> ${p.to}, switch=${switch != null}")
         finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
@@ -644,6 +678,8 @@ class LearnerPlugin(
             lastDura = store.lastDura,
             pctProposal = store.pctProposal,
             lastPct = store.lastPct,
+            specialUntil = store.specialDays.firstOrNull { val n = dateUtil.now(); n >= it.first && n < it.second }?.second ?: 0L,
+            hypoSize = store.hypoSize,
             dura = prefs.get(DoubleKey.ApsAutoIsfDuraWeight),
             hours = store.lastHours,
             message = message,
@@ -698,6 +734,11 @@ class LearnerPlugin(
         const val PROPOSAL_MAX_AGE_MS = CARD_EVERY_MS
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
+        const val SPECIAL_NOTE_SOURCE = "learner_special"
+        const val KIND_BASAL = "basal"
+        const val KIND_DURA = "dura:"
+        const val KIND_PCT = "pct:"
+        const val KIND_CR = "cr:"
         const val SENSOR_NOTE_SOURCE = "learner_sensor"
         const val CANNULA_NOTE_SOURCE = "learner_cannula"
         const val LOW_MEAL_NOTE_SOURCE = "learner_low_meal"

@@ -14,7 +14,7 @@ data class PctProposal(val from: Int, val to: Int, val madeAt: Long, val highPct
 data class CrProposal(val profileName: String, val block: String, val madeAt: Long, val lowPct: Double, val from: Map<Int, Double>, val to: Map<Int, Double>)
 
 /** A change waiting for its verdict: [label] says what changed, [warned] = the early rollback note was given. */
-data class PendingEval(val label: String, val at: Long, val before: EvalStats, val warned: Boolean = false)
+data class PendingEval(val label: String, val at: Long, val before: EvalStats, val warned: Boolean = false, val kind: String = "")
 
 /** A change with its verdict. */
 data class DoneEval(val label: String, val at: Long, val judgedAt: Long, val eval: ChangeEval)
@@ -173,12 +173,29 @@ class LearnerStore(private val preferences: Preferences) {
     /** A change waiting for its 3 day verdict: what it was, when, and the numbers of the 3 days before it. */
     var evalPending: PendingEval?
         get() = read().optJSONObject(KEY_EVAL_PENDING)?.let { o ->
-            runCatching { PendingEval(o.getString("label"), o.getLong("at"), statsOf(o.getJSONObject("before")), o.optBoolean("warned", false)) }.getOrNull()
+            runCatching { PendingEval(o.getString("label"), o.getLong("at"), statsOf(o.getJSONObject("before")), o.optBoolean("warned", false), o.optString("kind", "")) }.getOrNull()
         }
         set(value) = edit {
             if (value == null) remove(KEY_EVAL_PENDING)
-            else put(KEY_EVAL_PENDING, JSONObject().put("label", value.label).put("at", value.at).put("before", json(value.before)).put("warned", value.warned))
+            else put(KEY_EVAL_PENDING, JSONObject().put("label", value.label).put("at", value.at).put("before", json(value.before)).put("warned", value.warned).put("kind", value.kind))
         }
+
+    /** Special days (from, to), the last 30 days. */
+    var specialDays: List<Pair<Long, Long>>
+        get() = read().optJSONArray(KEY_SPECIAL)?.let { a ->
+            (0 until a.length()).mapNotNull { i -> a.optJSONArray(i)?.let { Pair(it.getLong(0), it.getLong(1)) } }
+        } ?: emptyList()
+        set(value) = edit { put(KEY_SPECIAL, JSONArray(value.map { JSONArray(listOf(it.first, it.second)) })) }
+
+    /** Kinds of change that were judged worse, and when (see `LearnerMemory`). */
+    var failedKinds: Map<String, Long>
+        get() = read().optJSONObject(KEY_FAILED)?.let { o -> o.keys().asSequence().associateWith { o.getLong(it) } } ?: emptyMap()
+        set(value) = edit { put(KEY_FAILED, JSONObject(value)) }
+
+    /** What the learner learned about hypo treatments (rise per gram, mg/dL, and how many treatments). */
+    var hypoSize: HypoSize?
+        get() = read().optJSONObject(KEY_HYPO)?.let { o -> runCatching { HypoSize(o.getDouble("perG"), o.getInt("n")) }.getOrNull() }
+        set(value) = edit { if (value == null) remove(KEY_HYPO) else put(KEY_HYPO, JSONObject().put("perG", value.risePerGMgdl).put("n", value.treatments)) }
 
     /** The last verdict. */
     var lastEval: DoneEval?
@@ -255,6 +272,9 @@ class LearnerStore(private val preferences: Preferences) {
     private companion object {
 
         const val KEY_CR = "cr_proposal"
+        const val KEY_SPECIAL = "special_days"
+        const val KEY_FAILED = "failed_kinds"
+        const val KEY_HYPO = "hypo_size"
         const val KEY_LAST_CR = "last_cr"
         const val KEY_DIGEST_ON = "digest_on"
         const val KEY_DIGEST = "digest_last"
