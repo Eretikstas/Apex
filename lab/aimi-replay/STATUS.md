@@ -2,6 +2,14 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — SHAPEAUDIT implementation committed (pre-run)
+
+- Test-source commit: `d83d79ca214ff03c72deeea7c6602f4a2f1814c0`; commit diff contains only `HistoryReplayTest.kt`.
+- Added opt-in `SHAPEAUDIT`: it reads synthetic sensor `bg` from the completed replay rows, computes 24 clock-hour means/SDs, normalizes each curve to a dimensionless ratio, and reports ratio MAE plus the normalized curves. It does not modify replay state, learner state, profile, or insulin delivery. Added a unit test for hour ordering, normalization, and missing-hour rejection.
+- Public reference contains only 24 normalized mean ratios and 24 normalized SD ratios. No absolute glucose values, dates, raw rows, identifiers, doses, or profile data were added.
+- Exact compile result for `d83d79ca` has not yet appeared; no compile pass is claimed. Per the lab dispatcher protocol, commit the three-seed baseline RUN next; dispatcher must verify the exact code commit's compile before replay starts.
+
+
 ### 2026-11-27 — Shape recalibration preflight (pre-run)
 
 - Re-read My-apps `CLAUDE.md`, handoff §13, Apex `RULES_FOR_CHATGPT.md` §00/§5, current `RUN.txt`, latest STATUS Task/Claude Results, and the Step-16/17/18 reports before proceeding.
