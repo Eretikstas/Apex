@@ -1,14 +1,12 @@
-# App CI run 45934489028
+# App CI run 45958489188
 
-- Link: https://github.com/Eretikstas/Apex/actions/runs/45934489028
-- Branch `autoisf-atc3`, commit `6f578b5b`, event `workflow_dispatch`, started 2026-11-27T03:29:45Z
-- Result: **success**
+- Link: https://github.com/Eretikstas/Apex/actions/runs/45958489188
+- Branch `claude/check-stand-45699126024-sh3epe`, commit `8ca1fc94`, event `workflow_dispatch`, started 2026-11-27T07:26:39Z
+- Result: **FAILURE: driver**
 
-## Job `emulator`: success
+## Job `driver`: cancelled
 
-## Job `driver`: success
+## Job `emulator`: skipped
 
 ## Artifacts (download from the run page)
-- `autoisf-atc3-emulator` (3334 KB)
-- `autoisf-atc3-test-reports` (850 KB)
-- `autoisf-atc3-ring-shots` (2137 KB)
+- `autoisf-atc3-test-reports` (5 KB)
