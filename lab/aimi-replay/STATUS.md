@@ -124,7 +124,10 @@
   (meal within 3 h after a hypo treatment -> low within 4 h in 55-80 % per job, other meals 22-31 %; real data 58 % vs
   34 %). The best set reproduced exactly (4.67 / 0.17 / 4.77 / 28.2 / 26.7). Giving less now for risky meals did NOT
   help: SPLITRISK_30 4.87 / 0.27 / 4.60 / 28.3 / 26.7, SPLITRISK_0 5.03 / 0.23 / 4.53 / 28.6 / 28.2 (means, seeds 1-3).
-  Next idea (not run): the guard does not let go on a meal after a hypo (SMB held, the meal bolus as usual).
+  v6 `46025386328` (`RGNOMEAL`: the guard does not let go on a logged meal): BEST+RGNOMEAL 4.57 / 0.20 / 4.77 / 28.4 /
+  26.7, RGAPP2 120 min + RGNOMEAL 4.77 / 0.23 / 4.57 / 28.1 / 27.7 - no clear gain (within seed noise). Conclusion: more
+  insulin control around a meal after a hypo does not remove those lows in the model; the guard's reach is the pure
+  rebounds (~15 % of real low time). The bigger shares are lows after meals (37 %) and night/basal (27 %).
 - The app guard was changed to these values (branch `learner-rebound`, `d25ae63a`). ChatGPT: after the
   re-calibration, run RGAPP2,RGWIN_180,RGCAP_1.0,SPLITAPP against CAL on the new model (more seeds if you can).
 
