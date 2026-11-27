@@ -2,6 +2,12 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — Step 16 attempt 3 DUMPCSV control check (job 0 complete)
+
+- Run [46023317575](https://github.com/Eretikstas/Apex/actions/runs/46023317575), job 0, seed-1 `CTRL13A,DUMPCSV`: completed successfully; replay summary remained exactly the Step-13a control (6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78).
+- The workflow's independent CSV validation reports `rows=16128`, `step_min=5`, `dump_insulin_u_day=11.7795`, `summary_insulin_u_day=11.7795`, `delta_pct=0.000`. This passes the one-row-per-5-minute-tick and insulin-reconciliation checks; artifact `aimi-replay-result-0` is ready. Overall six-job Step-16 run is still in progress; no Step-16 conclusion yet.
+
+
 ### Step 10 — exact APP per-seed reference recovered from public job logs
 
 - Source: replay `45653668453`, the 18 APP-variant jobs (even matrix indices); values below were parsed from each job's public summary, not inferred from scenario means. Use this table for the Step-18 report-only equality check.
