@@ -94,4 +94,16 @@
     <string name="learner_digest_last">Неделя до</string>
     <string name="learner_digest_week">%1$s: 3,9–10 %2$.0f %%, ниже 3,9 %3$.1f %%, ниже 3,0 %4$.1f %%, выше 10 %5$.1f %%, CV %6$.0f %%, средняя %7$.1f, инсулин %8$.1f ед/сут, углеводы на гипо %9$.0f г/сут</string>
     <string name="learner_why_digest">Ученик, неделя: 3,9–10 %1$.0f %%, ниже 3,9 %2$.1f %%, выше 10 %3$.1f %%, CV %4$.0f %%; целей %5$d из %6$d.</string>
+    <string name="learner_cr_title">CR по приёмам еды (страховка)</string>
+    <string name="learner_cr_rule" formatted="false">Вместе с карточкой базала, раз в 4 дня. Последние 14 дней, еда от 13 г: как часто в течение 4 ч было низкое (ниже 3,9). Если в одном блоке 40 % и больше, а в других 30 % и меньше — предлагает CR этого блока на 10 % слабее (меньше инсулина). Сильнее CR не предлагает никогда.</string>
+    <string name="learner_cr_seen">%1$s: низкое после %2$.0f %% приёмов еды</string>
+    <string name="learner_cr_change">%1$s: CR %2$.1f → %3$.1f г/ед</string>
+    <string name="learner_block_breakfast">Завтрак (05–11)</string>
+    <string name="learner_block_lunch">Обед (11–16)</string>
+    <string name="learner_block_dinner">Ужин (16–21)</string>
+    <string name="learner_notice_cr">Ученик: предложение по CR одного приёма еды (меньше инсулина) ждёт вашего ответа.</string>
+    <string name="learner_why_cr_proposal">Ученик: %1$s — низкое после %2$.0f %% приёмов еды; предложение: CR на 10 %% слабее (ждёт ответа).</string>
+    <string name="learner_why_cr_applied">Ученик: CR, %1$s, теперь на 10 %% слабее; оценка через 3 дня.</string>
+    <string name="learner_eval_label_cr">CR, %1$s</string>
+    <string name="learner_switch_note_cr">Ученик: CR одного приёма еды</string>
 </resources>

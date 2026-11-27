@@ -10,6 +10,9 @@ data class BasalProposal(val profileName: String, val madeAt: Long, val changes:
 /** A proposal of the percentage card: the profile percentage now, the one proposed, and what the card saw. */
 data class PctProposal(val from: Int, val to: Int, val madeAt: Long, val highPct: Double, val lowPct: Double)
 
+/** A CR block proposal: the profile, the block, when, the share of its meals ending low, the CR per hour now and proposed. */
+data class CrProposal(val profileName: String, val block: String, val madeAt: Long, val lowPct: Double, val from: Map<Int, Double>, val to: Map<Int, Double>)
+
 /** A change waiting for its verdict: [label] says what changed, [warned] = the early rollback note was given. */
 data class PendingEval(val label: String, val at: Long, val before: EvalStats, val warned: Boolean = false)
 
@@ -191,6 +194,26 @@ class LearnerStore(private val preferences: Preferences) {
             )
         }
 
+    var crProposal: CrProposal?
+        get() = read().optJSONObject(KEY_CR)?.let { o ->
+            runCatching {
+                fun map(j: JSONObject) = j.keys().asSequence().associate { it.toInt() to j.getDouble(it) }
+                CrProposal(o.getString("profile"), o.getString("block"), o.getLong("madeAt"), o.getDouble("low"), map(o.getJSONObject("from")), map(o.getJSONObject("to")))
+            }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_CR)
+            else put(
+                KEY_CR, JSONObject().put("profile", value.profileName).put("block", value.block).put("madeAt", value.madeAt).put("low", value.lowPct)
+                    .put("from", JSONObject(value.from.mapKeys { it.key.toString() })).put("to", JSONObject(value.to.mapKeys { it.key.toString() }))
+            )
+        }
+
+    /** The last CR block card: per block name the share of meals ending low. */
+    var lastCr: Map<String, Double>?
+        get() = read().optJSONObject(KEY_LAST_CR)?.let { o -> o.keys().asSequence().associateWith { o.getDouble(it) } }
+        set(value) = edit { if (value == null) remove(KEY_LAST_CR) else put(KEY_LAST_CR, JSONObject(value)) }
+
     /** The weekly digest is on (the user's switch). Off by default. */
     var digestOn: Boolean
         get() = read().optBoolean(KEY_DIGEST_ON, false)
@@ -226,6 +249,8 @@ class LearnerStore(private val preferences: Preferences) {
 
     private companion object {
 
+        const val KEY_CR = "cr_proposal"
+        const val KEY_LAST_CR = "last_cr"
         const val KEY_DIGEST_ON = "digest_on"
         const val KEY_DIGEST = "digest_last"
         const val KEY_EVAL_ON = "eval_on"

@@ -94,4 +94,16 @@
     <string name="learner_digest_last">Week before</string>
     <string name="learner_digest_week" comment="%1$s=week name, %2$.0f=3.9-10 percent, %3$.1f=under 3.9 percent, %4$.1f=under 3.0 percent, %5$.1f=over 10 percent, %6$.0f=CV percent, %7$.1f=mean mmol/L, %8$.1f=insulin U a day, %9$.0f=hypo carbs g a day">%1$s: in 3.9-10 %2$.0f %%, under 3.9 %3$.1f %%, under 3.0 %4$.1f %%, over 10 %5$.1f %%, CV %6$.0f %%, mean %7$.1f, insulin %8$.1f U/day, hypo carbs %9$.0f g/day</string>
     <string name="learner_why_digest" comment="%1$.0f=3.9-10 percent, %2$.1f=under 3.9 percent, %3$.1f=over 10 percent, %4$.0f=CV percent, %5$d=goals met, %6$d=goals">Learner, week: 3.9-10 %1$.0f %%, under 3.9 %2$.1f %%, over 10 %3$.1f %%, CV %4$.0f %%; goals %5$d of %6$d.</string>
+    <string name="learner_cr_title">CR by meal (safety)</string>
+    <string name="learner_cr_rule" formatted="false">With the basal card, every 4 days. Last 14 days, meals of 13 g or more: how often a low (under 3.9) came within 4 h. When one block has 40 % or more and the others 30 % or less, it proposes that block\'s CR 10 % weaker (less insulin). Never a stronger CR.</string>
+    <string name="learner_cr_seen" comment="%1$s=meal block name, %2$.0f=share of meals followed by a low, percent">%1$s: low after %2$.0f %% of meals</string>
+    <string name="learner_cr_change" comment="%1$s=meal block, %2$.1f=CR now g/U, %3$.1f=CR proposed g/U">%1$s: CR %2$.1f -> %3$.1f g/U</string>
+    <string name="learner_block_breakfast">Breakfast (05-11)</string>
+    <string name="learner_block_lunch">Lunch (11-16)</string>
+    <string name="learner_block_dinner">Dinner (16-21)</string>
+    <string name="learner_notice_cr">Learner: a proposal for the CR of one meal (less insulin) waits for your answer.</string>
+    <string name="learner_why_cr_proposal" comment="%1$s=meal block, %2$.0f=share of meals followed by a low, percent">Learner: %1$s ends low after %2$.0f %% of meals; proposal: CR 10 %% weaker (waits for your answer).</string>
+    <string name="learner_why_cr_applied" comment="%1$s=meal block">Learner: CR of %1$s is 10 %% weaker now; it is judged in 3 days.</string>
+    <string name="learner_eval_label_cr" comment="%1$s=meal block">CR %1$s</string>
+    <string name="learner_switch_note_cr">Learner: CR of one meal</string>
 </resources>

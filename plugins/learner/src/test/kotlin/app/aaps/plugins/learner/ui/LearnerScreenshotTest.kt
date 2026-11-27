@@ -32,6 +32,7 @@ import app.aaps.plugins.learner.BasalChange
 import app.aaps.plugins.learner.BasalProposal
 import app.aaps.plugins.learner.CannulaHint
 import app.aaps.plugins.learner.ChangeEval
+import app.aaps.plugins.learner.CrProposal
 import app.aaps.plugins.learner.DoneEval
 import app.aaps.plugins.learner.DuraProposal
 import app.aaps.plugins.learner.EvalStats
@@ -155,6 +156,14 @@ class LearnerScreenshotTest {
                 WeekStats(84.0, 3.1, 0.4, 12.9, 30.5, 126.0, 15.6, 24.0, 2016),
                 WeekStats(79.0, 5.4, 0.7, 15.6, 33.8, 122.0, 15.1, 33.0, 2016), 1, 4
             ))
+    )
+
+    @Test
+    fun crProposal() = shoot(
+        "learner_cr_proposal",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            crProposal = CrProposal("TestProfile", "DINNER", NOW - HOUR, 51.0, (16..20).associateWith { 25.83 }, (16..20).associateWith { 28.41 }),
+            lastCr = mapOf("BREAKFAST" to 22.0, "LUNCH" to 24.0, "DINNER" to 51.0))
     )
 
     private fun shoot(name: String, status: Status) {

@@ -74,6 +74,9 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onRefuseDura = plugin::refuseDura,
         onAcceptPct = plugin::acceptPct,
         onRefusePct = plugin::refusePct,
+        onAcceptCr = plugin::acceptCr,
+        onRefuseCr = plugin::refuseCr,
+        blockName = plugin::blockName,
         onSensorHints = plugin::setSensorHints,
         onCannulaHints = plugin::setCannulaHints,
         onEval = plugin::setEvalOn,
@@ -91,6 +94,9 @@ internal fun LearnerScreenContent(
     onRefuseDura: () -> Unit,
     onAcceptPct: () -> Unit = {},
     onRefusePct: () -> Unit = {},
+    onAcceptCr: () -> Unit = {},
+    onRefuseCr: () -> Unit = {},
+    blockName: (String) -> String = { it },
     onSensorHints: (Boolean) -> Unit = {},
     onCannulaHints: (Boolean) -> Unit = {},
     onEval: (Boolean) -> Unit = {},
@@ -145,6 +151,7 @@ internal fun LearnerScreenContent(
         } ?: Text(stringResource(R.string.learner_no_proposal), style = MaterialTheme.typography.bodyMedium)
 
         PctSection(status, onAcceptPct, onRefusePct)
+        CrSection(status, onAcceptCr, onRefuseCr, blockName)
         DuraSection(status, onAcceptDura, onRefuseDura)
         SensorSection(status, onSensorHints)
         CannulaSection(status, onCannulaHints)
@@ -372,4 +379,40 @@ private fun WeekLine(label: Int, w: WeekStats) {
         ),
         style = MaterialTheme.typography.bodySmall
     )
+}
+
+/** The CR block card (safety, only a weaker CR): what it saw per block, its rule, and a proposal with "Внести" / "Отказаться". */
+@Composable
+private fun CrSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Unit, blockName: (String) -> String) {
+    var confirm by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Text(stringResource(R.string.learner_cr_title), style = MaterialTheme.typography.titleMedium)
+            status.lastCr?.takeIf { it.isNotEmpty() }?.let { m ->
+                m.forEach { (block, pct) -> Text(stringResource(R.string.learner_cr_seen, blockName(block), pct), style = MaterialTheme.typography.bodyMedium) }
+            }
+            Text(stringResource(R.string.learner_cr_rule), style = MaterialTheme.typography.bodySmall)
+            status.crProposal?.let { p ->
+                val from = p.from.values.firstOrNull() ?: 0.0
+                val to = p.to.values.firstOrNull() ?: 0.0
+                Text(stringResource(R.string.learner_cr_change, blockName(p.block), from, to), fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
+                    Button(onClick = { confirm = true }, enabled = !status.busy) { Text(stringResource(R.string.learner_accept)) }
+                    OutlinedButton(onClick = onRefuse, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
+                }
+                if (confirm) AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text(stringResource(R.string.learner_cr_title)) },
+                    text = { Text(stringResource(R.string.learner_cr_change, blockName(p.block), from, to), fontWeight = FontWeight.SemiBold) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirm = false
+                            onAccept()
+                        }) { Text(stringResource(R.string.learner_accept)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
+                )
+            }
+        }
+    }
 }

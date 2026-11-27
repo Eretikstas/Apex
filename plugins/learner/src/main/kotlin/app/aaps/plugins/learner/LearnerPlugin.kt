@@ -82,6 +82,9 @@ class LearnerPlugin(
         val nextCardAt: Long = 0L,
         val proposal: BasalProposal? = null,
         val duraProposal: DuraProposal? = null,
+        /** The CR block card: a proposal (weaker CR of one block) and the last shares of meals ending low per block. */
+        val crProposal: CrProposal? = null,
+        val lastCr: Map<String, Double>? = null,
         /** The last dura card: flat highs and lows in percent. */
         val lastDura: Pair<Double, Double>? = null,
         val dura: Double = 0.0,
@@ -172,6 +175,10 @@ class LearnerPlugin(
         val duraCard = DuraCardEngine.card(steps.takeLast(DuraCardEngine.DAYS * STEPS_PER_DAY), dura)
         store.lastDura = Pair(duraCard.flatHighPct, duraCard.lowPct)
         aapsLogger.debug(LTag.APS, "Learner: dura card $duraCard")
+        // The CR block card looks at the same 14 days (it only proposes a WEAKER CR).
+        val crCard = CrBlockCardEngine.card(steps.takeLast(CrBlockCardEngine.DAYS * STEPS_PER_DAY))
+        store.lastCr = crCard.lowPct.mapKeys { it.key.name }
+        aapsLogger.debug(LTag.APS, "Learner: CR block card $crCard")
         // One change at a time: the basal first; nothing new while the last applied change is still judged.
         val judging = store.lastAppliedAt > 0 && now - store.lastAppliedAt < CARD_EVERY_MS - 2 * 3_600_000L
         when {
@@ -187,6 +194,18 @@ class LearnerPlugin(
                 store.proposal = null
                 store.duraProposal = DuraProposal(dura, duraCard.to, now, duraCard.flatHighPct, duraCard.lowPct)
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_dura), level = NotificationLevel.INFO)
+            }
+
+            crCard.weaker != null       -> {
+                val block = crCard.weaker
+                val icHours = hourly(single.ic)
+                store.proposal = null
+                store.duraProposal = null
+                store.crProposal = CrProposal(
+                    name, block.name, now, crCard.lowPct[block] ?: 0.0,
+                    (block.fromHour until block.toHour).associateWith { icHours[it] }, CrBlockCardEngine.weakerHours(icHours, block)
+                )
+                notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_cr), level = NotificationLevel.INFO)
             }
 
             else                        -> note(rh.gs(R.string.learner_why_no_change), now, NOTE_SHORT_MS)
@@ -282,7 +301,7 @@ class LearnerPlugin(
         val running = profileFunction.getRequestedProfile()
         if (running != null && running.duration > 0L) return
         store.lastPctDay = today
-        if (store.proposal != null || store.duraProposal != null || store.pctProposal != null) return
+        if (store.proposal != null || store.duraProposal != null || store.pctProposal != null || store.crProposal != null) return
         if (now - store.lastPctAppliedAt < PCT_GAP_MS) return
         val nowPct = running?.percentage ?: 100
         val card = PctCardEngine.card(history.steps(now, PctCardEngine.DAYS), nowPct)
@@ -491,6 +510,74 @@ class LearnerPlugin(
         refresh(rh.gs(R.string.learner_refused))
     }
 
+    /** "Внести" for the CR block card: the block hours of the profile get the weaker CR; switched to like the basal. */
+    fun acceptCr() {
+        if (!applying.compareAndSet(false, true)) return
+        setBusy(true)
+        scope.launch {
+            try {
+                applyCr()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                aapsLogger.error(LTag.APS, "Learner: applying the CR proposal failed", e)
+                finish(rh.gs(R.string.learner_profile_invalid, e.message.orEmpty()))
+            } finally {
+                applying.set(false)
+            }
+        }
+    }
+
+    private suspend fun applyCr() {
+        val p = store.crProposal ?: return finish("")
+        val running = profileFunction.getRequestedProfile()
+        if (running != null && running.duration > 0L) return finish(rh.gs(R.string.learner_wait_temporary))
+        val index = profileRepository.profiles.value.indexOfFirst { it.name == p.profileName }
+        val single = profileRepository.profiles.value.getOrNull(index) ?: return finish(rh.gs(R.string.learner_profile_gone))
+        val ic = hourly(single.ic)
+        if (p.from.any { (h, v) -> abs(ic[h] - v) > 0.005 }) {
+            store.crProposal = null
+            return finish(rh.gs(R.string.learner_profile_changed))
+        }
+        val edited = single.copy(ic = withHours(single.ic, p.to))
+        val percentage = running?.percentage ?: 100
+        val errors = profileRepository.validateStructured(edited) + profileRepository.validatePumpCompatibility(edited, percentage)
+        if (errors.isNotEmpty()) return finish(rh.gs(R.string.learner_profile_invalid, errors.joinToString { it.toString() }))
+        val saved = profileRepository.replace(index, edited)
+        if (saved.isFailure) return finish(rh.gs(R.string.learner_profile_invalid, saved.exceptionOrNull()?.message.orEmpty()))
+        val now = dateUtil.now()
+        val profileStore = profileRepository.profile.value
+        val iCfg = running?.iCfg ?: profileFunction.getProfile()?.iCfg
+        val switch = if (profileStore != null && iCfg != null) profileFunction.createProfileSwitch(
+            profileStore = profileStore, profileName = p.profileName, durationInMinutes = 0, percentage = percentage,
+            timeShiftInHours = ((running?.timeshift ?: 0L) / HOUR_MS).toInt(), timestamp = now,
+            action = Action.PROFILE_SWITCH, source = Sources.Aaps, note = rh.gs(R.string.learner_switch_note_cr),
+            listValues = emptyList(), iCfg = iCfg
+        ) else null
+        store.crProposal = null
+        store.lastAppliedAt = now
+        val label = rh.gs(R.string.learner_eval_label_cr, blockName(p.block))
+        startEval(label, now)
+        note(rh.gs(R.string.learner_why_cr_applied, blockName(p.block)), now, NOTE_LONG_MS)
+        aapsLogger.debug(LTag.APS, "Learner: CR of ${p.block} ${p.from} -> ${p.to}, switch=${switch != null}")
+        finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
+    }
+
+    fun refuseCr() {
+        store.crProposal = null
+        loopNotes.clear(NOTE_SOURCE)
+        refresh(rh.gs(R.string.learner_refused))
+    }
+
+    /** The block name in the user's language. */
+    fun blockName(block: String): String = rh.gs(
+        when (block) {
+            MealBlock.BREAKFAST.name -> R.string.learner_block_breakfast
+            MealBlock.LUNCH.name     -> R.string.learner_block_lunch
+            else                     -> R.string.learner_block_dinner
+        }
+    )
+
     fun refuseDura() {
         store.duraProposal = null
         loopNotes.clear(NOTE_SOURCE)
@@ -521,6 +608,8 @@ class LearnerPlugin(
         val now = dateUtil.now()
         store.proposal?.let { if (now - it.madeAt > PROPOSAL_MAX_AGE_MS) store.proposal = null }
         store.duraProposal?.let { if (now - it.madeAt > PROPOSAL_MAX_AGE_MS) store.duraProposal = null }
+        store.crProposal?.let { if (now - it.madeAt > PROPOSAL_MAX_AGE_MS) store.crProposal = null }
+        store.crProposal?.let { note(rh.gs(R.string.learner_why_cr_proposal, blockName(it.block), it.lowPct), it.madeAt, PROPOSAL_NOTE_MS) }
         // A waiting proposal is always in the "why", also after a restart of the app.
         store.proposal?.let { note(rh.gs(R.string.learner_why_proposal, it.changes.size), it.madeAt, PROPOSAL_NOTE_MS) }
         store.duraProposal?.let { note(rh.gs(R.string.learner_why_dura_proposal, it.from, it.to), it.madeAt, PROPOSAL_NOTE_MS) }
@@ -531,6 +620,8 @@ class LearnerPlugin(
             nextCardAt = nextCardAt(last),
             proposal = store.proposal,
             duraProposal = store.duraProposal,
+            crProposal = store.crProposal,
+            lastCr = store.lastCr,
             lastDura = store.lastDura,
             pctProposal = store.pctProposal,
             lastPct = store.lastPct,
