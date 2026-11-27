@@ -371,6 +371,15 @@ class LearnerStore(private val preferences: Preferences) {
         const val KEY_CANNULA_HINTS = "cannula_hints"
         const val KEY_LOW_MEAL = "low_meal_hints"
         const val KEY_SENSOR_HINTS = "sensor_hints"
+    /** The rebound guard is on (the user's switch). Off by default. */
+    var reboundOn: Boolean
+        get() = read().optBoolean(KEY_REBOUND_ON, false)
+        set(value) = edit { put(KEY_REBOUND_ON, value) }
+
+    private companion object {
+
+        const val KEY_REBOUND_ON = "rebound_on"
+
         const val KEY_LAST_CARD = "last_card_at"
         const val KEY_DIR = "card_dir"
         const val KEY_COUNT = "card_count"

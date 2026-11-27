@@ -41,6 +41,7 @@ import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.HypoSize
 import app.aaps.plugins.learner.LowCause
 import app.aaps.plugins.learner.LowEpisode
+import app.aaps.plugins.learner.GuardState
 import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.PeakFit
 import app.aaps.plugins.learner.PendingEval
@@ -194,6 +195,10 @@ class LearnerScreenshotTest {
         "learner_peak_forecast",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
             peakFitOn = true, peakFit = PeakFit(35, 55, 0.41, 0.12, 640, 9), lowPredOn = true, lowPredMargin = 9.0, lowPredStats = Pair(6, 3))
+    fun reboundGuard() = shoot(
+        "learner_rebound_guard",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            reboundOn = true, guard = GuardState(true, NOW - 20 * 60_000L, NOW + 100 * 60_000L))
     )
 
     private fun shoot(name: String, status: Status) {

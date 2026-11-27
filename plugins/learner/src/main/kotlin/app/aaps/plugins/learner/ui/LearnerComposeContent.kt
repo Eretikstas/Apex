@@ -89,7 +89,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onCannulaHints = plugin::setCannulaHints,
         onLowMealHints = plugin::setLowMealHints,
         onEval = plugin::setEvalOn,
-        onDigest = plugin::setDigestOn
+        onDigest = plugin::setDigestOn,
+        onRebound = plugin::setReboundOn
     )
 }
 
@@ -115,7 +116,8 @@ internal fun LearnerScreenContent(
     onCannulaHints: (Boolean) -> Unit = {},
     onLowMealHints: (Boolean) -> Unit = {},
     onEval: (Boolean) -> Unit = {},
-    onDigest: (Boolean) -> Unit = {}
+    onDigest: (Boolean) -> Unit = {},
+    onRebound: (Boolean) -> Unit = {}
 ) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
@@ -171,6 +173,7 @@ internal fun LearnerScreenContent(
             )
         } ?: Text(stringResource(R.string.learner_no_proposal), style = MaterialTheme.typography.bodyMedium)
 
+        ReboundSection(status, onRebound)
         PctSection(status, onAcceptPct, onRefusePct)
         HypoSizeSection(status)
         CrSection(status, onAcceptCr, onRefuseCr, blockName)
@@ -585,4 +588,39 @@ private fun LowPredSection(status: Status, onSwitch: (Boolean) -> Unit) {
             )
         }
     }
+/**
+ * The rebound guard: the switch (off by default), its rule, and whether it holds the loop now. A switch to "on" asks
+ * first, because this one changes what the loop does (it only takes insulin away).
+ */
+@Composable
+private fun ReboundSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    var confirm by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_guard_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.reboundOn, onCheckedChange = { on -> if (on) confirm = true else onSwitch(false) })
+            }
+            Text(stringResource(R.string.learner_guard_rule), style = MaterialTheme.typography.bodySmall)
+            if (status.reboundOn) Text(
+                if (status.guard.active) stringResource(R.string.learner_guard_holds, dateUtil.timeString(status.guard.until))
+                else stringResource(R.string.learner_guard_idle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (status.guard.active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+    if (confirm) AlertDialog(
+        onDismissRequest = { confirm = false },
+        title = { Text(stringResource(R.string.learner_guard_title)) },
+        text = { Text(stringResource(R.string.learner_guard_confirm)) },
+        confirmButton = {
+            TextButton(onClick = {
+                confirm = false
+                onSwitch(true)
+            }) { Text(stringResource(R.string.learner_guard_turn_on)) }
+        },
+        dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
+    )
 }
