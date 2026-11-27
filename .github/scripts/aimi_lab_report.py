@@ -40,13 +40,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def get(url: str, raw: bool = False):
+def get(url: str, raw: bool = False, timeout: int = 120):
     headers = {"Accept": "application/vnd.github+json"}
     if TOKEN:
         headers["Authorization"] = f"Bearer {TOKEN}"
     opener = urllib.request.build_opener(NoRedirect)
     try:
-        with opener.open(urllib.request.Request(url, headers=headers), timeout=120) as r:
+        with opener.open(urllib.request.Request(url, headers=headers), timeout=timeout) as r:
             data = r.read()
     except urllib.error.HTTPError as e:
         if e.code not in (301, 302, 303, 307, 308):
@@ -55,7 +55,7 @@ def get(url: str, raw: bool = False):
         if not location:
             raise
         # The signed storage URL authorizes itself; never send the GitHub token to it.
-        with urllib.request.urlopen(urllib.request.Request(location), timeout=120) as r:
+        with urllib.request.urlopen(urllib.request.Request(location), timeout=timeout) as r:
             data = r.read()
     return data.decode("utf-8", "replace") if raw else json.loads(data)
 
@@ -75,7 +75,7 @@ def log_lines(job_id: int):
     reason = "empty response"
     for _ in range(10):
         try:
-            text = get(f"{API}/jobs/{job_id}/logs", raw=True)
+            text = get(f"{API}/jobs/{job_id}/logs", raw=True, timeout=30)
             if text.strip():
                 # Each line starts with an ISO time stamp and a space.
                 return [re.sub(r"^\S+Z ", "", line).strip() for line in text.splitlines()]
