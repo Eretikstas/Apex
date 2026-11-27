@@ -155,6 +155,9 @@
   26.7, RGAPP2 120 min + RGNOMEAL 4.77 / 0.23 / 4.57 / 28.1 / 27.7 - no clear gain (within seed noise). Conclusion: more
   insulin control around a meal after a hypo does not remove those lows in the model; the guard's reach is the pure
   rebounds (~15 % of real low time). The bigger shares are lows after meals (37 %) and night/basal (27 %).
+- v7 `46038542283` (`NIGHTT_<mg/dL>`: loop target 21-06 h) on the best set, means of seeds 1-3:
+  NIGHTT_126 (7.0) 4.43 / 0.17 / 5.97 / 28.6 / 26.2; NIGHTT_135 (7.5) 4.10 / 0.23 / 6.87 / 29.1 / 23.3 (best set 4.67 /
+  0.17 / 4.77 / 28.2 / 26.7). Fewer lows and hypo carbs, more highs: a trade-off for the family to decide.
 - The app guard was changed to these values (branch `learner-rebound`, `d25ae63a`). ChatGPT: after the
   re-calibration, run RGAPP2,RGWIN_180,RGCAP_1.0,SPLITAPP against CAL on the new model (more seeds if you can).
 
