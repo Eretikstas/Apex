@@ -2,6 +2,23 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — inherited MEALAUDIT / SPLITRISK diagnostic (run 46022123724)
+
+- The pre-existing 12-job RUN from commit `934287dc` completed successfully; compile of source `f4a6c9bc` was green, 12/12 replay jobs succeeded, and the seed-1 CAL `CTRL13A` control matched exactly (PASS). This batch is separate from Step 16 and is not the final post-guard split-bolus validation.
+- Mean metrics across seeds (BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day):
+
+| Variant | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day |
+|---|---:|---:|---:|---:|---:|---:|
+| CAL | 4.93 | 0.30 | 4.80 | 28.77 | 28.99 | 11.44 |
+| RGAPP2 + SPLITAPP (BEST) | 4.67 | 0.17 | 4.77 | 28.20 | 26.67 | 11.36 |
+| BEST + SPLITRISK_30 | 4.87 | 0.27 | 4.60 | 28.27 | 26.67 | 11.40 |
+| BEST + SPLITRISK_0 | 5.03 | 0.23 | 4.53 | 28.57 | 28.21 | 11.42 |
+
+- SPLITRISK_30 and SPLITRISK_0 did not improve the low metrics consistently versus BEST; neither is selected. They remain lab-only and are not an app implementation. Re-test split bolus after the user's required rebound-guard sequence.
+- MEALAUDIT (12 jobs pooled): meals after hypo treatment had a low within 4 h in 324/472 (68.6%); falling-glucose meals 218/389 (56.0%); both flags 98/116 (84.5%); other meals 166/595 (27.9%). This is an association in the synthetic replay audit, not a causal proof or dose rule.
+- Report: [run 46022123724](https://github.com/Eretikstas/Apex/actions/runs/46022123724). No app code, bench branch, hints branch, phone, or Nightscout was touched.
+
+
 ### 2026-11-27 — Step 16 attempt 2 audited; attempt 3 submitted
 
 - Attempt 2 replay [45965576265](https://github.com/Eretikstas/Apex/actions/runs/45965576265), source `f051dd99`: 6/6 jobs succeeded; the no-LCR3 `CTRL13A` control exactly matched the Step-13a seed-1 reference and is PASS.
