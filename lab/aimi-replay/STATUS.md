@@ -2,6 +2,12 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — SHAPEAUDIT baseline replay started
+
+- Dispatcher `46056094075` wrote `dispatch-80fd2aaf.md`: compile `6f883d7c` green; lab free; **STARTED** replay `46057061061` from RUN retry `80fd2aaf`.
+- Three replay jobs are active: `SYNTH_56`, APP + CAL usual, seeds 1–3; seed 1 includes `CTRL13A`. Plan job passed; comparison-test was skipped as expected. No per-seed SHAPEAUDIT values are published yet.
+
+
 ### 2026-11-27 — SHAPEAUDIT source compile gate PASS
 
 - Exact source commit `6f883d7c5d6644fc6ec6aa878313927d979c02a1`; compile run `46055486474`; public report `compile-6f883d7c.md`: **SUCCESS**. All 11 checks passed: test-source compilation, AutoISF boundaries, HistoryReplayTest helper tests (including SHAPEAUDIT normalization), adaptation status builder/presenter, APSResult wrapper, laboratory FullDebug APK assembly, and APK upload.
