@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -20,26 +21,50 @@ ERR = re.compile(r"(^e: |FAILED|What went wrong|FAILURES!!!|Tests run:|OK \(\d+ 
                  r"Test classes that did not pass|expected to be|AssertionError|BUILD FAILED)")
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """The log endpoint answers with a redirect to a signed storage link: follow it ourselves, WITHOUT our token."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def get(url: str, raw: bool = False):
     headers = {"Accept": "application/vnd.github+json"}
     if TOKEN:
         headers["Authorization"] = f"Bearer {TOKEN}"
-    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=120) as r:
-        data = r.read()
+    opener = urllib.request.build_opener(NoRedirect)
+    try:
+        with opener.open(urllib.request.Request(url, headers=headers), timeout=120) as r:
+            data = r.read()
+    except urllib.error.HTTPError as e:
+        if e.code not in (301, 302, 303, 307, 308):
+            raise
+        # The storage link carries its own signature; a token sent there can make it fail.
+        with urllib.request.urlopen(urllib.request.Request(e.headers["Location"]), timeout=120) as r:
+            data = r.read()
     return data.decode("utf-8", "replace") if raw else json.loads(data)
 
 
 def log_lines(job_id: int):
-    """A job log is readable only some minutes after the job ends: ask again for up to about 10 minutes."""
-    for _ in range(20):
+    """
+    A job log can be not ready for some minutes after the job ends (404): ask again for up to about 5 minutes.
+    Any other error will not go away by waiting: stop at once. Never silent: a log that could not be read gives one
+    line "LOG NOT READ: <reason>".
+    """
+    reason = "empty"
+    for _ in range(10):
         try:
             text = get(f"{API}/jobs/{job_id}/logs", raw=True)
             if text.strip():
                 return [re.sub(r"^\S+Z ", "", l).rstrip() for l in text.splitlines()]
-        except Exception:
-            pass
+        except urllib.error.HTTPError as e:
+            reason = f"HTTP {e.code} {e.read()[:200]!r}"
+            if e.code != 404:
+                break
+        except Exception as e:
+            reason = repr(e)[:200]
         time.sleep(30)
-    return ["(LOG NOT READY)"]
+    return [f"LOG NOT READ: {reason}"]
 
 
 def main(run_id: str, out: Path) -> Path:
@@ -56,7 +81,7 @@ def main(run_id: str, out: Path) -> Path:
         if failed:
             lines.append(f"- Failed steps: {', '.join(failed)}")
         if j["conclusion"] not in ("skipped",):
-            hits = [l for l in log_lines(j["id"]) if ERR.search(l) and "[36;1m" not in l]
+            hits = [l for l in log_lines(j["id"]) if (ERR.search(l) or l.startswith("LOG NOT READ")) and "[36;1m" not in l]
             seen = set()
             hits = [l for l in hits if not (l in seen or seen.add(l))]
             if hits:
