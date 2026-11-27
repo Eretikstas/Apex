@@ -25,7 +25,7 @@
   - TREAT_15: prior-insulin 62, COB minimum-rate 40, prior hypo/rebound 17, SMB within 6 h 3.
 - Attempt 2 is a real screening failure (no accepted observations; no planted direction demonstrated), not a replay/infrastructure failure. It is NOT a §4a stop: candidate screening failures are results, and the CTRL13A control passed. MEALX_0.7 is not an independent negative because it is already part of CAL.
 - Procedure mismatch found: RUN.txt's comment said diagnostic source `f051dd99`, but dispatcher `dispatch-a4c4de27.md` records code commit `0dc64d56`. The six job logs confirm the old combined `prior-insulin` reason, so attempt 2 did not run the diagnostic split. Commit `f051dd99` (split prior-SMB vs prior-manual rejection reasons) was created at 07:29:31 UTC, after the attempt-2 replay jobs had completed around 07:23 UTC.
-- Attempt 3 now uses the same six-job matrix, with a new RUN commit created AFTER `f051dd99`; the dispatcher must compile that exact source before replay. This is the third and final attempt for Step 16. After its result, record the screen and proceed to Step 17 unless a §4a stop occurs.
+- Attempt 3 RUN commit `7fcf5d94` was created after `f051dd99`, with the same six-job matrix. At this check, `dispatch-7fcf5d94.md` and `compile-f051dd99.md` have not yet appeared, so no attempt-3 replay run ID is available; the dispatcher compile gate is pending. This is the third and final attempt for Step 16. After its result, record the screen and proceed to Step 17 unless a §4a stop occurs.
 - Bench branch `autoisf-atc3` remains frozen at `6f578b5b`; no app code is pushed there.
 
 ### Handoff §13 re-audit — corrected result files (2026-11-26)
