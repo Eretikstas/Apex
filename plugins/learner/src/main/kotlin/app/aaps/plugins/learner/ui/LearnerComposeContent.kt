@@ -71,7 +71,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onRefuseDura = plugin::refuseDura,
         onAcceptPct = plugin::acceptPct,
         onRefusePct = plugin::refusePct,
-        onSensorHints = plugin::setSensorHints
+        onSensorHints = plugin::setSensorHints,
+        onCannulaHints = plugin::setCannulaHints
     )
 }
 
@@ -85,7 +86,8 @@ internal fun LearnerScreenContent(
     onRefuseDura: () -> Unit,
     onAcceptPct: () -> Unit = {},
     onRefusePct: () -> Unit = {},
-    onSensorHints: (Boolean) -> Unit = {}
+    onSensorHints: (Boolean) -> Unit = {},
+    onCannulaHints: (Boolean) -> Unit = {}
 ) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
@@ -138,6 +140,7 @@ internal fun LearnerScreenContent(
         PctSection(status, onAcceptPct, onRefusePct)
         DuraSection(status, onAcceptDura, onRefuseDura)
         SensorSection(status, onSensorHints)
+        CannulaSection(status, onCannulaHints)
 
         if (status.hours.isNotEmpty()) {
             Text(stringResource(R.string.learner_hours_title), style = MaterialTheme.typography.titleMedium)
@@ -253,6 +256,26 @@ private fun SensorSection(status: Status, onSwitch: (Boolean) -> Unit) {
                             R.string.learner_sensor_last_jump, dateUtil.dateAndTimeString(h.at), (h.fromMgdl ?: 0.0) / 18.0, (h.toMgdl ?: 0.0) / 18.0
                         )
                     },
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+/** The cannula hint: the switch (off by default), its rule, and the hint shown now. Only text, nothing is changed. */
+@Composable
+private fun CannulaSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_cannula_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.cannulaHints, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_cannula_rule), style = MaterialTheme.typography.bodySmall)
+            if (status.cannulaHints) status.cannulaHint?.let { h ->
+                Text(
+                    stringResource(R.string.learner_cannula_now, h.ageH, h.highPct),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary
                 )
             }

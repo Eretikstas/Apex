@@ -94,6 +94,9 @@ class LearnerPlugin(
         /** The sensor hint switch (off by default) and the last hint given. */
         val sensorHints: Boolean = false,
         val sensorHint: SensorHint? = null,
+        /** The cannula hint switch (off by default) and the hint shown now. */
+        val cannulaHints: Boolean = false,
+        val cannulaHint: CannulaHint? = null,
     )
 
     private val store = LearnerStore(prefs)
@@ -112,6 +115,7 @@ class LearnerPlugin(
                 runCatching { maybeRunCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: card failed", it) }
                 runCatching { maybeRunPctCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: percentage card failed", it) }
                 runCatching { checkSensor() }.onFailure { aapsLogger.error(LTag.APS, "Learner: sensor hint failed", it) }
+                runCatching { checkCannula() }.onFailure { aapsLogger.error(LTag.APS, "Learner: cannula hint failed", it) }
                 delay(TICK_MS)
             }
         }
@@ -304,6 +308,33 @@ class LearnerPlugin(
         _status.value = _status.value.copy(sensorHint = hint)
     }
 
+    /**
+     * The cannula hint (advisor, off by default): a cannula of 60 hours or more and 40 % or more over 10 mmol/L in the
+     * last 6 hours -> a note in the overview "why" (`CannulaHintEngine`). Only text, nothing is changed.
+     */
+    private suspend fun checkCannula() {
+        if (!store.cannulaHints) return
+        val now = dateUtil.now()
+        val (changeAt, readings) = history.cannulaWatch(now)
+        val hint = CannulaHintEngine.check(now, changeAt, readings)
+        if (hint == null) {
+            loopNotes.clear(CANNULA_NOTE_SOURCE)
+        } else {
+            // Valid a bit longer than one tick: the next tick puts it again or removes it.
+            loopNotes.put(LoopNote(CANNULA_NOTE_SOURCE, rh.gs(R.string.learner_why_cannula, hint.ageH, hint.highPct), now, now + 2 * TICK_MS))
+            if (_status.value.cannulaHint == null) aapsLogger.debug(LTag.APS, "Learner: cannula hint $hint")
+        }
+        _status.value = _status.value.copy(cannulaHint = hint)
+    }
+
+    /** The user's switch for the cannula hint. Off also removes a hint that is shown now. */
+    fun setCannulaHints(on: Boolean) {
+        store.cannulaHints = on
+        if (!on) loopNotes.clear(CANNULA_NOTE_SOURCE)
+        _status.value = _status.value.copy(cannulaHints = on, cannulaHint = if (on) _status.value.cannulaHint else null)
+        if (on) scope.launch { runCatching { checkCannula() }.onFailure { aapsLogger.error(LTag.APS, "Learner: cannula hint failed", it) } }
+    }
+
     /** The user's switch for the sensor hint. Off also removes a hint that is shown now. */
     fun setSensorHints(on: Boolean) {
         store.sensorHints = on
@@ -416,6 +447,8 @@ class LearnerPlugin(
             busy = false,
             sensorHints = store.sensorHints,
             sensorHint = _status.value.sensorHint,
+            cannulaHints = store.cannulaHints,
+            cannulaHint = _status.value.cannulaHint,
         )
     }
 
@@ -457,6 +490,7 @@ class LearnerPlugin(
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
         const val SENSOR_NOTE_SOURCE = "learner_sensor"
+        const val CANNULA_NOTE_SOURCE = "learner_cannula"
         const val MGDL_PER_MMOL = 18.0
     }
 }

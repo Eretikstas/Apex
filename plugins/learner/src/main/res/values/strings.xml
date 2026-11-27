@@ -62,4 +62,8 @@
     <string name="learner_sensor_last_jump" comment="%1$s=date and time of the reading, %2$.1f=value before (mmol/L), %3$.1f=value after (mmol/L)">Jump at %1$s: %2$.1f -> %3$.1f in 5 minutes.</string>
     <string name="learner_why_sensor_first_hours">Learner: sensor changed less than 2 h ago, values may be wrong. Do not calibrate; check with a finger stick.</string>
     <string name="learner_why_sensor_jump" comment="%1$.1f=value before, %2$.1f=value after, both mmol/L">Learner: %1$.1f -> %2$.1f in 5 min after a sensor change, maybe false. Do not calibrate; check with a finger stick.</string>
+    <string name="learner_cannula_title">Cannula hint</string>
+    <string name="learner_cannula_rule" formatted="false">Off by default. A cannula of 60 hours or more and 40 % or more of the last 6 hours over 10 mmol/L: probably the cannula, consider a change. Only a note, nothing is changed. Rule from the real data: with an old cannula such hours were 3 to 5 times more often.</string>
+    <string name="learner_cannula_now" comment="%1$.0f=cannula age in hours, %2$.0f=share over 10 mmol/L in the last 6 hours, percent">Cannula %1$.0f h, over 10 for %2$.0f %% of the last 6 h.</string>
+    <string name="learner_why_cannula" comment="%1$.0f=cannula age in hours, %2$.0f=share over 10 mmol/L in the last 6 hours, percent">Learner: cannula %1$.0f h and over 10 for %2$.0f %% of 6 h - probably the cannula, consider a change.</string>
 </resources>

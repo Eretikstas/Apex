@@ -30,6 +30,7 @@ import app.aaps.core.ui.compose.LocalPreferences
 import app.aaps.core.ui.compose.LocalProfileUtil
 import app.aaps.plugins.learner.BasalChange
 import app.aaps.plugins.learner.BasalProposal
+import app.aaps.plugins.learner.CannulaHint
 import app.aaps.plugins.learner.DuraProposal
 import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.HourResult
@@ -122,7 +123,8 @@ class LearnerScreenshotTest {
     fun sensorHint() = shoot(
         "learner_sensor_hint",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
-            sensorHints = true, sensorHint = SensorHint(SensorHintKind.JUMP, NOW - 10 * HOUR, NOW - 10 * 60_000L, 54.0, 81.0))
+            sensorHints = true, sensorHint = SensorHint(SensorHintKind.JUMP, NOW - 10 * HOUR, NOW - 10 * 60_000L, 54.0, 81.0),
+            cannulaHints = true, cannulaHint = CannulaHint(66.0, 47.0))
     )
 
     private fun shoot(name: String, status: Status) {

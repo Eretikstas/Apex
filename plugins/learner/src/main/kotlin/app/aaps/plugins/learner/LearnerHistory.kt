@@ -91,6 +91,17 @@ class LearnerHistory(
         return Pair(change, readings)
     }
 
+    /**
+     * For the cannula hint: the last cannula change logged in AAPS within 10 days before [now] (null if none) and the
+     * readings of the last [CannulaHintEngine.WINDOW_MS], as (time, mg/dL).
+     */
+    suspend fun cannulaWatch(now: Long): Pair<Long?, List<Pair<Long, Double>>> {
+        val change = persistenceLayer.getTherapyEventDataFromToTime(now - 10 * 86_400_000L, now)
+            .filter { it.type == TE.Type.CANNULA_CHANGE }.maxOfOrNull { it.timestamp } ?: return Pair(null, emptyList())
+        val readings = persistenceLayer.getBgReadingsDataFromTimeToTime(now - CannulaHintEngine.WINDOW_MS, now, true).map { it.timestamp to it.value }
+        return Pair(change, readings)
+    }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0
