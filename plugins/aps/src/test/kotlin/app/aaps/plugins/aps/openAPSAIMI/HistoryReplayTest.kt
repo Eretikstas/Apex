@@ -1007,6 +1007,15 @@ class HistoryReplayTest {
         // given at 5.5 or more with a 15 min rise of 9 mg/dL or more, or a deviation of 2 or more.
         val splitApp = prefsText.contains("SPLITAPP"); val splitAppSlow = prefsText.contains("SPLITAPPSLOW")
         val appSplits = ArrayList<Split>(); var nSplitCovered = 0; var nRgHold = 0
+        // SPLITRISK_<pct>: with SPLITAPP, a RISKY meal (within 3 h after a hypo treatment, or glucose falling 0.3 mmol/L
+        // or more over the last 15 min) gets only <pct> % now, also when marked fast; the rest as any split rest.
+        // Real data 27.11: such meals were followed by a low in 58-70 % of cases (other meals 34 %).
+        val splitRisk = if (Regex("SPLITRISK_([0-9.]+)").containsMatchIn(prefsText)) tok("SPLITRISK", 60.0) / 100.0 else -1.0
+        // MEALAUDIT (report-only): for every meal of 13 g or more, was it within 3 h after a hypo treatment, was the glucose
+        // falling, and was there a reading under 70 within 4 h after it.
+        val mealAudit = prefsText.contains("MEALAUDIT")
+        class MealMark(val t: Long, val afterHypo: Boolean, val falling: Boolean)
+        val mealMarks = ArrayList<MealMark>()
         var pend: Pending? = null; var nDelayed = 0; var nFired = 0; var nCancel = 0; var delaySum = 0L
         // CHAIN_<pct>: a meal within 3 h after a hypo treatment gets only <pct> % of its meal part now (default 50); the rest
         // waits as a split part (seen rise, from SPLITMIN, dropped after 120 min). Breaks "low -> meal bolus -> low".
@@ -1823,6 +1832,9 @@ class HistoryReplayTest {
                 eatenList.add(Meal(t, ml.logged, ml.eaten, ml.a, ml.b))
                 Logged(t, ml.logged, ml.logged).also { logged.add(it); allLogged.add(it) }
                 nMeals++; mealThisTick += ml.logged
+                val mealAfterHypo = t - lastTreat < 180 * minute
+                val mealFalling = !sensorGapActive && readV.size > 15 && t - readT[readT.size - 16] <= 20 * minute && reading - readV[readV.size - 16] <= -5.4
+                if (mealAudit && ml.logged >= 13.0) mealMarks.add(MealMark(t, mealAfterHypo, mealFalling))
                 var iobAll = 0.0
                 for ((dt, u) in chain.manual + chain.ownSmb) iobAll += u * iobLeft((t - dt) / 60_000.0).first
                 val bIob = basalIob(t)
@@ -1843,7 +1855,8 @@ class HistoryReplayTest {
                     if (splitApp && ml.logged >= 13.0) {
                         val total = Math.round(maxOf(wiz, 0.0) / 0.05) * 0.05
                         val fastMark = if (markRnd.nextDouble() < 0.85) ml.a < 100.0 else ml.a >= 100.0
-                        val share = if (fastMark) 1.0 else if (splitAppSlow) 0.5 else 0.6
+                        val risky = splitRisk >= 0.0 && (mealAfterHypo || mealFalling)
+                        val share = if (risky) splitRisk else if (fastMark) 1.0 else if (splitAppSlow) 0.5 else 0.6
                         val first = Math.floor(total * share / 0.05 + 1e-9) * 0.05
                         giveBolus(t, first)
                         if (total - first >= 0.05) {
@@ -2523,6 +2536,16 @@ class HistoryReplayTest {
             crBlockVerdict()
         }
         println("AIMI replay: synthetic $days days, $nMeals meals, $nTreat hypo treatments, $nCorr rebound corrections, $failed failed ticks, smart: $nDelayed delayed, $nFired fired (avg ${if (nFired > 0) delaySum / nFired else 0} min), $nCancel cancelled, unlogged meals $nUnlog, late tail $nLate boluses ${"%.1f".format(lateU)} U, late basal floor $nLateB ticks, treatments avg ${if (nTreat > 0) "%.1f".format(treatSum / nTreat) else "-"} g, split: $nSplit, second part given $nSplitGiven, dropped $nSplitDrop")
+        if (mealAudit) {
+            fun lowAfter(m: MealMark): Boolean {
+                var i = readT.binarySearch(m.t + 15 * minute).let { if (it < 0) -it - 1 else it }
+                while (i < readT.size && readT[i] <= m.t + 240 * minute) { if (readV[i] < 70.0) return true; i++ }
+                return false
+            }
+            fun line(name: String, l: List<MealMark>) = "$name n=${l.size} low4h=${l.count { lowAfter(it) }} (${if (l.isEmpty()) 0 else 100 * l.count { lowAfter(it) } / l.size}%)"
+            println("AIMI audit MEALS: " + listOf(line("afterHypo", mealMarks.filter { it.afterHypo }), line("falling", mealMarks.filter { it.falling }),
+                line("afterHypoFalling", mealMarks.filter { it.afterHypo && it.falling }), line("other", mealMarks.filter { !it.afterHypo && !it.falling })).joinToString("; ") + " report-only")
+        }
         if (rgApp || splitApp) println("AIMI replay: app rules: rebound guard held $nRgHold loop runs; app split $nSplit, rest given $nSplitGiven, covered by SMB $nSplitCovered, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
