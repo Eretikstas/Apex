@@ -2,6 +2,13 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — lab report log retrieval
+
+- Fixed `.github/scripts/aimi_lab_report.py` in commit `7236396f`: GitHub job-log redirects now follow the signed storage URL without forwarding `GH_TOKEN`; only HTTP 404 is retried (10 × 30 s); other errors and empty logs are reported explicitly as `LOG NOT READ: ...`. A readable log is consumed immediately even if the expected marker is missing.
+- This is lab-report infrastructure only; no app code, synthetic model behaviour, workflows, or Claude's no-insulin hints changed. No compile gate required for this script-only commit.
+- Already-running Step 16 attempt-2 report `45957311944` uses its old checked-out script and is unaffected. Attempt 3 remains queued behind that run; check its dispatcher before another RUN change.
+
+
 ### 2026-11-27 — corrected ownership split (user update)
 
 - User supersedes the previous item-7 assignment: Claude now owns REBOUND GUARD core/rule/unit tests on branch `learner-rebound` based on `autoisf-atc3`; ChatGPT must NOT implement that core. Claude's implementation must be OFF by default, suppress-only (hold SMB and cap temp basal after hypo treatment), and must never add insulin.
