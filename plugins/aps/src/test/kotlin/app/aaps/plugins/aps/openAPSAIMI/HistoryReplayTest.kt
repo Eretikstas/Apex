@@ -883,6 +883,10 @@ class HistoryReplayTest {
         // treatment no SMB and the temp basal at most 1.5x the profile basal; lets go on a logged meal (from 30 min before
         // the first treatment of the window) or at a loop (smoothed) glucose of 250 or more. Fixed, no learning.
         val rgApp = prefsText.contains("RGAPP")
+        // RGAPP2: RGAPP plus the early releases of LEARNG3 with FIXED numbers (no learning): a strong rise (over 162 and
+        // short delta over 3.6), a rise the treatment does not explain (80 mg/dL over the glucose at the treatment and
+        // still rising, short delta over 1), or a flat high (over 180, short delta -1..1) later than 45 min.
+        val rgApp2 = prefsText.contains("RGAPP2")
         var capMult = if (learnG) 2.0 else if (rgApp) 1.5 else tok("CAPX", 1.0)
         val capOn = tempCap || learnG || rgApp
         var overStreak = 0; var tighten = 0; var loosen = 0
@@ -2007,7 +2011,10 @@ class HistoryReplayTest {
                     if (rgApp && t - lastTreat < 120 * minute) {
                         val first = treatTimes.filter { t - it < 120 * minute }.minOrNull() ?: lastTreat
                         val meal = allLogged.any { it.t >= first - 30 * minute && it.t <= t && treatTimes.binarySearch(it.t) < 0 }
-                        if (!meal && gs.glucose < 250.0) { guardHold = true; nRgHold++ }
+                        val early = rgApp2 && ((gs.glucose > 162.0 && gs.shortAvgDelta > 3.6) ||
+                            (gs.glucose > treatBg + 80.0 && gs.shortAvgDelta > 1.0) ||
+                            (gs.glucose > 180.0 && gs.shortAvgDelta in -1.0..1.0 && t - lastTreat > 45 * minute))
+                        if (!meal && gs.glucose < 250.0 && !early) { guardHold = true; nRgHold++ }
                     }
                 }
                 val noisy = noiseGuard && readV.size > 16 && t - readT[readT.size - 16] <= 20 * minute && (readV.size - 15 until readV.size).sumOf { Math.abs(readV[it] - 2 * readV[it - 1] + readV[it - 2]) } / 15.0 > noiseThr
