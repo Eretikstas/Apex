@@ -889,6 +889,8 @@ class HistoryReplayTest {
         val rgApp2 = prefsText.contains("RGAPP2")
         // RGWIN_<min> / RGCAP_<x>: other window and temp basal cap for RGAPP (default 120 min, 1.5x), e.g. what LEARNG3 learns.
         val rgWin = tok("RGWIN", 120.0).toLong()
+        // RGNOMEAL: a logged meal does NOT let RGAPP go (SMB stay off, temp cap stays; the meal bolus is given as usual).
+        val rgNoMeal = prefsText.contains("RGNOMEAL")
         var capMult = if (learnG) 2.0 else if (rgApp) tok("RGCAP", 1.5) else tok("CAPX", 1.0)
         val capOn = tempCap || learnG || rgApp
         var overStreak = 0; var tighten = 0; var loosen = 0
@@ -2025,7 +2027,7 @@ class HistoryReplayTest {
                     }
                     if (rgApp && t - lastTreat < rgWin * minute) {
                         val first = treatTimes.filter { t - it < rgWin * minute }.minOrNull() ?: lastTreat
-                        val meal = allLogged.any { it.t >= first - 30 * minute && it.t <= t && treatTimes.binarySearch(it.t) < 0 }
+                        val meal = !rgNoMeal && allLogged.any { it.t >= first - 30 * minute && it.t <= t && treatTimes.binarySearch(it.t) < 0 }
                         val early = rgApp2 && ((gs.glucose > 162.0 && gs.shortAvgDelta > 3.6) ||
                             (gs.glucose > treatBg + 80.0 && gs.shortAvgDelta > 1.0) ||
                             (gs.glucose > 180.0 && gs.shortAvgDelta in -1.0..1.0 && t - lastTreat > 45 * minute))
