@@ -82,9 +82,6 @@ class LearnerPlugin(
         val nextCardAt: Long = 0L,
         val proposal: BasalProposal? = null,
         val duraProposal: DuraProposal? = null,
-        /** The CR block card: a proposal (weaker CR of one block) and the last shares of meals ending low per block. */
-        val crProposal: CrProposal? = null,
-        val lastCr: Map<String, Double>? = null,
         /** The last dura card: flat highs and lows in percent. */
         val lastDura: Pair<Double, Double>? = null,
         val dura: Double = 0.0,
@@ -109,6 +106,9 @@ class LearnerPlugin(
         /** The weekly digest switch (off by default) and the last digest with its time. */
         val digestOn: Boolean = false,
         val lastDigest: Pair<Long, WeeklyDigest>? = null,
+        /** The CR block card: a proposal (weaker CR of one block) and the last shares of meals ending low per block. */
+        val crProposal: CrProposal? = null,
+        val lastCr: Map<String, Double>? = null,
     )
 
     private val store = LearnerStore(prefs)
