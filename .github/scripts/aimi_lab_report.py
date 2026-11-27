@@ -14,6 +14,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -32,13 +33,30 @@ CTRL13A = {
 KEEP = ("AIMI audit ", "AIMI replay: learner ALL", "AIMI replay: ", "AIMI_DUMPCSV_CHECK", "DUMPCSV_CHECK")
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """The job-log endpoint redirects to signed storage; do not forward the GitHub token there."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def get(url: str, raw: bool = False):
     headers = {"Accept": "application/vnd.github+json"}
     if TOKEN:
         headers["Authorization"] = f"Bearer {TOKEN}"
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = r.read()
+    opener = urllib.request.build_opener(NoRedirect)
+    try:
+        with opener.open(urllib.request.Request(url, headers=headers), timeout=120) as r:
+            data = r.read()
+    except urllib.error.HTTPError as e:
+        if e.code not in (301, 302, 303, 307, 308):
+            raise
+        location = e.headers.get("Location")
+        if not location:
+            raise
+        # The signed storage URL authorizes itself; never send the GitHub token to it.
+        with urllib.request.urlopen(urllib.request.Request(location), timeout=120) as r:
+            data = r.read()
     return data.decode("utf-8", "replace") if raw else json.loads(data)
 
 
@@ -52,21 +70,26 @@ def jobs(run_id: str):
         page += 1
 
 
-def log_lines(job_id: int, marker: str = ""):
-    """GitHub makes a job log readable some time after the job ends: ask again for up to about 10 minutes."""
-    text, err = "", ""
-    for _ in range(20):
+def log_lines(job_id: int):
+    """Retry only a 404 (log not yet published); other errors are permanent for this attempt and are reported."""
+    reason = "empty response"
+    for _ in range(10):
         try:
             text = get(f"{API}/jobs/{job_id}/logs", raw=True)
-            if text.strip() and (not marker or marker in text):
+            if text.strip():
+                # Each line starts with an ISO time stamp and a space.
+                return [re.sub(r"^\S+Z ", "", line).strip() for line in text.splitlines()]
+            reason = "empty response"
+            break
+        except urllib.error.HTTPError as e:
+            reason = f"HTTP {e.code} {e.read()[:200]!r}"
+            if e.code != 404:
                 break
-        except Exception as e:  # a missing log is retried, then reported
-            err = str(e)
+        except Exception as e:
+            reason = repr(e)[:200]
+            break
         time.sleep(30)
-    if not text.strip():
-        return [f"(LOG NOT READY: {err or 'empty'})"]
-    # Each line starts with an ISO time stamp and a space.
-    return [re.sub(r"^\S+Z ", "", line).strip() for line in text.splitlines()]
+    return [f"LOG NOT READ: {reason}"]
 
 
 def overall(js) -> str:
@@ -88,7 +111,7 @@ def replay(run_id: str) -> Path:
     for j in rjobs:
         m = re.match(r"replay \((\d+),", j["name"])
         idx = m.group(1) if m else "?"
-        log = log_lines(j["id"], "AIMI_REPLAY_PREFS")
+        log = log_lines(j["id"])
         prefs = next((l.split("AIMI_REPLAY_PREFS:", 1)[1].strip() for l in log if "AIMI_REPLAY_PREFS:" in l), "")
         tokens = [t for t in re.split(r"[,\s]+", prefs) if t]
         row = next((l for l in log if l.startswith("| SYNTH")), None)
@@ -108,6 +131,7 @@ def replay(run_id: str) -> Path:
         cells = nums if len(nums) == 6 else ["-"] * 6
         lines.append(f"| {idx} | {seed} | {j['conclusion']} | " + " | ".join(cells) + f" | {control} |")
         keep = [l for l in log if l.startswith(KEEP) and "AIMI_REPLAY_PREFS" not in l]
+        keep = [l for l in log if l.startswith("LOG NOT READ:")] + keep
         seen = set()
         keep = [l for l in keep if not (l in seen or seen.add(l))]
         details += ["", f"## Job {idx}", "", f"Tokens: `{short}`", "", "```text"] + keep[:200] + ["```"]
@@ -133,7 +157,7 @@ def compile_check(run_id: str) -> Path:
         for s in j["steps"]:
             lines.append(f"- {s['name']}: {s['conclusion']}")
         if j["conclusion"] != "success":
-            errs = [l for l in log_lines(j["id"]) if l.startswith("e: ") or "FAILED" in l or "What went wrong" in l]
+            errs = [l for l in log_lines(j["id"]) if l.startswith("LOG NOT READ:") or l.startswith("e: ") or "FAILED" in l or "What went wrong" in l]
             lines += ["", "Errors (first 40 lines):", "```text"] + errs[:40] + ["```"]
     OUT.mkdir(parents=True, exist_ok=True)
     path = OUT / f"compile-{run['head_sha'][:8]}.md"
