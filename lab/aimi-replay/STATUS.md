@@ -2,6 +2,30 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — SHAPEAUDIT baseline complete
+
+- Exact source commit `6f883d7c5d6644fc6ec6aa878313927d979c02a1`; compile run [46055486474](https://github.com/Eretikstas/Apex/actions/runs/46055486474) **SUCCESS**, all 11 checks green. RUN retry `80fd2aaf`; dispatcher [46056094075](https://github.com/Eretikstas/Apex/actions/runs/46056094075) **STARTED**; replay [46057061061](https://github.com/Eretikstas/Apex/actions/runs/46057061061) **SUCCESS**, 3/3 replay jobs, 0 failed ticks; `CTRL13A` seed 1 **PASS**.
+- Synthetic summary (BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day):
+
+| Seed | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| 2 | 4.0 | 0.1 | 4.2 | 27.7 | 24.11 | 10.92 |
+| 3 | 4.8 | 0.3 | 4.5 | 28.9 | 29.64 | 11.63 |
+
+- SHAPEAUDIT dimensionless 24-hour curves (reference `anonymized-v1`), ratio MAE:
+
+| Seed | Mean-ratio MAE | SD-ratio MAE |
+|---:|---:|---:|
+| 1 | 0.0894 | 0.2677 |
+| 2 | 0.0768 | 0.3213 |
+| 3 | 0.0892 | 0.2771 |
+| Mean | 0.0851 | 0.2887 |
+
+- Pooled normalized-curve MAE: mean 0.0824, SD 0.2844. Residual shape: SD ratio is above reference mainly in hours 02–07 and below reference in 15–21; mean ratio differs most around 00–01 and 14–17, 20, 22. These are anonymized dimensionless ratios only; no absolute BG, raw records, dates, doses, or profile values were added.
+- This is a diagnostic baseline, not a calibrated model. No generator parameter, learner behaviour, profile, or insulin delivery changed. `SHAPEAUDIT` is report-only; control confirms no-token APP numbers unchanged.
+- Next shape-screen: test existing synthetic-only `MEALX` (0.7 → 1.0 and 1.4) to address low afternoon/evening mean/SD ratios, and `DAWN` (0.9 and 0.8) to screen the early-morning excess. Include `MEALX_1.0+DAWN_0.9`, 3 seeds per candidate, plus one unchanged seed-1 `CTRL13A`. These values are explicitly **our estimates**, not clinical ranges; compare only dimensionless shape MAE for model selection. No new parameter or app code is introduced.
+
 ### 2026-11-27 — SHAPEAUDIT baseline replay started
 
 - Dispatcher `46056094075` wrote `dispatch-80fd2aaf.md`: compile `6f883d7c` green; lab free; **STARTED** replay `46057061061` from RUN retry `80fd2aaf`.
