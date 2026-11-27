@@ -42,6 +42,7 @@ import app.aaps.plugins.learner.EvalStats
 import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.HypoSizeEngine
 import app.aaps.plugins.learner.LowCause
+import app.aaps.plugins.learner.PeakFitEngine
 import app.aaps.plugins.learner.R
 import app.aaps.plugins.learner.WeekStats
 import app.aaps.plugins.learner.SensorHintKind
@@ -78,6 +79,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onRefusePct = plugin::refusePct,
         onSpecialDay = plugin::setSpecialDay,
         onCurveWatch = plugin::setCurveWatch,
+        onPeakFit = plugin::setPeakFitOn,
+        onLowPred = plugin::setLowPredOn,
         onLowCauses = plugin::setLowCauses,
         onAcceptCr = plugin::acceptCr,
         onRefuseCr = plugin::refuseCr,
@@ -102,6 +105,8 @@ internal fun LearnerScreenContent(
     onRefusePct: () -> Unit = {},
     onSpecialDay: (Boolean) -> Unit = {},
     onCurveWatch: (Boolean) -> Unit = {},
+    onPeakFit: (Boolean) -> Unit = {},
+    onLowPred: (Boolean) -> Unit = {},
     onLowCauses: (Boolean) -> Unit = {},
     onAcceptCr: () -> Unit = {},
     onRefuseCr: () -> Unit = {},
@@ -131,6 +136,8 @@ internal fun LearnerScreenContent(
 
         SpecialSection(status, onSpecialDay)
         CurveSection(status, onCurveWatch)
+        PeakFitSection(status, onPeakFit)
+        LowPredSection(status, onLowPred)
         LowCauseSection(status, onLowCauses)
 
         status.proposal?.let { p ->
@@ -540,4 +547,42 @@ private fun causeName(c: LowCause): Int = when (c) {
     LowCause.AFTER_MEAL  -> R.string.learner_cause_after_meal
     LowCause.NIGHT       -> R.string.learner_cause_night
     LowCause.OTHER       -> R.string.learner_cause_other
+}
+
+/** The night peak check: the switch (off by default), the last fit and a proposal (text only). */
+@Composable
+private fun PeakFitSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_peak_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.peakFitOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_peak_rule), style = MaterialTheme.typography.bodySmall)
+            if (!status.peakFitOn) return@Column
+            status.peakFit?.let { f ->
+                Text(stringResource(R.string.learner_peak_seen, f.bestPeakMin, f.currentPeakMin, f.nights), style = MaterialTheme.typography.bodyMedium)
+                if (PeakFitEngine.proposes(f))
+                    Text(stringResource(R.string.learner_peak_propose, f.bestPeakMin), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+            } ?: Text(stringResource(R.string.learner_peak_none), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** The low predictor: the switch (off by default), what it learned, and its record. */
+@Composable
+private fun LowPredSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_pred_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.lowPredOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_pred_rule), style = MaterialTheme.typography.bodySmall)
+            if (status.lowPredOn) Text(
+                stringResource(R.string.learner_pred_seen, status.lowPredStats.first, status.lowPredStats.second, status.lowPredMargin / 18.0),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
 }

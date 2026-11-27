@@ -239,6 +239,41 @@ class LearnerStore(private val preferences: Preferences) {
             })))
         }
 
+    /** The night peak check is shown (the user's switch). Off by default. */
+    var peakFitOn: Boolean
+        get() = read().optBoolean(KEY_PEAK_ON, false)
+        set(value) = edit { put(KEY_PEAK_ON, value) }
+
+    /** The last night peak fit. */
+    var lastPeakFit: PeakFit?
+        get() = read().optJSONObject(KEY_PEAK)?.let { o ->
+            runCatching { PeakFit(o.getInt("best"), o.getInt("cur"), o.getDouble("eNow"), o.getDouble("eBest"), o.getInt("n"), o.getInt("nights")) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_PEAK)
+            else put(KEY_PEAK, JSONObject().put("best", value.bestPeakMin).put("cur", value.currentPeakMin).put("eNow", value.errNow)
+                .put("eBest", value.errBest).put("n", value.points).put("nights", value.nights))
+        }
+
+    /** The low predictor is on (the user's switch). Off by default. */
+    var lowPredOn: Boolean
+        get() = read().optBoolean(KEY_PRED_ON, false)
+        set(value) = edit { put(KEY_PRED_ON, value) }
+
+    /** The low predictor's learned margin (mg/dL). */
+    var lowPredMargin: Double
+        get() = read().optDouble(KEY_PRED_MARGIN, 0.0)
+        set(value) = edit { put(KEY_PRED_MARGIN, value) }
+
+    /** The last warnings of the low predictor (newest last, at most 20). */
+    var lowWarnings: List<LowWarning>
+        get() = read().optJSONArray(KEY_PRED_WARN)?.let { a ->
+            (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let { LowWarning(it.getLong("at"), if (it.has("ok")) it.getBoolean("ok") else null) } }
+        } ?: emptyList()
+        set(value) = edit {
+            put(KEY_PRED_WARN, JSONArray(value.takeLast(20).map { w -> JSONObject().put("at", w.at).also { o -> w.trueLow?.let { o.put("ok", it) } } }))
+        }
+
     /** The last verdict. */
     var lastEval: DoneEval?
         get() = read().optJSONObject(KEY_EVAL_LAST)?.let { o ->
@@ -314,6 +349,11 @@ class LearnerStore(private val preferences: Preferences) {
     private companion object {
 
         const val KEY_CR = "cr_proposal"
+        const val KEY_PEAK_ON = "peak_fit_on"
+        const val KEY_PEAK = "peak_fit"
+        const val KEY_PRED_ON = "low_pred_on"
+        const val KEY_PRED_MARGIN = "low_pred_margin"
+        const val KEY_PRED_WARN = "low_pred_warnings"
         const val KEY_CURVE_ON = "curve_watch"
         const val KEY_CURVE = "last_curve"
         const val KEY_CURVE_CHANGE = "curve_change"

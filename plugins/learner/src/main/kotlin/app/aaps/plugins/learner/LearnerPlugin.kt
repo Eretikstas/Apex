@@ -120,12 +120,20 @@ class LearnerPlugin(
         /** "Why was it low": switch and the lows of the last 7 days with their likely cause. */
         val lowCausesOn: Boolean = false,
         val lows: List<LowEpisode> = emptyList(),
+        /** Night peak check: switch and the last fit. */
+        val peakFitOn: Boolean = false,
+        val peakFit: PeakFit? = null,
+        /** Low predictor: switch, learned margin (mg/dL), warnings checked (true, false). */
+        val lowPredOn: Boolean = false,
+        val lowPredMargin: Double = 0.0,
+        val lowPredStats: Pair<Int, Int> = Pair(0, 0),
     )
 
     private val store = LearnerStore(prefs)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
     private val applying = AtomicBoolean(false)
+    private var predJob: Job? = null
     @Volatile private var lastRollbackCheck = 0L
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
@@ -133,6 +141,7 @@ class LearnerPlugin(
     override suspend fun onStart() {
         super.onStart()
         refresh()
+        if (store.lowPredOn) watchLows()
         ticker?.cancel()
         ticker = scope.launch {
             while (isActive) {
@@ -192,6 +201,13 @@ class LearnerPlugin(
         )
         val steps = cleanSteps(now, BasalCardEngine.NEED_DAYS)
         store.hypoSize = HypoSizeEngine.learn(steps)
+        if (store.peakFitOn) runCatching {
+            val i = profile.iCfg
+            store.lastPeakFit = PeakFitEngine.fit(steps, i.peak, i.dia)
+            store.lastPeakFit?.takeIf { PeakFitEngine.proposes(it) }?.let { f ->
+                note(rh.gs(R.string.learner_why_peak, f.bestPeakMin, f.currentPeakMin), now, NOTE_LONG_MS, PEAK_NOTE_SOURCE)
+            }
+        }.onFailure { aapsLogger.error(LTag.APS, "Learner: peak fit failed", it) }
         val card = engine.card(steps, profileBasal, store.cardState)
         store.cardState = card.state
         store.lastCardAt = now
@@ -523,6 +539,55 @@ class LearnerPlugin(
         if (on) scope.launch { runCatching { maybeCountLows(force = true) }.onFailure { aapsLogger.error(LTag.APS, "Learner: low causes failed", it) } }
     }
 
+    fun setPeakFitOn(on: Boolean) {
+        store.peakFitOn = on
+        if (!on) loopNotes.clear(PEAK_NOTE_SOURCE)
+        refresh()
+    }
+
+    /** The low predictor (advisor, off by default, `LowPredictEngine`): checked every 5 minutes while on. */
+    fun setLowPredOn(on: Boolean) {
+        store.lowPredOn = on
+        if (on) watchLows() else predJob?.cancel()
+        refresh()
+    }
+
+    private fun watchLows() {
+        predJob?.cancel()
+        predJob = scope.launch {
+            while (isActive && store.lowPredOn) {
+                runCatching { checkLowPred() }.onFailure { aapsLogger.error(LTag.APS, "Learner: low predictor failed", it) }
+                delay(PRED_TICK_MS)
+            }
+        }
+    }
+
+    private suspend fun checkLowPred() {
+        val now = dateUtil.now()
+        // Check old warnings: did a low come within 40 min?
+        var warnings = store.lowWarnings
+        if (warnings.any { it.trueLow == null && now - it.at >= LowPredictEngine.CHECK_MS }) {
+            warnings = warnings.map { w ->
+                if (w.trueLow == null && now - w.at >= LowPredictEngine.CHECK_MS)
+                    w.copy(trueLow = history.lowBetween(w.at, w.at + LowPredictEngine.CHECK_MS, LowPredictEngine.LOW_MGDL))
+                else w
+            }
+            store.lowWarnings = warnings
+            store.lowPredMargin = LowPredictEngine.learn(store.lowPredMargin, warnings)
+        }
+        val (bg, delta15) = history.smoothedNow(now)
+        val last = warnings.maxOfOrNull { it.at } ?: 0L
+        if (LowPredictEngine.warn(now, bg, delta15?.let { it / 3.0 }, store.lowPredMargin, last)) {
+            store.lowWarnings = warnings + LowWarning(now)
+            val grams = store.hypoSize?.let { HypoSizeEngine.suggest(it, LowPredictEngine.LOW_MGDL) }
+            val text = if (grams != null) rh.gs(R.string.learner_pred_warn_g, grams) else rh.gs(R.string.learner_pred_warn)
+            notificationManager.post(NotificationId.AUTOMATION_MESSAGE, text, level = NotificationLevel.IMPORTANT)
+            note(text, now, LowPredictEngine.GAP_MS, PRED_NOTE_SOURCE)
+            aapsLogger.debug(LTag.APS, "Learner: low forecast, bg=$bg delta15=$delta15 margin=${store.lowPredMargin}")
+        }
+        refresh()
+    }
+
     /** The user's switch for the change evaluation. Off also removes its note. */
     fun setEvalOn(on: Boolean) {
         store.evalOn = on
@@ -735,6 +800,11 @@ class LearnerPlugin(
             lastPct = store.lastPct,
             specialUntil = store.specialDays.firstOrNull { val n = dateUtil.now(); n >= it.first && n < it.second }?.second ?: 0L,
             hypoSize = store.hypoSize,
+            peakFitOn = store.peakFitOn,
+            peakFit = store.lastPeakFit,
+            lowPredOn = store.lowPredOn,
+            lowPredMargin = store.lowPredMargin,
+            lowPredStats = store.lowWarnings.let { w -> Pair(w.count { it.trueLow == true }, w.count { it.trueLow == false }) },
             curveWatch = store.curveWatch,
             curve = store.lastCurve,
             curveChange = store.curveChange,
@@ -795,6 +865,9 @@ class LearnerPlugin(
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
         const val SPECIAL_NOTE_SOURCE = "learner_special"
+        const val PEAK_NOTE_SOURCE = "learner_peak"
+        const val PRED_NOTE_SOURCE = "learner_pred"
+        const val PRED_TICK_MS = 5 * 60_000L
         const val CURVE_NOTE_SOURCE = "learner_curve"
         const val KIND_BASAL = "basal"
         const val KIND_DURA = "dura:"

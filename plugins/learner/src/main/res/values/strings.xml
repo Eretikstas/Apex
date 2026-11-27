@@ -136,4 +136,15 @@
     <string name="learner_cause_after_meal">after a meal</string>
     <string name="learner_cause_night">night</string>
     <string name="learner_cause_other">other</string>
+    <string name="learner_peak_title">Insulin peak check (nights)</string>
+    <string name="learner_peak_rule" formatted="false">Off by default. With the basal card: at night without food the glucose change is compared with insulin curves of peak 25-75 min (DIA as in the profile); the best fit is shown. A proposal only when it is 10 min or more away from the profile peak and fits clearly better. It changes nothing: the peak is set by the family in the insulin settings.</string>
+    <string name="learner_peak_seen" comment="%1$d=best peak min, %2$d=profile peak min, %3$d=nights">Best fit: peak %1$d min (profile: %2$d min), from %3$d nights.</string>
+    <string name="learner_peak_propose" comment="%1$d=peak min">Proposal: try a peak of %1$d min (one change, judge 3-4 days).</string>
+    <string name="learner_peak_none">Not enough clean nights yet (at least 5).</string>
+    <string name="learner_why_peak" comment="%1$d=best peak min, %2$d=profile peak min">Learner: at night a peak of %1$d min fits better than the profile %2$d min (only a proposal).</string>
+    <string name="learner_pred_title">Low forecast</string>
+    <string name="learner_pred_rule" formatted="false">Off by default. Every 5 min: smoothed glucose + 6 x its fall per 5 min = glucose in about 30 min. Under 3.9 with the glucose under 6.5 and falling: a notice. Each notice is checked 40 min later; many false ones make it stricter, it never gets looser than at the start without many true ones. Only a notice.</string>
+    <string name="learner_pred_warn">Learner: a low is possible in about 30 min.</string>
+    <string name="learner_pred_warn_g" comment="%1$d=grams of fast carbs">Learner: a low is possible in about 30 min (if it comes: about %1$d g of fast carbs).</string>
+    <string name="learner_pred_seen" comment="%1$d=true notices, %2$d=false notices, %3$.1f=margin mmol/L">Notices checked: right %1$d, false %2$d; stricter by %3$.1f mmol/L.</string>
 </resources>

@@ -42,6 +42,7 @@ import app.aaps.plugins.learner.HypoSize
 import app.aaps.plugins.learner.LowCause
 import app.aaps.plugins.learner.LowEpisode
 import app.aaps.plugins.learner.PctProposal
+import app.aaps.plugins.learner.PeakFit
 import app.aaps.plugins.learner.PendingEval
 import app.aaps.plugins.learner.WeekStats
 import app.aaps.plugins.learner.WeeklyDigest
@@ -186,6 +187,13 @@ class LearnerScreenshotTest {
                 LowEpisode(NOW - 30 * HOUR, 61.0, 25, LowCause.AFTER_MEAL), LowEpisode(NOW - 20 * HOUR, 58.0, 40, LowCause.NIGHT),
                 LowEpisode(NOW - 5 * HOUR, 64.0, 15, LowCause.REBOUND)
             ))
+    )
+
+    @Test
+    fun peakAndForecast() = shoot(
+        "learner_peak_forecast",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            peakFitOn = true, peakFit = PeakFit(35, 55, 0.41, 0.12, 640, 9), lowPredOn = true, lowPredMargin = 9.0, lowPredStats = Pair(6, 3))
     )
 
     private fun shoot(name: String, status: Status) {

@@ -116,6 +116,21 @@ class LearnerHistory(
     suspend fun sensorChanges(now: Long, days: Int): List<Long> =
         persistenceLayer.getTherapyEventDataFromToTime(now - days * 86_400_000L, now).filter { it.type == TE.Type.SENSOR_CHANGE }.map { it.timestamp }
 
+    /**
+     * The newest SMOOTHED glucose of the last 15 minutes (the value the loop uses) and its change over the last 15
+     * minutes, both mg/dL, or nulls.
+     */
+    fun smoothedNow(now: Long): Pair<Double?, Double?> {
+        val v = iobCobCalculator.ads.getStatusDataCopy().orEmpty().filter { it.timestamp <= now }.sortedBy { it.timestamp }
+        val newest = v.lastOrNull()?.takeIf { now - it.timestamp <= 900_000L } ?: return Pair(null, null)
+        val old = v.lastOrNull { newest.timestamp - it.timestamp in 840_000L..1_080_000L }
+        return Pair(newest.recalculated, old?.let { newest.recalculated - it.recalculated })
+    }
+
+    /** Whether a sensor reading under [mgdl] came from [from] to [to]. */
+    suspend fun lowBetween(from: Long, to: Long, mgdl: Double): Boolean =
+        persistenceLayer.getBgReadingsDataFromTimeToTime(from, to, true).any { it.value < mgdl }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0
