@@ -11,9 +11,10 @@ import app.aaps.core.objects.runningMode.PumpCommandGate
 import app.aaps.core.interfaces.pump.DetailedBolusInfo
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.queue.CommandQueue
-import app.aaps.core.interfaces.aps.LoopNotes
-import app.aaps.core.interfaces.constraints.Constraint
+import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.constraints.PluginConstraints
+import app.aaps.core.interfaces.constraints.Constraint
+import app.aaps.core.interfaces.aps.LoopNotes
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.NotificationId
@@ -22,7 +23,6 @@ import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.plugin.PluginBaseWithPreferences
 import app.aaps.core.interfaces.plugin.PluginDescription
-import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileRepository
 import app.aaps.core.interfaces.resources.ResourceHelper
@@ -101,9 +101,6 @@ class LearnerPlugin(
         val message: String = "",
         val busy: Boolean = false,
         val pctProposal: PctProposal? = null,
-        /** The rebound guard switch (off by default) and its state at the last loop run. */
-        val reboundOn: Boolean = false,
-        val guard: GuardState = GuardState(false),
         /** The last percentage card: highs, lows (percent), hint to try more than 100 %. */
         val lastPct: Triple<Double, Double, Boolean>? = null,
         /** The sensor hint switch (off by default) and the last hint given. */
@@ -142,6 +139,9 @@ class LearnerPlugin(
         val lowPredOn: Boolean = false,
         val lowPredMargin: Double = 0.0,
         val lowPredStats: Pair<Int, Int> = Pair(0, 0),
+        /** The rebound guard switch (off by default) and its state at the last loop run. */
+        val reboundOn: Boolean = false,
+        val guard: GuardState = GuardState(false),
         /** Split meal bolus: switch (asked before on), a calculated preview, the meal waiting for its rest, a message. */
         val splitOn: Boolean = false,
         val splitPreview: SplitPlan? = null,
@@ -153,10 +153,10 @@ class LearnerPlugin(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
     private val applying = AtomicBoolean(false)
-    private var predJob: Job? = null
-    @Volatile private var lastRollbackCheck = 0L
     @Volatile private var guard = GuardState(false)
     private var splitJob: Job? = null
+    private var predJob: Job? = null
+    @Volatile private var lastRollbackCheck = 0L
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
 
@@ -752,6 +752,10 @@ class LearnerPlugin(
         if (!on) {
             guard = GuardState(false)
             loopNotes.clear(GUARD_NOTE_SOURCE)
+        }
+        refresh()
+    }
+
     /** The user's switch for the split bolus (the screen asks first). Off drops a waiting rest. */
     fun setSplitOn(on: Boolean) {
         store.splitOn = on
@@ -1076,6 +1080,10 @@ class LearnerPlugin(
         const val PROPOSAL_MAX_AGE_MS = CARD_EVERY_MS
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
+        const val GUARD_NOTE_SOURCE = "learner_guard"
+        const val SPLIT_NOTE_SOURCE = "learner_split"
+        const val SPLIT_STEP = 0.05
+        const val SPLIT_TICK_MS = 60_000L
         const val SPECIAL_NOTE_SOURCE = "learner_special"
         const val PEAK_NOTE_SOURCE = "learner_peak"
         const val PRED_NOTE_SOURCE = "learner_pred"
@@ -1092,10 +1100,6 @@ class LearnerPlugin(
         const val DIGEST_NOTE_SOURCE = "learner_digest"
         const val DIGEST_EVERY_MS = 7 * 86_400_000L
         const val MGDL_PER_MMOL = 18.0
-        const val GUARD_NOTE_SOURCE = "learner_guard"
-        const val SPLIT_NOTE_SOURCE = "learner_split"
-        const val SPLIT_STEP = 0.05
-        const val SPLIT_TICK_MS = 60_000L
     }
 }
 

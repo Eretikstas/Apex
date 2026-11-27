@@ -450,73 +450,6 @@ private fun CrSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Unit
                             confirm = false
                             onAccept()
                         }) { Text(stringResource(R.string.learner_accept)) }
-/**
- * The split meal bolus (gives insulin): the switch asks first; carbs and the meal type; a calculated dose shown before
- * anything is given; then "give the first part"; a waiting rest with "cancel the rest".
- */
-@Composable
-private fun SplitSection(
-    status: Status,
-    onSwitch: (Boolean) -> Unit,
-    onPreview: (Double, MealType) -> Unit,
-    onStart: () -> Unit,
-    onCancel: () -> Unit
-) {
-    val dateUtil = LocalDateUtil.current
-    var askOn by remember { mutableStateOf(false) }
-    var carbsText by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf(MealType.NORMAL) }
-    var confirm by remember { mutableStateOf(false) }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(stringResource(R.string.learner_split_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Switch(checked = status.splitOn, onCheckedChange = { on -> if (on) askOn = true else onSwitch(false) })
-            }
-            Text(stringResource(R.string.learner_split_rule), style = MaterialTheme.typography.bodySmall)
-            if (!status.splitOn) return@Column
-            status.splitPlan?.let { p ->
-                Text(
-                    stringResource(R.string.learner_split_waiting, dateUtil.timeString(p.madeAt), p.firstU, p.restU),
-                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary
-                )
-                OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.learner_split_cancel)) }
-                return@Column
-            }
-            OutlinedTextField(
-                value = carbsText, onValueChange = { v -> carbsText = v.filter { it.isDigit() }.take(3) },
-                label = { Text(stringResource(R.string.learner_split_carbs)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
-                MealType.entries.forEach { t ->
-                    FilterChip(
-                        selected = type == t, onClick = { type = t },
-                        label = {
-                            Text(stringResource(when (t) {
-                                MealType.FAST   -> R.string.learner_split_type_fast
-                                MealType.NORMAL -> R.string.learner_split_type_normal
-                                MealType.SLOW   -> R.string.learner_split_type_slow
-                            }))
-                        }
-                    )
-                }
-            }
-            val carbs = carbsText.toDoubleOrNull() ?: 0.0
-            Button(onClick = { onPreview(carbs, type); confirm = true }, enabled = carbs >= 5.0 && carbs <= 120.0 && !status.busy) {
-                Text(stringResource(R.string.learner_split_calc))
-            }
-            if (status.splitMessage.isNotEmpty()) Text(status.splitMessage, color = MaterialTheme.colorScheme.error)
-            status.splitPreview?.takeIf { confirm }?.let { p ->
-                AlertDialog(
-                    onDismissRequest = { confirm = false },
-                    title = { Text(stringResource(R.string.learner_split_title)) },
-                    text = { Text(stringResource(R.string.learner_split_confirm, p.carbsG, p.totalU, p.firstU, p.restU)) },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            confirm = false
-                            onStart()
-                        }) { Text(stringResource(R.string.learner_split_give)) }
                     },
                     dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
                 )
@@ -669,6 +602,8 @@ private fun LowPredSection(status: Status, onSwitch: (Boolean) -> Unit) {
             )
         }
     }
+}
+
 /**
  * The rebound guard: the switch (off by default), its rule, and whether it holds the loop now. A switch to "on" asks
  * first, because this one changes what the loop does (it only takes insulin away).
@@ -703,6 +638,82 @@ private fun ReboundSection(status: Status, onSwitch: (Boolean) -> Unit) {
             }) { Text(stringResource(R.string.learner_guard_turn_on)) }
         },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
+    )
+}
+
+/**
+ * The split meal bolus (gives insulin): the switch asks first; carbs and the meal type; a calculated dose shown before
+ * anything is given; then "give the first part"; a waiting rest with "cancel the rest".
+ */
+@Composable
+private fun SplitSection(
+    status: Status,
+    onSwitch: (Boolean) -> Unit,
+    onPreview: (Double, MealType) -> Unit,
+    onStart: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val dateUtil = LocalDateUtil.current
+    var askOn by remember { mutableStateOf(false) }
+    var carbsText by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf(MealType.NORMAL) }
+    var confirm by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_split_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.splitOn, onCheckedChange = { on -> if (on) askOn = true else onSwitch(false) })
+            }
+            Text(stringResource(R.string.learner_split_rule), style = MaterialTheme.typography.bodySmall)
+            if (!status.splitOn) return@Column
+            status.splitPlan?.let { p ->
+                Text(
+                    stringResource(R.string.learner_split_waiting, dateUtil.timeString(p.madeAt), p.firstU, p.restU),
+                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary
+                )
+                OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.learner_split_cancel)) }
+                return@Column
+            }
+            OutlinedTextField(
+                value = carbsText, onValueChange = { v -> carbsText = v.filter { it.isDigit() }.take(3) },
+                label = { Text(stringResource(R.string.learner_split_carbs)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+                MealType.entries.forEach { t ->
+                    FilterChip(
+                        selected = type == t, onClick = { type = t },
+                        label = {
+                            Text(stringResource(when (t) {
+                                MealType.FAST   -> R.string.learner_split_type_fast
+                                MealType.NORMAL -> R.string.learner_split_type_normal
+                                MealType.SLOW   -> R.string.learner_split_type_slow
+                            }))
+                        }
+                    )
+                }
+            }
+            val carbs = carbsText.toDoubleOrNull() ?: 0.0
+            Button(onClick = { onPreview(carbs, type); confirm = true }, enabled = carbs >= 5.0 && carbs <= 120.0 && !status.busy) {
+                Text(stringResource(R.string.learner_split_calc))
+            }
+            if (status.splitMessage.isNotEmpty()) Text(status.splitMessage, color = MaterialTheme.colorScheme.error)
+            status.splitPreview?.takeIf { confirm }?.let { p ->
+                AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text(stringResource(R.string.learner_split_title)) },
+                    text = { Text(stringResource(R.string.learner_split_confirm, p.carbsG, p.totalU, p.firstU, p.restU)) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirm = false
+                            onStart()
+                        }) { Text(stringResource(R.string.learner_split_give)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
+                )
+            }
+        }
+    }
     if (askOn) AlertDialog(
         onDismissRequest = { askOn = false },
         title = { Text(stringResource(R.string.learner_split_title)) },

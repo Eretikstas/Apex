@@ -131,6 +131,7 @@ class LearnerHistory(
     suspend fun lowBetween(from: Long, to: Long, mgdl: Double): Boolean =
         persistenceLayer.getBgReadingsDataFromTimeToTime(from, to, true).any { it.value < mgdl }
 
+    /**
      * For the rebound guard: the carb entries of the last [ReboundGuardEngine.WINDOW_MS] + 30 minutes with the glucose at
      * each (the newest value not more than 10 minutes before it, else the first one up to 10 minutes after), and the last
      * glucose of the last 15 minutes (null if none).

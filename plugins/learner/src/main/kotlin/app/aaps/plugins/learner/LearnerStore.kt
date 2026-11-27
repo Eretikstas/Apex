@@ -346,8 +346,31 @@ class LearnerStore(private val preferences: Preferences) {
 
     private fun statsOf(o: JSONObject) = EvalStats(o.getDouble("l39"), o.getDouble("l30"), o.getDouble("h10"), o.getDouble("cv"), o.getDouble("min"), o.getInt("n"))
 
+    /** The rebound guard is on (the user's switch). Off by default. */
+    var reboundOn: Boolean
+        get() = read().optBoolean(KEY_REBOUND_ON, false)
+        set(value) = edit { put(KEY_REBOUND_ON, value) }
+
+    /** The split bolus may be used (the user's switch, asked before it is turned on). Off by default. */
+    var splitOn: Boolean
+        get() = read().optBoolean(KEY_SPLIT_ON, false)
+        set(value) = edit { put(KEY_SPLIT_ON, value) }
+
+    /** A split meal waiting for its rest. */
+    var splitPlan: SplitPlan?
+        get() = read().optJSONObject(KEY_SPLIT)?.let { o ->
+            runCatching { SplitPlan(o.getLong("at"), MealType.valueOf(o.getString("type")), o.getDouble("total"), o.getDouble("first"), o.optDouble("carbs", 0.0)) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_SPLIT)
+            else put(KEY_SPLIT, JSONObject().put("at", value.madeAt).put("type", value.type.name).put("total", value.totalU).put("first", value.firstU).put("carbs", value.carbsG))
+        }
+
     private companion object {
 
+        const val KEY_REBOUND_ON = "rebound_on"
+        const val KEY_SPLIT_ON = "split_on"
+        const val KEY_SPLIT = "split_plan"
         const val KEY_CR = "cr_proposal"
         const val KEY_PEAK_ON = "peak_fit_on"
         const val KEY_PEAK = "peak_fit"
@@ -371,34 +394,6 @@ class LearnerStore(private val preferences: Preferences) {
         const val KEY_CANNULA_HINTS = "cannula_hints"
         const val KEY_LOW_MEAL = "low_meal_hints"
         const val KEY_SENSOR_HINTS = "sensor_hints"
-    /** The rebound guard is on (the user's switch). Off by default. */
-    var reboundOn: Boolean
-        get() = read().optBoolean(KEY_REBOUND_ON, false)
-        set(value) = edit { put(KEY_REBOUND_ON, value) }
-
-    private companion object {
-
-        const val KEY_REBOUND_ON = "rebound_on"
-    /** The split bolus may be used (the user's switch, asked before it is turned on). Off by default. */
-    var splitOn: Boolean
-        get() = read().optBoolean(KEY_SPLIT_ON, false)
-        set(value) = edit { put(KEY_SPLIT_ON, value) }
-
-    /** A split meal waiting for its rest. */
-    var splitPlan: SplitPlan?
-        get() = read().optJSONObject(KEY_SPLIT)?.let { o ->
-            runCatching { SplitPlan(o.getLong("at"), MealType.valueOf(o.getString("type")), o.getDouble("total"), o.getDouble("first"), o.optDouble("carbs", 0.0)) }.getOrNull()
-        }
-        set(value) = edit {
-            if (value == null) remove(KEY_SPLIT)
-            else put(KEY_SPLIT, JSONObject().put("at", value.madeAt).put("type", value.type.name).put("total", value.totalU).put("first", value.firstU).put("carbs", value.carbsG))
-        }
-
-    private companion object {
-
-        const val KEY_SPLIT_ON = "split_on"
-        const val KEY_SPLIT = "split_plan"
-
         const val KEY_LAST_CARD = "last_card_at"
         const val KEY_DIR = "card_dir"
         const val KEY_COUNT = "card_count"
