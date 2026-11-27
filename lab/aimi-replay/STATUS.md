@@ -2,6 +2,12 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — learner branch ownership preflight (read-only)
+
+- Existing `learner-rebound` head `d25ae63a` is four commits ahead of frozen app-code base `6f578b5b` and already contains `ReboundGuardEngine` plus tests. It is preserved untouched; a fresh ChatGPT-owned branch with a distinct name will be created from `6f578b5b` after shape recalibration rather than overwrite that branch.
+- Existing `learner-split` head `e762c799` contains `SplitBolusEngine` and tests; it is read-only and will not be merged or edited before lab validation. No-insulin hints branch remains untouched.
+
+
 ### 2026-11-27 — SHAPEAUDIT baseline RUN retry committed
 
 - RUN commit `80fd2aafd0807d46a040230d7623c03e67d589b9` re-submits the same three usual APP + CAL `SYNTH_56` jobs for seeds 1–3; `CTRL13A` remains only on seed 1. No scenario or model token changed. The dispatcher will wait for the full compile of `6f883d7c`; no replay run ID or score is claimed yet.
