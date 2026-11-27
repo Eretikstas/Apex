@@ -14,7 +14,7 @@ the tests named next to it.
 - `.github/workflows/autoisf-atc3-ci.yml`, `.github/workflows/upstream-check.yml` - our CI.
 
 - `ui/.../overview/ring/` - the "Кольцо" overview: ring, period numbers, next hour, plain "why" of oref/AutoISF decisions (`RingWhyMapper`, tests in `ui/src/commonTest/.../ring`).
-- `plugins/learner` - the learner, first part: basal card every 4 days at 06:00 (`BasalCardEngine`, the rules tested on the body model), proposal with "Внести" / "Отказаться"; apply edits the active profile in place and switches to it at 100 %.
+- `plugins/learner` - the learner, first part: basal card every 4 days at 06:00 (`BasalCardEngine`, the rules tested on the body model), proposal with "Внести" / "Отказаться"; apply edits the active profile in place and switches to it at 100 %. Rebound guard (`ReboundGuardEngine`, off by default, asks before it is turned on): the learner is also a loop constraint (`PluginConstraints`, our module only); for 2 h after a hypo treatment (12 g or less at glucose under 4.5) no SMB and the temp basal at most 1.5x the profile basal; lets go on a logged meal or glucose 13.9+; only takes insulin away.
 - `plugins/sibionics` - native Sibionics 2 source + its calibration plugin; compiles `sibionics-core/` (JugglucoNG, GPL-3.0) in unchanged.
 
 ## Edits in blaqone files (keep this list complete)

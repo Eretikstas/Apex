@@ -80,6 +80,23 @@ class LearnerHistory(
         return out
     }
 
+    /**
+     * For the rebound guard: the carb entries of the last [ReboundGuardEngine.WINDOW_MS] + 30 minutes with the sensor
+     * glucose at each (the newest reading not more than 10 minutes before it, else the first one up to 10 minutes after),
+     * and the last sensor glucose of the last 15 minutes (null if none).
+     */
+    suspend fun reboundInputs(now: Long): Pair<List<CarbEntry>, Double?> {
+        val from = now - ReboundGuardEngine.WINDOW_MS - ReboundGuardEngine.MEAL_BEFORE_MS
+        val bgs = persistenceLayer.getBgReadingsDataFromTimeToTime(from - 600_000L, now, true)
+        val carbs = persistenceLayer.getCarbsFromTimeToTimeExpanded(from, now, true).filter { it.amount > 0 }.map { c ->
+            val before = bgs.lastOrNull { it.timestamp <= c.timestamp && c.timestamp - it.timestamp <= 600_000L }
+            val after = bgs.firstOrNull { it.timestamp > c.timestamp && it.timestamp - c.timestamp <= 600_000L }
+            CarbEntry(c.timestamp, c.amount, (before ?: after)?.value)
+        }
+        val bgNow = bgs.lastOrNull()?.takeIf { now - it.timestamp <= 900_000L }?.value
+        return Pair(carbs, bgNow)
+    }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0

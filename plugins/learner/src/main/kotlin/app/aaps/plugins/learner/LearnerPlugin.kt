@@ -6,6 +6,8 @@ import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
 import app.aaps.core.interfaces.aps.LoopNote
 import app.aaps.core.interfaces.aps.LoopNotes
+import app.aaps.core.interfaces.constraints.Constraint
+import app.aaps.core.interfaces.constraints.PluginConstraints
 import app.aaps.core.interfaces.logging.AAPSLogger
 import app.aaps.core.interfaces.logging.LTag
 import app.aaps.core.interfaces.notifications.NotificationId
@@ -14,6 +16,7 @@ import app.aaps.core.interfaces.notifications.NotificationManager
 import app.aaps.core.interfaces.plugin.PluginBase
 import app.aaps.core.interfaces.plugin.PluginBaseWithPreferences
 import app.aaps.core.interfaces.plugin.PluginDescription
+import app.aaps.core.interfaces.profile.Profile
 import app.aaps.core.interfaces.profile.ProfileFunction
 import app.aaps.core.interfaces.profile.ProfileRepository
 import app.aaps.core.interfaces.resources.ResourceHelper
@@ -75,7 +78,7 @@ class LearnerPlugin(
         .pluginName(TextRef.AndroidRes(R.string.learner_name))
         .description(TextRef.AndroidRes(R.string.learner_description)),
     LearnerStringNonKey.entries, aapsLogger, rh, prefs, notificationManager
-) {
+), PluginConstraints {
 
     data class Status(
         val lastCardAt: Long = 0L,
@@ -89,6 +92,9 @@ class LearnerPlugin(
         val message: String = "",
         val busy: Boolean = false,
         val pctProposal: PctProposal? = null,
+        /** The rebound guard switch (off by default) and its state at the last loop run. */
+        val reboundOn: Boolean = false,
+        val guard: GuardState = GuardState(false),
         /** The last percentage card: highs, lows (percent), hint to try more than 100 %. */
         val lastPct: Triple<Double, Double, Boolean>? = null,
     )
@@ -97,6 +103,7 @@ class LearnerPlugin(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var ticker: Job? = null
     private val applying = AtomicBoolean(false)
+    @Volatile private var guard = GuardState(false)
     private val _status = MutableStateFlow(Status())
     val status: StateFlow<Status> = _status.asStateFlow()
 
@@ -327,6 +334,62 @@ class LearnerPlugin(
         }
     }
 
+    /**
+     * The rebound guard (`ReboundGuardEngine`), off by default. The loop asks this before every run: while the guard
+     * holds (2 hours after a hypo treatment, no meal, glucose under 13.9) SMB are off. It only takes away: it never turns
+     * SMB on and never adds insulin. A failure to read the data leaves the loop as it is.
+     */
+    override suspend fun isSMBModeEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
+        if (!store.reboundOn) {
+            guard = GuardState(false)
+            return value
+        }
+        val now = dateUtil.now()
+        val state = runCatching {
+            val (carbs, bgNow) = history.reboundInputs(now)
+            ReboundGuardEngine.state(now, carbs, bgNow)
+        }.getOrElse {
+            aapsLogger.error(LTag.APS, "Learner: rebound guard could not read the data", it)
+            GuardState(false)
+        }
+        if (state.active != guard.active) aapsLogger.debug(LTag.APS, "Learner: rebound guard $state")
+        guard = state
+        if (state.active) {
+            value.set(false, rh.gs(R.string.learner_guard_smb_reason), this)
+            loopNotes.put(LoopNote(GUARD_NOTE_SOURCE, rh.gs(R.string.learner_why_guard, dateUtil.timeString(state.until)), state.startedAt, state.until))
+        } else loopNotes.clear(GUARD_NOTE_SOURCE)
+        _status.value = _status.value.copy(guard = state)
+        return value
+    }
+
+    /** While the guard holds, the temp basal is at most 1.5 times the profile basal. Only lowers, never raises. */
+    override fun applyBasalConstraints(absoluteRate: Constraint<Double>, profile: Profile): Constraint<Double> {
+        val g = guard
+        if (!store.reboundOn || !g.active || dateUtil.now() >= g.until) return absoluteRate
+        val cap = ReboundGuardEngine.basalCap(profile.getBasal())
+        absoluteRate.setIfSmaller(cap, rh.gs(R.string.learner_guard_basal_reason, cap), this)
+        return absoluteRate
+    }
+
+    /** The same cap for pumps that take a percentage. */
+    override fun applyBasalPercentConstraints(percentRate: Constraint<Int>, profile: Profile): Constraint<Int> {
+        val g = guard
+        if (!store.reboundOn || !g.active || dateUtil.now() >= g.until) return percentRate
+        val cap = (ReboundGuardEngine.BASAL_CAP * 100).toInt()
+        percentRate.setIfSmaller(cap, rh.gs(R.string.learner_guard_percent_reason, cap), this)
+        return percentRate
+    }
+
+    /** The user's switch for the rebound guard. Off lets go at once. */
+    fun setReboundOn(on: Boolean) {
+        store.reboundOn = on
+        if (!on) {
+            guard = GuardState(false)
+            loopNotes.clear(GUARD_NOTE_SOURCE)
+        }
+        refresh()
+    }
+
     fun refusePct() {
         store.pctProposal = null
         loopNotes.clear(NOTE_SOURCE)
@@ -375,6 +438,8 @@ class LearnerPlugin(
             duraProposal = store.duraProposal,
             lastDura = store.lastDura,
             pctProposal = store.pctProposal,
+            reboundOn = store.reboundOn,
+            guard = guard,
             lastPct = store.lastPct,
             dura = prefs.get(DoubleKey.ApsAutoIsfDuraWeight),
             hours = store.lastHours,
@@ -420,6 +485,7 @@ class LearnerPlugin(
         const val PROPOSAL_MAX_AGE_MS = CARD_EVERY_MS
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
+        const val GUARD_NOTE_SOURCE = "learner_guard"
     }
 }
 

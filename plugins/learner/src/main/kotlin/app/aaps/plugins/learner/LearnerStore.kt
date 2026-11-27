@@ -141,7 +141,14 @@ class LearnerStore(private val preferences: Preferences) {
         get() = read().optLong(KEY_PCT_APPLIED, 0L)
         set(value) = edit { put(KEY_PCT_APPLIED, value) }
 
+    /** The rebound guard is on (the user's switch). Off by default. */
+    var reboundOn: Boolean
+        get() = read().optBoolean(KEY_REBOUND_ON, false)
+        set(value) = edit { put(KEY_REBOUND_ON, value) }
+
     private companion object {
+
+        const val KEY_REBOUND_ON = "rebound_on"
 
         const val KEY_LAST_CARD = "last_card_at"
         const val KEY_DIR = "card_dir"
