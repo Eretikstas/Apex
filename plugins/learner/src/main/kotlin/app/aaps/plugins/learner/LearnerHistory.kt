@@ -89,7 +89,7 @@ class LearnerHistory(
      * smoothed when a smoothing plugin such as UKF runs), so one noisy reading does not let the guard go. When the store
      * has no values yet (just after a start), the raw readings of the database are used.
      */
-    suspend fun reboundInputs(now: Long): Pair<List<CarbEntry>, Double?> {
+    suspend fun reboundInputs(now: Long): Triple<List<CarbEntry>, Double?, Double?> {
         val from = now - ReboundGuardEngine.WINDOW_MS - ReboundGuardEngine.MEAL_BEFORE_MS
         val smoothed = iobCobCalculator.ads.getStatusDataCopy().orEmpty()
             .filter { it.timestamp in (from - 600_000L)..now }.map { it.timestamp to it.recalculated }.sortedBy { it.first }
@@ -101,8 +101,12 @@ class LearnerHistory(
             val after = values.firstOrNull { it.first > c.timestamp && it.first - c.timestamp <= 600_000L }
             CarbEntry(c.timestamp, c.amount, (before ?: after)?.second)
         }
-        val bgNow = values.lastOrNull()?.takeIf { now - it.first <= 900_000L }?.second
-        return Pair(carbs, bgNow)
+        val newest = values.lastOrNull()?.takeIf { now - it.first <= 900_000L }
+        // The change per 5 minutes, averaged over the last 15 minutes (like the loop's short average delta).
+        val delta = newest?.let { n ->
+            values.lastOrNull { n.first - it.first in 840_000L..1_080_000L }?.let { old -> (n.second - old.second) / ((n.first - old.first) / 300_000.0) }
+        }
+        return Triple(carbs, newest?.second, delta)
     }
 
     private companion object {

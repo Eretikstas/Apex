@@ -336,7 +336,7 @@ class LearnerPlugin(
 
     /**
      * The rebound guard (`ReboundGuardEngine`), off by default. The loop asks this before every run: while the guard
-     * holds (2 hours after a hypo treatment, no meal, glucose under 13.9) SMB are off. It only takes away: it never turns
+     * holds (3 hours after a hypo treatment, no meal, glucose under 13.9, no early release) SMB are off. It only takes away: it never turns
      * SMB on and never adds insulin. A failure to read the data leaves the loop as it is.
      */
     override suspend fun isSMBModeEnabled(value: Constraint<Boolean>): Constraint<Boolean> {
@@ -346,8 +346,8 @@ class LearnerPlugin(
         }
         val now = dateUtil.now()
         val state = runCatching {
-            val (carbs, bgNow) = history.reboundInputs(now)
-            ReboundGuardEngine.state(now, carbs, bgNow)
+            val (carbs, bgNow, delta) = history.reboundInputs(now)
+            ReboundGuardEngine.state(now, carbs, bgNow, delta)
         }.getOrElse {
             aapsLogger.error(LTag.APS, "Learner: rebound guard could not read the data", it)
             GuardState(false)
@@ -362,7 +362,7 @@ class LearnerPlugin(
         return value
     }
 
-    /** While the guard holds, the temp basal is at most 1.5 times the profile basal. Only lowers, never raises. */
+    /** While the guard holds, the temp basal is at most the profile basal (no high temps). Only lowers, never raises. */
     override fun applyBasalConstraints(absoluteRate: Constraint<Double>, profile: Profile): Constraint<Double> {
         val g = guard
         if (!store.reboundOn || !g.active || dateUtil.now() >= g.until) return absoluteRate
