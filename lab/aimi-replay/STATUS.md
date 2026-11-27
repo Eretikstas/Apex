@@ -2,6 +2,16 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — Shape recalibration preflight (pre-run)
+
+- Re-read My-apps `CLAUDE.md`, handoff §13, Apex `RULES_FOR_CHATGPT.md` §00/§5, current `RUN.txt`, latest STATUS Task/Claude Results, and the Step-16/17/18 reports before proceeding.
+- Step 16 attempt 3: replay `46023317575`, 6/6 jobs successful; `CTRL13A` PASS. Step 17: replay `46029516923`, 2/2 jobs successful; both controls PASS and no-token metrics unchanged. Step 18: replay `46051803175`, 18/18 jobs successful; `CTRL13A` PASS. The Step-18 report confirms 105/108 rounded metric cells equal the Step-10 references; three insulin/day cells differ by 0.01 U/day and remain unresolved, so the matrix is not called an exact pass.
+- Step-18 source commit `a1d93913` has a green exact-source compile, run `46044690002`; its RUN dispatch `fbd4c234` confirms the compile gate was green. Replay jobs and report job are all completed successfully.
+- Current `aimi-replay` head is `553abd68`; the only commit after the Step-18 result head `fa0f1195` changes STATUS.md. Frozen app code remains at `6f578b5b`; the later `autoisf-atc3` head `689aa356` changes only `.github/scripts/ci_report.py`. No app code or bench build will be changed.
+- Next: add an opt-in `SHAPEAUDIT` report-only audit over synthetic sensor BG (`bg`) in local clock-hour order. The public reference will contain only dimensionless 24-hour mean/SD shape ratios; no absolute glucose values, dates, raw rows, identifiers, doses, or profile data. Baseline matrix: APP + CAL usual, `SYNTH_56`, seeds 1–3, with `CTRL13A` on seed 1 only. No generator parameters are changed in this audit step.
+- Scope remains `aimi-replay` test source and lab STATUS/RUN only. No changes to the hints branch, `learner-rebound`, frozen app code, child's phone, or Nightscout.
+
+
 ### 2026-11-27 — User ownership and safety update (supersedes older ownership notes)
 
 - ChatGPT owns Steps 16–18, shape recalibration using only anonymized shape statistics in public Apex, then REBOUND GUARD on a separate `learner-rebound` branch based on frozen `autoisf-atc3`; after that, test the food-first smart calculator and split bolus in the lab before any app implementation.
