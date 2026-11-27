@@ -14,6 +14,7 @@
 
 - Fixed `.github/scripts/aimi_lab_report.py` in commit `7236396f`: GitHub job-log redirects now follow the signed storage URL without forwarding `GH_TOKEN`; only HTTP 404 is retried (10 × 30 s); other errors and empty logs are reported explicitly as `LOG NOT READ: ...`. A readable log is consumed immediately even if the expected marker is missing.
 - This is lab-report infrastructure only; no app code, synthetic model behaviour, workflows, or Claude's no-insulin hints changed. No compile gate required for this script-only commit.
+- Follow-up commit `883fd230`: the individual job-log request timeout is 30 s (other GitHub API calls retain 120 s), preventing a stalled signed-storage request from blocking a report for hours.
 - Already-running Step 16 attempt-2 report `45957311944` uses its old checked-out script and is unaffected. Attempt 3 remains queued behind that run; check its dispatcher before another RUN change.
 
 
