@@ -41,7 +41,7 @@
 
 - Attempt-2 rejection counts: CAL = prior-insulin 65, COB-min-rate 43, prior-hypo-rebound 14; CRT_26.4 = COB-min-rate 59, prior-insulin 53, prior-hypo-rebound 10; CRT_17.6 = prior-insulin 72, COB-min-rate 36, prior-hypo-rebound 14; TREAT_15 = prior-insulin 62, COB-min-rate 40, prior-hypo-rebound 17, SMB within 6 h 3.
 - Diagnostic split in `f051dd99` distinguishes prior SMB from prior manual correction. It did NOT run in attempt 2: `dispatch-a4c4de27.md` records code `0dc64d56`; `f051dd99` was committed later. Compile `45958813071` for `f051dd99` is green.
-- Attempt 2 RUN commit `d53a50ab` dispatch `45959189491` and attempt 3 RUN commit `7fcf5d94` dispatch `45960043127` are both waiting behind attempt-1 workflow-dispatch/report `45957311944`. Per the RUN comment, attempt 2 is pinned to code `0dc64d56` (the diagnostic commit `f051dd99` landed after that RUN commit); attempt 3 is pinned to `f051dd99`, whose compile is green. Neither has a replay ID yet. Do not create another RUN commit. Attempt 3 is the last permitted attempt. Continue to Step 17 after attempt 3 results; no CTRL13A failure occurred.
+- Attempt 2 RUN commit `d53a50ab` dispatch `45959189491` is waiting behind attempt-1 workflow-dispatch/report `45957311944`. Per the RUN history, attempt 2 is pinned to code `0dc64d56`. Attempt 3 RUN commit `7fcf5d94` pinned to diagnostic code `f051dd99` (compile green), but its dispatcher `45960043127` was cancelled before any job started; it has no replay ID and does not count as a replay attempt. After attempt 2 completes, re-commit the same attempt-3 batch once to start the final permitted replay. No CTRL13A failure occurred.
 - No app branch or hint branch was changed.
 
 
