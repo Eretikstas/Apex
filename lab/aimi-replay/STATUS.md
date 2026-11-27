@@ -2,6 +2,32 @@
 
 ## Task (written by ChatGPT)
 
+### Step 10 — exact APP per-seed reference recovered from public job logs
+
+- Source: replay `45653668453`, the 18 APP-variant jobs (even matrix indices); values below were parsed from each job's public summary, not inferred from scenario means. Use this table for the Step-18 report-only equality check.
+
+| Scenario | Seed | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| usual | 1 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| MEALX lower | 1 | 5.4 | 0.2 | 6.0 | 29.6 | 30.18 | 11.44 |
+| CHGISF higher | 1 | 7.2 | 0.6 | 4.1 | 29.7 | 38.39 | 11.04 |
+| CHGISF lower | 1 | 5.0 | 0.2 | 7.7 | 30.2 | 28.39 | 12.66 |
+| DRIFT_2 | 1 | 5.2 | 0.1 | 8.4 | 30.8 | 29.64 | 13.02 |
+| NOISE_0.12 | 1 | 12.9 | 3.0 | 15.5 | 41.1 | 59.29 | 13.04 |
+| usual | 2 | 4.0 | 0.1 | 4.2 | 27.7 | 24.11 | 10.92 |
+| MEALX lower | 2 | 4.0 | 0.1 | 3.9 | 27.1 | 24.11 | 10.71 |
+| CHGISF higher | 2 | 4.4 | 0.2 | 3.2 | 26.7 | 26.25 | 10.19 |
+| CHGISF lower | 2 | 3.6 | 0.1 | 6.2 | 28.2 | 20.36 | 11.80 |
+| DRIFT_2 | 2 | 3.5 | 0.2 | 6.9 | 27.6 | 19.82 | 12.16 |
+| NOISE_0.12 | 2 | 11.0 | 2.7 | 12.8 | 38.0 | 52.86 | 11.83 |
+| usual | 3 | 4.8 | 0.3 | 4.5 | 28.9 | 29.64 | 11.63 |
+| MEALX lower | 3 | 4.7 | 0.2 | 3.8 | 27.8 | 26.96 | 11.25 |
+| CHGISF higher | 3 | 6.0 | 0.4 | 3.2 | 28.2 | 35.36 | 10.98 |
+| CHGISF lower | 3 | 4.5 | 0.2 | 5.2 | 28.4 | 26.07 | 12.63 |
+| DRIFT_2 | 3 | 4.4 | 0.2 | 6.0 | 29.7 | 26.61 | 13.00 |
+| NOISE_0.12 | 3 | 12.0 | 3.2 | 14.7 | 40.3 | 55.71 | 12.86 |
+
+
 ### 2026-11-27 — inherited MEALAUDIT / SPLITRISK diagnostic (run 46022123724)
 
 - The pre-existing 12-job RUN from commit `934287dc` completed successfully; compile of source `f4a6c9bc` was green, 12/12 replay jobs succeeded, and the seed-1 CAL `CTRL13A` control matched exactly (PASS). This batch is separate from Step 16 and is not the final post-guard split-bolus validation.
