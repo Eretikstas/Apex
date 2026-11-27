@@ -87,4 +87,11 @@
     <string name="learner_why_eval_worse" comment="%1$s=what changed">Learner: 3 days after %1$s - worse; check whether to undo it.</string>
     <string name="learner_why_eval_rollback" comment="%1$s=what changed">Learner: after %1$s the rollback rule was hit (lows); check whether to undo it.</string>
     <string name="learner_why_eval_no_data" comment="%1$s=what changed">Learner: 3 days after %1$s - not enough data for a verdict.</string>
+    <string name="learner_digest_title">Weekly digest</string>
+    <string name="learner_digest_rule" formatted="false">Off by default. Once a week from 06:00: the last 7 days against the 7 days before. Goals: 3.9-10 at least 80 %, under 3.9 at most 2 %, over 10 at most 5 %, CV at most 33 %. Only numbers, no advice.</string>
+    <string name="learner_digest_made" comment="%1$s=date and time, %2$d=goals met, %3$d=number of goals">Made %1$s: %2$d of %3$d goals met this week.</string>
+    <string name="learner_digest_this">This week</string>
+    <string name="learner_digest_last">Week before</string>
+    <string name="learner_digest_week" comment="%1$s=week name, %2$.0f=3.9-10 percent, %3$.1f=under 3.9 percent, %4$.1f=under 3.0 percent, %5$.1f=over 10 percent, %6$.0f=CV percent, %7$.1f=mean mmol/L, %8$.1f=insulin U a day, %9$.0f=hypo carbs g a day">%1$s: in 3.9-10 %2$.0f %%, under 3.9 %3$.1f %%, under 3.0 %4$.1f %%, over 10 %5$.1f %%, CV %6$.0f %%, mean %7$.1f, insulin %8$.1f U/day, hypo carbs %9$.0f g/day</string>
+    <string name="learner_why_digest" comment="%1$.0f=3.9-10 percent, %2$.1f=under 3.9 percent, %3$.1f=over 10 percent, %4$.0f=CV percent, %5$d=goals met, %6$d=goals">Learner, week: 3.9-10 %1$.0f %%, under 3.9 %2$.1f %%, over 10 %3$.1f %%, CV %4$.0f %%; goals %5$d of %6$d.</string>
 </resources>

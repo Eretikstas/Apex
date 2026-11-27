@@ -191,6 +191,34 @@ class LearnerStore(private val preferences: Preferences) {
             )
         }
 
+    /** The weekly digest is on (the user's switch). Off by default. */
+    var digestOn: Boolean
+        get() = read().optBoolean(KEY_DIGEST_ON, false)
+        set(value) = edit { put(KEY_DIGEST_ON, value) }
+
+    /** The last weekly digest and when it was made. */
+    var lastDigest: Pair<Long, WeeklyDigest>?
+        get() = read().optJSONObject(KEY_DIGEST)?.let { o ->
+            runCatching {
+                o.getLong("at") to WeeklyDigest(weekOf(o.getJSONObject("this")), weekOf(o.getJSONObject("last")), o.getInt("met"), o.getInt("goals"))
+            }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_DIGEST)
+            else put(
+                KEY_DIGEST, JSONObject().put("at", value.first).put("this", json(value.second.thisWeek)).put("last", json(value.second.lastWeek))
+                    .put("met", value.second.goalsMet).put("goals", value.second.goals)
+            )
+        }
+
+    private fun json(w: WeekStats) = JSONObject().put("tir", w.inRangePct).put("l39", w.low39Pct).put("l30", w.low30Pct).put("h10", w.high10Pct)
+        .put("cv", w.cvPct).put("mean", w.meanMgdl).put("ins", w.insulinPerDay).put("hypo", w.hypoGPerDay).put("n", w.readings)
+
+    private fun weekOf(o: JSONObject) = WeekStats(
+        o.getDouble("tir"), o.getDouble("l39"), o.getDouble("l30"), o.getDouble("h10"), o.getDouble("cv"), o.getDouble("mean"),
+        o.getDouble("ins"), o.getDouble("hypo"), o.getInt("n")
+    )
+
     private fun json(s: EvalStats) = JSONObject().put("l39", s.low39Pct).put("l30", s.low30Pct).put("h10", s.high10Pct)
         .put("cv", s.cvPct).put("min", s.minMgdl).put("n", s.readings)
 
@@ -198,6 +226,8 @@ class LearnerStore(private val preferences: Preferences) {
 
     private companion object {
 
+        const val KEY_DIGEST_ON = "digest_on"
+        const val KEY_DIGEST = "digest_last"
         const val KEY_EVAL_ON = "eval_on"
         const val KEY_EVAL_PENDING = "eval_pending"
         const val KEY_EVAL_LAST = "eval_last"

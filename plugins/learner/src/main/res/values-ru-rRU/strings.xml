@@ -87,4 +87,11 @@
     <string name="learner_why_eval_worse">Ученик: через 3 дня после изменения (%1$s) — хуже; проверьте, не откатить ли.</string>
     <string name="learner_why_eval_rollback">Ученик: после изменения (%1$s) сработало правило отката (низкие); проверьте, не откатить ли.</string>
     <string name="learner_why_eval_no_data">Ученик: через 3 дня после изменения (%1$s) — мало данных для оценки.</string>
+    <string name="learner_digest_title">Недельная сводка</string>
+    <string name="learner_digest_rule" formatted="false">По умолчанию выключена. Раз в неделю с 06:00: последние 7 дней против 7 дней до них. Цели: 3,9–10 не меньше 80 %, ниже 3,9 не больше 2 %, выше 10 не больше 5 %, CV не больше 33 %. Только цифры, без советов.</string>
+    <string name="learner_digest_made">Сводка %1$s: целей выполнено %2$d из %3$d.</string>
+    <string name="learner_digest_this">Эта неделя</string>
+    <string name="learner_digest_last">Неделя до</string>
+    <string name="learner_digest_week">%1$s: 3,9–10 %2$.0f %%, ниже 3,9 %3$.1f %%, ниже 3,0 %4$.1f %%, выше 10 %5$.1f %%, CV %6$.0f %%, средняя %7$.1f, инсулин %8$.1f ед/сут, углеводы на гипо %9$.0f г/сут</string>
+    <string name="learner_why_digest">Ученик, неделя: 3,9–10 %1$.0f %%, ниже 3,9 %2$.1f %%, выше 10 %3$.1f %%, CV %4$.0f %%; целей %5$d из %6$d.</string>
 </resources>

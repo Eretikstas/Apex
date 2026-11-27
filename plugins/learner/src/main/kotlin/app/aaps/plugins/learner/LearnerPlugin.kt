@@ -101,6 +101,9 @@ class LearnerPlugin(
         val evalOn: Boolean = false,
         val evalPending: PendingEval? = null,
         val lastEval: DoneEval? = null,
+        /** The weekly digest switch (off by default) and the last digest with its time. */
+        val digestOn: Boolean = false,
+        val lastDigest: Pair<Long, WeeklyDigest>? = null,
     )
 
     private val store = LearnerStore(prefs)
@@ -122,6 +125,7 @@ class LearnerPlugin(
                 runCatching { checkSensor() }.onFailure { aapsLogger.error(LTag.APS, "Learner: sensor hint failed", it) }
                 runCatching { checkCannula() }.onFailure { aapsLogger.error(LTag.APS, "Learner: cannula hint failed", it) }
                 runCatching { checkEval() }.onFailure { aapsLogger.error(LTag.APS, "Learner: change evaluation failed", it) }
+                runCatching { maybeDigest() }.onFailure { aapsLogger.error(LTag.APS, "Learner: weekly digest failed", it) }
                 delay(TICK_MS)
             }
         }
@@ -383,6 +387,31 @@ class LearnerPlugin(
         }, label
     )
 
+    /** The weekly digest (advisor, `WeeklyDigestEngine`): from 06:00, 7 days after the last one; a note and the numbers. */
+    private suspend fun maybeDigest(force: Boolean = false) {
+        if (!store.digestOn) return
+        val now = dateUtil.now()
+        val last = store.lastDigest?.first ?: 0L
+        if (!force) {
+            if (Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).hour < CARD_HOUR) return
+            if (now - last < DIGEST_EVERY_MS - 2 * HOUR_MS) return
+        }
+        val digest = WeeklyDigestEngine.digest(history.steps(now, WeeklyDigestEngine.DAYS))
+        store.lastDigest = now to digest
+        val w = digest.thisWeek
+        note(rh.gs(R.string.learner_why_digest, w.inRangePct, w.low39Pct, w.high10Pct, w.cvPct, digest.goalsMet, digest.goals), now, NOTE_LONG_MS, DIGEST_NOTE_SOURCE)
+        aapsLogger.debug(LTag.APS, "Learner: weekly digest $digest")
+        refresh()
+    }
+
+    /** The user's switch for the weekly digest. On makes a digest now; off removes its note. */
+    fun setDigestOn(on: Boolean) {
+        store.digestOn = on
+        if (!on) loopNotes.clear(DIGEST_NOTE_SOURCE)
+        refresh()
+        if (on) scope.launch { runCatching { maybeDigest(force = true) }.onFailure { aapsLogger.error(LTag.APS, "Learner: weekly digest failed", it) } }
+    }
+
     /** The user's switch for the change evaluation. Off also removes its note. */
     fun setEvalOn(on: Boolean) {
         store.evalOn = on
@@ -516,6 +545,8 @@ class LearnerPlugin(
             evalOn = store.evalOn,
             evalPending = store.evalPending,
             lastEval = store.lastEval,
+            digestOn = store.digestOn,
+            lastDigest = store.lastDigest,
         )
     }
 
@@ -559,6 +590,8 @@ class LearnerPlugin(
         const val SENSOR_NOTE_SOURCE = "learner_sensor"
         const val CANNULA_NOTE_SOURCE = "learner_cannula"
         const val EVAL_NOTE_SOURCE = "learner_eval"
+        const val DIGEST_NOTE_SOURCE = "learner_digest"
+        const val DIGEST_EVERY_MS = 7 * 86_400_000L
         const val MGDL_PER_MMOL = 18.0
     }
 }

@@ -38,6 +38,8 @@ import app.aaps.plugins.learner.EvalStats
 import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.PendingEval
+import app.aaps.plugins.learner.WeekStats
+import app.aaps.plugins.learner.WeeklyDigest
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin.Status
@@ -141,6 +143,17 @@ class LearnerScreenshotTest {
             lastEval = DoneEval(
                 "percentage 100 -> 90 %", NOW - 5 * DAY, NOW - 2 * DAY,
                 ChangeEval(EvalStats(6.2, 0.8, 7.5, 33.0, 50.0, 864), EvalStats(4.1, 0.3, 8.0, 30.0, 59.0, 864), EvalVerdict.BETTER, false)
+            ))
+    )
+
+    @Test
+    fun weeklyDigest() = shoot(
+        "learner_weekly_digest",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            digestOn = true,
+            lastDigest = (NOW - HOUR) to WeeklyDigest(
+                WeekStats(84.0, 3.1, 0.4, 12.9, 30.5, 126.0, 15.6, 24.0, 2016),
+                WeekStats(79.0, 5.4, 0.7, 15.6, 33.8, 122.0, 15.1, 33.0, 2016), 1, 4
             ))
     )
 

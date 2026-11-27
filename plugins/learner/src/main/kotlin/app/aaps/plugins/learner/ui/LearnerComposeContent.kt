@@ -41,6 +41,7 @@ import app.aaps.plugins.learner.LearnerPlugin
 import app.aaps.plugins.learner.EvalStats
 import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.R
+import app.aaps.plugins.learner.WeekStats
 import app.aaps.plugins.learner.SensorHintKind
 
 /** The learner's screen: the basal proposal with "Внести" / "Отказаться", and what it measured per hour. */
@@ -75,7 +76,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onRefusePct = plugin::refusePct,
         onSensorHints = plugin::setSensorHints,
         onCannulaHints = plugin::setCannulaHints,
-        onEval = plugin::setEvalOn
+        onEval = plugin::setEvalOn,
+        onDigest = plugin::setDigestOn
     )
 }
 
@@ -91,7 +93,8 @@ internal fun LearnerScreenContent(
     onRefusePct: () -> Unit = {},
     onSensorHints: (Boolean) -> Unit = {},
     onCannulaHints: (Boolean) -> Unit = {},
-    onEval: (Boolean) -> Unit = {}
+    onEval: (Boolean) -> Unit = {},
+    onDigest: (Boolean) -> Unit = {}
 ) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
@@ -146,6 +149,7 @@ internal fun LearnerScreenContent(
         SensorSection(status, onSensorHints)
         CannulaSection(status, onCannulaHints)
         EvalSection(status, onEval)
+        DigestSection(status, onDigest)
 
         if (status.hours.isNotEmpty()) {
             Text(stringResource(R.string.learner_hours_title), style = MaterialTheme.typography.titleMedium)
@@ -334,6 +338,38 @@ private fun EvalSection(status: Status, onSwitch: (Boolean) -> Unit) {
 private fun StatsLine(label: Int, s: EvalStats) {
     Text(
         stringResource(R.string.learner_eval_stats, stringResource(label), s.low39Pct, s.low30Pct, s.high10Pct, s.cvPct, s.minMgdl / 18.0),
+        style = MaterialTheme.typography.bodySmall
+    )
+}
+
+/** The weekly digest: the switch (off by default), this week against the week before, and the goals met. */
+@Composable
+private fun DigestSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_digest_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.digestOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_digest_rule), style = MaterialTheme.typography.bodySmall)
+            if (!status.digestOn) return@Column
+            status.lastDigest?.let { (at, d) ->
+                Text(stringResource(R.string.learner_digest_made, dateUtil.dateAndTimeString(at), d.goalsMet, d.goals), fontWeight = FontWeight.SemiBold)
+                WeekLine(R.string.learner_digest_this, d.thisWeek)
+                WeekLine(R.string.learner_digest_last, d.lastWeek)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekLine(label: Int, w: WeekStats) {
+    Text(
+        stringResource(
+            R.string.learner_digest_week, stringResource(label), w.inRangePct, w.low39Pct, w.low30Pct, w.high10Pct, w.cvPct, w.meanMgdl / 18.0,
+            w.insulinPerDay, w.hypoGPerDay
+        ),
         style = MaterialTheme.typography.bodySmall
     )
 }
