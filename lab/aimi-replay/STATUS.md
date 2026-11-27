@@ -2,10 +2,15 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — SHAPEAUDIT compile fix partial checks
+
+- Exact compile run `46055486474` for `6f883d7c`: `compileFullDebugUnitTestKotlin` PASS; AutoISF weight-boundary tests PASS; `HistoryReplayTest` report-helper tests PASS, including the new normalization test. Dashboard builder/presenter tests are still running; APSResult wrapper, APK assembly, and upload have not yet run. Overall compile gate remains pending.
+
+
 ### 2026-11-27 — SHAPEAUDIT first RUN refused by compile gate
 
 - Dispatcher run `46055094067` completed and wrote `dispatch-b55c429b.md`: **REFUSED** because the exact source compile for `d83d79ca` concluded failure. No replay was started from RUN commit `b55c429b`.
-- Formatting fix commit `6f883d7c5d6644fc6ec6aa878313927d979c02a1` triggered exact compile run `46055486474`; it is still in progress at this check. Do not retry RUN until its report is green.
+- Formatting fix commit `6f883d7c5d6644fc6ec6aa878313927d979c02a1` triggered exact compile run `46055486474`; source compilation, AutoISF boundaries, and HistoryReplayTest helper tests are green; dashboard/presenter tests are in progress. Per §00, a new RUN commit is submitted now and the dispatcher will wait for the full compile gate.
 
 
 ### 2026-11-27 — SHAPEAUDIT compile attempt 1 failed; formatting fix committed
