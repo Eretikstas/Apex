@@ -2401,9 +2401,14 @@ class HistoryReplayTest {
             fun ratios(values: DoubleArray) = values.joinToString(prefix = "[", postfix = "]") {
                 java.lang.String.format(java.util.Locale.US, "%.3f", it)
             }
-            println("AIMI audit SHAPEAUDIT: valid-samples=\${samples.size} mean-ratio-MAE=\${java.lang.String.format(java.util.Locale.US, "%.4f", meanMae)} sd-ratio-MAE=\${java.lang.String.format(java.util.Locale.US, "%.4f", sdMae)} reference=anonymized-v1 report-only")
-            println("AIMI audit SHAPEAUDIT mean-ratio-by-hour=\${ratios(shape.meanRatio)}")
-            println("AIMI audit SHAPEAUDIT sd-ratio-by-hour=\${ratios(shape.sdRatio)}")
+            println(
+                "AIMI audit SHAPEAUDIT: valid-samples=" + samples.size +
+                    " mean-ratio-MAE=" + java.lang.String.format(java.util.Locale.US, "%.4f", meanMae) +
+                    " sd-ratio-MAE=" + java.lang.String.format(java.util.Locale.US, "%.4f", sdMae) +
+                    " reference=anonymized-v1 report-only"
+            )
+            println("AIMI audit SHAPEAUDIT mean-ratio-by-hour=" + ratios(shape.meanRatio))
+            println("AIMI audit SHAPEAUDIT sd-ratio-by-hour=" + ratios(shape.sdRatio))
         }
         // WATTR is report-only. Emit its accumulated evidence so planted-cause runs can be scored.
         if (wAttr) {
