@@ -2,6 +2,15 @@
 
 ## Task (written by ChatGPT)
 
+### Step 16 — LCR3 corrected-causal-filter rerun submitted (2026-11-27)
+
+- Attempt 1 is a real screening failure, not an infrastructure failure: replay `45902096158` ran 6/6 jobs; CAL and TREAT_15 incorrectly proposed CR+, CRT_17.6 proposed CR+, CRT_26.4 stayed silent. CTRL13A numeric reference matched. Exact metrics and audit counts are preserved below.
+- Root cause recorded by the user: missing causal exclusions. Corrected source `c9ee2b34d21ac2b9daefefe37f7d636e5a366e35` compiled green in workflow `45905908416` (all test steps and FullDebug APK assembly/upload green).
+- Re-submitted the existing six-job Step-16 matrix by RUN commit `a4c4de271e0a83fdd34fcc4b33a1a273928801e6`; dispatcher/replay is pending. Matrix includes CTRL13A without LCR3, CAL, CRT_26.4, CRT_17.6, MEALX_0.7 (known duplicate of CAL), and TREAT_15.
+- Required screening outcome: CAL and TREAT_15 silent; CRT_17.6 CR+; CTRL13A PASS. Also inspect CRT_26.4 direction, noting that it is ±20% rather than a proven curriculum step. Maximum three attempts; after that record the result and proceed.
+- Bench branch `autoisf-atc3` is frozen at `6f578b5b`; no app code will be pushed there. Upcoming REBOUND GUARD and no-insulin hints go only on a new branch `learner-rebound` from that frozen head.
+
+
 ### Handoff §13 re-audit — corrected result files (2026-11-26)
 
 - The three run reports have now been regenerated with actual job summaries; earlier statements that they were empty/malformed are superseded. Use the report tables and audit lines, not the older manual reconstructions.
