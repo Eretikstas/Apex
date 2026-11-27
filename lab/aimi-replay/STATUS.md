@@ -2,13 +2,37 @@
 
 ## Task (written by ChatGPT)
 
-### 2026-11-27 — Claude: lab check of the APP rules (user asked Claude to run it)
+### 2026-11-27 — Claude: lab check of the APP rules (DONE)
 
-- New tokens in `4ee01c8e` (OFF unless present, no change without them): `RGAPP` = the app's rebound guard
-  (branch `learner-rebound`), `SPLITAPP` / `SPLITAPPSLOW` = the app's split meal bolus (branch `learner-split`).
-- RUN `6b1b4086`, 19 jobs: CTRL13A control + per seed 1-3 PLAIN, +RGAPP, +SPLIT_60+RGAPP, +LEARNG3+SPLITAPP,
-  +RGAPP+SPLITAPP, +RGAPP+SPLITAPPSLOW. It queues behind Step 16 attempt 3. Claude reads the result and writes the
-  summary here; ChatGPT: do not rerun it, go on with steps 16-18.
+- Tokens (OFF unless present; CTRL13A PASS in every run with them in the code): `RGAPP` = app rebound guard
+  (`4ee01c8e`), `SPLITAPP` / `SPLITAPPSLOW` = app split bolus, `RGAPP2` = RGAPP + LEARNG3's early releases with fixed
+  numbers (`9dbae452`), `RGWIN_<min>` / `RGCAP_<x>` = RGAPP window and temp cap (`ccad1ea6`'s parent).
+- Run 1 `45966450987` had NO valid control: its jobs lacked `LACAUSE` (it changes the learner cards). Not used.
+- Every job below: CAL tokens + `LACAUSE,CRAUDIT,LSTAGE0,LISF2`; PLAIN = CAL without SPLIT_60, SPLITMIN_20, LEARNG3.
+  Runs `45967958290` (v2), `45980152371` (v3), `45983278740` (v4). Means of seeds 1-3:
+
+| Set | <70 | <54 | >180 | CV | hypo g/day |
+|---|---:|---:|---:|---:|---:|
+| CAL (LEARNG3 + SPLIT_60) | 4.93 | 0.30 | 4.80 | 28.8 | 29.0 |
+| PLAIN | 5.67 | 0.27 | 4.60 | 28.8 | 31.7 |
+| PLAIN + RGAPP (120 min, 1.5x) | 5.23 | 0.30 | 5.47 | 29.4 | 29.9 |
+| PLAIN + RGAPP2 | 5.60 | 0.27 | 4.87 | 29.1 | 31.3 |
+| SPLIT_60 + RGAPP | 5.10 | 0.27 | 5.30 | 29.3 | 28.7 |
+| SPLIT_60 + RGAPP2 | 5.17 | 0.27 | 4.80 | 29.0 | 31.3 |
+| LEARNG3 + SPLITAPP | 4.90 | 0.23 | 4.83 | 28.3 | 27.6 |
+| RGAPP + SPLITAPP | 5.33 | 0.20 | 4.90 | 29.3 | 30.5 |
+| RGAPP + SPLITAPPSLOW | 5.27 | 0.27 | 4.70 | 28.9 | 30.5 |
+| RGAPP2 + SPLITAPP | 5.33 | 0.30 | 4.70 | 28.8 | 30.6 |
+| RGAPP 120 min / 1.0x + SPLITAPP | 5.00 | 0.17 | 5.50 | 29.2 | 28.5 |
+| RGAPP 180 min / 1.0x + SPLITAPP | 4.83 | 0.17 | 6.60 | 30.5 | 27.9 |
+| **RGAPP2 180 min / 1.0x + SPLITAPP** | **4.67** | **0.17** | **4.80** | **28.2** | **26.7** |
+
+- Result: the app split is as good as the lab split or better. The first app guard (120 min, 1.5x) helps against the
+  plain loop but less than LEARNG3. With the values LEARNG3 learns (180 min, cap 1.0x) and its early releases, fixed,
+  the app guard + app split beat CAL on all three low numbers with the same highs. Per seed it is mixed (seed 2 <54
+  0.2 vs 0.1, seed 3 <70 5.0 vs 4.8); differences are near seed noise; 3 seeds only; model not yet re-calibrated.
+- The app guard was changed to these values (branch `learner-rebound`, `d25ae63a`). ChatGPT: after the
+  re-calibration, run RGAPP2,RGWIN_180,RGCAP_1.0,SPLITAPP against CAL on the new model (more seeds if you can).
 
 ### 2026-11-27 — lab report log retrieval
 
