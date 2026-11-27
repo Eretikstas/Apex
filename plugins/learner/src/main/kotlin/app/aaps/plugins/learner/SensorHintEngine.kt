@@ -12,10 +12,9 @@ enum class SensorHintKind { FIRST_HOURS, JUMP }
 data class SensorHint(val kind: SensorHintKind, val changeAt: Long, val at: Long, val fromMgdl: Double? = null, val toMgdl: Double? = null)
 
 /**
- * The learner's sensor hint (advisor only). After a sensor change logged in AAPS the first readings can be wrong: in
- * real data the first value after a change was 22.8 mmol/L and fell to 3.7 in 25 minutes, and a value rose 3.0 -> 4.5 in
- * 5 minutes after 6 g of carbs, which is too fast to be real. Three changes are too few to learn a rule, so the rule is
- * fixed and careful:
+ * The learner's sensor hint (advisor only). After a sensor change logged in AAPS the first readings can be wrong: a first
+ * value far off that falls back within half an hour, or a jump too fast to be real. There are too few sensor changes to
+ * learn a rule, so the rule is fixed and careful:
  *
  * - in the first 2 hours after the change: "the values may be wrong";
  * - in the first 24 hours: a change of 1.5 mmol/L or more between two readings about 5 minutes apart is a "jump",

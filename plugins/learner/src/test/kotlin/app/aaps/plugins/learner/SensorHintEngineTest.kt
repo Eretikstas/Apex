@@ -31,8 +31,8 @@ class SensorHintEngineTest {
 
     @Test
     fun `a first value far above the last one before the change is a jump`() {
-        // Like the real case: 7.7 before the change, 22.8 as the first value after it.
-        val r = listOf((change - 5 * min) to 7.7 * 18.0, (change + min) to 22.8 * 18.0) + everyFive(6, 9.1, 5.5, 5.6)
+        // A first value far above the last one before the change.
+        val r = listOf((change - 5 * min) to 7.5 * 18.0, (change + min) to 21.0 * 18.0) + everyFive(6, 9.1, 5.5, 5.6)
         val h = SensorHintEngine.check(change + 20 * min, change, r)
         assertThat(h?.kind).isEqualTo(SensorHintKind.JUMP)
         assertThat(h?.toMgdl).isWithin(0.01).of(5.5 * 18.0)
@@ -40,7 +40,7 @@ class SensorHintEngineTest {
 
     @Test
     fun `a rise of 1_5 in 5 minutes on the first day is a jump, read every minute`() {
-        // Like the real case: 3.0 -> 4.5 in 5 minutes, 10 hours after the change.
+        // 3.0 -> 4.5 in 5 minutes, 10 hours after the change.
         val r = everyMinute(600, 3.0, 3.0, 3.0, 3.2, 3.6, 4.1, 4.5, 4.4, 4.4)
         val h = SensorHintEngine.check(change + 620 * min, change, r)
         assertThat(h?.kind).isEqualTo(SensorHintKind.JUMP)
@@ -62,7 +62,7 @@ class SensorHintEngineTest {
 
     @Test
     fun `a jump is shown for 30 minutes, then the first hours hint comes back`() {
-        val r = listOf((change - 5 * min) to 7.7 * 18.0, (change + min) to 22.8 * 18.0) + everyFive(6, 9.1, 9.0, 8.9)
+        val r = listOf((change - 5 * min) to 7.5 * 18.0, (change + min) to 21.0 * 18.0) + everyFive(6, 9.1, 9.0, 8.9)
         assertThat(SensorHintEngine.check(change + 30 * min, change, r)?.kind).isEqualTo(SensorHintKind.JUMP)
         assertThat(SensorHintEngine.check(change + 50 * min, change, r)?.kind).isEqualTo(SensorHintKind.FIRST_HOURS)
     }

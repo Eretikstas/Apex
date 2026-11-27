@@ -4,10 +4,8 @@ package app.aaps.plugins.learner
 data class CannulaHint(val ageH: Double, val highPct: Double)
 
 /**
- * The learner's cannula hint (advisor only). In real data of 80 days the share of readings over 10 mmol/L was 5-9 % with
- * a cannula younger than 60 hours, 13 % at 60-72 hours and 33 % at 72-84 hours. Six hours with 40 % or more over 10
- * happened 0.15-0.33 times a day with a younger cannula and 0.85 times a day with a cannula of 60 hours or more: so about
- * 7 of 10 such hours with an old cannula come from the cannula. The rule:
+ * The learner's cannula hint (advisor only). An old cannula brings more highs: the family's own data (kept private, not
+ * in this repository) showed long high stretches clearly more often with a cannula of 60 hours or more. The rule:
  *
  * - the cannula is 60 hours old or more (from the last cannula change logged in AAPS; unknown age = no hint);
  * - in the last 6 hours 40 % or more of the readings are over 10 mmol/L (at least 80 % of the readings there).

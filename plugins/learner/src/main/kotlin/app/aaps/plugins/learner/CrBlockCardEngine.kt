@@ -16,8 +16,8 @@ data class CrBlockCard(val meals: Map<MealBlock, Int>, val lowPct: Map<MealBlock
 
 /**
  * The learner's CR card per meal block (advisor, SAFETY ONLY: it only ever proposes a WEAKER CR, that is less insulin).
- * Real data 27.11: meals at dinner (16-21 h) were followed by a low within 4 h in 51 % of cases (79 % since the diet),
- * breakfast and lunch in 17-38 %, with the same bolus per gram.
+ * One meal of the day can need a weaker CR than the others (for example dinner); the family's own data (kept private,
+ * not in this repository) showed this.
  *
  * - The last [DAYS] days; meals of [MIN_MEAL_G] g or more; a meal "ends low" when a reading under 3.9 mmol/L comes 15 min
  *   to 4 h after it.
