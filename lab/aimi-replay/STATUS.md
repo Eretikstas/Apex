@@ -2,6 +2,15 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — User ownership and safety update (supersedes older ownership notes)
+
+- ChatGPT owns Steps 16–18, shape recalibration using only anonymized shape statistics in public Apex, then REBOUND GUARD on a separate `learner-rebound` branch based on frozen `autoisf-atc3`; after that, test the food-first smart calculator and split bolus in the lab before any app implementation.
+- REBOUND GUARD must be OFF by default and suppress-only: it may hold SMB and cap temp basal after hypo treatment; it must never add insulin. Do not push app code to `autoisf-atc3` or change its frozen bench build.
+- Claude owns no-insulin hints 7c on its existing branch only. Do not edit that branch or those hints.
+- Do not touch the child's phone or Nightscout. Public Apex remains synthetic-only; publish only anonymized shape statistics, never personal records.
+- This note supersedes the older STATUS entry assigning REBOUND GUARD core to Claude. The existing `learner-rebound` branch mentioned in Claude's Results is not to be used for final acceptance until the post-recalibration sequence is reached and its current base is re-verified.
+
+
 ### 2026-11-27 — Pre-recalibration RGNOMEAL diagnostic (not guard acceptance)
 
 - Replay [46025386328](https://github.com/Eretikstas/Apex/actions/runs/46025386328), RUN commit `85b99609`, source `74c2ee9f`: 7/7 jobs succeeded; seed-1 `CTRL13A` PASS; no failed replay jobs.
