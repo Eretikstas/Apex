@@ -90,6 +90,58 @@ class HistoryReplayTest {
 
     private val minute = 60_000L
 
+    // Dimensionless clock-hour shape ratios only; no absolute glucose values or patient metadata.
+    private val anonymizedMeanShape = doubleArrayOf(
+        1.048, 0.902, 0.873, 0.880, 0.937, 0.984, 0.978, 0.977,
+        1.066, 0.995, 1.030, 0.931, 1.037, 1.075, 1.147, 1.104,
+        1.029, 1.084, 0.925, 1.047, 1.157, 0.955, 0.888, 0.950
+    )
+    private val anonymizedSdShape = doubleArrayOf(
+        0.828, 0.756, 0.489, 0.570, 0.464, 0.434, 0.469, 0.751,
+        1.175, 1.156, 0.937, 0.843, 0.967, 0.873, 1.411, 1.414,
+        1.262, 1.277, 1.433, 1.530, 1.493, 1.525, 1.017, 0.925
+    )
+
+    private data class HourlyShape(val meanRatio: DoubleArray, val sdRatio: DoubleArray)
+
+    private fun normalizedHourlyShape(samples: List<Pair<Int, Double>>): HourlyShape {
+        require(samples.isNotEmpty()) { "SHAPEAUDIT has no sensor samples" }
+        val buckets = Array(24) { ArrayList<Double>() }
+        samples.forEach { (hour, value) ->
+            require(hour in 0..23 && value.isFinite()) { "SHAPEAUDIT sample is invalid" }
+            buckets[hour].add(value)
+        }
+        require(buckets.all { it.size >= 2 }) { "SHAPEAUDIT needs samples in all 24 clock hours" }
+        val means = DoubleArray(24) { buckets[it].average() }
+        val sds = DoubleArray(24) { hour ->
+            val mean = means[hour]
+            Math.sqrt(buckets[hour].sumOf { (it - mean) * (it - mean) } / buckets[hour].size)
+        }
+        val meanBase = means.average()
+        val sdBase = sds.average()
+        require(meanBase.isFinite() && meanBase > 0.0 && sdBase.isFinite() && sdBase > 0.0) {
+            "SHAPEAUDIT normalization base is invalid"
+        }
+        return HourlyShape(
+            DoubleArray(24) { means[it] / meanBase },
+            DoubleArray(24) { sds[it] / sdBase }
+        )
+    }
+
+    @Test
+    fun shapeAuditRatiosPreserveClockHourOrderAndNormalizeBothCurves() {
+        val samples = (0 until 24).flatMap { hour ->
+            listOf(hour to (100.0 + hour), hour to (102.0 + hour))
+        }
+        val shape = normalizedHourlyShape(samples)
+        assertEquals(1.0, shape.meanRatio.average(), 1e-9)
+        assertEquals(1.0, shape.sdRatio.average(), 1e-9)
+        assertEquals(true, shape.meanRatio[23] > shape.meanRatio[0])
+        assertThrows(IllegalArgumentException::class.java) {
+            normalizedHourlyShape(samples.filterNot { it.first == 23 })
+        }
+    }
+
     private fun protectionExclusionReason(row: JSONObject, t0: Long): String? = when {
         !row.has("bg") -> "missing-bg"
         row.optLong("t", Long.MIN_VALUE) < t0 + 24 * 60 * minute -> "sensor-start"
@@ -1119,6 +1171,7 @@ class HistoryReplayTest {
         val lisf2 = replayTokens.contains("LISF2")
         val lcr3 = replayTokens.contains("LCR3")
         val lexpl = replayTokens.contains("LEXPL")
+        val shapeAudit = replayTokens.contains("SHAPEAUDIT")
         require(!lcr3 || causalFilter) { "LCR3 requires LACAUSE for causal exclusions" }
         require(!lexpl || (causalFilter && crAudit && stage0 && lisf2 && lcr3 && wAttr)) {
             "LEXPL requires LACAUSE, CRAUDIT, LSTAGE0, LISF2, LCR3 and WATTR"
@@ -2332,6 +2385,26 @@ class HistoryReplayTest {
             t += minute
         }
         write(outPath, out)
+        // SHAPEAUDIT is opt-in and report-only; it measures the same sensor BG series used by compare_days.py.
+        if (shapeAudit) {
+            val samples = ArrayList<Pair<Int, Double>>()
+            for (i in 0 until out.length()) {
+                val row = out.getJSONObject(i)
+                if (row.has("bg") && !row.isNull("bg")) {
+                    val bg = row.optDouble("bg", Double.NaN)
+                    if (bg.isFinite()) samples.add(Pair(hourOf(row.getLong("t")), bg))
+                }
+            }
+            val shape = normalizedHourlyShape(samples)
+            val meanMae = shape.meanRatio.indices.map { Math.abs(shape.meanRatio[it] - anonymizedMeanShape[it]) }.average()
+            val sdMae = shape.sdRatio.indices.map { Math.abs(shape.sdRatio[it] - anonymizedSdShape[it]) }.average()
+            fun ratios(values: DoubleArray) = values.joinToString(prefix = "[", postfix = "]") {
+                java.lang.String.format(java.util.Locale.US, "%.3f", it)
+            }
+            println("AIMI audit SHAPEAUDIT: valid-samples=\${samples.size} mean-ratio-MAE=\${java.lang.String.format(java.util.Locale.US, "%.4f", meanMae)} sd-ratio-MAE=\${java.lang.String.format(java.util.Locale.US, "%.4f", sdMae)} reference=anonymized-v1 report-only")
+            println("AIMI audit SHAPEAUDIT mean-ratio-by-hour=\${ratios(shape.meanRatio)}")
+            println("AIMI audit SHAPEAUDIT sd-ratio-by-hour=\${ratios(shape.sdRatio)}")
+        }
         // WATTR is report-only. Emit its accumulated evidence so planted-cause runs can be scored.
         if (wAttr) {
             val cards = listOf("acce", "brake", "pp", "dura", "lower", "higher")
