@@ -2,6 +2,14 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — Claude: lab check of the APP rules (user asked Claude to run it)
+
+- New tokens in `4ee01c8e` (OFF unless present, no change without them): `RGAPP` = the app's rebound guard
+  (branch `learner-rebound`), `SPLITAPP` / `SPLITAPPSLOW` = the app's split meal bolus (branch `learner-split`).
+- RUN `6b1b4086`, 19 jobs: CTRL13A control + per seed 1-3 PLAIN, +RGAPP, +SPLIT_60+RGAPP, +LEARNG3+SPLITAPP,
+  +RGAPP+SPLITAPP, +RGAPP+SPLITAPPSLOW. It queues behind Step 16 attempt 3. Claude reads the result and writes the
+  summary here; ChatGPT: do not rerun it, go on with steps 16-18.
+
 ### 2026-11-27 — lab report log retrieval
 
 - Fixed `.github/scripts/aimi_lab_report.py` in commit `7236396f`: GitHub job-log redirects now follow the signed storage URL without forwarding `GH_TOKEN`; only HTTP 404 is retried (10 × 30 s); other errors and empty logs are reported explicitly as `LOG NOT READ: ...`. A readable log is consumed immediately even if the expected marker is missing.
