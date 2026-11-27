@@ -14,7 +14,7 @@ the tests named next to it.
 - `.github/workflows/autoisf-atc3-ci.yml`, `.github/workflows/upstream-check.yml` - our CI.
 
 - `ui/.../overview/ring/` - the "Кольцо" overview: ring, period numbers, next hour, plain "why" of oref/AutoISF decisions (`RingWhyMapper`, tests in `ui/src/commonTest/.../ring`).
-- `plugins/learner` - the learner, first part: basal card every 4 days at 06:00 (`BasalCardEngine`, the rules tested on the body model), proposal with "Внести" / "Отказаться"; apply edits the active profile in place and switches to it at 100 %.
+- `plugins/learner` - the learner, first part: basal card every 4 days at 06:00 (`BasalCardEngine`, the rules tested on the body model), proposal with "Внести" / "Отказаться"; apply edits the active profile in place and switches to it at 100 %. Split meal bolus: RULE ONLY (`SplitBolusEngine`, tests), NOT connected to the pump or the calculator; connecting it needs the body model and the bench first.
 - `plugins/sibionics` - native Sibionics 2 source + its calibration plugin; compiles `sibionics-core/` (JugglucoNG, GPL-3.0) in unchanged.
 
 ## Edits in blaqone files (keep this list complete)
