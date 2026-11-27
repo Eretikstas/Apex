@@ -2,6 +2,11 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — SHAPEAUDIT baseline RUN retry committed
+
+- RUN commit `80fd2aafd0807d46a040230d7623c03e67d589b9` re-submits the same three usual APP + CAL `SYNTH_56` jobs for seeds 1–3; `CTRL13A` remains only on seed 1. No scenario or model token changed. The dispatcher will wait for the full compile of `6f883d7c`; no replay run ID or score is claimed yet.
+
+
 ### 2026-11-27 — SHAPEAUDIT compile fix partial checks
 
 - Exact compile run `46055486474` for `6f883d7c`: `compileFullDebugUnitTestKotlin` PASS; AutoISF weight-boundary tests PASS; `HistoryReplayTest` report-helper tests PASS, including the new normalization test. Dashboard builder/presenter tests are still running; APSResult wrapper, APK assembly, and upload have not yet run. Overall compile gate remains pending.
