@@ -121,4 +121,19 @@
     <string name="learner_hypo_none">Not enough clean treatments yet (at least 5, without a meal around them).</string>
     <string name="learner_hypo_rule" formatted="false">Learned with the basal card from the last 14 days. Never under 4 g and never over 10 g. Only a hint: a falling glucose or insulin on board can need more.</string>
     <string name="learner_eval_failed_note">Changes judged worse are not proposed again for 14 days.</string>
+    <string name="learner_curve_title">Insulin curve watch</string>
+    <string name="learner_curve_rule" formatted="false">Off by default. If the insulin curve of the running profile changes (name, peak or DIA), for example after an app update or a settings import, it warns at once. A wrong curve makes the loop see a wrong IOB for days. Only a warning.</string>
+    <string name="learner_curve_now" comment="%1$s=curve name, %2$d=peak minutes, %3$.1f=DIA hours">Now: %1$s, peak %2$d min, DIA %3$.1f h</string>
+    <string name="learner_curve_changed" comment="%1$s=date and time, %2$s=old curve name, %3$d=old peak minutes, %4$.1f=old DIA hours">Changed %1$s; before: %2$s, peak %3$d min, DIA %4$.1f h. Check that this is wanted.</string>
+    <string name="learner_why_curve" comment="%1$s=old name, %2$d=old peak, %3$.1f=old DIA, %4$s=new name, %5$d=new peak, %6$.1f=new DIA">Learner: the insulin curve changed: %1$s %2$d min / %3$.1f h -> %4$s %5$d min / %6$.1f h. Check the profile!</string>
+    <string name="learner_lows_title">Why was it low</string>
+    <string name="learner_lows_rule" formatted="false">Off by default. Lows (under 3.9 for 10 min or more) of the last 7 days with the likely cause from the logged data: meal at a low glucose, rebound after a hypo treatment, after a meal, night, other. A likely cause, not a proven one.</string>
+    <string name="learner_lows_none">No lows in the last 7 days.</string>
+    <string name="learner_lows_count" comment="%1$s=cause, %2$d=number of lows">%1$s: %2$d</string>
+    <string name="learner_lows_item" comment="%1$s=date and time, %2$.1f=lowest mmol/L, %3$d=minutes, %4$s=cause">%1$s: down to %2$.1f, %3$d min - %4$s</string>
+    <string name="learner_cause_meal_at_low">meal at a low glucose</string>
+    <string name="learner_cause_rebound">rebound after a hypo treatment</string>
+    <string name="learner_cause_after_meal">after a meal</string>
+    <string name="learner_cause_night">night</string>
+    <string name="learner_cause_other">other</string>
 </resources>

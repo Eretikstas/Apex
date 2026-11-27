@@ -113,6 +113,13 @@ class LearnerPlugin(
         val specialUntil: Long = 0L,
         /** What the learner learned about hypo treatments. */
         val hypoSize: HypoSize? = null,
+        /** Insulin curve watch: switch, the curve now, the last change (when, the curve before). */
+        val curveWatch: Boolean = false,
+        val curve: CurveSnap? = null,
+        val curveChange: Pair<Long, CurveSnap>? = null,
+        /** "Why was it low": switch and the lows of the last 7 days with their likely cause. */
+        val lowCausesOn: Boolean = false,
+        val lows: List<LowEpisode> = emptyList(),
     )
 
     private val store = LearnerStore(prefs)
@@ -134,6 +141,8 @@ class LearnerPlugin(
                 runCatching { checkSensor() }.onFailure { aapsLogger.error(LTag.APS, "Learner: sensor hint failed", it) }
                 runCatching { checkCannula() }.onFailure { aapsLogger.error(LTag.APS, "Learner: cannula hint failed", it) }
                 runCatching { checkLowMeal() }.onFailure { aapsLogger.error(LTag.APS, "Learner: low meal hint failed", it) }
+                runCatching { checkCurve() }.onFailure { aapsLogger.error(LTag.APS, "Learner: curve watch failed", it) }
+                runCatching { maybeCountLows() }.onFailure { aapsLogger.error(LTag.APS, "Learner: low causes failed", it) }
                 runCatching { checkEval() }.onFailure { aapsLogger.error(LTag.APS, "Learner: change evaluation failed", it) }
                 runCatching { maybeDigest() }.onFailure { aapsLogger.error(LTag.APS, "Learner: weekly digest failed", it) }
                 delay(TICK_MS)
@@ -148,7 +157,11 @@ class LearnerPlugin(
     }
 
     /** The history without the readings of special days (see `LearnerMemory`). */
-    private suspend fun cleanSteps(now: Long, days: Int): List<LearnerStep> = LearnerMemory.withoutSpecial(history.steps(now, days), store.specialDays)
+    private suspend fun cleanSteps(now: Long, days: Int): List<LearnerStep> {
+        // With the sensor hint on, the first 2 h after a logged sensor change are left out too (readings may be false).
+        val sensor = if (store.sensorHints) history.sensorChanges(now, days + 1).map { Pair(it, it + SensorHintEngine.FIRST_HOURS_MS) } else emptyList()
+        return LearnerMemory.withoutSpecial(history.steps(now, days), store.specialDays + sensor)
+    }
 
     private fun failed(kind: String) = LearnerMemory.failedRecently(dateUtil.now(), kind, store.failedKinds)
 
@@ -468,6 +481,48 @@ class LearnerPlugin(
         refresh()
     }
 
+    /**
+     * The insulin curve watch (advisor, off by default, `CurveWatchEngine`): when the curve of the running profile
+     * (name, peak, DIA) is not the one seen last time, a note and a notice. Only text.
+     */
+    private suspend fun checkCurve() {
+        val i = profileFunction.getProfile()?.iCfg ?: return
+        val now = CurveSnap(i.insulinLabel, i.peak, i.dia)
+        val before = store.lastCurve
+        if (before == now) return
+        store.lastCurve = now
+        if (store.curveWatch && CurveWatchEngine.changed(before, now) && before != null) {
+            val t = dateUtil.now()
+            store.curveChange = t to before
+            val text = rh.gs(R.string.learner_why_curve, before.label, before.peakMin, before.diaH, now.label, now.peakMin, now.diaH)
+            note(text, t, NOTE_LONG_MS, CURVE_NOTE_SOURCE)
+            notificationManager.post(NotificationId.AUTOMATION_MESSAGE, text, level = NotificationLevel.URGENT)
+            aapsLogger.debug(LTag.APS, "Learner: insulin curve changed $before -> $now")
+        }
+        refresh()
+    }
+
+    fun setCurveWatch(on: Boolean) {
+        store.curveWatch = on
+        if (!on) loopNotes.clear(CURVE_NOTE_SOURCE)
+        refresh()
+    }
+
+    /** "Why was it low" (advisor, off by default, `LowCauseEngine`): counted at most every 6 hours, last 7 days. */
+    private suspend fun maybeCountLows(force: Boolean = false) {
+        if (!store.lowCausesOn) return
+        val now = dateUtil.now()
+        if (!force && now - (store.lastLows?.first ?: 0L) < 6 * HOUR_MS) return
+        store.lastLows = now to LowCauseEngine.episodes(cleanSteps(now, 7))
+        refresh()
+    }
+
+    fun setLowCauses(on: Boolean) {
+        store.lowCausesOn = on
+        refresh()
+        if (on) scope.launch { runCatching { maybeCountLows(force = true) }.onFailure { aapsLogger.error(LTag.APS, "Learner: low causes failed", it) } }
+    }
+
     /** The user's switch for the change evaluation. Off also removes its note. */
     fun setEvalOn(on: Boolean) {
         store.evalOn = on
@@ -680,6 +735,11 @@ class LearnerPlugin(
             lastPct = store.lastPct,
             specialUntil = store.specialDays.firstOrNull { val n = dateUtil.now(); n >= it.first && n < it.second }?.second ?: 0L,
             hypoSize = store.hypoSize,
+            curveWatch = store.curveWatch,
+            curve = store.lastCurve,
+            curveChange = store.curveChange,
+            lowCausesOn = store.lowCausesOn,
+            lows = store.lastLows?.second.orEmpty(),
             dura = prefs.get(DoubleKey.ApsAutoIsfDuraWeight),
             hours = store.lastHours,
             message = message,
@@ -735,6 +795,7 @@ class LearnerPlugin(
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
         const val SPECIAL_NOTE_SOURCE = "learner_special"
+        const val CURVE_NOTE_SOURCE = "learner_curve"
         const val KIND_BASAL = "basal"
         const val KIND_DURA = "dura:"
         const val KIND_PCT = "pct:"

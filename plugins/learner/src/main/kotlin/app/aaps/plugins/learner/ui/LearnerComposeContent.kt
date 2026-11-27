@@ -41,6 +41,7 @@ import app.aaps.plugins.learner.LearnerPlugin
 import app.aaps.plugins.learner.EvalStats
 import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.HypoSizeEngine
+import app.aaps.plugins.learner.LowCause
 import app.aaps.plugins.learner.R
 import app.aaps.plugins.learner.WeekStats
 import app.aaps.plugins.learner.SensorHintKind
@@ -76,6 +77,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onAcceptPct = plugin::acceptPct,
         onRefusePct = plugin::refusePct,
         onSpecialDay = plugin::setSpecialDay,
+        onCurveWatch = plugin::setCurveWatch,
+        onLowCauses = plugin::setLowCauses,
         onAcceptCr = plugin::acceptCr,
         onRefuseCr = plugin::refuseCr,
         blockName = plugin::blockName,
@@ -98,6 +101,8 @@ internal fun LearnerScreenContent(
     onAcceptPct: () -> Unit = {},
     onRefusePct: () -> Unit = {},
     onSpecialDay: (Boolean) -> Unit = {},
+    onCurveWatch: (Boolean) -> Unit = {},
+    onLowCauses: (Boolean) -> Unit = {},
     onAcceptCr: () -> Unit = {},
     onRefuseCr: () -> Unit = {},
     blockName: (String) -> String = { it },
@@ -125,6 +130,8 @@ internal fun LearnerScreenContent(
         if (status.message.isNotEmpty()) Text(status.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
 
         SpecialSection(status, onSpecialDay)
+        CurveSection(status, onCurveWatch)
+        LowCauseSection(status, onLowCauses)
 
         status.proposal?.let { p ->
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -473,4 +480,64 @@ private fun HypoSizeSection(status: Status) {
             Text(stringResource(R.string.learner_hypo_rule), style = MaterialTheme.typography.bodySmall)
         }
     }
+}
+
+/** The insulin curve watch: the switch (off by default), the curve now, and the last change. Only text. */
+@Composable
+private fun CurveSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_curve_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.curveWatch, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_curve_rule), style = MaterialTheme.typography.bodySmall)
+            status.curve?.let { Text(stringResource(R.string.learner_curve_now, it.label, it.peakMin, it.diaH), style = MaterialTheme.typography.bodyMedium) }
+            if (status.curveWatch) status.curveChange?.let { (at, before) ->
+                Text(
+                    stringResource(R.string.learner_curve_changed, dateUtil.dateAndTimeString(at), before.label, before.peakMin, before.diaH),
+                    color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+/** "Why was it low": the switch (off by default), counts per likely cause and the last lows. Only text. */
+@Composable
+private fun LowCauseSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_lows_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.lowCausesOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_lows_rule), style = MaterialTheme.typography.bodySmall)
+            if (!status.lowCausesOn) return@Column
+            if (status.lows.isEmpty()) {
+                Text(stringResource(R.string.learner_lows_none), style = MaterialTheme.typography.bodyMedium)
+                return@Column
+            }
+            LowCause.entries.forEach { c ->
+                val n = status.lows.count { it.cause == c }
+                if (n > 0) Text(stringResource(R.string.learner_lows_count, stringResource(causeName(c)), n), fontWeight = FontWeight.SemiBold)
+            }
+            status.lows.takeLast(10).reversed().forEach { e ->
+                Text(
+                    stringResource(R.string.learner_lows_item, dateUtil.dateAndTimeString(e.start), e.minMgdl / 18.0, e.minutes, stringResource(causeName(e.cause))),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+private fun causeName(c: LowCause): Int = when (c) {
+    LowCause.MEAL_AT_LOW -> R.string.learner_cause_meal_at_low
+    LowCause.REBOUND     -> R.string.learner_cause_rebound
+    LowCause.AFTER_MEAL  -> R.string.learner_cause_after_meal
+    LowCause.NIGHT       -> R.string.learner_cause_night
+    LowCause.OTHER       -> R.string.learner_cause_other
 }

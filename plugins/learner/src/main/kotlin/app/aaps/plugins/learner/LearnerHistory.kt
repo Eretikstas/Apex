@@ -112,6 +112,10 @@ class LearnerHistory(
         }
     }
 
+    /** Sensor changes logged in AAPS within [days] days before [now]. */
+    suspend fun sensorChanges(now: Long, days: Int): List<Long> =
+        persistenceLayer.getTherapyEventDataFromToTime(now - days * 86_400_000L, now).filter { it.type == TE.Type.SENSOR_CHANGE }.map { it.timestamp }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0

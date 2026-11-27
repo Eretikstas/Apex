@@ -197,6 +197,48 @@ class LearnerStore(private val preferences: Preferences) {
         get() = read().optJSONObject(KEY_HYPO)?.let { o -> runCatching { HypoSize(o.getDouble("perG"), o.getInt("n")) }.getOrNull() }
         set(value) = edit { if (value == null) remove(KEY_HYPO) else put(KEY_HYPO, JSONObject().put("perG", value.risePerGMgdl).put("n", value.treatments)) }
 
+    /** The insulin curve watch is on (the user's switch). Off by default. */
+    var curveWatch: Boolean
+        get() = read().optBoolean(KEY_CURVE_ON, false)
+        set(value) = edit { put(KEY_CURVE_ON, value) }
+
+    /** The insulin curve seen last time. */
+    var lastCurve: CurveSnap?
+        get() = read().optJSONObject(KEY_CURVE)?.let { o -> runCatching { CurveSnap(o.getString("label"), o.getInt("peak"), o.getDouble("dia")) }.getOrNull() }
+        set(value) = edit { if (value == null) remove(KEY_CURVE) else put(KEY_CURVE, JSONObject().put("label", value.label).put("peak", value.peakMin).put("dia", value.diaH)) }
+
+    /** The last curve change: when, and the curve before it. */
+    var curveChange: Pair<Long, CurveSnap>?
+        get() = read().optJSONObject(KEY_CURVE_CHANGE)?.let { o ->
+            runCatching { o.getLong("at") to CurveSnap(o.getString("label"), o.getInt("peak"), o.getDouble("dia")) }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_CURVE_CHANGE)
+            else put(KEY_CURVE_CHANGE, JSONObject().put("at", value.first).put("label", value.second.label).put("peak", value.second.peakMin).put("dia", value.second.diaH))
+        }
+
+    /** The "why was it low" list is shown (the user's switch). Off by default. */
+    var lowCausesOn: Boolean
+        get() = read().optBoolean(KEY_LOWS_ON, false)
+        set(value) = edit { put(KEY_LOWS_ON, value) }
+
+    /** The lows of the last 7 days with their likely cause, and when they were counted. */
+    var lastLows: Pair<Long, List<LowEpisode>>?
+        get() = read().optJSONObject(KEY_LOWS)?.let { o ->
+            runCatching {
+                val a = o.getJSONArray("list")
+                o.getLong("at") to (0 until a.length()).map { i ->
+                    a.getJSONObject(i).let { LowEpisode(it.getLong("t"), it.getDouble("min"), it.getInt("m"), LowCause.valueOf(it.getString("c"))) }
+                }
+            }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_LOWS)
+            else put(KEY_LOWS, JSONObject().put("at", value.first).put("list", JSONArray(value.second.map {
+                JSONObject().put("t", it.start).put("min", it.minMgdl).put("m", it.minutes).put("c", it.cause.name)
+            })))
+        }
+
     /** The last verdict. */
     var lastEval: DoneEval?
         get() = read().optJSONObject(KEY_EVAL_LAST)?.let { o ->
@@ -272,6 +314,11 @@ class LearnerStore(private val preferences: Preferences) {
     private companion object {
 
         const val KEY_CR = "cr_proposal"
+        const val KEY_CURVE_ON = "curve_watch"
+        const val KEY_CURVE = "last_curve"
+        const val KEY_CURVE_CHANGE = "curve_change"
+        const val KEY_LOWS_ON = "low_causes_on"
+        const val KEY_LOWS = "last_lows"
         const val KEY_SPECIAL = "special_days"
         const val KEY_FAILED = "failed_kinds"
         const val KEY_HYPO = "hypo_size"

@@ -33,11 +33,14 @@ import app.aaps.plugins.learner.BasalProposal
 import app.aaps.plugins.learner.CannulaHint
 import app.aaps.plugins.learner.ChangeEval
 import app.aaps.plugins.learner.CrProposal
+import app.aaps.plugins.learner.CurveSnap
 import app.aaps.plugins.learner.DoneEval
 import app.aaps.plugins.learner.DuraProposal
 import app.aaps.plugins.learner.EvalStats
 import app.aaps.plugins.learner.EvalVerdict
 import app.aaps.plugins.learner.HypoSize
+import app.aaps.plugins.learner.LowCause
+import app.aaps.plugins.learner.LowEpisode
 import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.PendingEval
 import app.aaps.plugins.learner.WeekStats
@@ -172,6 +175,17 @@ class LearnerScreenshotTest {
         "learner_special_hypo",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
             specialUntil = NOW + 20 * HOUR, hypoSize = HypoSize(6.0, 9))
+    )
+
+    @Test
+    fun curveAndLows() = shoot(
+        "learner_curve_lows",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            curveWatch = true, curve = CurveSnap("Rapid", 75, 8.0), curveChange = (NOW - HOUR) to CurveSnap("Fiasp test", 35, 5.0),
+            lowCausesOn = true, lows = listOf(
+                LowEpisode(NOW - 30 * HOUR, 61.0, 25, LowCause.AFTER_MEAL), LowEpisode(NOW - 20 * HOUR, 58.0, 40, LowCause.NIGHT),
+                LowEpisode(NOW - 5 * HOUR, 64.0, 15, LowCause.REBOUND)
+            ))
     )
 
     private fun shoot(name: String, status: Status) {

@@ -121,4 +121,19 @@
     <string name="learner_hypo_none">Пока мало «чистых» лечений (нужно не меньше 5, без еды рядом).</string>
     <string name="learner_hypo_rule" formatted="false">Считается вместе с карточкой базала по последним 14 дням. Не меньше 4 г и не больше 10 г. Только подсказка: при падающей глюкозе или активном инсулине может понадобиться больше.</string>
     <string name="learner_eval_failed_note">Изменения, оценённые как «хуже», 14 дней не предлагаются снова.</string>
+    <string name="learner_curve_title">Сторож кривой инсулина</string>
+    <string name="learner_curve_rule" formatted="false">По умолчанию выключен. Если у работающего профиля меняется кривая инсулина (название, пик или DIA), например после обновления приложения или импорта настроек, сразу предупреждает. Неверная кривая — петля днями видит неверный IOB. Только предупреждение.</string>
+    <string name="learner_curve_now">Сейчас: %1$s, пик %2$d мин, DIA %3$.1f ч</string>
+    <string name="learner_curve_changed">Изменилась %1$s; было: %2$s, пик %3$d мин, DIA %4$.1f ч. Проверьте, так ли задумано.</string>
+    <string name="learner_why_curve">Ученик: изменилась кривая инсулина: %1$s %2$d мин / %3$.1f ч → %4$s %5$d мин / %6$.1f ч. Проверьте профиль!</string>
+    <string name="learner_lows_title">Почему было низкое</string>
+    <string name="learner_lows_rule" formatted="false">По умолчанию выключено. Низкие (ниже 3,9 дольше 10 мин) за последние 7 дней с вероятной причиной по записанным данным: еда при низкой глюкозе, отскок после лечения гипо, после еды, ночь, другое. Вероятная причина, не доказанная.</string>
+    <string name="learner_lows_none">За последние 7 дней низких нет.</string>
+    <string name="learner_lows_count">%1$s: %2$d</string>
+    <string name="learner_lows_item">%1$s: до %2$.1f, %3$d мин — %4$s</string>
+    <string name="learner_cause_meal_at_low">еда при низкой глюкозе</string>
+    <string name="learner_cause_rebound">отскок после лечения гипо</string>
+    <string name="learner_cause_after_meal">после еды</string>
+    <string name="learner_cause_night">ночь</string>
+    <string name="learner_cause_other">другое</string>
 </resources>
