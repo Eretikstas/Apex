@@ -2,6 +2,14 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — corrected ownership split (user update)
+
+- User supersedes the previous item-7 assignment: Claude now owns REBOUND GUARD core/rule/unit tests on branch `learner-rebound` based on `autoisf-atc3`; ChatGPT must NOT implement that core. Claude's implementation must be OFF by default, suppress-only (hold SMB and cap temp basal after hypo treatment), and must never add insulin.
+- ChatGPT owns only the lab evaluation of Claude's finished REBOUND GUARD after Step 16, Steps 17–18, and lab-model recalibration are complete. Compare on the recalibrated synthetic model against the 19.11 best set (target reference: hypo treatment ~24 g/day, BG <3.9 ~3.3%). Do not start this test before those prerequisites and the branch implementation are ready.
+- ChatGPT continues Steps 16–18 and recalibration. Claude owns no-insulin hints 7c. Do not modify the hints branch or implement hints.
+- User confirms `autoisf-atc3` app code remains frozen at `6f578b5b`; `689aa356` is one script-only `.github/scripts/ci_report.py` change (33 additions, 8 deletions), no app-code files. Do not push app code to the bench branch.
+- Current Step 16 attempt 3 RUN matrix remains the six lines in RUN.txt. Attempt-3 dispatcher is still waiting; prior replay's report job is the remaining active job. Do not launch a competing batch. Latest observed branch head at this note: `98fff196` (STATUS-only record after RUN commit `7fcf5d94`).
+
 ### 2026-11-27 — ownership split and Step 16 attempt-2 evidence
 
 - User split learner item 7: ChatGPT owns lab steps 16–18, shape recalibration, REBOUND GUARD on a new `learner-rebound` branch based on frozen `autoisf-atc3`, then food-first smart calculator and split bolus (each lab-first). Claude owns no-insulin hints 7c on its existing branch. Do not edit or merge that hints branch. Keep `autoisf-atc3` frozen at `6f578b5b`.
