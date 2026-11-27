@@ -2,6 +2,26 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — Step 16 LCR3 attempt 3 complete
+
+- Source commit: `f4a6c9bc5d6a02c52f54a40ebf68ad1a26ad7b5e`; RUN commit: `382554b9061755f1b0c7d22200b40a81f5d7ecf9`; replay head: `e63a48b1`; run [46023317575](https://github.com/Eretikstas/Apex/actions/runs/46023317575). All 6/6 jobs succeeded; `CTRL13A` PASS; no replay failures.
+- Metrics (BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day):
+
+| Case | <70 | <54 | >180 | CV | Hypo g/day | Insulin U/day |
+|---|---:|---:|---:|---:|---:|---:|
+| CTRL13A, no LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| CAL + LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| CRT_26.4 + LCR3 | 6.4 | 0.3 | 4.7 | 30.2 | 35.89 | 11.32 |
+| CRT_17.6 + LCR3 | 4.3 | 0.2 | 7.2 | 29.5 | 26.79 | 12.26 |
+| MEALX_0.7 + LCR3 | 6.0 | 0.5 | 5.7 | 29.7 | 33.21 | 11.78 |
+| TREAT_15 + LCR3 | 3.3 | 0.2 | 6.4 | 26.6 | 75.54 | 13.51 |
+
+- LCR3: 610 candidates across five jobs; 0 accepted, 610 rejected, 0 eligible days, proposal silent, gate FAIL in every job. Top reasons: prior-SMB 290/610, COB-min-rate 221/610, prior-hypo-rebound 69/610, prior-SMB+manual 27/610, SMB-within-6h 3/610. Both positive CRT perturbations were missed; negative TREAT_15 remained silent. `MEALX_0.7` is not an independent negative because it is already in CAL. This is a bad score, not a §4a stop; do not loosen filters or invent a new CR rule.
+- Supporting audits: LISF2 accepted 0/478 (all four time blocks gate FAIL; 469 rejected as meal-hypo, 9 as AutoISF-not-1). LSTAGE0 reported 0 cannula/sensor/illness/activity days, 36–59 COB-min-rate meals and 9–37 untreated-low episodes per job; calibration-window and medical-procedure fields are unavailable. CRAUDIT remained counting-only.
+- DUMPCSV control: 16,128 rows at 5-minute intervals; insulin/day 11.7795 U vs replay summary 11.7795 U, delta 0.000 %. No-token control exactly matches Step 13a. CSV artifact is synthetic only.
+- Assumptions that failed: the current COB/SMB/rebound exclusions leave no clean meal windows, so the positive CRT direction cannot be detected. Preserve the thresholds; Step 17 must explain each low and each card's passed/blocked rules. Next: implement `LEXPL` report-only, OFF by default, then run its no-token/with-token seed-1 control comparison.
+
+
 ### 2026-11-27 — Step 16 attempt 3 DUMPCSV control check (job 0 complete)
 
 - Run [46023317575](https://github.com/Eretikstas/Apex/actions/runs/46023317575), job 0, seed-1 `CTRL13A,DUMPCSV`: completed successfully; replay summary remained exactly the Step-13a control (6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78).
