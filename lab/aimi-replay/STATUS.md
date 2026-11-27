@@ -26,14 +26,31 @@
 - Exact-source compile [46027080361](https://github.com/Eretikstas/Apex/actions/runs/46027080361) completed SUCCESS. The later public-repository privacy cleanup commit [`a1d93913`](https://github.com/Eretikstas/Apex/commit/a1d93913d9a18e613dc7fd68c6cca197685095a8) did not change replay logic; its exact compile [46044690002](https://github.com/Eretikstas/Apex/actions/runs/46044690002) also completed SUCCESS.
 - RUN commit [`3d6f1bae`](https://github.com/Eretikstas/Apex/commit/3d6f1bae1c03bd3780b37ce23654dfdbddeca329); replay [46029516923](https://github.com/Eretikstas/Apex/actions/runs/46029516923): 2/2 jobs successful, 0 replay failures. No-token and LEXPL jobs both returned exactly `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` (BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day); both `CTRL13A` controls PASS. **No-token = old numbers: PASS.**
 - LEXPL raw job log (the generated Markdown report omitted the card-summary lines, so these are taken directly from the public job log): 300 low episodes — rebound 270, SMB 18, COB-min-rate 6, ambiguous 5, other 1. Overlapping evidence: after-hypo 270, after-SMB 172, after-meal 191, after-manual 118, COB-min-rate meal 79; these evidence counts are not mutually exclusive.
-- Card screen: WATTR 0 events (2,255 clean-window and 73 other blocks); LSTAGE0 day/meal audit ran, with calibration-window and medical-procedure unavailable (0 cannula/sensor/illness/activity days, 43 minimum-rate meals, 36 untreated lows); LISF2 all four blocks silent (0 accepted; meal-hypo dominated); LCR3 silent (0/122 accepted; prior-SMB 59, COB-min-rate 43, prior-hypo-rebound 14, prior-SMB+manual 6); basal audit 43/3,960 accepted, 10 days, 9 eligible + 15 estimated hours, gate PASS; PCT 3 up / 5 down, final 80%; DURA final 0.50. Ten card summaries emitted. No learner or insulin writes.
+- Card screen: WATTR 0 events (2,255 clean-window and 73 other blocks); LSTAGE0 day/meal audit ran, with calibration-window and medical-procedure unavailable (0 cannula/sensor/illness/activity days, 43 minimum-rate meals, 36 untreated lows); LISF2 all four blocks silent (0 accepted; meal-hypo dominated); LCR3 silent (0/122 accepted; prior-SMB 59, COB-min-rate 43, prior-hypo-rebound 14, prior-SMB+manual 6); basal audit 43/3,960 accepted, 10 days, 9 eligible + 15 estimated hours, gate PASS; PCT 3 up / 5 down, final 80%; DURA final 0.50. Ten card summaries emitted. LEXPL itself is report-only and made no writes; the existing APP learner cards ran unchanged.
 - Latest RUN before this step was Claude's separate v7 NIGHTT diagnostic, replay [46038542283](https://github.com/Eretikstas/Apex/actions/runs/46038542283), 7/7 successful; its result remains in Claude's Results and is not the Step-18 matrix. No app branch, frozen bench build, hints branch, phone, or Nightscout was touched.
 
-### 2026-11-27 — Step 18 pre-run definition
+### 2026-11-27 — Step 18 complete
 
-- Current branch head at pre-run audit: `abf91644`; current `RUN.txt` was the completed Claude v7 NIGHTT batch from RUN commit `c4ec6ce8`. Latest branch CI: privacy-cleanup compile [46044690002](https://github.com/Eretikstas/Apex/actions/runs/46044690002) SUCCESS; latest replay [46044690034](https://github.com/Eretikstas/Apex/actions/runs/46044690034) completed SUCCESS. No queued or running replay was present.
-- Step-18 matrix: 18 APP-variant jobs (even-index jobs from the original Step-10 RUN commit `e997ab29`), six scenarios × seeds 1–3: CAL usual; `MEALX_0.6`; `CHGISF_1.3`; `CHGISF_1.1`; `DRIFT_2`; `NOISE_0.12`. Retain the exact APP tokens and CAL `MEALX_0.7,CHGISF_1.2,SBIAS_0.45,TREAT_5`; add only `LACAUSE,CRAUDIT,LSTAGE0,LISF2,LCR3,WATTR,LEXPL`. Add `CTRL13A` only to the CAL usual seed-1 control. All added audits are report-only; no app or learner formula is changed.
-- Compare all six replay metrics per job against the exact APP per-seed references in Step 10 above; collect each card's passed/blocked score from raw public job logs because the Step-17 Markdown report omitted LEXPL card lines. No personal records or real-child statistics are to be copied into public Apex.
+- RUN commit [`fbd4c234`](https://github.com/Eretikstas/Apex/commit/fbd4c234); dispatcher [46051770364](https://github.com/Eretikstas/Apex/actions/runs/46051770364) confirmed compile gate green and lab free; replay [46051803175](https://github.com/Eretikstas/Apex/actions/runs/46051803175) completed SUCCESS: 18/18 replay jobs successful, 0 failed ticks/jobs. Current branch head at result commit: `fa0f1195`.
+- `CTRL13A` CAL-usual seed 1 PASS. Across 18 APP jobs × 6 metrics, 105/108 cells exactly match the Step-10 APP references. Three insulin/day cells differ by 0.01 U/day only: CHGISF-lower seed 1 (12.65 vs 12.66), CHGISF-lower seed 3 (12.62 vs 12.63), DRIFT_2 seed 3 (12.99 vs 13.00). All other 105 cells match; exact equality for those three rounded cells is **not verified**, so do not call the whole matrix an exact pass.
+- All 18 jobs emitted 10 card summaries. Aggregate screen (candidate counts are across 18 jobs):
+
+| Card | Result |
+|---|---|
+| WATTR | 7 candidate weight events met the report filters; 42,199 clean-window and 978 other blocks. Report-only; no weight writes. |
+| Stage0 | Day/meal audit passed 18/18; 831 COB-min-rate meals and 633 untreated lows. Cannula/sensor/illness/activity days = 0; calibration-window and medical-procedure unavailable. |
+| ISF morning | 2,733 candidates; 0 accepted; 2,733 rejected (2,638 meal-hypo, 95 AutoISF-not-1). |
+| ISF day | 3,351 candidates; 0 accepted; 3,351 rejected (3,288 meal-hypo, 63 AutoISF-not-1). |
+| ISF evening | 1,772 candidates; 0 accepted; 1,772 rejected (1,759 meal-hypo, 13 AutoISF-not-1). |
+| ISF night | 1,526 candidates; 0 accepted; 1,526 rejected (1,334 meal-hypo, 190 AutoISF-not-1, 2 overlapping-manual). |
+| CR | 1,860 candidates; 0 accepted; 1,860 rejected: COB-min-rate 826, prior-SMB 718, prior-hypo-rebound 229, prior-SMB+manual 71, SMB-within-6h 15, not-fully-absorbed 1. Gate FAIL in all 18 jobs because evidence was excluded. |
+| Basal | 71,280 candidates; 799 accepted, 70,481 rejected; gate PASS in 18/18; 183 eligible and 249 estimated hours. Main rejects: hypo-rebound 36,079, not-hour-boundary 32,274, meal-window 1,925. |
+| PCT | 46 up / 82 down; final 80% in all 18 jobs. |
+| DURA | Final 0.50 in all 18 jobs. |
+
+- LEXPL classified 5,522 synthetic low episodes across the 18 jobs: rebound 4,894; SMB 308; COB-min-rate 135; ambiguous 138; other 28; fasting 11; meal-bolus 6; manual-correction 2. Raw job logs contain complete summaries; the generated Markdown report truncates some low-detail lines. No personal records or real-child measurements were added to public Apex.
+- Result: Step 18 execution and control passed; three 0.01 U/day reference discrepancies remain explicitly unresolved. New audit tokens were report-only; existing APP learner cards remained the same. No app code, frozen bench branch, Claude hints branch, phone, or Nightscout was touched.
+- Next: shape recalibration on the synthetic model using only a normalized, anonymized shape reference (relative hourly mean/SD shape; no dates, raw rows, identifiers, doses, or personal profile). Add a report-only shape audit first, compare baseline, then tune the synthetic generator; do not alter app code or the frozen bench build.
 
 ### 2026-11-27 — Step 16 LCR3 attempt 3 complete
 
