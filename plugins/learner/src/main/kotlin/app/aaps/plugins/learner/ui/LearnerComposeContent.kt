@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +39,7 @@ import app.aaps.plugins.learner.LearnerPlugin.Status
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin
 import app.aaps.plugins.learner.R
+import app.aaps.plugins.learner.SensorHintKind
 
 /** The learner's screen: the basal proposal with "Внести" / "Отказаться", and what it measured per hour. */
 class LearnerComposeContent(private val plugin: LearnerPlugin) : ComposablePluginContent {
@@ -68,7 +70,8 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onAcceptDura = plugin::acceptDura,
         onRefuseDura = plugin::refuseDura,
         onAcceptPct = plugin::acceptPct,
-        onRefusePct = plugin::refusePct
+        onRefusePct = plugin::refusePct,
+        onSensorHints = plugin::setSensorHints
     )
 }
 
@@ -81,7 +84,8 @@ internal fun LearnerScreenContent(
     onAcceptDura: () -> Unit,
     onRefuseDura: () -> Unit,
     onAcceptPct: () -> Unit = {},
-    onRefusePct: () -> Unit = {}
+    onRefusePct: () -> Unit = {},
+    onSensorHints: (Boolean) -> Unit = {}
 ) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
@@ -133,6 +137,7 @@ internal fun LearnerScreenContent(
 
         PctSection(status, onAcceptPct, onRefusePct)
         DuraSection(status, onAcceptDura, onRefuseDura)
+        SensorSection(status, onSensorHints)
 
         if (status.hours.isNotEmpty()) {
             Text(stringResource(R.string.learner_hours_title), style = MaterialTheme.typography.titleMedium)
@@ -224,6 +229,32 @@ private fun PctSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Uni
                 )
             } ?: run {
                 if (status.lastPct?.third == true) Text(stringResource(R.string.learner_pct_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+/** The sensor hint: the switch (off by default), its rule, and the last hint. Only text, nothing is changed. */
+@Composable
+private fun SensorSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_sensor_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.sensorHints, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_sensor_rule), style = MaterialTheme.typography.bodySmall)
+            if (status.sensorHints) status.sensorHint?.let { h ->
+                Text(
+                    when (h.kind) {
+                        SensorHintKind.FIRST_HOURS -> stringResource(R.string.learner_sensor_last_first_hours, dateUtil.dateAndTimeString(h.changeAt))
+                        SensorHintKind.JUMP        -> stringResource(
+                            R.string.learner_sensor_last_jump, dateUtil.dateAndTimeString(h.at), (h.fromMgdl ?: 0.0) / 18.0, (h.toMgdl ?: 0.0) / 18.0
+                        )
+                    },
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }

@@ -35,6 +35,8 @@ import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin.Status
+import app.aaps.plugins.learner.SensorHint
+import app.aaps.plugins.learner.SensorHintKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Before
 import org.junit.Rule
@@ -114,6 +116,13 @@ class LearnerScreenshotTest {
     fun duraProposal() = shoot(
         "learner_dura_proposal",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, DuraProposal(0.5, 0.75, NOW - 2 * HOUR, 3.4, 1.9), Pair(3.4, 1.9), 0.5, hours)
+    )
+
+    @Test
+    fun sensorHint() = shoot(
+        "learner_sensor_hint",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            sensorHints = true, sensorHint = SensorHint(SensorHintKind.JUMP, NOW - 10 * HOUR, NOW - 10 * 60_000L, 54.0, 81.0))
     )
 
     private fun shoot(name: String, status: Status) {

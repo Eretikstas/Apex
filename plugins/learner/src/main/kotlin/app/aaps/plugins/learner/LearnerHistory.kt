@@ -80,6 +80,17 @@ class LearnerHistory(
         return out
     }
 
+    /**
+     * For the sensor hint: the last sensor change logged in AAPS within [SensorHintEngine.WATCH_MS] before [now] (null if
+     * none), and the readings from 10 minutes before it up to [now], oldest first, as (time, mg/dL).
+     */
+    suspend fun sensorWatch(now: Long): Pair<Long?, List<Pair<Long, Double>>> {
+        val change = persistenceLayer.getTherapyEventDataFromToTime(now - SensorHintEngine.WATCH_MS, now)
+            .filter { it.type == TE.Type.SENSOR_CHANGE }.maxOfOrNull { it.timestamp } ?: return Pair(null, emptyList())
+        val readings = persistenceLayer.getBgReadingsDataFromTimeToTime(change - 600_000L, now, true).map { it.timestamp to it.value }
+        return Pair(change, readings)
+    }
+
     private companion object {
 
         const val HYPO_MAX_G = 12.0

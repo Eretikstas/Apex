@@ -141,8 +141,14 @@ class LearnerStore(private val preferences: Preferences) {
         get() = read().optLong(KEY_PCT_APPLIED, 0L)
         set(value) = edit { put(KEY_PCT_APPLIED, value) }
 
+    /** The sensor hint is on (the user's switch on the learner screen). Off by default. */
+    var sensorHints: Boolean
+        get() = read().optBoolean(KEY_SENSOR_HINTS, false)
+        set(value) = edit { put(KEY_SENSOR_HINTS, value) }
+
     private companion object {
 
+        const val KEY_SENSOR_HINTS = "sensor_hints"
         const val KEY_LAST_CARD = "last_card_at"
         const val KEY_DIR = "card_dir"
         const val KEY_COUNT = "card_count"

@@ -56,4 +56,10 @@
     <string name="learner_pct_applied">Внесено: профиль работает с новым процентом.</string>
     <string name="learner_pct_changed">Процент меняли после проверки. Предложение снято.</string>
     <string name="learner_switch_note_pct">Ученик: процент профиля</string>
+    <string name="learner_sensor_title">Подсказка о сенсоре</string>
+    <string name="learner_sensor_rule" formatted="false">По умолчанию выключена. После смены сенсора, записанной в AAPS: заметка на первые 2 часа и при скачке на 1,5 ммоль/л и больше за 5 минут в первые сутки. Только заметка: значения и тревоги не меняются, петля не трогается. В это время не калибровать, проверить глюкометром.</string>
+    <string name="learner_sensor_last_first_hours">Сенсор сменён %1$s: первые 2 часа.</string>
+    <string name="learner_sensor_last_jump">Скачок %1$s: %2$.1f → %3$.1f за 5 минут.</string>
+    <string name="learner_why_sensor_first_hours">Ученик: сенсор сменён меньше 2 ч назад, значения могут быть неточными. Не калибровать, проверить глюкометром.</string>
+    <string name="learner_why_sensor_jump">Ученик: %1$.1f → %2$.1f за 5 мин после смены сенсора, возможно ложное. Не калибровать, проверить глюкометром.</string>
 </resources>

@@ -56,4 +56,10 @@
     <string name="learner_pct_applied">Applied: the profile runs with the new percentage.</string>
     <string name="learner_pct_changed">The percentage was changed after the check. The proposal is dropped.</string>
     <string name="learner_switch_note_pct">Learner: profile percentage</string>
+    <string name="learner_sensor_title">Sensor hint</string>
+    <string name="learner_sensor_rule" formatted="false">Off by default. After a sensor change logged in AAPS: a note for the first 2 hours, and for a jump of 1.5 mmol/L or more in 5 minutes during the first day. Only a note: values and alarms stay as they are, the loop is not touched. Do not calibrate then; check with a finger stick.</string>
+    <string name="learner_sensor_last_first_hours" comment="%1$s=date and time of the sensor change">Sensor changed at %1$s: first 2 hours.</string>
+    <string name="learner_sensor_last_jump" comment="%1$s=date and time of the reading, %2$.1f=value before (mmol/L), %3$.1f=value after (mmol/L)">Jump at %1$s: %2$.1f -> %3$.1f in 5 minutes.</string>
+    <string name="learner_why_sensor_first_hours">Learner: sensor changed less than 2 h ago, values may be wrong. Do not calibrate; check with a finger stick.</string>
+    <string name="learner_why_sensor_jump" comment="%1$.1f=value before, %2$.1f=value after, both mmol/L">Learner: %1$.1f -> %2$.1f in 5 min after a sensor change, maybe false. Do not calibrate; check with a finger stick.</string>
 </resources>

@@ -91,6 +91,9 @@ class LearnerPlugin(
         val pctProposal: PctProposal? = null,
         /** The last percentage card: highs, lows (percent), hint to try more than 100 %. */
         val lastPct: Triple<Double, Double, Boolean>? = null,
+        /** The sensor hint switch (off by default) and the last hint given. */
+        val sensorHints: Boolean = false,
+        val sensorHint: SensorHint? = null,
     )
 
     private val store = LearnerStore(prefs)
@@ -108,6 +111,7 @@ class LearnerPlugin(
             while (isActive) {
                 runCatching { maybeRunCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: card failed", it) }
                 runCatching { maybeRunPctCard() }.onFailure { aapsLogger.error(LTag.APS, "Learner: percentage card failed", it) }
+                runCatching { checkSensor() }.onFailure { aapsLogger.error(LTag.APS, "Learner: sensor hint failed", it) }
                 delay(TICK_MS)
             }
         }
@@ -279,6 +283,36 @@ class LearnerPlugin(
     }
 
     /**
+     * The sensor hint (advisor, off by default): after a sensor change logged in AAPS, a note in the overview "why" for
+     * the first 2 hours and for a jump of 1.5 mmol/L or more in 5 minutes during the first day (`SensorHintEngine`).
+     * Only text: no value is hidden, no alarm is stopped, the loop is not touched.
+     */
+    private suspend fun checkSensor() {
+        if (!store.sensorHints) return
+        val now = dateUtil.now()
+        val (changeAt, readings) = history.sensorWatch(now)
+        val hint = SensorHintEngine.check(now, changeAt, readings) ?: return
+        // Put again on every tick with fixed times: the same note, also after a restart of the app.
+        val text = when (hint.kind) {
+            SensorHintKind.FIRST_HOURS -> rh.gs(R.string.learner_why_sensor_first_hours)
+            SensorHintKind.JUMP        -> rh.gs(R.string.learner_why_sensor_jump, (hint.fromMgdl ?: 0.0) / MGDL_PER_MMOL, (hint.toMgdl ?: 0.0) / MGDL_PER_MMOL)
+        }
+        val until = if (hint.kind == SensorHintKind.FIRST_HOURS) hint.changeAt + SensorHintEngine.FIRST_HOURS_MS else hint.at + SensorHintEngine.JUMP_SHOW_MS
+        if (until <= now) return
+        loopNotes.put(LoopNote(SENSOR_NOTE_SOURCE, text, if (hint.kind == SensorHintKind.JUMP) hint.at else hint.changeAt, until))
+        if (_status.value.sensorHint != hint) aapsLogger.debug(LTag.APS, "Learner: sensor hint $hint")
+        _status.value = _status.value.copy(sensorHint = hint)
+    }
+
+    /** The user's switch for the sensor hint. Off also removes a hint that is shown now. */
+    fun setSensorHints(on: Boolean) {
+        store.sensorHints = on
+        if (!on) loopNotes.clear(SENSOR_NOTE_SOURCE)
+        _status.value = _status.value.copy(sensorHints = on, sensorHint = if (on) _status.value.sensorHint else null)
+        if (on) scope.launch { runCatching { checkSensor() }.onFailure { aapsLogger.error(LTag.APS, "Learner: sensor hint failed", it) } }
+    }
+
+    /**
      * For the virtual bench (the app's device tests): the basal and dura card, or the percentage card, now - without
      * their clock gates (06:00, every 4 days, once a day). Not used by the app itself.
      */
@@ -380,6 +414,8 @@ class LearnerPlugin(
             hours = store.lastHours,
             message = message,
             busy = false,
+            sensorHints = store.sensorHints,
+            sensorHint = _status.value.sensorHint,
         )
     }
 
@@ -420,6 +456,8 @@ class LearnerPlugin(
         const val PROPOSAL_MAX_AGE_MS = CARD_EVERY_MS
         const val PCT_GAP_MS = 2 * 86_400_000L
         const val PCT_MAX_AGE_MS = 2 * 86_400_000L
+        const val SENSOR_NOTE_SOURCE = "learner_sensor"
+        const val MGDL_PER_MMOL = 18.0
     }
 }
 
