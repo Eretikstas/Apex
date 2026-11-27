@@ -2,6 +2,12 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-27 — SHAPEAUDIT first RUN refused by compile gate
+
+- Dispatcher run `46055094067` completed and wrote `dispatch-b55c429b.md`: **REFUSED** because the exact source compile for `d83d79ca` concluded failure. No replay was started from RUN commit `b55c429b`.
+- Formatting fix commit `6f883d7c5d6644fc6ec6aa878313927d979c02a1` triggered exact compile run `46055486474`; it is still in progress at this check. Do not retry RUN until its report is green.
+
+
 ### 2026-11-27 — SHAPEAUDIT compile attempt 1 failed; formatting fix committed
 
 - Exact compile run `46054986377` for source commit `d83d79ca` failed at `:plugins:aps:compileFullDebugUnitTestKotlin`. The shape helper itself was not reported as the cause; the three audit `println` statements escaped Kotlin string interpolation and caused a parser error at source line 2404. All later compile/test/APK steps were skipped. This is a real compile failure, not a pass.
