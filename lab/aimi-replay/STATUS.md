@@ -147,14 +147,13 @@
   plain loop but less than LEARNG3. With the values LEARNG3 learns (180 min, cap 1.0x) and its early releases, fixed,
   the app guard + app split beat CAL on all three low numbers with the same highs. Per seed it is mixed (seed 2 <54
   0.2 vs 0.1, seed 3 <70 5.0 vs 4.8); differences are near seed noise; 3 seeds only; model not yet re-calibrated.
-- v5 `46022123724` (tokens `SPLITRISK_<pct>`, `MEALAUDIT`, report-only audit): the model DOES show the real pattern
-  (meal within 3 h after a hypo treatment -> low within 4 h in 55-80 % per job, other meals 22-31 %; real data 58 % vs
-  34 %). The best set reproduced exactly (4.67 / 0.17 / 4.77 / 28.2 / 26.7). Giving less now for risky meals did NOT
+- v5 `46022123724` (tokens `SPLITRISK_<pct>`, `MEALAUDIT`, report-only audit): in the model a meal within 3 h after a
+  hypo treatment is followed by a low within 4 h in 55-80 % per job, other meals 22-31 %. The best set reproduced exactly (4.67 / 0.17 / 4.77 / 28.2 / 26.7). Giving less now for risky meals did NOT
   help: SPLITRISK_30 4.87 / 0.27 / 4.60 / 28.3 / 26.7, SPLITRISK_0 5.03 / 0.23 / 4.53 / 28.6 / 28.2 (means, seeds 1-3).
   v6 `46025386328` (`RGNOMEAL`: the guard does not let go on a logged meal): BEST+RGNOMEAL 4.57 / 0.20 / 4.77 / 28.4 /
   26.7, RGAPP2 120 min + RGNOMEAL 4.77 / 0.23 / 4.57 / 28.1 / 27.7 - no clear gain (within seed noise). Conclusion: more
   insulin control around a meal after a hypo does not remove those lows in the model; the guard's reach is the pure
-  rebounds (~15 % of real low time). The bigger shares are lows after meals (37 %) and night/basal (27 %).
+  rebounds, a small share of all lows; lows after meals and at night are bigger shares.
 - v7 `46038542283` (`NIGHTT_<mg/dL>`: loop target 21-06 h) on the best set, means of seeds 1-3:
   NIGHTT_126 (7.0) 4.43 / 0.17 / 5.97 / 28.6 / 26.2; NIGHTT_135 (7.5) 4.10 / 0.23 / 6.87 / 29.1 / 23.3 (best set 4.67 /
   0.17 / 4.77 / 28.2 / 26.7). Fewer lows and hypo carbs, more highs: a trade-off for the family to decide.

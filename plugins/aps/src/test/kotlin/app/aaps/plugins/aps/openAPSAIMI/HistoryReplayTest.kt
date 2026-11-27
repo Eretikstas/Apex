@@ -963,7 +963,7 @@ class HistoryReplayTest {
         val basalStart = profBasal.sum(); var icNow = icP; val learnCr = tok("LEARNCR", 0.0)
         val targetP = prof?.optDouble("target", cfg.getDouble("profTarget")) ?: cfg.getDouble("profTarget")
         // NIGHTT_<mg/dL>: the LOOP's target from 21:00 to 06:00 (the wizard keeps the profile target), e.g. a night
-        // temporary target. Real data 27.11: nights with glucose 7-8 at 22:00 had fewer night lows than under 7.
+        // temporary target.
         val nightT = tok("NIGHTT", 0.0)
         val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / tok("CRT", cfg.getDouble("crTrue"))
         val peak = cfg.getDouble("peak"); val dia = cfg.getDouble("dia")
@@ -1065,7 +1065,6 @@ class HistoryReplayTest {
         val appSplits = ArrayList<Split>(); var nSplitCovered = 0; var nRgHold = 0
         // SPLITRISK_<pct>: with SPLITAPP, a RISKY meal (within 3 h after a hypo treatment, or glucose falling 0.3 mmol/L
         // or more over the last 15 min) gets only <pct> % now, also when marked fast; the rest as any split rest.
-        // Real data 27.11: such meals were followed by a low in 58-70 % of cases (other meals 34 %).
         val splitRisk = if (Regex("SPLITRISK_([0-9.]+)").containsMatchIn(prefsText)) tok("SPLITRISK", 60.0) / 100.0 else -1.0
         // MEALAUDIT (report-only): for every meal of 13 g or more, was it within 3 h after a hypo treatment, was the glucose
         // falling, and was there a reading under 70 within 4 h after it.
