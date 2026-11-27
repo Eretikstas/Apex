@@ -48,7 +48,6 @@ import app.aaps.plugins.learner.PendingEval
 import app.aaps.plugins.learner.WeekStats
 import app.aaps.plugins.learner.WeeklyDigest
 import app.aaps.plugins.learner.MealType
-import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.SplitPlan
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
