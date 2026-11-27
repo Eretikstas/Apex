@@ -146,6 +146,37 @@ class HistoryReplayTest {
         }
     }
 
+    private fun explainLowCause(row: JSONObject, minRateMeal: Boolean): String = when {
+        row.optBoolean("sensorGap") || row.optBoolean("falseLow") -> "sensor"
+        row.optBoolean("oldCannula") -> "cannula"
+        row.optBoolean("illness") -> "illness"
+        row.optBoolean("activity") -> "activity"
+        row.optBoolean("afterHypo") || row.optString("hypoCause") == "rebound" -> "rebound"
+        minRateMeal -> "COB-min-rate"
+        row.optString("hypoCause") == "ambiguous" -> "ambiguous"
+        row.optString("hypoCause") == "meal_bolus" -> "meal-bolus"
+        row.optString("hypoCause") == "smb" -> "SMB"
+        row.optString("hypoCause") == "fasting" -> "fasting"
+        row.optBoolean("afterManual") -> "manual-correction"
+        else -> "other"
+    }
+
+    private fun explainLowEvidence(row: JSONObject, minRateMeal: Boolean): String {
+        val flags = ArrayList<String>()
+        if (row.optBoolean("afterHypo")) flags.add("after-hypo")
+        if (row.optBoolean("afterSmb")) flags.add("after-SMB")
+        if (row.optBoolean("afterManual")) flags.add("after-manual")
+        if (row.optBoolean("afterMeal")) flags.add("after-meal")
+        if (row.optBoolean("oldCannula")) flags.add("cannula>72h")
+        if (row.optBoolean("sensorGap")) flags.add("sensor-gap")
+        if (row.optBoolean("falseLow")) flags.add("false-low")
+        if (row.optBoolean("illness")) flags.add("illness")
+        if (row.optBoolean("activity")) flags.add("activity")
+        if (minRateMeal) flags.add("COB-min-rate-meal")
+        flags.add("base=${row.optString("hypoCause", "unavailable")}")
+        return flags.joinToString("+").ifBlank { "none" }
+    }
+
     private fun protectionBlocksInsulinIncrease(validDays: Int, lowPct: Double): Boolean =
         validDays < 3 || lowPct > 3.0
 
@@ -284,6 +315,26 @@ class HistoryReplayTest {
         assertEquals("false-low", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("falseLow", true).put("bg", 65.0), start))
         assertEquals("sensor-gap", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute).put("sensorGap", true).put("bg", 65.0), start))
         assertEquals("missing-bg", protectionExclusionReason(JSONObject().put("t", start + 24 * 60 * minute), start))
+    }
+
+    @Test
+    fun `LEXPL explains low causes without hiding overlapping evidence`() {
+        assertEquals("sensor", explainLowCause(JSONObject().put("hypoCause", "rebound").put("afterHypo", true).put("sensorGap", true), false))
+        assertEquals("cannula", explainLowCause(JSONObject().put("oldCannula", true), false))
+        assertEquals("illness", explainLowCause(JSONObject().put("illness", true), false))
+        assertEquals("activity", explainLowCause(JSONObject().put("activity", true), false))
+        assertEquals("rebound", explainLowCause(JSONObject().put("hypoCause", "rebound").put("afterHypo", true), false))
+        assertEquals("COB-min-rate", explainLowCause(JSONObject().put("hypoCause", "meal_bolus"), true))
+        assertEquals("ambiguous", explainLowCause(JSONObject().put("hypoCause", "ambiguous"), false))
+        assertEquals("meal-bolus", explainLowCause(JSONObject().put("hypoCause", "meal_bolus"), false))
+        assertEquals("SMB", explainLowCause(JSONObject().put("hypoCause", "smb"), false))
+        assertEquals("fasting", explainLowCause(JSONObject().put("hypoCause", "fasting"), false))
+        assertEquals("manual-correction", explainLowCause(JSONObject().put("afterManual", true), false))
+        assertEquals("other", explainLowCause(JSONObject().put("hypoCause", "other"), false))
+        val evidence = explainLowEvidence(JSONObject().put("hypoCause", "meal_bolus").put("afterHypo", true).put("afterMeal", true), true)
+        assertEquals(true, evidence.contains("after-hypo"))
+        assertEquals(true, evidence.contains("COB-min-rate-meal"))
+        assertEquals(true, evidence.contains("base=meal_bolus"))
     }
 
     @Test
@@ -1065,7 +1116,11 @@ class HistoryReplayTest {
         val stage0 = replayTokens.contains("LSTAGE0")
         val lisf2 = replayTokens.contains("LISF2")
         val lcr3 = replayTokens.contains("LCR3")
+        val lexpl = replayTokens.contains("LEXPL")
         require(!lcr3 || causalFilter) { "LCR3 requires LACAUSE for causal exclusions" }
+        require(!lexpl || (causalFilter && crAudit && stage0 && lisf2 && lcr3 && wAttr)) {
+            "LEXPL requires LACAUSE, CRAUDIT, LSTAGE0, LISF2, LCR3 and WATTR"
+        }
         require(!wAttr || causalFilter) { "WATTR requires LACAUSE for causal-window exclusions" }
         class WAttrTick(
             val t: Long, val day: Int, val weight: String?, val impactPct: Double, val clamped: Boolean,
@@ -1079,6 +1134,8 @@ class HistoryReplayTest {
         val wAttrEvents = ArrayList<WAttrEvent>()
         val wAttrOtherProposalTimes = ArrayList<Long>()
         var wAttrBlockedClean = 0; var wAttrBlockedOther = 0; var wAttrCrossings = 0
+        val lexplCardReports = ArrayList<String>()
+        var lexplBasalSummary = "not-run"
         var lastWAttrBg: Double? = null
         val require3Days = prefsText.contains("LADAYS")
         val pctBack = prefsText.contains("LAPCTBACK")
@@ -1215,6 +1272,11 @@ class HistoryReplayTest {
                 } else 0
                 val dayGate = enoughWindowDays && auditDays.size >= (if (require3Days) 3 else 1)
                 val gate = dayGate && (eligibleHours > 0 || estimatedHours > 0)
+                if (lexpl) lexplBasalSummary =
+                    "candidates=$auditCandidates accepted=$auditAccepted rejected=$rejected " +
+                        "reasons=${auditCounts.entries.joinToString(",") { "${it.key}:${it.value}" }} " +
+                        "days=${auditDays.size} eligibleHours=$eligibleHours estimatedHours=$estimatedHours " +
+                        "gate=${if (gate) "PASS" else "FAIL"}"
                 println("AIMI audit Basal: candidates=$auditCandidates accepted=$auditAccepted rejected=$rejected reasons=${auditCounts.entries.joinToString(",") { "${it.key}:${it.value}" }} days=${auditDays.size} eligibleHours=$eligibleHours estimatedHours=$estimatedHours thresholds=min:$minN,tail:${maxOf(minN, lbTailMin)} perHour=${(0 until 24).joinToString(",") { h -> "$h:${needs[h].size}/${if (tailHours[h]) maxOf(minN, lbTailMin) else minN}" }} gate=${if (gate) "PASS" else "FAIL"} reason=${if (!enoughWindowDays) "insufficient-days" else if (eligibleHours == 0 && estimatedHours == 0) "no-hour-meets-threshold" else "none"}")
             }
             return needs
@@ -2276,6 +2338,11 @@ class HistoryReplayTest {
                 "$card:${events.size}(increase=${events.count { it.direction == "increase" }},decrease=${events.count { it.direction == "decrease" }})"
             }
             println("AIMI audit WATTR: crossings=$wAttrCrossings events=${wAttrEvents.size} blocked-clean=$wAttrBlockedClean blocked-other=$wAttrBlockedOther cards=$cardCounts")
+            if (lexpl) lexplCardReports.add(
+                "weights passed=${if (wAttrEvents.isNotEmpty()) "clean-window,active-effect>=5%,not-clamped,counterfactual>=50%,no-other-card-pending" else "none"} " +
+                    "events=${wAttrEvents.size} blocked-clean=$wAttrBlockedClean blocked-other=$wAttrBlockedOther " +
+                    "repeat-days=not-evaluated-in-WATTR"
+            )
             wAttrEvents.forEach { event ->
                 println("AIMI audit WATTR event: day=${event.day} card=${event.weight} direction=${event.direction} miss=${event.miss} explained_pct=${"%.1f".format(event.explainedPct)}")
             }
@@ -2315,6 +2382,11 @@ class HistoryReplayTest {
                 "low-without-hypo-carbs-in-next-15m episodes=${untreatedLowRows.size} days=${untreatedHypoDays.size}; " +
                 "calibration-window=UNAVAILABLE(no calibration-event field); " +
                 "medical-procedure=UNAVAILABLE(no procedure field); report-only")
+            if (lexpl) lexplCardReports.add(
+                "stage0 passed=day/meal audit; blocked-or-unavailable=calibration-window,medical-procedure " +
+                    "cannulaDays=${cannulaDays.size} sensorDays=${sensorDays.size} illnessDays=${illnessDays.size} " +
+                    "activityDays=${activityDays.size} minRateMeals=${minRateMeals.size} untreatedLows=${untreatedLowRows.size}"
+            )
         }
         // LISF2 is a report-only BerNie-sign ISF card. It never changes isfP or insulin delivery.
         // Autotune categorization is restricted to windows where the recorded AutoISF factor stayed at 1.0.
@@ -2407,6 +2479,16 @@ class HistoryReplayTest {
                     else -> isfStart
                 }
                 println("AIMI audit LISF2: block=$block candidates=${candidates.getValue(block)[0]} accepted=${values.size} rejected=${candidates.getValue(block)[0] - values.size} days=$dayCount median=${if (median.isFinite()) "%.1f".format(median) else "-"} profile=${"%.1f".format(isfStart)} proposal=$direction proposed=${"%.1f".format(proposed)} step=10% gate=${if (gate) "PASS" else "FAIL"} rejects=${rejects.getValue(block).entries.joinToString(",") { "${it.key}:${it.value}" }} night-IOB-gate=0.30 report-only")
+                if (lexpl) {
+                    val blocked = ArrayList<String>()
+                    if (values.size < 5) blocked.add("accepted<5")
+                    if (dayCount < 3) blocked.add("distinct-days<3")
+                    rejects.getValue(block).forEach { (reason, count) -> blocked.add("$reason:$count") }
+                    lexplCardReports.add(
+                        "ISF/$block passed=${if (values.isNotEmpty()) "window+net-iob" else "none"} " +
+                            "blocked=${blocked.ifEmpty { listOf("no-blocker") }.joinToString("+")}"
+                    )
+                }
             }
         }
         // LCR3 is report-only. Match the established CR audit's causal exclusions before judging post-meal direction.
@@ -2509,6 +2591,66 @@ class HistoryReplayTest {
                 "proposal=$direction gate=${if (gate) "PASS" else "FAIL"} " +
                 "rejects=${rejected.entries.joinToString(",") { "${it.key}:${it.value}" }} " +
                 "max-meal=60g COB-zero-within-6h COB-min-rate-exclusion=50% causal-exclusions=CRAUDIT report-only")
+            if (lexpl) {
+                val blocked = ArrayList<String>()
+                if (accepted < 5) blocked.add("accepted<5")
+                if (acceptedDays.size < 3) blocked.add("distinct-days<3")
+                rejected.forEach { (reason, count) -> blocked.add("$reason:$count") }
+                lexplCardReports.add(
+                    "CR passed=${if (candidates.isNotEmpty()) "logged-meal>=13g,6h-followup" else "none"} " +
+                        "blocked=${blocked.ifEmpty { listOf("no-blocker") }.joinToString("+")}"
+                )
+            }
+        }
+        // LEXPL is report-only: it explains the completed replay and never changes learner or insulin state.
+        if (lexpl) {
+            val rows = (0 until out.length()).map { out.getJSONObject(it) }
+            val mealTimes = meals.map { it.t }.toSet()
+            val minRateMealTimes = allLogged.filter { meal ->
+                meal.t in mealTimes && meal.g >= 13.0 && meal.absorbedByCob > 0.0 &&
+                    meal.absorbedByMinRate / meal.absorbedByCob >= 0.5
+            }.map { it.t }.toSet()
+            var lowEpisodes = 0
+            var i = 0
+            while (i < rows.size) {
+                val row = rows[i]
+                val bg = row.optDouble("bg", Double.NaN)
+                val previous = if (i > 0) rows[i - 1].optDouble("bg", Double.NaN) else Double.NaN
+                val lowCross = bg.isFinite() && bg < 70.0 && (!previous.isFinite() || previous >= 70.0)
+                if (!lowCross) { i++; continue }
+                var end = i
+                while (end + 1 < rows.size) {
+                    val nextBg = rows[end + 1].optDouble("bg", Double.NaN)
+                    if (!nextBg.isFinite() || nextBg >= 70.0) break
+                    end++
+                }
+                val startTime = row.getLong("t")
+                val minRateMealTime = minRateMealTimes.filter { it <= startTime && startTime - it <= 360 * minute }.maxOrNull()
+                val minRateMeal = minRateMealTime != null
+                val nadir = (i..end).minOf { rows[it].optDouble("bg", Double.NaN) }
+                val local = Instant.ofEpochMilli(startTime).atZone(tz)
+                val cause = explainLowCause(row, minRateMeal)
+                println(
+                    "AIMI audit LEXPL low: day=${rowDay(row) + 1} time=${"%02d:%02d".format(local.hour, local.minute)} " +
+                        "bg=${"%.1f".format(bg)} nadir=${"%.1f".format(nadir)} cause=$cause " +
+                        "evidence=${explainLowEvidence(row, minRateMeal)}"
+                )
+                lowEpisodes++
+                i = end + 1
+            }
+            if (lb2 || lb3 || lb5) {
+                hourNeeds(minOf(out.length(), lbDays * 288), audit = true)
+                lexplCardReports.add("basal $lexplBasalSummary")
+            } else lexplCardReports.add("basal blocked=basal-learner-token-not-enabled")
+            if (pctCard) lexplCardReports.add(
+                "PCT up=$pctUp down=$pctDown final=${"%.0f".format(pctNow * 100)}% " +
+                    "rules=down-low>4% (or >6%/2 checks); up-high>8%,low<=3%,TDD-rise>=15% or high>12%,PCTSTRICT"
+            )
+            if (learnDura) lexplCardReports.add(
+                "DURA final=${"%.2f".format(aw.dura)} rules=5-valid-days,flat-high>=2%,low<=3% for increase; low>4% for decrease"
+            )
+            lexplCardReports.forEach { println("AIMI audit LEXPL card: $it") }
+            println("AIMI audit LEXPL summary: low-episodes=$lowEpisodes cards=${lexplCardReports.size} report-only; no learner or insulin writes")
         }
         // DUMPCSV is report-only and OFF by default. Replay rows are already 5-minute ticks.
         // Export exactly one CSV row per tick; deliv is the basal rate for the following 5-minute interval.
