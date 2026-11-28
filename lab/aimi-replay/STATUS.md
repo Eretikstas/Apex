@@ -1,6 +1,32 @@
 # Lab status
 
 ## Task (written by ChatGPT)
+ 
+### 2026-11-28 — STOP: Rebound Guard fails the post-recalibration TREAT_12 safety gate
+
+- Preflight reread: My-apps main `CLAUDE.md` and handoff §§1, 4, 6, 7, 9, 13; Apex `RULES_FOR_CHATGPT.md` §§00 and 5; current Task, Claude Results, RUN, source commits and CI. Shape-only CAL remains `MEALX_1.4,CHGISF_1.2,SBIAS_0.45,TREAT_5`, selected only from anonymized dimensionless shape statistics.
+- RUN commit [`26af22f3`](https://github.com/Eretikstas/Apex/commit/26af22f3a22f3aab5834bbb2d73d5918df357413); dispatcher/replay [46159163384](https://github.com/Eretikstas/Apex/actions/runs/46159163384), source `626ffbe9` compile green. Result file [`run-46159163384.md`](results/run-46159163384.md): 18/18 replay jobs succeeded. No `CTRL13A` was used because its fixed reference belongs to the pre-recalibration model.
+- Each pair below is same scenario and seed, no guard → `RGAPP2,RGWIN_180,RGCAP_1.0` guard. Metric order: BG <70 / <54 / >180 / CV / hypo g/day / insulin U/day.
+
+| Scenario | Seed | No guard | Guard | Safety gate |
+|---|---:|---|---|---|
+| CAL usual | 1 | 9.1 / 1.4 / 10.2 / 35.7 / 45.71 / 14.15 | 7.5 / 1.0 / 11.1 / 35.0 / 38.93 / 13.90 | pass |
+| CAL usual | 2 | 6.2 / 1.1 / 7.6 / 31.5 / 33.57 / 13.03 | 5.5 / 1.1 / 8.4 / 30.9 / 28.93 / 12.82 | pass |
+| CAL usual | 3 | 7.7 / 1.5 / 8.0 / 33.1 / 39.29 / 14.10 | 7.6 / 1.1 / 8.6 / 33.1 / 38.93 / 14.02 | pass |
+| TREAT_12 | 1 | 4.1 / 0.3 / 10.8 / 30.3 / 68.14 / 15.04 | 4.2 / 0.4 / 10.5 / 29.8 / 68.57 / 14.99 | **FAIL** |
+| TREAT_12 | 2 | 3.3 / 0.2 / 8.2 / 28.4 / 56.57 / 13.83 | 3.5 / 0.4 / 7.8 / 27.9 / 57.43 / 13.86 | **FAIL** |
+| TREAT_12 | 3 | 4.9 / 0.5 / 7.2 / 30.0 / 75.00 / 15.42 | 4.5 / 0.5 / 8.7 / 30.1 / 72.43 / 15.27 | pass |
+| NOISE_0.12 | 1 | 16.9 / 5.4 / 18.1 / 46.8 / 75.54 / 15.70 | 14.7 / 4.8 / 19.2 / 45.5 / 64.64 / 15.23 | pass |
+| NOISE_0.12 | 2 | 14.4 / 4.6 / 14.1 / 42.0 / 65.71 / 14.12 | 12.3 / 4.1 / 15.5 / 40.8 / 58.39 / 13.84 | pass |
+| NOISE_0.12 | 3 | 15.9 / 4.8 / 16.9 / 45.4 / 71.96 / 15.52 | 13.7 / 4.3 / 17.4 / 43.7 / 63.21 / 15.04 | pass |
+
+- RULES §4 pass gate: <70, <54 and hypo grams must not increase against the paired baseline. TREAT_12 seed 1 increases all three (+0.1 pp, +0.1 pp, +0.43 g/day); seed 2 also increases all three (+0.2 pp, +0.2 pp, +0.86 g/day). The other seven pairs meet these three limits; >180 rises in several passing pairs and is recorded above.
+- **STOP under RULES §4a:** this learner change is intended for the app and breaks the required low/hypo safety gate in two TREAT_12 seeds. Do not continue to SMARTS or split-bolus lab runs, change the guard, or make further code/workflow changes in this chain until the stop is resolved. The successful workflow status means jobs executed; it does not mean the candidate passed.
+- The public replay report contains no explicit app-rule hold-count / basal-cap audit line, so lab evidence for actual hold/cap events is **unverified**. Do not infer it from the six outcome metrics.
+- Separate guard branch CI [46158050202](https://github.com/Eretikstas/Apex/actions/runs/46158050202): driver job completed successfully, including driver tests, core safeguard tests, learner tests/build and app assembly; emulator job was skipped on this push path; report job was still running at last check. Bench APK steps were skipped. This is not a full bench/emulator pass.
+- Guard app commit `b8ff067e` is on `learner-rebound-chatgpt`, based on frozen app-code base `6f578b5b`; the follow-up commit `7697db7b` only adds this branch to the existing CI push trigger. No app code was pushed to `autoisf-atc3`; its frozen bench build is unchanged. Existing `learner-rebound`, Claude's hints branch, phone and Nightscout were not touched. No SMARTS or split-bolus app implementation was changed.
+
+
 
 ### 2026-11-28 — Rebound Guard post-recalibration lab run submitted (pending)
 
