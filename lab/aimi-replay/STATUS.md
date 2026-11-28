@@ -2,6 +2,16 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-28 — Corrected SHAPEAUDIT screen PASS; model shape recalibrated
+
+- Corrected replay [46156758753](https://github.com/Eretikstas/Apex/actions/runs/46156758753): **16/16 jobs success; no control failures**. Seed-1 control PASS exactly reproduces `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` (<70 / <54 / >180 / CV / hypo g/day / insulin U/day). The earlier failure in 46058383247 was the missing-token batch error recorded above.
+- Three-seed baseline (`MEALX_0.7`) shape MAE: mean curve `0.0851`, SD curve `0.2887`. Corrected candidate means (seeds 1–3): `MEALX_1.0` = `0.0798 / 0.2729`; `MEALX_1.4` = `0.0718 / 0.2456`; `DAWN_0.9` = `0.0771 / 0.2840`; `DAWN_0.8` = `0.0768 / 0.2862`; `MEALX_1.0+DAWN_0.9` = `0.0735 / 0.2755` (mean MAE / SD MAE).
+- Selection uses only the anonymized dimensionless shape statistics: equal-weight mean of the mean-ratio MAE and SD-ratio MAE. `MEALX_1.4` wins at `0.1587` versus baseline `0.1869` (about 15.1% lower combined shape error); both component MAEs improve. No absolute BG, insulin, dose, profile, or raw personal data was used for this selection.
+- New synthetic model CAL: `MEALX_1.4,CHGISF_1.2,SBIAS_0.45,TREAT_5` (DAWN remains default `1.0`). This doubles the synthetic meal-size multiplier relative to the prior `MEALX_0.7`; it is a model-shape calibration only, not a patient setting or dosing recommendation. Other replay outcome columns were not used to choose the shape calibration.
+- No app code or frozen bench build changed. No writes to `autoisf-atc3`, existing `learner-rebound`, or Claude's hints branch; no phone or Nightscout access.
+- Next: Rebound Guard work on a fresh ChatGPT-owned branch from frozen base `6f578b5b`. Keep the switch OFF by default and enforce suppress-only behaviour (SMB hold / temp-basal cap only; never add insulin). Then lab-test the food-first `SMARTS` path and `SPLITAPP` path on the recalibrated synthetic model before any app implementation of either.
+
+
 ### 2026-11-28 — SHAPEAUDIT control correction (pre-run)
 
 - The first shape screen replay [46058383247](https://github.com/Eretikstas/Apex/actions/runs/46058383247) executed 16/16 jobs, but its seed-1 control failed: observed `4.6 / 0.1 / 7.6 / 30.1 / 26.07 / 11.54` versus the required `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` (<70 / <54 / >180 / CV / hypo g/day / insulin U/day).
