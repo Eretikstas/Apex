@@ -197,10 +197,16 @@ class LearnerScreenshotTest {
         "learner_peak_forecast",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
             peakFitOn = true, peakFit = PeakFit(35, 55, 0.41, 0.12, 640, 9), lowPredOn = true, lowPredMargin = 9.0, lowPredStats = Pair(6, 3))
+    )
+
+    @Test
     fun reboundGuard() = shoot(
         "learner_rebound_guard",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
             reboundOn = true, guard = GuardState(true, NOW - 20 * 60_000L, NOW + 100 * 60_000L))
+    )
+
+    @Test
     fun splitWaiting() = shoot(
         "learner_split_waiting",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
