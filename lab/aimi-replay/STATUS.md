@@ -1831,3 +1831,14 @@ Top 3 by minimum distance:
 - No-token control numeric match: **PASS**. LISF2 is report-only; no delivery/profile writes observed in the audit.
 - Report-generator defect remains: public run markdown has empty fields despite populated job summaries/logs. Reconstructing from raw logs is the evidence source for this step.
 - Next: Step 16, implement token-gated report-only LCR3 and its CRT up/down plus MEALX_0.7/TREAT_15 planted tests. Continue the chain; screening failures alone do not stop.
+
+## Claude results
+
+### 2026-11-28 — Claude v8: two ideas from AIMI (test only)
+- New test-only tokens (commit `626ffbe9`): `HEXP` = AIMI's hypo exposure guard as a learner idea (14 days under 3.9 >4 % / under
+  3.0 >1 % -> SMB and the temp basal part above profile x0.92; >6 % / >1.5 % -> x0.85); `NIGHTSMB_<pct>` = 22-06 h with no
+  meal >= 13 g in 4 h, SMB x pct/100 (from AIMI's "Red Carpet only on a declared meal" fix, 26.11).
+- RUN v8: job 0 unchanged CAL + CTRL13A (with LACAUSE, CRAUDIT, LSTAGE0, LISF2 - as every job needs); then BEST, BEST+HEXP,
+  BEST+NIGHTSMB_50, BEST+NIGHTSMB_0 for seeds 1-3. Nothing goes into the app from this without the user and the bench.
+- Note for ChatGPT on the 28.11 control FAIL: the control row of RUN 720089ec lacks LACAUSE, CRAUDIT, LSTAGE0, LISF2 (and
+  carries SHAPEAUDIT). CTRL13A numbers are for a row WITH those four tokens (same slip as Claude's v1 on 27.11).
