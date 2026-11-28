@@ -2,6 +2,16 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-28 — SHAPEAUDIT control correction (pre-run)
+
+- The first shape screen replay [46058383247](https://github.com/Eretikstas/Apex/actions/runs/46058383247) executed 16/16 jobs, but its seed-1 control failed: observed `4.6 / 0.1 / 7.6 / 30.1 / 26.07 / 11.54` versus the required `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` (<70 / <54 / >180 / CV / hypo g/day / insulin U/day).
+- Root cause verified by comparing the exact RUN row with Claude's later control in replay [46144921012](https://github.com/Eretikstas/Apex/actions/runs/46144921012): the failed shape RUN omitted the report-only tokens `LACAUSE,CRAUDIT,LSTAGE0,LISF2`; the later control included all four and matched all six reference values exactly. This is a batch-construction mismatch, not evidence that the SHAPEAUDIT code changed replay behaviour.
+- The 15 candidate shape rows from 46058383247 are retained as exploratory only; no model setting is selected from a batch with a failed control. The corrective retry will preserve all 16 rows and all candidate tokens, add those four report-only audit tokens to every row, keep `SHAPEAUDIT`, and keep `CTRL13A` only on the unchanged seed-1 control.
+- Pre-run checks: source commit `626ffbe9` compile report [46143849621](https://github.com/Eretikstas/Apex/actions/runs/46143849621) is SUCCESS (all 11 checks); v8 replay [46144921012](https://github.com/Eretikstas/Apex/actions/runs/46144921012) is SUCCESS, 13/13 jobs, control PASS; push-only run [46145704893](https://github.com/Eretikstas/Apex/actions/runs/46145704893) completed with replay skipped, so the lab is free. Current branch head before this note: `603bdd8b`.
+- Scope remains synthetic only. Shape comparison uses only anonymized dimensionless hourly mean/SD ratios (`anonymized-v1`); no personal records, absolute readings, dates, doses, or profile data are used. No app code, frozen bench build, hints branch, phone, or Nightscout was touched.
+- Next: commit the corrected RUN batch and wait for its dispatcher, replay, and public result file. Do not rank candidates until the corrected `CTRL13A` passes.
+
+
 ### 2026-11-28 — STOP: SHAPEAUDIT screen control mismatch
 
 - Per RULES_FOR_CHATGPT.md §00 / §4a, STOP. The unchanged APP + CAL usual seed-1 control in replay [46058383247](https://github.com/Eretikstas/Apex/actions/runs/46058383247) reports **FAIL**. This is a hard stop; no further lab step, calibration choice, branch creation, code change, or RUN submission is made in this turn.
