@@ -2,6 +2,14 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-28 — Rebound Guard post-recalibration lab run submitted (pending)
+
+- Pre-run review: My-apps main `CLAUDE.md`; Apex `RULES_FOR_CHATGPT.md` §00 and §5; newest Task and Claude Results; current RUN; corrected shape replay [46156758753](https://github.com/Eretikstas/Apex/actions/runs/46156758753); source commit `626ffbe9` compile report is green. The shape-only CAL is `MEALX_1.4,CHGISF_1.2,SBIAS_0.45,TREAT_5`.
+- Guard app branch: `learner-rebound-chatgpt`, engine commit `b8ff067e` based on frozen bench code `6f578b5b`; follow-up workflow commit `7697db7b` only adds this branch to the existing CI push trigger. CI run [46158050202](https://github.com/Eretikstas/Apex/actions/runs/46158050202) is still running at submission: driver job active, emulator skipped. Its push path builds the debug app; bench APK steps are dispatch-only and are not run by this push.
+- The lab candidate uses `RGAPP2,RGWIN_180,RGCAP_1.0`: 180-minute hold, early releases matching the fixed app rules, and a temp-basal ceiling at 1.0× profile. `RGNOMEAL` is intentionally absent so a logged meal releases the guard. No insulin-adding token or path is used by this guard.
+- Paired no-guard / guard jobs, 3 seeds each, on three synthetic conditions: recalibrated usual CAL, `TREAT_12` (upper edge of the app's <=12 g hypo-treatment classifier), and `NOISE_0.12` (sensor-noise stress). Total 18 jobs. The batch intentionally removes `SMARTS`, `SPLIT_60`, `SPLITMIN_20`, and `LEARNG3` so this run isolates the guard; smart calculator and split bolus remain separate later tests.
+- No `CTRL13A`: its fixed reference is the pre-recalibration model and would be invalid here. Compare each guard row against its same-seed, same-scenario no-guard pair; report all six replay metrics and the app-rule hold/cap evidence. No app code was pushed to `autoisf-atc3`; frozen bench build, existing `learner-rebound`, Claude's hints branch, phone, and Nightscout remain untouched.
+
 ### 2026-11-28 — Rebound Guard isolated on a fresh branch (CI pending)
 
 - Created `learner-rebound-chatgpt` from frozen bench base `6f578b5b`; commit [`b8ff067e`](https://github.com/Eretikstas/Apex/commit/b8ff067e3f59060f1a25928f0bd9b136433df1c5). This is separate from the existing `learner-rebound` branch (left unchanged) and `autoisf-atc3` (left unchanged).
