@@ -1,19 +1,13 @@
-# App CI run 46118696529
+# App CI run 46158050202
 
-- Link: https://github.com/Eretikstas/Apex/actions/runs/46118696529
-- Branch `learner-all`, commit `a1c0f532`, event `workflow_dispatch`, started 2026-11-28T06:53:41Z
+- Link: https://github.com/Eretikstas/Apex/actions/runs/46158050202
+- Branch `learner-rebound-chatgpt`, commit `7697db7b`, event `push`, started 2026-11-28T15:05:57Z
 - Result: **success**
 
 ## Job `driver`: success
 
-## Job `emulator`: success
-
-```text
-app.aaps.e2e.VirtualBenchTest,app.aaps.e2e.ApexScenarioTest: OK (22 tests)
-```
+## Job `emulator`: skipped
 
 ## Artifacts (download from the run page)
-- `autoisf-atc3-emulator` (1604 KB)
-- `autoisf-atc3-ring-shots` (7271 KB)
-- `autoisf-atc3-test-reports` (872 KB)
-- `autoisf-atc3-bench-apk` (135603 KB)
+- `autoisf-atc3-test-reports` (851 KB)
+- `autoisf-atc3-ring-shots` (2642 KB)
