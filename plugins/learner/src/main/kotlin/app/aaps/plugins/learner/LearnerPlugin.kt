@@ -785,6 +785,31 @@ class LearnerPlugin(
         return SplitBolusEngine.plan(now, type, Math.round(total / SPLIT_STEP) * SPLIT_STEP, SPLIT_STEP).copy(carbsG = carbs)
     }
 
+    /** The app side of the split bolus (`SplitDelivery` holds the rules). */
+    private val splitPort = object : SplitPort {
+        override var plan: SplitPlan?
+            get() = store.splitPlan
+            set(value) {
+                store.splitPlan = value
+            }
+        override val enabled: Boolean get() = store.splitOn
+        override fun bolusRejection(): String? = runningModeGuard.rejectionMessage(PumpCommandGate.CommandKind.BOLUS)
+        override suspend fun glucose(now: Long): Pair<Double?, Double?> = history.smoothedNow(now)
+        override suspend fun bolusesSince(from: Long, now: Long): Double = history.bolusesSince(from, now)
+        override suspend fun bolus(units: Double, carbs: Double, first: Boolean, now: Long): Pair<Boolean, String> {
+            val dbi = DetailedBolusInfo().apply {
+                insulin = units
+                this.carbs = carbs
+                eventType = TE.Type.MEAL_BOLUS
+                timestamp = now
+                notes = rh.gs(if (first) R.string.learner_split_note_first else R.string.learner_split_note_rest)
+            }
+            val r = commandQueue.bolus(dbi)
+            return Pair(r.success, r.comment)
+        }
+    }
+    private val splitDelivery = SplitDelivery(splitPort, SPLIT_STEP)
+
     /** "Give the first part": carbs and the first part as one meal bolus; the rest waits (`checkSplit`). */
     fun startSplit() {
         val preview = _status.value.splitPreview ?: return
@@ -793,27 +818,22 @@ class LearnerPlugin(
         setBusy(true)
         scope.launch {
             try {
-                runningModeGuard.rejectionMessage(PumpCommandGate.CommandKind.BOLUS)?.let { return@launch finish(it) }
                 val now = dateUtil.now()
                 // Recalculated now: the preview may be minutes old.
                 val plan = splitPlanFor(preview.carbsG, preview.type, now) ?: return@launch finish(rh.gs(R.string.learner_split_no_profile))
-                val dbi = DetailedBolusInfo().apply {
-                    insulin = plan.firstU
-                    carbs = plan.carbsG
-                    eventType = TE.Type.MEAL_BOLUS
-                    timestamp = now
-                    notes = rh.gs(R.string.learner_split_note_first)
+                when (val r = splitDelivery.start(plan, now)) {
+                    is SplitStart.Refused -> finish(rh.gs(R.string.learner_split_failed, r.why))
+                    is SplitStart.Failed  -> finish(rh.gs(R.string.learner_split_failed, r.comment))
+                    is SplitStart.Started -> {
+                        if (r.waiting) {
+                            note(rh.gs(R.string.learner_why_split_wait, plan.restU), now, SplitBolusEngine.SLOW_LIMIT_MS, SPLIT_NOTE_SOURCE)
+                            watchSplit()
+                        }
+                        aapsLogger.debug(LTag.APS, "Learner: split bolus started $plan")
+                        _status.value = _status.value.copy(splitPreview = null)
+                        finish(rh.gs(R.string.learner_split_started, plan.firstU, plan.restU))
+                    }
                 }
-                val r = commandQueue.bolus(dbi)
-                if (!r.success) return@launch finish(rh.gs(R.string.learner_split_failed, r.comment))
-                if (plan.restU >= SplitBolusEngine.MIN_BOLUS_U) {
-                    store.splitPlan = plan
-                    note(rh.gs(R.string.learner_why_split_wait, plan.restU), now, SplitBolusEngine.SLOW_LIMIT_MS, SPLIT_NOTE_SOURCE)
-                    watchSplit()
-                }
-                aapsLogger.debug(LTag.APS, "Learner: split bolus started $plan")
-                _status.value = _status.value.copy(splitPreview = null)
-                finish(rh.gs(R.string.learner_split_started, plan.firstU, plan.restU))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -827,7 +847,7 @@ class LearnerPlugin(
 
     /** "Cancel the rest": nothing more is given for this meal. */
     fun cancelSplit() {
-        store.splitPlan = null
+        splitDelivery.cancel()
         splitJob?.cancel()
         loopNotes.clear(SPLIT_NOTE_SOURCE)
         refresh(rh.gs(R.string.learner_split_cancelled))
@@ -843,48 +863,35 @@ class LearnerPlugin(
         }
     }
 
-    /**
-     * Every minute while a rest waits: `SplitBolusEngine.decide` on the smoothed glucose, its 15 minute change and the SMB
-     * given since the meal. The plan is removed BEFORE the rest is sent, so a crash can never give it twice.
-     */
+    /** Every minute while a rest waits: see `SplitDelivery.check` (the plan is removed BEFORE the rest is sent). */
     private suspend fun checkSplit() {
-        val plan = store.splitPlan ?: return
-        if (!store.splitOn) return cancelSplit()
         val now = dateUtil.now()
-        val (bg, delta15) = history.smoothedNow(now)
-        val smb = history.smbSince(plan.madeAt, now)
-        when (val d = SplitBolusEngine.decide(now, plan, bg, delta15, null, smb, SPLIT_STEP)) {
-            is SplitDecision.Give    -> {
-                if (runningModeGuard.rejectionMessage(PumpCommandGate.CommandKind.BOLUS) != null) return
-                store.splitPlan = null
-                val dbi = DetailedBolusInfo().apply {
-                    insulin = d.units
-                    eventType = TE.Type.MEAL_BOLUS
-                    timestamp = now
-                    notes = rh.gs(R.string.learner_split_note_rest)
-                }
-                val r = commandQueue.bolus(dbi)
+        when (val o = splitDelivery.check(now)) {
+            is SplitOutcome.Given    -> {
                 loopNotes.clear(SPLIT_NOTE_SOURCE)
-                if (r.success) note(rh.gs(R.string.learner_why_split_given, d.units), now, NOTE_SHORT_MS)
-                else notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_failed, r.comment), level = NotificationLevel.URGENT)
-                aapsLogger.debug(LTag.APS, "Learner: split rest ${d.units} U, success=${r.success}")
-                refresh(if (r.success) rh.gs(R.string.learner_split_rest_given, d.units) else rh.gs(R.string.learner_split_failed, r.comment))
+                if (o.success) note(rh.gs(R.string.learner_why_split_given, o.units), now, NOTE_SHORT_MS)
+                else notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_failed, o.comment), level = NotificationLevel.URGENT)
+                aapsLogger.debug(LTag.APS, "Learner: split rest ${o.units} U, success=${o.success}")
+                refresh(if (o.success) rh.gs(R.string.learner_split_rest_given, o.units) else rh.gs(R.string.learner_split_failed, o.comment))
             }
 
-            SplitDecision.Covered    -> {
-                store.splitPlan = null
+            SplitOutcome.Covered     -> {
                 loopNotes.clear(SPLIT_NOTE_SOURCE)
                 refresh(rh.gs(R.string.learner_split_covered))
             }
 
-            SplitDecision.Dropped    -> {
-                store.splitPlan = null
+            SplitOutcome.Dropped     -> {
                 loopNotes.clear(SPLIT_NOTE_SOURCE)
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_dropped), level = NotificationLevel.NORMAL)
                 refresh(rh.gs(R.string.learner_split_dropped))
             }
 
-            is SplitDecision.Wait    -> _status.value = _status.value.copy(splitPlan = plan)
+            SplitOutcome.SwitchedOff -> {
+                loopNotes.clear(SPLIT_NOTE_SOURCE)
+                refresh()
+            }
+
+            is SplitOutcome.Waiting, is SplitOutcome.Held, SplitOutcome.NoPlan -> _status.value = _status.value.copy(splitPlan = store.splitPlan)
         }
     }
 

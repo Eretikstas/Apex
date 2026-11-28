@@ -160,9 +160,9 @@ class LearnerHistory(
         return Triple(carbs, newest?.second, delta)
     }
 
-    /** SMB given from [from] to [now], units. */
-    suspend fun smbSince(from: Long, now: Long): Double =
-        persistenceLayer.getBolusesFromTimeToTime(from, now, true).filter { it.type == BS.Type.SMB }.sumOf { it.amount }
+    /** All boluses (meal, correction, SMS, SMB; no priming) given from [from] to [now], units. */
+    suspend fun bolusesSince(from: Long, now: Long): Double =
+        persistenceLayer.getBolusesFromTimeToTime(from, now, true).filter { it.type != BS.Type.PRIMING }.sumOf { it.amount }
 
     private companion object {
 

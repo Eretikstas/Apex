@@ -20,10 +20,10 @@ sealed class SplitDecision {
     /** Not yet: check again later. [why] for the log and the screen. */
     data class Wait(val why: SplitWait) : SplitDecision()
 
-    /** Give [units] now (the rest minus the SMB the loop gave since the meal). */
+    /** Give [units] now (the rest minus the other boluses since the meal). */
     data class Give(val units: Double) : SplitDecision()
 
-    /** Nothing more to give: the loop's SMB covered the rest. */
+    /** Nothing more to give: other boluses since the meal (SMB, a correction) covered the rest. */
     data object Covered : SplitDecision()
 
     /** The rest is dropped: the food was not seen in time. The family gets a notice. */
@@ -44,7 +44,8 @@ enum class SplitWait { TOO_EARLY, LOW, FALLING, NO_FOOD_SEEN }
  *   is at [MIN_GIVE_MGDL] (5.5 mmol/L) or more, or AAPS sees carbs absorbing (deviation of [DEVIATION_MGDL] mg/dL per 5
  *   minutes or more) at 5.5 or more.
  * - Never under 4.5 mmol/L and never while the glucose falls.
- * - What is given is the rest minus the SMB the loop gave since the meal; under [MIN_BOLUS_U] -> covered, nothing given.
+ * - What is given is the rest minus all other boluses since the meal (SMB, a manual or SMS correction); under
+ *   [MIN_BOLUS_U] -> covered, nothing given.
  * - Not seen by 90 minutes (SLOW: 180) -> the rest is dropped and the family gets a notice.
  */
 object SplitBolusEngine {
@@ -72,10 +73,11 @@ object SplitBolusEngine {
 
     /**
      * The decision at [now]. [bgMgdl] is the last sensor glucose, [delta15Mgdl] its change over the last 15 minutes,
-     * [deviationMgdl] the AAPS deviation (null when not known), [smbSinceU] the SMB given since the meal.
+     * [deviationMgdl] the AAPS deviation (null when not known), [otherBolusU] all other boluses given since the meal
+     * (the loop's SMB, a manual or SMS correction; not the first part).
      */
-    fun decide(now: Long, plan: SplitPlan, bgMgdl: Double?, delta15Mgdl: Double?, deviationMgdl: Double?, smbSinceU: Double, stepU: Double): SplitDecision {
-        val rest = floorTo(plan.restU - smbSinceU, stepU)
+    fun decide(now: Long, plan: SplitPlan, bgMgdl: Double?, delta15Mgdl: Double?, deviationMgdl: Double?, otherBolusU: Double, stepU: Double): SplitDecision {
+        val rest = floorTo(plan.restU - otherBolusU, stepU)
         if (rest < MIN_BOLUS_U) return SplitDecision.Covered
         val age = now - plan.madeAt
         val limit = if (plan.type == MealType.SLOW) SLOW_LIMIT_MS else NORMAL_LIMIT_MS
