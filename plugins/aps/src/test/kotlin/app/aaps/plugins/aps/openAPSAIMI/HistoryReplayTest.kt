@@ -1017,6 +1017,13 @@ class HistoryReplayTest {
         // NIGHTT_<mg/dL>: the LOOP's target from 21:00 to 06:00 (the wizard keeps the profile target), e.g. a night
         // temporary target.
         val nightT = tok("NIGHTT", 0.0)
+        // HEXP (Claude, test only): the learner idea from AIMI's hypo exposure guard (Boost V5). Once a day: the readings of
+        // the last 14 days (at least 7 days and 1500 readings); under 3.9 over 4 % or under 3.0 over 1 % -> SMB and the part
+        // of a temp basal above the profile basal x0.92; over 6 % / 1.5 % -> x0.85. It never touches less insulin.
+        val hExp = prefsText.contains("HEXP"); var hExpScale = 1.0; var hExpDay = -1; var hExpCutU = 0.0; var hExpDays = 0
+        // NIGHTSMB_<pct> (Claude, test only): from 22:00 to 06:00 with no meal of 13 g or more in the last 4 h, the SMB is
+        // pct % of what the loop asks (0 = no SMB). The idea from AIMI's "Red Carpet" fix (no full SMB on a guessed meal).
+        val nightSmbPct = tok("NIGHTSMB", -1.0); var nightSmbCutU = 0.0; var nightSmbTicks = 0
         val isfT = cfg.getDouble("isfTrue"); val csfT = isfT / tok("CRT", cfg.getDouble("crTrue"))
         val peak = cfg.getDouble("peak"); val dia = cfg.getDouble("dia")
         val t0 = cfg.getLong("t0")
@@ -2320,10 +2327,39 @@ class HistoryReplayTest {
                         }
                         lastWAttrBg = gs.glucose
                     }
-                    val smb = rt.units ?: 0.0
+                    var smb = rt.units ?: 0.0
+                    if (hExp) {
+                        val dayNow = ((t - t0) / 86_400_000L).toInt()
+                        if (dayNow != hExpDay) {
+                            hExpDay = dayNow
+                            val from = t - 14 * 86_400_000L
+                            val k0 = readT.binarySearch(from).let { if (it >= 0) it else -it - 1 }
+                            val n = readV.size - k0
+                            val spanDays = if (n > 0) (t - readT[k0]) / 86_400_000.0 else 0.0
+                            hExpScale = if (n >= 1500 && spanDays >= 7.0) {
+                                val p70 = 100.0 * (k0 until readV.size).count { readV[it] < 70.0 } / n
+                                val p54 = 100.0 * (k0 until readV.size).count { readV[it] < 54.0 } / n
+                                when {
+                                    p70 > 6.0 || p54 > 1.5 -> 0.85
+                                    p70 > 4.0 || p54 > 1.0 -> 0.92
+                                    else -> 1.0
+                                }
+                            } else 1.0
+                            if (hExpScale < 1.0) hExpDays++
+                        }
+                        if (smb > 0.0 && hExpScale < 1.0) {
+                            val cut = smb - Math.floor(smb * hExpScale / 0.05 + 1e-9) * 0.05
+                            smb -= cut; hExpCutU += cut
+                        }
+                    }
+                    if (nightSmbPct >= 0.0 && smb > 0.0 && (h >= 22 || h < 6) && mealLog.none { t - it.first <= 4 * 3_600_000L }) {
+                        val cut = smb - Math.floor(smb * nightSmbPct / 100.0 / 0.05 + 1e-9) * 0.05
+                        smb -= cut; nightSmbCutU += cut; nightSmbTicks++
+                    }
                     if (smb > 0.0) { chain.ownSmb.add(Pair(t, smb)); doses.add(Pair(t, smb)) }
                     val capRate = profBasal[h] * capMult
                     var rate = if (guardHold && capOn && (rt.rate ?: 0.0) > capRate) capRate else rt.rate
+                    if (hExp && hExpScale < 1.0 && (rate ?: 0.0) > profBasal[h]) rate = profBasal[h] + ((rate ?: 0.0) - profBasal[h]) * hExpScale
                     if (noiseGuard && noisy && (rate ?: 0.0) > profBasal[h]) rate = profBasal[h]
                     var dur = rt.duration
                     // LATEB_<x>: in the late meal window (90-240 min after a meal >= 13 g, absorption seen in 2 cycles,
@@ -2770,6 +2806,8 @@ class HistoryReplayTest {
             println("AIMI audit MEALS: " + listOf(line("afterHypo", mealMarks.filter { it.afterHypo }), line("falling", mealMarks.filter { it.falling }),
                 line("afterHypoFalling", mealMarks.filter { it.afterHypo && it.falling }), line("other", mealMarks.filter { !it.afterHypo && !it.falling })).joinToString("; ") + " report-only")
         }
+        if (hExp) println("AIMI replay: HEXP days with less insulin $hExpDays, SMB cut ${"%.2f".format(hExpCutU)} U")
+        if (nightSmbPct >= 0.0) println("AIMI replay: NIGHTSMB_${nightSmbPct.toInt()} night SMB cut on $nightSmbTicks loop runs, ${"%.2f".format(nightSmbCutU)} U")
         if (rgApp || splitApp) println("AIMI replay: app rules: rebound guard held $nRgHold loop runs; app split $nSplit, rest given $nSplitGiven, covered by SMB $nSplitCovered, dropped $nSplitDrop")
         if (learnG3) println("AIMI replay: learner 3 let SMB go early $releases times; expected rebound ${expRise.roundToInt()} mg/dL, margin ${relMargin.roundToInt()} mg/dL")
         if (learnG2) println("AIMI replay: learner 2 saw $lowsByLoop lows caused by the loop, $lowsAnyway lows that would come anyway, $overAvoidable overshoots the guard caused")
