@@ -1,23 +1,19 @@
-# App CI run 46117635804
+# App CI run 46118696529
 
-- Link: https://github.com/Eretikstas/Apex/actions/runs/46117635804
-- Branch `learner-all`, commit `e2eefd30`, event `workflow_dispatch`, started 2026-11-28T06:39:44Z
-- Result: **FAILURE: driver**
+- Link: https://github.com/Eretikstas/Apex/actions/runs/46118696529
+- Branch `learner-all`, commit `a1c0f532`, event `workflow_dispatch`, started 2026-11-28T06:53:41Z
+- Result: **success**
 
-## Job `driver`: failure
-- Failed steps: Native Sibionics source tests (and the new SourceSensor entry), Ring overview tests (and the preference key list), Build the app
+## Job `driver`: success
+
+## Job `emulator`: success
 
 ```text
-> Task :plugins:learner:compileDebugKotlin FAILED
-* What went wrong:
-BUILD FAILED in 8s
-> Task :plugins:learner:compileReleaseKotlin FAILED
-BUILD FAILED in 1m 28s
-BUILD FAILED in 10s
+app.aaps.e2e.VirtualBenchTest,app.aaps.e2e.ApexScenarioTest: OK (22 tests)
 ```
 
-## Job `emulator`: skipped
-
 ## Artifacts (download from the run page)
-- `autoisf-atc3-test-reports` (830 KB)
-- `autoisf-atc3-ring-shots` (1340 KB)
+- `autoisf-atc3-emulator` (1604 KB)
+- `autoisf-atc3-ring-shots` (7271 KB)
+- `autoisf-atc3-test-reports` (872 KB)
+- `autoisf-atc3-bench-apk` (135603 KB)
