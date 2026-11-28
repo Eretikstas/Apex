@@ -8,7 +8,7 @@
 - Ported the opt-in guard engine, plugin constraints, smoothed-glucose inputs, switch UI, strings, and tests. Default is OFF (`reboundOn` reads false when unset); active guard only disables SMB and applies `setIfSmaller` temp-basal caps at or below profile basal. No bolus-adding path is called; user-entered boluses are not cancelled. The UI requires confirmation to turn it on.
 - Engine tests cover the 3-hour hold, meal/high/strong-rise releases, and that the basal cap never exceeds profile basal. Comments were sanitized; no family-specific values or prior outcome metrics were copied into the new public branch.
 - No app code was pushed to `autoisf-atc3`; frozen bench build remains `6f578b5b`. No phone or Nightscout access.
-- Next: run the app/unit-test + separate bench-APK CI on `learner-rebound-chatgpt`; then test the guard on recalibrated CAL in the synthetic lab. Food-first `SMARTS` and `SPLITAPP` remain lab-only until their tests pass.
+- Push CI for `learner-rebound-chatgpt` started: [46158050202](https://github.com/Eretikstas/Apex/actions/runs/46158050202), head `7697db7b`; driver job is running, emulator job was skipped. It runs the learner/unit tests and app build. No bench APK was rebuilt or uploaded; the frozen bench build remains unchanged. Next: verify this CI result, then test the guard on recalibrated CAL in the synthetic lab. Food-first `SMARTS` and `SPLITAPP` remain lab-only until their tests pass.
 
 
 ### 2026-11-28 — Corrected SHAPEAUDIT screen PASS; model shape recalibrated
