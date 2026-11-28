@@ -2,6 +2,14 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-28 — STOP: SHAPEAUDIT screen control mismatch
+
+- Per RULES_FOR_CHATGPT.md §00 / §4a, STOP. The unchanged APP + CAL usual seed-1 control in replay [46058383247](https://github.com/Eretikstas/Apex/actions/runs/46058383247) reports **FAIL**. This is a hard stop; no further lab step, calibration choice, branch creation, code change, or RUN submission is made in this turn.
+- RUN commit: [720089ec](https://github.com/Eretikstas/Apex/commit/720089ec8010f467067c3e54016724a634e002c1). Exact source commit: `6f883d7c`; compile gate `46055486474` was green and dispatcher `46058359316` started the replay. Replay process completed 16/16 jobs successfully, but the control gate failed.
+- Control expected (from RULES §4): <70 6.0, <54 0.5, >180 5.7, CV 29.7, hypo 33.21 g/day, insulin 11.78 U/day. Observed: <70 4.6, <54 0.1, >180 7.6, CV 30.1, hypo 26.07 g/day, insulin 11.54 U/day. These are synthetic lab outputs; they do not match the required no-change control.
+- The candidate rows are not ranked or selected because the control is invalid. No generator/model parameters were changed by this screen. The next work is blocked pending the user's direction on the control mismatch.
+
+
 ### 2026-11-27 — shape calibration screen submitted
 
 - RUN commit [`720089ec`](https://github.com/Eretikstas/Apex/commit/720089ec8010f467067c3e54016724a634e002c1) contains 16 synthetic jobs: unchanged seed-1 control plus five existing-token candidates across seeds 1–3. Dispatcher [46058359316](https://github.com/Eretikstas/Apex/actions/runs/46058359316) confirms source compile `6f883d7c` green and **STARTED** replay [46058383247](https://github.com/Eretikstas/Apex/actions/runs/46058383247).
