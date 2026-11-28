@@ -181,4 +181,19 @@
     <string name="learner_split_note_rest">Learner: split bolus, rest</string>
     <string name="learner_why_split_wait" comment="%1$.2f=rest U">Learner: the rest of the meal bolus (up to %1$.2f U) waits for the food to be seen.</string>
     <string name="learner_why_split_given" comment="%1$.2f=rest U">Learner: the rest of the meal bolus %1$.2f U was given.</string>
+    <string name="learner_pct_watch_title">Profile percentage watch</string>
+    <string name="learner_pct_watch_rule" formatted="false">Off by default. Only a notice, it changes nothing. 1) The percentage is over 100 % for 4 hours or more: a reminder, again every 4 hours. 2) The percentage came down from over 100 % less than an hour ago and the active insulin is 1.0 U or more: the insulin of the high hours still works, watch the next hour for a low. 4 h, 1 h and 1.0 U are our estimates.</string>
+    <string name="learner_pct_watch_last" comment="%1$s=date and time, %2$s=the hint text">Last: %1$s. %2$s</string>
+    <string name="learner_why_pct_high" comment="%1$d=profile percentage, %2$.1f=hours. Example: Learner: the profile is at 150 % for 4.5 h already.">Learner: the profile is at %1$d %% for %2$.1f h already. Is it still needed?</string>
+    <string name="learner_why_pct_drop" comment="%1$d=percentage before, %2$.1f=hours it ran, %3$.1f=active insulin in U">Learner: the percentage came down from %1$d %% (it ran %2$.1f h), active insulin %3$.1f U: watch the next hour for a low.</string>
+    <string name="learner_ns_hints_title">Hints to Nightscout (iPhone)</string>
+    <string name="learner_ns_hints_rule">Off by default. Important hints (insulin curve changed, low forecast, cannula, sensor, profile percentage, split bolus not given) are also written as an announcement, which AAPS uploads to Nightscout. So the family sees them on the iPhone. Only text: no treatment is written. The same text is not sent again within 6 hours.</string>
+    <string name="learner_nt_title">Night target (lows at night)</string>
+    <string name="learner_nt_rule" formatted="false">Off by default. With the basal card, every 4 days. Last 14 days, night = 21:00 to 06:00. If a low (15 min or more under 3.9) came in 40 % of the nights or more and the night time over 10 is 10 % or less: a proposal to raise the night target by 1.0 mmol/L (never over 8.0). Only HIGHER = less insulin at night, but more highs are possible. Lab: fewer lows, a bit more highs. \"Внести\" edits the profile target for 21-06 h; it is judged in 3 days.</string>
+    <string name="learner_nt_seen" comment="%1$d=nights with a low, %2$d=nights with data">Nights with a low: %1$d of %2$d.</string>
+    <string name="learner_nt_change" comment="%1$.1f=night target now, %2$.1f=proposed, mmol/L">Night target 21-06 h: %1$.1f → %2$.1f mmol/L</string>
+    <string name="learner_notice_nt">Learner: a proposal for a higher night target waits for your answer.</string>
+    <string name="learner_switch_note_nt">Learner: night target</string>
+    <string name="learner_eval_label_nt">night target</string>
+    <string name="learner_why_nt_applied">Learner: the night target (21-06 h) is higher now; it is judged in 3 days.</string>
 </resources>

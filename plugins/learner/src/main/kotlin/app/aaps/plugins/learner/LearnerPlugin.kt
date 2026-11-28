@@ -1,6 +1,7 @@
 package app.aaps.plugins.learner
 
 import app.aaps.core.data.model.data.Block
+import app.aaps.core.data.model.data.TargetBlock
 import app.aaps.core.data.plugin.PluginType
 import app.aaps.core.data.ue.Action
 import app.aaps.core.data.ue.Sources
@@ -147,6 +148,16 @@ class LearnerPlugin(
         val splitPreview: SplitPlan? = null,
         val splitPlan: SplitPlan? = null,
         val splitMessage: String = "",
+        /** Profile percentage watch: switch and the last hint (when, the hint). */
+        val pctWatchOn: Boolean = false,
+        val pctHint: Pair<Long, PctHint>? = null,
+        /** Important hints also go to Nightscout as announcements (iPhone). */
+        val nsHintsOn: Boolean = false,
+        /** Night target card: switch, what it saw (nights with a low, nights), a proposal, the profile units factor to mg/dL. */
+        val ntOn: Boolean = false,
+        val lastNt: Pair<Int, Int>? = null,
+        val ntProposal: NightTargetProposal? = null,
+        val ntUnitsToMgdl: Double = 1.0,
     )
 
     private val store = LearnerStore(prefs)
@@ -174,6 +185,7 @@ class LearnerPlugin(
                 runCatching { checkCannula() }.onFailure { aapsLogger.error(LTag.APS, "Learner: cannula hint failed", it) }
                 runCatching { checkLowMeal() }.onFailure { aapsLogger.error(LTag.APS, "Learner: low meal hint failed", it) }
                 runCatching { checkCurve() }.onFailure { aapsLogger.error(LTag.APS, "Learner: curve watch failed", it) }
+                runCatching { checkPct() }.onFailure { aapsLogger.error(LTag.APS, "Learner: percentage watch failed", it) }
                 runCatching { maybeCountLows() }.onFailure { aapsLogger.error(LTag.APS, "Learner: low causes failed", it) }
                 runCatching { checkEval() }.onFailure { aapsLogger.error(LTag.APS, "Learner: change evaluation failed", it) }
                 runCatching { maybeDigest() }.onFailure { aapsLogger.error(LTag.APS, "Learner: weekly digest failed", it) }
@@ -245,12 +257,22 @@ class LearnerPlugin(
         val crCard = CrBlockCardEngine.card(steps.takeLast(CrBlockCardEngine.DAYS * STEPS_PER_DAY))
         store.lastCr = crCard.lowPct.mapKeys { it.key.name }
         aapsLogger.debug(LTag.APS, "Learner: CR block card $crCard")
+        // The night target card (only HIGHER, off by default) looks at the same 14 days.
+        val ntCard = if (store.ntOn) NightTargetEngine.card(steps.takeLast(NightTargetEngine.DAYS * STEPS_PER_DAY)) else null
+        ntCard?.let { store.lastNt = it.lowNights to it.nights }
+        val unitsToMgdl = if (single.mgdl) 1.0 else MGDL_PER_MMOL
+        val ntHigher = ntCard?.takeIf { it.propose }?.let {
+            NightTargetEngine.higher(hourlyTarget(single.target, low = true).map { v -> v * unitsToMgdl }.toDoubleArray(),
+                hourlyTarget(single.target, low = false).map { v -> v * unitsToMgdl }.toDoubleArray())
+        }
+        aapsLogger.debug(LTag.APS, "Learner: night target card $ntCard")
         // One change at a time: the basal first; nothing new while the last applied change is still judged.
         val judging = store.lastAppliedAt > 0 && now - store.lastAppliedAt < CARD_EVERY_MS - 2 * 3_600_000L
         when {
             judging                     -> note(rh.gs(R.string.learner_why_judging), now, NOTE_SHORT_MS)
             card.changes.isNotEmpty() && !failed(KIND_BASAL) -> {
                 store.proposal = BasalProposal(name, now, card.changes)
+                store.ntProposal = null
                 store.duraProposal = null
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_proposal), level = NotificationLevel.INFO)
             }
@@ -259,6 +281,7 @@ class LearnerPlugin(
                 // One proposal at a time.
                 store.proposal = null
                 store.duraProposal = DuraProposal(dura, duraCard.to, now, duraCard.flatHighPct, duraCard.lowPct)
+                store.ntProposal = null
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_dura), level = NotificationLevel.INFO)
             }
 
@@ -267,11 +290,25 @@ class LearnerPlugin(
                 val icHours = hourly(single.ic)
                 store.proposal = null
                 store.duraProposal = null
+                store.ntProposal = null
                 store.crProposal = CrProposal(
                     name, block.name, now, crCard.lowPct[block] ?: 0.0,
                     (block.fromHour until block.toHour).associateWith { icHours[it] }, CrBlockCardEngine.weakerHours(icHours, block)
                 )
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_cr), level = NotificationLevel.INFO)
+            }
+
+            ntCard != null && ntHigher != null && !failed(KIND_NT) -> {
+                store.proposal = null
+                store.duraProposal = null
+                store.crProposal = null
+                val lowNow = hourlyTarget(single.target, low = true)
+                store.ntProposal = NightTargetProposal(
+                    name, now, ntCard.lowNights, ntCard.nights,
+                    NightTargetEngine.HOURS.associateWith { lowNow[it] },
+                    ntHigher.first.mapValues { it.value / unitsToMgdl }, ntHigher.second.mapValues { it.value / unitsToMgdl }
+                )
+                notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_notice_nt), level = NotificationLevel.INFO)
             }
 
             else                        -> note(rh.gs(R.string.learner_why_no_change), now, NOTE_SHORT_MS)
@@ -402,7 +439,10 @@ class LearnerPlugin(
         val until = if (hint.kind == SensorHintKind.FIRST_HOURS) hint.changeAt + SensorHintEngine.FIRST_HOURS_MS else hint.at + SensorHintEngine.JUMP_SHOW_MS
         if (until <= now) return
         loopNotes.put(LoopNote(SENSOR_NOTE_SOURCE, text, if (hint.kind == SensorHintKind.JUMP) hint.at else hint.changeAt, until))
-        if (_status.value.sensorHint != hint) aapsLogger.debug(LTag.APS, "Learner: sensor hint $hint")
+        if (_status.value.sensorHint != hint) {
+            aapsLogger.debug(LTag.APS, "Learner: sensor hint $hint")
+            toNightscout(text)
+        }
         _status.value = _status.value.copy(sensorHint = hint)
     }
 
@@ -420,7 +460,10 @@ class LearnerPlugin(
         } else {
             // Valid a bit longer than one tick: the next tick puts it again or removes it.
             loopNotes.put(LoopNote(CANNULA_NOTE_SOURCE, rh.gs(R.string.learner_why_cannula, hint.ageH, hint.highPct), now, now + 2 * TICK_MS))
-            if (_status.value.cannulaHint == null) aapsLogger.debug(LTag.APS, "Learner: cannula hint $hint")
+            if (_status.value.cannulaHint == null) {
+                aapsLogger.debug(LTag.APS, "Learner: cannula hint $hint")
+                toNightscout(rh.gs(R.string.learner_why_cannula, hint.ageH, hint.highPct))
+            }
         }
         _status.value = _status.value.copy(cannulaHint = hint)
     }
@@ -536,8 +579,51 @@ class LearnerPlugin(
             val text = rh.gs(R.string.learner_why_curve, before.label, before.peakMin, before.diaH, now.label, now.peakMin, now.diaH)
             note(text, t, NOTE_LONG_MS, CURVE_NOTE_SOURCE)
             notificationManager.post(NotificationId.AUTOMATION_MESSAGE, text, level = NotificationLevel.URGENT)
+            toNightscout(text)
             aapsLogger.debug(LTag.APS, "Learner: insulin curve changed $before -> $now")
         }
+        refresh()
+    }
+
+    /** The profile percentage watch (advisor, off by default, `PctWatchEngine`): a notice only, it changes nothing. */
+    private suspend fun checkPct() {
+        if (!store.pctWatchOn) return
+        val now = dateUtil.now()
+        val (current, previous) = history.pctRuns(now)
+        current ?: return
+        val iob = iobCobCalculator.calculateIobFromBolus().iob + iobCobCalculator.calculateIobFromTempBasalsIncludingConvertedExtended().basaliob
+        val hint = PctWatchEngine.check(now, current, previous, iob) ?: return
+        if (store.lastPctHint?.second?.key == hint.key) return
+        store.lastPctHint = now to hint
+        val text = when (hint.kind) {
+            PctHintKind.HIGH_LONG     -> rh.gs(R.string.learner_why_pct_high, hint.percent, hint.hours)
+            PctHintKind.DROP_WITH_IOB -> rh.gs(R.string.learner_why_pct_drop, hint.percent, hint.hours, hint.iobU)
+        }
+        note(text, now, NOTE_SHORT_MS, PCT_WATCH_NOTE_SOURCE)
+        notificationManager.post(NotificationId.AUTOMATION_MESSAGE, text, level = NotificationLevel.NORMAL)
+        toNightscout(text)
+        aapsLogger.debug(LTag.APS, "Learner: percentage hint $hint")
+        refresh()
+    }
+
+    /** Copies an important hint to Nightscout as an announcement, when the user's switch is on. Never more than text. */
+    private suspend fun toNightscout(text: String) {
+        if (!store.nsHintsOn) return
+        val now = dateUtil.now()
+        // The same text again within 6 h (a restart of the app, a hint put on every tick) is not sent twice.
+        store.lastNsHint?.let { (at, last) -> if (last == text && now - at < 6 * HOUR_MS) return }
+        store.lastNsHint = now to text
+        runCatching { history.announce(text, now) }.onFailure { aapsLogger.error(LTag.APS, "Learner: hint to Nightscout failed", it) }
+    }
+
+    fun setNsHints(on: Boolean) {
+        store.nsHintsOn = on
+        refresh()
+    }
+
+    fun setPctWatch(on: Boolean) {
+        store.pctWatchOn = on
+        if (!on) loopNotes.clear(PCT_WATCH_NOTE_SOURCE)
         refresh()
     }
 
@@ -605,6 +691,7 @@ class LearnerPlugin(
             val grams = store.hypoSize?.let { HypoSizeEngine.suggest(it, LowPredictEngine.LOW_MGDL) }
             val text = if (grams != null) rh.gs(R.string.learner_pred_warn_g, grams) else rh.gs(R.string.learner_pred_warn)
             notificationManager.post(NotificationId.AUTOMATION_MESSAGE, text, level = NotificationLevel.IMPORTANT)
+            toNightscout(text)
             note(text, now, LowPredictEngine.GAP_MS, PRED_NOTE_SOURCE)
             aapsLogger.debug(LTag.APS, "Learner: low forecast, bg=$bg delta15=$delta15 margin=${store.lowPredMargin}")
         }
@@ -870,7 +957,10 @@ class LearnerPlugin(
             is SplitOutcome.Given    -> {
                 loopNotes.clear(SPLIT_NOTE_SOURCE)
                 if (o.success) note(rh.gs(R.string.learner_why_split_given, o.units), now, NOTE_SHORT_MS)
-                else notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_failed, o.comment), level = NotificationLevel.URGENT)
+                else {
+                    notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_failed, o.comment), level = NotificationLevel.URGENT)
+                    toNightscout(rh.gs(R.string.learner_split_failed, o.comment))
+                }
                 aapsLogger.debug(LTag.APS, "Learner: split rest ${o.units} U, success=${o.success}")
                 refresh(if (o.success) rh.gs(R.string.learner_split_rest_given, o.units) else rh.gs(R.string.learner_split_failed, o.comment))
             }
@@ -883,6 +973,7 @@ class LearnerPlugin(
             SplitOutcome.Dropped     -> {
                 loopNotes.clear(SPLIT_NOTE_SOURCE)
                 notificationManager.post(NotificationId.AUTOMATION_MESSAGE, rh.gs(R.string.learner_split_dropped), level = NotificationLevel.NORMAL)
+                toNightscout(rh.gs(R.string.learner_split_dropped))
                 refresh(rh.gs(R.string.learner_split_dropped))
             }
 
@@ -953,6 +1044,74 @@ class LearnerPlugin(
         aapsLogger.debug(LTag.APS, "Learner: CR of ${p.block} ${p.from} -> ${p.to}, switch=${switch != null}")
         finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
     }
+
+    fun setNtOn(on: Boolean) {
+        store.ntOn = on
+        if (!on) store.ntProposal = null
+        refresh()
+    }
+
+    /** "Внести" on the night target card: the night hours of the profile target go up (same profile, edited in place). */
+    fun acceptNt() {
+        if (!applying.compareAndSet(false, true)) return
+        setBusy(true)
+        scope.launch {
+            try {
+                applyNt()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                aapsLogger.error(LTag.APS, "Learner: applying the night target failed", e)
+                finish(rh.gs(R.string.learner_profile_invalid, e.message.orEmpty()))
+            } finally {
+                applying.set(false)
+            }
+        }
+    }
+
+    private suspend fun applyNt() {
+        val p = store.ntProposal ?: return finish("")
+        val running = profileFunction.getRequestedProfile()
+        if (running != null && running.duration > 0L) return finish(rh.gs(R.string.learner_wait_temporary))
+        val index = profileRepository.profiles.value.indexOfFirst { it.name == p.profileName }
+        val single = profileRepository.profiles.value.getOrNull(index) ?: return finish(rh.gs(R.string.learner_profile_gone))
+        val lowNow = hourlyTarget(single.target, low = true)
+        if (p.fromLow.any { (h, v) -> abs(lowNow[h] - v) > 0.005 }) {
+            store.ntProposal = null
+            return finish(rh.gs(R.string.learner_profile_changed))
+        }
+        val edited = single.copy(target = withTargetHours(single.target, p.toLow, p.toHigh))
+        val percentage = running?.percentage ?: 100
+        val errors = profileRepository.validateStructured(edited) + profileRepository.validatePumpCompatibility(edited, percentage)
+        if (errors.isNotEmpty()) return finish(rh.gs(R.string.learner_profile_invalid, errors.joinToString { it.toString() }))
+        val saved = profileRepository.replace(index, edited)
+        if (saved.isFailure) return finish(rh.gs(R.string.learner_profile_invalid, saved.exceptionOrNull()?.message.orEmpty()))
+        val now = dateUtil.now()
+        val profileStore = profileRepository.profile.value
+        val iCfg = running?.iCfg ?: profileFunction.getProfile()?.iCfg
+        val switch = if (profileStore != null && iCfg != null) profileFunction.createProfileSwitch(
+            profileStore = profileStore, profileName = p.profileName, durationInMinutes = 0, percentage = percentage,
+            timeShiftInHours = ((running?.timeshift ?: 0L) / HOUR_MS).toInt(), timestamp = now,
+            action = Action.PROFILE_SWITCH, source = Sources.Aaps, note = rh.gs(R.string.learner_switch_note_nt),
+            listValues = emptyList(), iCfg = iCfg
+        ) else null
+        store.ntProposal = null
+        store.lastAppliedAt = now
+        startEval(rh.gs(R.string.learner_eval_label_nt), now, KIND_NT)
+        note(rh.gs(R.string.learner_why_nt_applied), now, NOTE_LONG_MS)
+        aapsLogger.debug(LTag.APS, "Learner: night target ${p.fromLow} -> ${p.toLow}, switch=${switch != null}")
+        finish(rh.gs(if (switch != null) R.string.learner_applied else R.string.learner_saved_no_switch))
+    }
+
+    fun refuseNt() {
+        store.ntProposal = null
+        loopNotes.clear(NOTE_SOURCE)
+        refresh(rh.gs(R.string.learner_refused))
+    }
+
+    /** The target per hour (24 values, profile units): the low or the high end. */
+    private fun hourlyTarget(blocks: List<TargetBlock>, low: Boolean): DoubleArray =
+        hourly(blocks.map { Block(it.duration, if (low) it.lowTarget else it.highTarget) })
 
     fun refuseCr() {
         store.crProposal = null
@@ -1028,6 +1187,13 @@ class LearnerPlugin(
             lowPredOn = store.lowPredOn,
             lowPredMargin = store.lowPredMargin,
             lowPredStats = store.lowWarnings.let { w -> Pair(w.count { it.trueLow == true }, w.count { it.trueLow == false }) },
+            pctWatchOn = store.pctWatchOn,
+            nsHintsOn = store.nsHintsOn,
+            ntOn = store.ntOn,
+            lastNt = store.lastNt,
+            ntProposal = store.ntProposal,
+            ntUnitsToMgdl = store.ntProposal?.let { p -> profileRepository.profiles.value.firstOrNull { it.name == p.profileName } }?.let { if (it.mgdl) 1.0 else MGDL_PER_MMOL } ?: 1.0,
+            pctHint = store.lastPctHint,
             curveWatch = store.curveWatch,
             curve = store.lastCurve,
             curveChange = store.curveChange,
@@ -1096,10 +1262,12 @@ class LearnerPlugin(
         const val PRED_NOTE_SOURCE = "learner_pred"
         const val PRED_TICK_MS = 5 * 60_000L
         const val CURVE_NOTE_SOURCE = "learner_curve"
+        const val PCT_WATCH_NOTE_SOURCE = "learner_pct_watch"
         const val KIND_BASAL = "basal"
         const val KIND_DURA = "dura:"
         const val KIND_PCT = "pct:"
         const val KIND_CR = "cr:"
+        const val KIND_NT = "nt"
         const val SENSOR_NOTE_SOURCE = "learner_sensor"
         const val CANNULA_NOTE_SOURCE = "learner_cannula"
         const val LOW_MEAL_NOTE_SOURCE = "learner_low_meal"

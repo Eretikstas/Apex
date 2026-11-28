@@ -49,6 +49,10 @@ import app.aaps.plugins.learner.WeekStats
 import app.aaps.plugins.learner.WeeklyDigest
 import app.aaps.plugins.learner.MealType
 import app.aaps.plugins.learner.SplitPlan
+import app.aaps.plugins.learner.PctHint
+import app.aaps.plugins.learner.NightTargetEngine
+import app.aaps.plugins.learner.NightTargetProposal
+import app.aaps.plugins.learner.PctHintKind
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
 import app.aaps.plugins.learner.LearnerPlugin.Status
@@ -211,6 +215,24 @@ class LearnerScreenshotTest {
         "learner_split_waiting",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
             splitOn = true, splitPlan = SplitPlan(NOW - 30 * 60_000L, MealType.NORMAL, 1.2, 0.7, 30.0))
+    )
+
+    @Test
+    fun pctWatch() = shoot(
+        "learner_pct_watch",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            pctWatchOn = true, pctHint = (NOW - 20 * 60_000L) to PctHint(PctHintKind.DROP_WITH_IOB, 150, 7.8, 1.4, "drop@0"))
+    )
+
+    @Test
+    fun nightTargetAndNsHints() = shoot(
+        "learner_night_target",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            nsHintsOn = true, ntOn = true, lastNt = 7 to 13, ntUnitsToMgdl = 18.0,
+            ntProposal = NightTargetProposal(
+                "TestProfile", NOW - HOUR, 7, 13,
+                NightTargetEngine.HOURS.associateWith { 6.0 }, NightTargetEngine.HOURS.associateWith { 7.0 }, NightTargetEngine.HOURS.associateWith { 7.0 }
+            ))
     )
 
     private fun shoot(name: String, status: Status) {

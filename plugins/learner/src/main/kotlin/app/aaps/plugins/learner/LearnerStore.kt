@@ -366,10 +366,76 @@ class LearnerStore(private val preferences: Preferences) {
             else put(KEY_SPLIT, JSONObject().put("at", value.madeAt).put("type", value.type.name).put("total", value.totalU).put("first", value.firstU).put("carbs", value.carbsG))
         }
 
+    /** The night target card is on (the user's switch). Off by default. */
+    var ntOn: Boolean
+        get() = read().optBoolean(KEY_NT_ON, false)
+        set(value) = edit { put(KEY_NT_ON, value) }
+
+    /** What the night target card saw last time: (nights with a low, nights). */
+    var lastNt: Pair<Int, Int>?
+        get() = read().optJSONObject(KEY_NT_LAST)?.let { o -> runCatching { o.getInt("low") to o.getInt("n") }.getOrNull() }
+        set(value) = edit { if (value == null) remove(KEY_NT_LAST) else put(KEY_NT_LAST, JSONObject().put("low", value.first).put("n", value.second)) }
+
+    /** A night target proposal waiting for the user. */
+    var ntProposal: NightTargetProposal?
+        get() = read().optJSONObject(KEY_NT)?.let { o ->
+            runCatching {
+                fun map(key: String): Map<Int, Double> = o.getJSONObject(key).let { m -> m.keys().asSequence().associate { it.toInt() to m.getDouble(it) } }
+                NightTargetProposal(o.getString("profile"), o.getLong("madeAt"), o.getInt("low"), o.getInt("n"), map("fromLow"), map("toLow"), map("toHigh"))
+            }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_NT)
+            else {
+                fun obj(m: Map<Int, Double>) = JSONObject().also { j -> m.forEach { (h, v) -> j.put(h.toString(), v) } }
+                put(
+                    KEY_NT, JSONObject().put("profile", value.profileName).put("madeAt", value.madeAt).put("low", value.lowNights).put("n", value.nights)
+                        .put("fromLow", obj(value.fromLow)).put("toLow", obj(value.toLow)).put("toHigh", obj(value.toHigh))
+                )
+            }
+        }
+
+    /** Important hints are copied to Nightscout as announcements (the user's switch). Off by default. */
+    var nsHintsOn: Boolean
+        get() = read().optBoolean(KEY_NS_HINTS, false)
+        set(value) = edit { put(KEY_NS_HINTS, value) }
+
+    /** The last hint copied to Nightscout (when, the text): the same text is not sent again within 6 hours. */
+    var lastNsHint: Pair<Long, String>?
+        get() = read().optJSONObject(KEY_NS_LAST)?.let { o -> runCatching { o.getLong("at") to o.getString("text") }.getOrNull() }
+        set(value) = edit { if (value == null) remove(KEY_NS_LAST) else put(KEY_NS_LAST, JSONObject().put("at", value.first).put("text", value.second)) }
+
+    /** The profile percentage watch is on (the user's switch). Off by default. */
+    var pctWatchOn: Boolean
+        get() = read().optBoolean(KEY_PCT_WATCH_ON, false)
+        set(value) = edit { put(KEY_PCT_WATCH_ON, value) }
+
+    /** The last percentage hint given (when, the hint); its key stops the same hint twice. */
+    var lastPctHint: Pair<Long, PctHint>?
+        get() = read().optJSONObject(KEY_PCT_HINT)?.let { o ->
+            runCatching {
+                o.getLong("at") to PctHint(PctHintKind.valueOf(o.getString("kind")), o.getInt("pct"), o.getDouble("hours"), o.getDouble("iob"), o.getString("key"))
+            }.getOrNull()
+        }
+        set(value) = edit {
+            if (value == null) remove(KEY_PCT_HINT)
+            else put(
+                KEY_PCT_HINT, JSONObject().put("at", value.first).put("kind", value.second.kind.name).put("pct", value.second.percent)
+                    .put("hours", value.second.hours).put("iob", value.second.iobU).put("key", value.second.key)
+            )
+        }
+
     private companion object {
 
         const val KEY_REBOUND_ON = "rebound_on"
         const val KEY_SPLIT_ON = "split_on"
+        const val KEY_PCT_WATCH_ON = "pct_watch_on"
+        const val KEY_NS_HINTS = "ns_hints_on"
+        const val KEY_NT_ON = "nt_on"
+        const val KEY_NT_LAST = "nt_last"
+        const val KEY_NT = "nt_proposal"
+        const val KEY_NS_LAST = "ns_hint_last"
+        const val KEY_PCT_HINT = "pct_hint_last"
         const val KEY_SPLIT = "split_plan"
         const val KEY_CR = "cr_proposal"
         const val KEY_PEAK_ON = "peak_fit_on"

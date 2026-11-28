@@ -2,6 +2,9 @@ package app.aaps.plugins.learner
 
 import app.aaps.core.data.model.BS
 import app.aaps.core.data.model.TE
+import app.aaps.core.data.ue.Action
+import app.aaps.core.data.ue.Sources
+import app.aaps.core.objects.extensions.asAnnouncement
 import app.aaps.core.interfaces.db.PersistenceLayer
 import app.aaps.core.interfaces.iob.IobCobCalculator
 import app.aaps.core.interfaces.profile.ProfileFunction
@@ -158,6 +161,29 @@ class LearnerHistory(
             values.lastOrNull { n.first - it.first in 840_000L..1_080_000L }?.let { old -> (n.second - old.second) / ((n.first - old.first) / 300_000.0) }
         }
         return Triple(carbs, newest?.second, delta)
+    }
+
+    /** The profile percentage running at [now] and the one before it, each with its start (nulls when not known). */
+    suspend fun pctRuns(now: Long): Pair<PctRun?, PctRun?> {
+        val current = persistenceLayer.getEffectiveProfileSwitchActiveAt(now) ?: return Pair(null, null)
+        val previous = persistenceLayer.getEffectiveProfileSwitchesFromTimeToTime(current.timestamp - 2 * 86_400_000L, current.timestamp - 1, false)
+            .firstOrNull()
+        return Pair(PctRun(current.originalPercentage, current.timestamp), previous?.let { PctRun(it.originalPercentage, it.timestamp) })
+    }
+
+    /**
+     * Writes [text] as an announcement (a therapy event that AAPS uploads to Nightscout like any other), so the family
+     * sees the hint on the iPhone. Only text: no treatment, no insulin, no carbs.
+     */
+    suspend fun announce(text: String, now: Long) {
+        persistenceLayer.insertPumpTherapyEventIfNewByTimestamp(
+            therapyEvent = TE.asAnnouncement(text).also { it.timestamp = now },
+            timestamp = now,
+            action = Action.TREATMENT,
+            source = Sources.Announcement,
+            note = text,
+            listValues = listOf()
+        )
     }
 
     /** All boluses (meal, correction, SMS, SMB; no priming) given from [from] to [now], units. */

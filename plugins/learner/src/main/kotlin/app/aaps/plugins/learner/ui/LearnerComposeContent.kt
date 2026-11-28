@@ -18,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import app.aaps.plugins.learner.MealType
+import app.aaps.plugins.learner.PctHintKind
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.FilterChip
@@ -84,6 +85,11 @@ private fun LearnerScreen(plugin: LearnerPlugin) {
         onRefusePct = plugin::refusePct,
         onSpecialDay = plugin::setSpecialDay,
         onCurveWatch = plugin::setCurveWatch,
+        onPctWatch = plugin::setPctWatch,
+        onNsHints = plugin::setNsHints,
+        onNtOn = plugin::setNtOn,
+        onAcceptNt = plugin::acceptNt,
+        onRefuseNt = plugin::refuseNt,
         onPeakFit = plugin::setPeakFitOn,
         onLowPred = plugin::setLowPredOn,
         onLowCauses = plugin::setLowCauses,
@@ -130,7 +136,12 @@ internal fun LearnerScreenContent(
     onSplitOn: (Boolean) -> Unit = {},
     onSplitPreview: (Double, MealType) -> Unit = { _, _ -> },
     onSplitStart: () -> Unit = {},
-    onSplitCancel: () -> Unit = {}
+    onSplitCancel: () -> Unit = {},
+    onPctWatch: (Boolean) -> Unit = {},
+    onNsHints: (Boolean) -> Unit = {},
+    onNtOn: (Boolean) -> Unit = {},
+    onAcceptNt: () -> Unit = {},
+    onRefuseNt: () -> Unit = {}
 ) {
     val dateUtil = LocalDateUtil.current
     var confirm by remember { mutableStateOf(false) }
@@ -150,7 +161,9 @@ internal fun LearnerScreenContent(
         if (status.message.isNotEmpty()) Text(status.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
 
         SpecialSection(status, onSpecialDay)
+        NsHintsSection(status, onNsHints)
         CurveSection(status, onCurveWatch)
+        PctWatchSection(status, onPctWatch)
         PeakFitSection(status, onPeakFit)
         LowPredSection(status, onLowPred)
         LowCauseSection(status, onLowCauses)
@@ -191,6 +204,7 @@ internal fun LearnerScreenContent(
         PctSection(status, onAcceptPct, onRefusePct)
         HypoSizeSection(status)
         CrSection(status, onAcceptCr, onRefuseCr, blockName)
+        NightTargetSection(status, onNtOn, onAcceptNt, onRefuseNt)
         DuraSection(status, onAcceptDura, onRefuseDura)
         SensorSection(status, onSensorHints)
         CannulaSection(status, onCannulaHints)
@@ -458,6 +472,45 @@ private fun CrSection(status: Status, onAccept: () -> Unit, onRefuse: () -> Unit
     }
 }
 
+/** The night target card: the switch (off by default), what it saw, a proposal (only a HIGHER night target). */
+@Composable
+private fun NightTargetSection(status: Status, onSwitch: (Boolean) -> Unit, onAccept: () -> Unit, onRefuse: () -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_nt_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.ntOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_nt_rule), style = MaterialTheme.typography.bodySmall)
+            if (status.ntOn) status.lastNt?.let { (low, n) -> Text(stringResource(R.string.learner_nt_seen, low, n), style = MaterialTheme.typography.bodyMedium) }
+            status.ntProposal?.let { p ->
+                val toMmol = status.ntUnitsToMgdl / 18.0
+                val from = (p.fromLow[21] ?: 0.0) * toMmol
+                val to = (p.toLow[21] ?: 0.0) * toMmol
+                val change = stringResource(R.string.learner_nt_change, from, to)
+                Text(change, fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(AapsSpacing.medium)) {
+                    Button(onClick = { confirm = true }, enabled = !status.busy) { Text(stringResource(R.string.learner_accept)) }
+                    OutlinedButton(onClick = onRefuse, enabled = !status.busy) { Text(stringResource(R.string.learner_refuse)) }
+                }
+                if (confirm) AlertDialog(
+                    onDismissRequest = { confirm = false },
+                    title = { Text(stringResource(R.string.learner_nt_title)) },
+                    text = { Text(change, fontWeight = FontWeight.SemiBold) },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            confirm = false
+                            onAccept()
+                        }) { Text(stringResource(R.string.learner_accept)) }
+                    },
+                    dismissButton = { TextButton(onClick = { confirm = false }) { Text(stringResource(R.string.learner_cancel)) } }
+                )
+            }
+        }
+    }
+}
+
 /** The low meal hint: the switch (off by default) and its rule. Only text, nothing is changed. */
 @Composable
 private fun LowMealSection(status: Status, onSwitch: (Boolean) -> Unit) {
@@ -523,6 +576,42 @@ private fun CurveSection(status: Status, onSwitch: (Boolean) -> Unit) {
                     stringResource(R.string.learner_curve_changed, dateUtil.dateAndTimeString(at), before.label, before.peakMin, before.diaH),
                     color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold
                 )
+            }
+        }
+    }
+}
+
+/** Hints to Nightscout: the switch (off by default). Only text goes there. */
+@Composable
+private fun NsHintsSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_ns_hints_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.nsHintsOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_ns_hints_rule), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** The profile percentage watch: the switch (off by default) and the last hint. Only text. */
+@Composable
+private fun PctWatchSection(status: Status, onSwitch: (Boolean) -> Unit) {
+    val dateUtil = LocalDateUtil.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(AapsSpacing.large), verticalArrangement = Arrangement.spacedBy(AapsSpacing.small)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(R.string.learner_pct_watch_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(checked = status.pctWatchOn, onCheckedChange = onSwitch)
+            }
+            Text(stringResource(R.string.learner_pct_watch_rule), style = MaterialTheme.typography.bodySmall)
+            if (status.pctWatchOn) status.pctHint?.let { (at, h) ->
+                val text = when (h.kind) {
+                    PctHintKind.HIGH_LONG     -> stringResource(R.string.learner_why_pct_high, h.percent, h.hours)
+                    PctHintKind.DROP_WITH_IOB -> stringResource(R.string.learner_why_pct_drop, h.percent, h.hours, h.iobU)
+                }
+                Text(stringResource(R.string.learner_pct_watch_last, dateUtil.dateAndTimeString(at), text), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
