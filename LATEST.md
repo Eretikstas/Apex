@@ -1,31 +1,26 @@
-# App CI run 46069733737
+# App CI run 46071491058
 
-- Link: https://github.com/Eretikstas/Apex/actions/runs/46069733737
-- Branch `learner-all`, commit `d2f95c4a`, event `workflow_dispatch`, started 2026-11-27T21:21:10Z
-- Result: **FAILURE: driver, emulator**
+- Link: https://github.com/Eretikstas/Apex/actions/runs/46071491058
+- Branch `learner-all`, commit `87cfc44e`, event `workflow_dispatch`, started 2026-11-27T21:37:16Z
+- Result: **FAILURE: driver**
 
 ## Job `driver`: failure
-- Failed steps: Native Sibionics source tests (and the new SourceSensor entry), Ring overview tests (and the preference key list), Build the app, Bench APK (own package info.nightscout.androidaps.bench, installs next to AAPS)
+- Failed steps: Native Sibionics source tests (and the new SourceSensor entry)
 
 ```text
-> Task :plugins:learner:compileDebugKotlin FAILED
+> Task :plugins:learner:compileDebugUnitTestKotlin FAILED
 * What went wrong:
-BUILD FAILED in 9s
-> Task :plugins:learner:compileReleaseKotlin FAILED
-BUILD FAILED in 1m 32s
 BUILD FAILED in 11s
-BUILD FAILED in 12s
 ```
 
-## Job `emulator`: failure
-- Failed steps: Build the app and the test app
+## Job `emulator`: success
 
 ```text
-> Task :plugins:learner:compileReleaseKotlin FAILED
-* What went wrong:
-BUILD FAILED in 5m 8s
+app.aaps.e2e.VirtualBenchTest,app.aaps.e2e.ApexScenarioTest: OK (22 tests)
 ```
 
 ## Artifacts (download from the run page)
-- `autoisf-atc3-test-reports` (830 KB)
+- `autoisf-atc3-emulator` (1495 KB)
+- `autoisf-atc3-bench-apk` (135511 KB)
+- `autoisf-atc3-test-reports` (838 KB)
 - `autoisf-atc3-ring-shots` (1340 KB)
