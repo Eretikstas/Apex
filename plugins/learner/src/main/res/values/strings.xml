@@ -56,4 +56,14 @@
     <string name="learner_pct_applied">Applied: the profile runs with the new percentage.</string>
     <string name="learner_pct_changed">The percentage was changed after the check. The proposal is dropped.</string>
     <string name="learner_switch_note_pct">Learner: profile percentage</string>
+    <string name="learner_guard_title">Rebound guard</string>
+    <string name="learner_guard_rule" formatted="false">Off by default. After a hypo treatment (12 g or less at glucose under 4.5) for 3 hours: no SMB and the temp basal not above the profile basal. Lets go at once when a meal is logged, at glucose 13.9 or more, or early when insulin is really needed: a strong rise over 9, a rise far above what the treatment explains, or a flat high over 10 after 45 minutes. It only takes insulin away: it never gives more, never blocks your bolus. Manual temp basals in these 3 hours are capped too.</string>
+    <string name="learner_guard_holds" comment="%1$s=time the guard ends">Holds now: no SMB, temp basal capped, until %1$s.</string>
+    <string name="learner_guard_idle">Not holding now.</string>
+    <string name="learner_guard_confirm">The guard changes what the loop does after a hypo treatment: up to 3 hours without SMB and without high temp basals. On a test phone and the bench first. Turn it on?</string>
+    <string name="learner_guard_turn_on">Turn on</string>
+    <string name="learner_guard_smb_reason">Learner: rebound guard after a hypo treatment, no SMB</string>
+    <string name="learner_guard_basal_reason" comment="%1$.2f=highest temp basal in U/h">Learner: rebound guard, temp basal at most %1$.2f U/h</string>
+    <string name="learner_guard_percent_reason" comment="%1$d=highest temp basal in percent">Learner: rebound guard, temp basal at most %1$d %%</string>
+    <string name="learner_why_guard" comment="%1$s=time the guard ends">Learner: after the hypo treatment no SMB and a lower temp basal until %1$s (rebound guard).</string>
 </resources>

@@ -56,4 +56,14 @@
     <string name="learner_pct_applied">Внесено: профиль работает с новым процентом.</string>
     <string name="learner_pct_changed">Процент меняли после проверки. Предложение снято.</string>
     <string name="learner_switch_note_pct">Ученик: процент профиля</string>
+    <string name="learner_guard_title">Защита от отскока</string>
+    <string name="learner_guard_rule" formatted="false">По умолчанию выключена. После лечения гипо (12 г и меньше при глюкозе ниже 4,5) на 3 часа: без SMB, временный базал не выше базала профиля. Отпускает сразу, если записана еда, при глюкозе 13,9 и выше, и раньше, когда инсулин правда нужен: сильный подъём выше 9, подъём намного выше, чем объясняет лечение, или ровно выше 10 дольше 45 минут. Только убирает инсулин: больше не даёт, ваш болюс не блокирует. Ручной временный базал в эти 3 часа тоже ограничен.</string>
+    <string name="learner_guard_holds">Держит сейчас: без SMB, временный базал ограничен, до %1$s.</string>
+    <string name="learner_guard_idle">Сейчас не держит.</string>
+    <string name="learner_guard_confirm">Защита меняет работу петли после лечения гипо: до 3 часов без SMB и без повышенного временного базала. Сначала тестовый телефон и стенд. Включить?</string>
+    <string name="learner_guard_turn_on">Включить</string>
+    <string name="learner_guard_smb_reason">Ученик: защита от отскока после лечения гипо, без SMB</string>
+    <string name="learner_guard_basal_reason">Ученик: защита от отскока, временный базал не выше %1$.2f ед/ч</string>
+    <string name="learner_guard_percent_reason">Ученик: защита от отскока, временный базал не выше %1$d %%</string>
+    <string name="learner_why_guard">Ученик: после лечения гипо без SMB и с меньшим временным базалом до %1$s (защита от отскока).</string>
 </resources>

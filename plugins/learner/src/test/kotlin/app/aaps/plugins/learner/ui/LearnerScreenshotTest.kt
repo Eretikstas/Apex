@@ -31,6 +31,7 @@ import app.aaps.core.ui.compose.LocalProfileUtil
 import app.aaps.plugins.learner.BasalChange
 import app.aaps.plugins.learner.BasalProposal
 import app.aaps.plugins.learner.DuraProposal
+import app.aaps.plugins.learner.GuardState
 import app.aaps.plugins.learner.PctProposal
 import app.aaps.plugins.learner.HourResult
 import app.aaps.plugins.learner.HourSource
@@ -114,6 +115,13 @@ class LearnerScreenshotTest {
     fun duraProposal() = shoot(
         "learner_dura_proposal",
         Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, DuraProposal(0.5, 0.75, NOW - 2 * HOUR, 3.4, 1.9), Pair(3.4, 1.9), 0.5, hours)
+    )
+
+    @Test
+    fun reboundGuard() = shoot(
+        "learner_rebound_guard",
+        Status(NOW - 2 * HOUR, NOW + 4 * DAY - 2 * HOUR, null, null, Pair(1.2, 2.1), 0.5, hours,
+            reboundOn = true, guard = GuardState(true, NOW - 20 * 60_000L, NOW + 100 * 60_000L))
     )
 
     private fun shoot(name: String, status: Status) {
