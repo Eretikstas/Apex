@@ -17,7 +17,7 @@ interface SplitPort {
     val enabled: Boolean
 
     /** Null when a bolus may be given now, else why not (loop suspended, pump disconnected...). */
-    fun bolusRejection(): String?
+    suspend fun bolusRejection(): String?
 
     /** The smoothed glucose of now and its change over the last 15 minutes, mg/dL (nulls when not known). */
     suspend fun glucose(now: Long): Pair<Double?, Double?>

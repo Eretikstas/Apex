@@ -880,7 +880,7 @@ class LearnerPlugin(
                 store.splitPlan = value
             }
         override val enabled: Boolean get() = store.splitOn
-        override fun bolusRejection(): String? = runningModeGuard.rejectionMessage(PumpCommandGate.CommandKind.BOLUS)
+        override suspend fun bolusRejection(): String? = runningModeGuard.rejectionMessage(PumpCommandGate.CommandKind.BOLUS)
         override suspend fun glucose(now: Long): Pair<Double?, Double?> = history.smoothedNow(now)
         override suspend fun bolusesSince(from: Long, now: Long): Double = history.bolusesSince(from, now)
         override suspend fun bolus(units: Double, carbs: Double, first: Boolean, now: Long): Pair<Boolean, String> {

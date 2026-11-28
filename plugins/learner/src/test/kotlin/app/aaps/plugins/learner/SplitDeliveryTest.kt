@@ -34,7 +34,7 @@ class SplitDeliveryTest {
         var onGlucose: () -> Unit = {}
         var sendDelayMs = 0L
 
-        override fun bolusRejection(): String? = rejection
+        override suspend fun bolusRejection(): String? = rejection
         override suspend fun glucose(now: Long): Pair<Double?, Double?> {
             onGlucose()
             return Pair(bg, delta15)
