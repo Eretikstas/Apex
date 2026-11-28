@@ -1,7 +1,7 @@
-# App CI run 46071491058
+# App CI run 46086850472
 
-- Link: https://github.com/Eretikstas/Apex/actions/runs/46071491058
-- Branch `learner-all`, commit `87cfc44e`, event `workflow_dispatch`, started 2026-11-27T21:37:16Z
+- Link: https://github.com/Eretikstas/Apex/actions/runs/46086850472
+- Branch `learner-all`, commit `2be2c6d3`, event `workflow_dispatch`, started 2026-11-28T00:14:52Z
 - Result: **FAILURE: driver**
 
 ## Job `driver`: failure
@@ -10,17 +10,12 @@
 ```text
 > Task :plugins:learner:compileDebugUnitTestKotlin FAILED
 * What went wrong:
-BUILD FAILED in 11s
+BUILD FAILED in 14s
 ```
 
-## Job `emulator`: success
-
-```text
-app.aaps.e2e.VirtualBenchTest,app.aaps.e2e.ApexScenarioTest: OK (22 tests)
-```
+## Job `emulator`: skipped
 
 ## Artifacts (download from the run page)
-- `autoisf-atc3-emulator` (1495 KB)
-- `autoisf-atc3-bench-apk` (135511 KB)
-- `autoisf-atc3-test-reports` (838 KB)
 - `autoisf-atc3-ring-shots` (1340 KB)
+- `autoisf-atc3-bench-apk` (135511 KB)
+- `autoisf-atc3-test-reports` (839 KB)
