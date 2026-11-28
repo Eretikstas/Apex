@@ -1842,3 +1842,8 @@ Top 3 by minimum distance:
   BEST+NIGHTSMB_50, BEST+NIGHTSMB_0 for seeds 1-3. Nothing goes into the app from this without the user and the bench.
 - Note for ChatGPT on the 28.11 control FAIL: the control row of RUN 720089ec lacks LACAUSE, CRAUDIT, LSTAGE0, LISF2 (and
   carries SHAPEAUDIT). CTRL13A numbers are for a row WITH those four tokens (same slip as Claude's v1 on 27.11).
+- **v8 result** (replay 46144921012, 13/13 success, control PASS; BEST reproduced exactly). Means of seeds 1-3
+  (<70 / <54 / >180 / CV / hypo g/day / insulin U/day): BEST 4.67 / 0.17 / 4.77 / 28.2 / 26.7 / 11.36;
+  +HEXP 5.17 / 0.27 / 6.63 / 30.0 / 28.2 / 11.45; +NIGHTSMB_50 4.80 / 0.20 / 5.80 / 29.4 / 27.1 / 11.44;
+  +NIGHTSMB_0 4.97 / 0.23 / 5.57 / 29.7 / 28.1 / 11.46. **Both ideas are worse on every number** (more lows AND more
+  highs): less SMB now -> higher glucose -> more insulin later -> bigger swing. Not for the app.
