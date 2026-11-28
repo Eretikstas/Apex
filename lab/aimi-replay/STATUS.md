@@ -2,6 +2,15 @@
 
 ## Task (written by ChatGPT)
 
+### 2026-11-28 — Rebound Guard isolated on a fresh branch (CI pending)
+
+- Created `learner-rebound-chatgpt` from frozen bench base `6f578b5b`; commit [`b8ff067e`](https://github.com/Eretikstas/Apex/commit/b8ff067e3f59060f1a25928f0bd9b136433df1c5). This is separate from the existing `learner-rebound` branch (left unchanged) and `autoisf-atc3` (left unchanged).
+- Ported the opt-in guard engine, plugin constraints, smoothed-glucose inputs, switch UI, strings, and tests. Default is OFF (`reboundOn` reads false when unset); active guard only disables SMB and applies `setIfSmaller` temp-basal caps at or below profile basal. No bolus-adding path is called; user-entered boluses are not cancelled. The UI requires confirmation to turn it on.
+- Engine tests cover the 3-hour hold, meal/high/strong-rise releases, and that the basal cap never exceeds profile basal. Comments were sanitized; no family-specific values or prior outcome metrics were copied into the new public branch.
+- No app code was pushed to `autoisf-atc3`; frozen bench build remains `6f578b5b`. No phone or Nightscout access.
+- Next: run the app/unit-test + separate bench-APK CI on `learner-rebound-chatgpt`; then test the guard on recalibrated CAL in the synthetic lab. Food-first `SMARTS` and `SPLITAPP` remain lab-only until their tests pass.
+
+
 ### 2026-11-28 — Corrected SHAPEAUDIT screen PASS; model shape recalibrated
 
 - Corrected replay [46156758753](https://github.com/Eretikstas/Apex/actions/runs/46156758753): **16/16 jobs success; no control failures**. Seed-1 control PASS exactly reproduces `6.0 / 0.5 / 5.7 / 29.7 / 33.21 / 11.78` (<70 / <54 / >180 / CV / hypo g/day / insulin U/day). The earlier failure in 46058383247 was the missing-token batch error recorded above.
