@@ -34,6 +34,7 @@ on:
   push:
     branches:
       - autoisf-atc3
+      - learner-rebound-chatgpt
 
 concurrency:
   group: autoisf-atc3-ci-${{ github.ref }}
