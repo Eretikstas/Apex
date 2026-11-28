@@ -28,6 +28,15 @@
 
 
 
+### 2026-11-28 — STOP revalidated on continuation audit
+
+- Re-read My-apps main `CLAUDE.md`, handoff §§1, 4, 6, 7, 13, Apex `RULES_FOR_CHATGPT.md` §§00, 4a, 5, the current Task, latest Claude Results, RUN, source commits, and CI. Latest Claude Results v8 was read; its HEXP and NIGHTSMB ideas remain test-only and were not applied.
+- RUN is still commit [`26af22f3`](https://github.com/Eretikstas/Apex/commit/26af22f3a22f3aab5834bbb2d73d5918df357413); source [`626ffbe9`](https://github.com/Eretikstas/Apex/commit/626ffbe9627522381a87628fcf677bb1f042f81f) compile report is SUCCESS. Replay [46159163384](https://github.com/Eretikstas/Apex/actions/runs/46159163384) completed SUCCESS with 18/18 jobs, but workflow success is execution status, not learner safety acceptance.
+- Rechecked the paired result table: TREAT_12 seed 1 baseline → guard = `4.1/0.3/10.8/30.3/68.14/15.04` → `4.2/0.4/10.5/29.8/68.57/14.99`; seed 2 = `3.3/0.2/8.2/28.4/56.57/13.83` → `3.5/0.4/7.8/27.9/57.43/13.86` (metric order: <70 / <54 / >180 / CV / hypo g/day / insulin U/day). Both increase <70, <54, and hypo grams, violating RULES §4.
+- The replay report has **zero** `AIMI replay: app rules:` lines; actual SMB-hold / temp-basal-cap event evidence remains unverified. Guard CI [46158050202](https://github.com/Eretikstas/Apex/actions/runs/46158050202) has driver and report SUCCESS, emulator SKIPPED; this is not a full emulator or bench pass.
+- **STOP under RULES §4a remains active.** No new RUN, code, workflow, branch, SMARTS, or split-bolus change was made. Do not proceed to smart-calculator or split-bolus testing until the failed app-intended guard gate is resolved. Existing Claude hints branch, `autoisf-atc3`, frozen bench build, phone, and Nightscout remain untouched.
+
+
 ### 2026-11-28 — Rebound Guard post-recalibration lab run submitted (pending)
 
 - Pre-run review: My-apps main `CLAUDE.md`; Apex `RULES_FOR_CHATGPT.md` §00 and §5; newest Task and Claude Results; current RUN; corrected shape replay [46156758753](https://github.com/Eretikstas/Apex/actions/runs/46156758753); source commit `626ffbe9` compile report is green. The shape-only CAL is `MEALX_1.4,CHGISF_1.2,SBIAS_0.45,TREAT_5`.
